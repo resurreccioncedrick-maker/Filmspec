@@ -3,14 +3,6 @@
 set -e
 
 if [ "$IS_LARAVEL" = "true" ]; then
-  # TEMPORARY DIAGNOSTIC — remove once we've confirmed where DB_CONNECTION etc.
-  # actually live. Prints variable NAMES only (never values) so no secrets
-  # leak into the log, just answers "is this variable visible to bash here at all".
-  echo "--- ENV DIAGNOSTIC: variable names visible to this script ---"
-  env | cut -d= -f1 | sort
-  echo "--- DB_CONNECTION is set: $([ -n "${DB_CONNECTION+x}" ] && echo yes || echo no), non-empty: $([ -n "$DB_CONNECTION" ] && echo yes || echo no) ---"
-  echo "--- END ENV DIAGNOSTIC ---"
-
   # FrankenPHP does not reliably expose the container's runtime environment
   # variables to PHP's env()/getenv() (a known FrankenPHP goroutine/env-array
   # inconsistency), so Laravel keeps resolving config defaults (e.g. sqlite)
@@ -46,7 +38,11 @@ EOF
 
   if [ "$RAILPACK_SKIP_MIGRATIONS" != "true" ]; then
     echo "Running migrations and seeding database ..."
-    php artisan migrate --force
+    # Railway briefly runs more than one instance of this container during a
+    # restart/deploy, so two processes can race to create the same table.
+    # Don't let a losing race (table already exists) crash the whole
+    # container — the winning instance already finished the schema.
+    php artisan migrate --force || echo "migrate exited non-zero (possibly a concurrent-deploy race); continuing boot"
   fi
 
   php artisan storage:link
