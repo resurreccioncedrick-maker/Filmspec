@@ -3,13 +3,37 @@
 set -e
 
 if [ "$IS_LARAVEL" = "true" ]; then
-  # Clear any config cache baked in at build time BEFORE migrating. Railpack's
-  # own build step runs `php artisan config:cache` without access to the
-  # runtime service variables (DB_HOST, DB_PASSWORD, etc.), so that cached
-  # file always resolves back to the default (sqlite) connection. The
-  # upstream start-container.sh runs migrate before optimize:clear, so it
-  # always migrates against the stale cached config — clearing it first here
-  # ensures migrate reads the real runtime environment instead.
+  # FrankenPHP does not reliably expose the container's runtime environment
+  # variables to PHP's env()/getenv() (a known FrankenPHP goroutine/env-array
+  # inconsistency), so Laravel keeps resolving config defaults (e.g. sqlite)
+  # even after clearing the config cache. Writing a real .env file from the
+  # container's actual environment lets Laravel's normal dotenv loading pick
+  # these values up reliably instead.
+  cat > /app/.env <<EOF
+APP_NAME="${APP_NAME}"
+APP_ENV=${APP_ENV}
+APP_KEY=${APP_KEY}
+APP_DEBUG=${APP_DEBUG}
+APP_URL=${APP_URL}
+DB_CONNECTION=${DB_CONNECTION}
+DB_HOST=${DB_HOST}
+DB_PORT=${DB_PORT}
+DB_DATABASE=${DB_DATABASE}
+DB_USERNAME=${DB_USERNAME}
+DB_PASSWORD=${DB_PASSWORD}
+SESSION_DRIVER=${SESSION_DRIVER}
+CACHE_STORE=${CACHE_STORE}
+QUEUE_CONNECTION=${QUEUE_CONNECTION}
+MAIL_MAILER=${MAIL_MAILER}
+MAIL_HOST=${MAIL_HOST}
+MAIL_PORT=${MAIL_PORT}
+MAIL_USERNAME=${MAIL_USERNAME}
+MAIL_PASSWORD="${MAIL_PASSWORD}"
+MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
+MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
+MAIL_FROM_NAME="${MAIL_FROM_NAME}"
+EOF
+
   php artisan config:clear
 
   if [ "$RAILPACK_SKIP_MIGRATIONS" != "true" ]; then
