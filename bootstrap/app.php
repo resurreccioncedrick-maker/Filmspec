@@ -17,6 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\EnsureRole::class,
             'can_access' => \App\Http\Middleware\EnsureCanAccess::class,
         ]);
+
+        // Railway's edge proxy terminates HTTPS and forwards plain HTTP
+        // internally; without this, Laravel thinks every request is HTTP,
+        // generating http:// form actions/redirects behind an https:// proxy.
+        $middleware->trustProxies(at: '*');
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('support-chat:prune')->daily();
