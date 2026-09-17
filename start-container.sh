@@ -3,6 +3,14 @@
 set -e
 
 if [ "$IS_LARAVEL" = "true" ]; then
+  # TEMPORARY DIAGNOSTIC — remove once we've confirmed where DB_CONNECTION etc.
+  # actually live. Prints variable NAMES only (never values) so no secrets
+  # leak into the log, just answers "is this variable visible to bash here at all".
+  echo "--- ENV DIAGNOSTIC: variable names visible to this script ---"
+  env | cut -d= -f1 | sort
+  echo "--- DB_CONNECTION is set: $([ -n "${DB_CONNECTION+x}" ] && echo yes || echo no), non-empty: $([ -n "$DB_CONNECTION" ] && echo yes || echo no) ---"
+  echo "--- END ENV DIAGNOSTIC ---"
+
   # FrankenPHP does not reliably expose the container's runtime environment
   # variables to PHP's env()/getenv() (a known FrankenPHP goroutine/env-array
   # inconsistency), so Laravel keeps resolving config defaults (e.g. sqlite)
