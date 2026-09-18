@@ -52,6 +52,13 @@ EOF
   php artisan optimize:clear
   php artisan optimize
 
+  # Railway/FrankenPHP has no system cron, and this container only ever runs the web
+  # server in the foreground — so withSchedule()'s registered jobs (support-chat:prune)
+  # were never actually being triggered by anything. schedule:work is Laravel's own
+  # foreground scheduler loop (checks every minute, runs whatever is due); backgrounded
+  # here so it runs alongside the web server for the life of the container.
+  php artisan schedule:work >> /dev/stdout 2>&1 &
+
   echo "Starting Laravel server ..."
 fi
 

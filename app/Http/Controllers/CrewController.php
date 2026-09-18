@@ -240,7 +240,12 @@ class CrewController extends Controller
         if ($action === 'remove_unavailability') {
             $unavailId = (int) $request->input('unavailability_id');
             if ($unavailId) {
+                $row = DB::table('crew_unavailability')->where('unavailability_id', $unavailId)->first();
                 DB::table('crew_unavailability')->where('unavailability_id', $unavailId)->delete();
+                if ($row) {
+                    $crewName = DB::table('crew_members')->where('crew_id', $row->crew_id)->selectRaw("CONCAT(first_name,' ',last_name) AS name")->value('name');
+                    ActivityLog::record($uid, 'delete', 'crew', "Removed unavailability block for $crewName: {$row->date_from} – {$row->date_to}", $row->crew_id);
+                }
 
                 return ['type' => 'success', 'text' => 'Unavailability block removed.'];
             }

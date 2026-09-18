@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Support\ImageUpload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -175,6 +176,7 @@ class AccessoriesController extends Controller
                 ImageUpload::deleteOld($row->image_path);
             }
             DB::table('accessories')->where('accessory_id', $aid)->delete();
+            ActivityLog::record($request->user()->user_id, 'delete', 'accessory', 'Deleted accessory: ' . ($row->accessory_name ?? "ID $aid"), $aid);
 
             return response()->json(['success' => true]);
         }

@@ -273,16 +273,35 @@ class SuperAdminController extends Controller
                 return ['type' => 'danger', 'text' => 'Restore not confirmed — type RESTORE exactly to proceed.'];
             }
 
-            $origName = $file->getClientOriginalName();
-            $result = DatabaseBackup::restore(file_get_contents($file->getRealPath()));
-
-            ActivityLog::record($actorId, 'restore', 'database', "Restored database from uploaded file: $origName");
-
-            if ($result['success']) {
-                return ['type' => 'success', 'text' => 'Database restored successfully from ' . e($origName) . '.'];
+            $sqlContent = file_get_contents($file->getRealPath());
+            // A real dump always CREATEs at least one table — a .sql-named file that's actually
+            // something else entirely (empty, plain text, HTML, a different tool's export)
+            // shouldn't be handed to the mysql CLI/mysqli at all.
+            if (! preg_match('/create\s+table/i', $sqlContent)) {
+                return ['type' => 'danger', 'text' => 'This file doesn\'t look like a database dump (no CREATE TABLE statement found). Restore cancelled.'];
             }
 
-            return ['type' => 'danger', 'text' => 'Restore failed: ' . e($result['error'] ?? 'Unknown error')];
+            // Automatic safety net: snapshot the CURRENT database before overwriting it, so a
+            // bad upload has a way back. Saved next to manual backups, not auto-deleted.
+            $origName = $file->getClientOriginalName();
+            $preRestoreName = 'pre_restore_' . now()->format('Y-m-d_His') . '.sql';
+            $preRestoreDir = storage_path('app/backups');
+            if (! is_dir($preRestoreDir)) {
+                mkdir($preRestoreDir, 0755, true);
+            }
+            file_put_contents($preRestoreDir . DIRECTORY_SEPARATOR . $preRestoreName, DatabaseBackup::dump());
+
+            $result = DatabaseBackup::restore($sqlContent);
+
+            if ($result['success']) {
+                ActivityLog::record($actorId, 'restore', 'database', "Restored database from uploaded file: $origName (pre-restore snapshot: $preRestoreName)");
+
+                return ['type' => 'success', 'text' => 'Database restored successfully from ' . e($origName) . '. A snapshot of the previous state was saved as <strong>' . e($preRestoreName) . '</strong> in storage/app/backups.'];
+            }
+
+            ActivityLog::record($actorId, 'restore', 'database', "FAILED restore attempt from uploaded file: $origName — " . ($result['error'] ?? 'unknown error'));
+
+            return ['type' => 'danger', 'text' => 'Restore failed: ' . e($result['error'] ?? 'Unknown error') . ' A pre-restore snapshot was saved as <strong>' . e($preRestoreName) . '</strong> in case anything changed.'];
         }
 
         return null;

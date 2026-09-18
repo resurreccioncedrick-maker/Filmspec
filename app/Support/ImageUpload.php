@@ -16,6 +16,15 @@ class ImageUpload
 {
     private const ALLOWED_MIMES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
 
+    // The stored extension comes from THIS map (keyed by the verified MIME type), never from
+    // the client-supplied original filename — a crafted upload whose bytes are a genuine image
+    // (so getMimeType() correctly reports e.g. image/gif) but named "shell.php" must never be
+    // saved with a .php extension onto the public disk.
+    private const EXT_BY_MIME = [
+        'image/jpeg' => 'jpg', 'image/jpg' => 'jpg', 'image/png' => 'png',
+        'image/webp' => 'webp', 'image/gif' => 'gif',
+    ];
+
     private const MAX_SIZE = 5 * 1024 * 1024;
 
     public static function handle(?UploadedFile $file, string $subDir): array
@@ -29,11 +38,12 @@ class ImageUpload
         if ($file->getSize() > self::MAX_SIZE) {
             return ['success' => false, 'path' => '', 'error' => 'File too large. Max 5MB.'];
         }
-        if (! in_array($file->getMimeType(), self::ALLOWED_MIMES, true)) {
+        $mime = $file->getMimeType();
+        if (! in_array($mime, self::ALLOWED_MIMES, true)) {
             return ['success' => false, 'path' => '', 'error' => 'Only JPG, PNG, WebP, GIF allowed.'];
         }
 
-        $ext = strtolower($file->getClientOriginalExtension());
+        $ext = self::EXT_BY_MIME[$mime];
         $filename = uniqid($subDir . '_', true) . '.' . $ext;
         $path = 'assets/uploads/' . $subDir . '/' . $filename;
 

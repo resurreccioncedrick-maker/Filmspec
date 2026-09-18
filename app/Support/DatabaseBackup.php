@@ -97,22 +97,27 @@ class DatabaseBackup
         $binary = self::findBinary('mysql', 'mysql_path');
 
         if ($binary) {
-            $tmpFile = storage_path('app/tmp/restore_' . uniqid() . '.sql');
-            if (! is_dir(dirname($tmpFile))) {
-                mkdir(dirname($tmpFile), 0755, true);
+            // Same safe array-argument Process::run() dump() already uses, with the SQL piped
+            // over stdin instead of a temp file on disk — no shell string interpolation means
+            // the password (or anything else in $conn) never needs manual escaping, unlike the
+            // shell_exec('... -p' . $password . ' ...') this replaced, which passed the password
+            // unescaped while every other argument here was.
+            $args = [$binary, '-h', $conn['host'], '-u', $conn['username']];
+            if ($conn['password'] !== '') {
+                $args[] = '-p' . $conn['password'];
             }
-            file_put_contents($tmpFile, $sqlContent);
+            $args[] = $conn['database'];
 
-            $cmd = '"' . $binary . '" -h ' . escapeshellarg($conn['host']) . ' -u ' . escapeshellarg($conn['username'])
-                . ($conn['password'] !== '' ? ' -p' . $conn['password'] : '')
-                . ' ' . escapeshellarg($conn['database'])
-                . ' < ' . escapeshellarg($tmpFile) . ' 2>&1';
-            $result = shell_exec($cmd);
-            @unlink($tmpFile);
-
-            if ($result === null || trim((string) $result) === '') {
+            $result = Process::timeout(300)->input($sqlContent)->run($args);
+            if ($result->successful()) {
                 return ['success' => true];
             }
+
+            // A real CLI failure (bad SQL, connection error) — surface it rather than silently
+            // falling through to re-running the whole file again via the mysqli fallback below,
+            // which the old "any stderr output at all" check used to do even for a harmless
+            // warning that still left the CLI restore fully applied.
+            return ['success' => false, 'error' => trim($result->errorOutput()) ?: trim($result->output()) ?: 'mysql CLI exited with an error.'];
         }
 
         // Fallback: PHP mysqli multi_query (PDO has no clean multi-statement execution).
