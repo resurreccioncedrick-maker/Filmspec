@@ -1489,7 +1489,7 @@ textarea.fi{resize:vertical;min-height:60px}
         <div class="uav">{{ strtoupper(substr($user->first_name ?? 'U', 0, 1)) }}</div>
         <span class="uname">{{ $user->first_name ?? '' }}</span>
       </div>
-      <a href="{{ route('logout') }}"><button class="nav-btn">Logout</button></a>
+      <form method="POST" action="{{ route('logout') }}" style="display:contents">@csrf<button type="submit" class="nav-btn">Logout</button></form>
     @else
       <a href="{{ route('login') }}"><button class="nav-btn">Sign In</button></a>
     @endif
@@ -2561,11 +2561,11 @@ function renderFaqList() {
   list.innerHTML = f.map(x=>`
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden">
       <button onclick="toggleFaq(${x.id})" style="width:100%;text-align:left;padding:16px 18px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:inherit">
-        <span style="font-weight:700;font-size:.9rem;color:var(--text)">${x.q}</span>
+        <span style="font-weight:700;font-size:.9rem;color:var(--text)">${escHtml(x.q)}</span>
         <svg id="faq-icon-${x.id}" class="faq-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="2.5" style="flex-shrink:0;transition:transform .2s"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <div id="faq-a-${x.id}" class="faq-answer" style="max-height:0;overflow:hidden;transition:max-height .25s ease">
-        <div style="padding:0 18px 16px;font-size:.85rem;color:var(--sub);line-height:1.65">${x.a}</div>
+        <div style="padding:0 18px 16px;font-size:.85rem;color:var(--sub);line-height:1.65">${escHtml(x.a)}</div>
       </div>
     </div>
   `).join('');
@@ -2587,8 +2587,8 @@ function renderGrid() {
     const isFav=favIds.includes(eq.id);
     const statusText = av ? 'Available' : (isBooked ? 'Booked' : 'In Use');
     const availClass = av ? 'av' : (isBooked ? 'busy' : 'inuse');
-    const catAb=(eq.cat||'').substring(0,2).toUpperCase();
-    const imgHtml=eq.img?`<img src="${ASSET_BASE}/${eq.img}" alt="">`:(`<span class="eq-cat-icon">${catAb}</span>`);
+    const catAb=escHtml((eq.cat||'').substring(0,2).toUpperCase());
+    const imgHtml=eq.img?`<img src="${ASSET_BASE}/${escAttr(eq.img)}" alt="">`:(`<span class="eq-cat-icon">${catAb}</span>`);
     const opHtml=eq.req_op?`<div class="eq-op">Operator req'd</div>`:'';
     const btnHtml=IS_LOGIN
       ?`<button class="req-btn${inList?' selected':''}" data-eid="${eq.id}" onclick="${inList?`removeByEqId(${eq.id})`:`toggleEquipment(${eq.id})`}" ${!av&&!inList?'disabled':''}>
@@ -2603,12 +2603,12 @@ function renderGrid() {
       <div class="eq-img" onclick="openEqDetail(${eq.id})" style="cursor:pointer" title="View details">
         ${imgHtml}
         ${favBtnHtml}
-        <span class="eq-cat-pill">${eq.cat}</span>
+        <span class="eq-cat-pill">${escHtml(eq.cat)}</span>
         <span class="avail-pill ${availClass}">${statusText}</span>
       </div>
       <div class="eq-body">
-        <div class="eq-name">${eq.name}</div>
-        <div class="eq-brand">${eq.brand}</div>
+        <div class="eq-name">${escHtml(eq.name)}</div>
+        <div class="eq-brand">${escHtml(eq.brand)}</div>
         <div class="eq-divider"></div>
         ${opHtml}
         <div class="eq-foot">

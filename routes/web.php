@@ -55,17 +55,17 @@ Route::get('/support-poll', [HomeController::class, 'supportPoll'])
 
 Route::controller(AuthController::class)->group(function () {
     Route::get('/login', 'showLogin')->name('login');
-    Route::post('/login', 'login')->name('login.store');
-    Route::post('/register', 'register')->name('register.store');
+    Route::post('/login', 'login')->middleware('throttle:10,1')->name('login.store');
+    Route::post('/register', 'register')->middleware('throttle:10,1')->name('register.store');
     Route::get('/verify-mfa', 'showVerifyMfa')->name('verify-mfa');
-    Route::post('/verify-mfa', 'verifyMfa')->name('verify-mfa.store');
+    Route::post('/verify-mfa', 'verifyMfa')->middleware('throttle:15,1')->name('verify-mfa.store');
     Route::get('/verify-signup', 'showVerifySignup')->name('verify-signup');
-    Route::post('/verify-signup', 'verifySignup')->name('verify-signup.store');
+    Route::post('/verify-signup', 'verifySignup')->middleware('throttle:15,1')->name('verify-signup.store');
     Route::get('/forgot-password', 'showForgotPassword')->name('forgot-password');
-    Route::post('/forgot-password', 'sendResetOtp')->name('forgot-password.store');
+    Route::post('/forgot-password', 'sendResetOtp')->middleware('throttle:5,1')->name('forgot-password.store');
     Route::get('/reset-password', 'showResetPassword')->name('reset-password');
-    Route::post('/reset-password', 'resetPassword')->name('reset-password.store');
-    Route::get('/logout', 'logout')->name('logout');
+    Route::post('/reset-password', 'resetPassword')->middleware('throttle:15,1')->name('reset-password.store');
+    Route::post('/logout', 'logout')->name('logout');
 });
 
 Route::get('/dashboard', [DashboardController::class, 'index'])

@@ -199,6 +199,7 @@ class HomeController extends Controller
 
         $message = DB::table('client_support_messages')
             ->where('message_id', $messageId)->where('client_id', $clientId)
+            ->where('is_internal', false)
             ->select('attachment_path', 'attachment_name')
             ->first();
 

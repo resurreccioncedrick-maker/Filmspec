@@ -201,6 +201,9 @@ class SuperAdminController extends Controller
             if ($uid === $actorId && $role !== 'super_admin') {
                 return ['type' => 'danger', 'text' => 'You cannot change your own role.'];
             }
+            if (! array_key_exists($role, $this->rolesDef)) {
+                return ['type' => 'danger', 'text' => 'Invalid role selected.'];
+            }
 
             $roleId = DB::table('roles')->where('role_name', $role)->value('role_id');
             if (! $roleId) {

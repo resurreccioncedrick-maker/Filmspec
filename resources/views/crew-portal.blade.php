@@ -233,9 +233,12 @@ button{font-family:var(--font-b);cursor:pointer}
       <div style="font-size:10px;color:var(--muted)">{{ $crewMember ? ($crewMember->position_name ?? 'Crew') : 'Crew' }}</div>
     </div>
     <div class="av">{{ strtoupper(substr($user->first_name ?? 'C', 0, 1)) }}</div>
-    <a href="{{ route('logout') }}" title="Logout" class="logout-btn">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
-    </a>
+    <form method="POST" action="{{ route('logout') }}" style="display:contents">
+      @csrf
+      <button type="submit" title="Logout" class="logout-btn" style="background:none;border:none;cursor:pointer">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+      </button>
+    </form>
   </div>
 </div>
 
@@ -846,10 +849,13 @@ button{font-family:var(--font-b);cursor:pointer}
         <div class="more-item-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
         <span>Maintenance</span>
       </div>
-      <a href="{{ route('logout') }}" class="more-item" style="color:var(--red)">
+      <form method="POST" action="{{ route('logout') }}" style="display:contents">
+      @csrf
+      <button type="submit" class="more-item" style="color:var(--red);background:none;border:none;cursor:pointer;width:100%;text-align:left;font:inherit">
         <div class="more-item-ico" style="background:var(--redlt);color:var(--red)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg></div>
         <span>Logout</span>
-      </a>
+      </button>
+      </form>
     </div>
   </div>
 </div>
@@ -1046,13 +1052,13 @@ button{font-family:var(--font-b);cursor:pointer}
 <script>
 // Equipment scoped per booking (Fix 3) — same pattern as IncidentsController.php's
 // $bookingEquipMap / incidents.blade.php's filterEquipmentByBooking().
-const BOOKING_EQUIP = {!! json_encode($bookingEquipMap) !!};
+const BOOKING_EQUIP = {!! json_encode($bookingEquipMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 
 // Field-request pickers — the OPPOSITE list from BOOKING_EQUIP above: equipment/accessories
 // NOT yet on the booking (available to request), keyed by booking_id, same shape ClientBookingDetailController
 // builds server-side for the client's own request form.
-const FIELD_EQUIP = {!! json_encode($fieldEquipMap) !!};
-const FIELD_ACC = {!! json_encode($fieldAccMap) !!};
+const FIELD_EQUIP = {!! json_encode($fieldEquipMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
+const FIELD_ACC = {!! json_encode($fieldAccMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 
 function freqSwitch(type, btn) {
   document.getElementById('freqItemType').value = type;

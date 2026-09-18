@@ -169,9 +169,12 @@
     <a href="{{ $pageUrl('profile') }}" class="nav-item {{ $curPage === 'profile' ? 'active' : '' }}">
       <i data-feather="settings"></i><span>My Profile</span>
     </a>
-    <a href="{{ route('logout') }}" class="nav-item nav-logout">
-      <i data-feather="log-out"></i><span>Logout</span>
-    </a>
+    <form method="POST" action="{{ route('logout') }}">
+      @csrf
+      <button type="submit" class="nav-item nav-logout" style="font-family:inherit;font-size:inherit">
+        <i data-feather="log-out"></i><span>Logout</span>
+      </button>
+    </form>
   </div>
 </aside>
 

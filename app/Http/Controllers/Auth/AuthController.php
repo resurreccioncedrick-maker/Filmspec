@@ -137,7 +137,13 @@ class AuthController extends Controller
             $otpToSend = $pending['_otp'];
             unset($pending['_otp']);
             $request->session()->put('mfa_pending', $pending);
-            $this->sendMail($pending['email'], 'Your FilmSpec Verification Code', OtpMailTemplates::login($pending['first_name'], $otpToSend));
+            $sent = $this->sendMail($pending['email'], 'Your FilmSpec Verification Code', OtpMailTemplates::login($pending['first_name'], $otpToSend));
+            if (! $sent) {
+                $request->session()->forget(['mfa_pending', 'mfa_attempts']);
+                \DB::table('mfa_tokens')->where('user_id', (int) $pending['user_id'])->delete();
+
+                return redirect()->route('login')->withErrors(['login' => 'We couldn\'t send your verification code. Please try signing in again in a moment.']);
+            }
         }
 
         return view('auth.verify-mfa', [
@@ -218,7 +224,12 @@ class AuthController extends Controller
             $otpToSend = $pending['_otp'];
             unset($pending['_otp']);
             $request->session()->put('signup_pending', $pending);
-            $this->sendMail($pending['email'], 'Verify your FilmSpec account', OtpMailTemplates::signup($pending['first_name'], $otpToSend));
+            $sent = $this->sendMail($pending['email'], 'Verify your FilmSpec account', OtpMailTemplates::signup($pending['first_name'], $otpToSend));
+            if (! $sent) {
+                $request->session()->forget(['signup_pending', 'signup_otp_attempts']);
+
+                return redirect()->route('login')->withInput(['form' => 'signup'])->withErrors(['register' => 'We couldn\'t send your verification code. Please try registering again in a moment.']);
+            }
         }
 
         $at = strpos($pending['email'], '@');
@@ -349,7 +360,13 @@ class AuthController extends Controller
             'expires_at' => now()->addMinutes(10),
         ]);
 
-        $this->sendMail($user->email, 'Reset your FilmSpec password', OtpMailTemplates::resetPassword($user->first_name, $otp));
+        $sent = $this->sendMail($user->email, 'Reset your FilmSpec password', OtpMailTemplates::resetPassword($user->first_name, $otp));
+        if (! $sent) {
+            $request->session()->forget(['password_reset_pending', 'password_reset_attempts']);
+            \DB::table('password_reset_tokens')->where('user_id', $user->user_id)->delete();
+
+            return redirect()->route('forgot-password')->withInput()->with('forgot_error', 'We couldn\'t send the reset code. Please try again in a moment.');
+        }
 
         return redirect()->route('reset-password');
     }
@@ -494,14 +511,18 @@ class AuthController extends Controller
         return $score;
     }
 
-    private function sendMail(string $to, string $subject, string $html): void
+    private function sendMail(string $to, string $subject, string $html): bool
     {
         try {
             Mail::html($html, function ($message) use ($to, $subject) {
                 $message->to($to)->subject($subject);
             });
+
+            return true;
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('OTP mail failed: ' . $e->getMessage());
+
+            return false;
         }
     }
 }

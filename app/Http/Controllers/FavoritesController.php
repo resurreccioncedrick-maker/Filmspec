@@ -41,6 +41,9 @@ class FavoritesController extends Controller
         if (! $eid) {
             return response()->json(['error' => 'No equipment']);
         }
+        if (! DB::table('equipment')->where('equipment_id', $eid)->exists()) {
+            return response()->json(['error' => 'Equipment not found']);
+        }
 
         $existing = DB::table('equipment_favorites')->where('user_id', $uid)->where('equipment_id', $eid)->value('favorite_id');
         if ($existing) {

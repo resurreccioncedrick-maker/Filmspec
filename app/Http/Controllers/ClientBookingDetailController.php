@@ -302,6 +302,7 @@ class ClientBookingDetailController extends Controller
             ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
             ->where('bc.comment_id', $commentId)->where('bc.booking_id', $id)->where('c.user_id', $user->user_id)
+            ->where('bc.is_internal', false)
             ->select('bc.attachment_path', 'bc.attachment_name')
             ->first();
 
