@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,interactive-widget=resizes-content">
 <title>FilmSpec — Sign In</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
 <style>
@@ -12,6 +12,7 @@ body{
   font-family:'DM Sans',sans-serif;
   background:#ECF2FA;
   min-height:100vh;
+  min-height:100dvh;
   display:flex;align-items:center;justify-content:center;
   padding:20px;
 }
@@ -104,6 +105,11 @@ body{
 .dpa-row a,.dpa-row strong.link{color:#0060C7;cursor:pointer;font-weight:600;text-decoration:underline;text-underline-offset:2px}
 
 @media(max-width:880px){
+  /* Centering against 100vh/100dvh traps a focused input under the keyboard once the
+     card is taller than the visible (keyboard-shrunk) viewport — align to the top instead
+     so the page scrolls normally and the browser's own "scroll focused field into view"
+     behavior can do its job. */
+  body{align-items:flex-start}
   .shell{flex-direction:column;max-width:480px;min-height:unset;border-radius:14px}
   .panel{flex:none;padding:36px 32px 28px}
   .panel-logo{height:60px}
