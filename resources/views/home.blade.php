@@ -1310,18 +1310,36 @@ textarea.fi{resize:vertical;min-height:60px}
   .eq-rate-sub{font-size:10px;font-weight:600;margin-bottom:0}
   .req-btn{margin-top:8px;padding:9px;font-size:11.5px;min-height:38px}
 
-  /* My Bookings — card layout instead of a horizontally-scrolled 7-column table.
-     filterMyBookings() still targets the same tr[data-search]/data-status rows. */
-  .table-wrap{overflow-x:visible}
+  /* My Bookings — card layout instead of a horizontally-scrolled 7-column
+     table, matching the artifact's card exactly (ref+title left / status
+     badge right, one meta line, total+action footer) via CSS Grid placement
+     of the existing <td>s. filterMyBookings() still targets the same
+     tr[data-search]/data-status rows — no markup restructuring, just how
+     each cell is positioned and styled. */
+  .table-wrap{overflow-x:visible;background:transparent!important;border:none!important}
   .bk-tbl,.bk-tbl thead,.bk-tbl tbody{display:block;width:100%}
   .bk-tbl thead{display:none}
-  .bk-tbl tr{display:flex;flex-direction:column;gap:7px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px 15px;margin-bottom:10px}
+  .bk-tbl tbody tr{
+    display:grid;grid-template-columns:1fr auto;column-gap:10px;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);
+    padding:14px 15px;margin-bottom:10px;
+  }
   .bk-tbl tbody tr.row-action td:first-child,.bk-tbl tbody tr.row-pending td:first-child,
   .bk-tbl tbody tr.row-confirmed td:first-child,.bk-tbl tbody tr.row-completed td:first-child{box-shadow:none}
-  .bk-tbl td{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 0;border-bottom:none;font-size:13.5px;max-width:none!important}
-  .bk-tbl td[data-label]::before{content:attr(data-label);font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;flex-shrink:0}
-  .bk-tbl td:last-child{justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border);margin-top:2px}
+  .bk-tbl td{padding:0;border-bottom:none;max-width:none!important}
+  .bk-tbl td[data-label]::before{content:none}
+  .bk-tbl td:nth-child(1){grid-column:1;grid-row:1;font-size:12px!important}
+  .bk-tbl td:nth-child(2){grid-column:1;grid-row:2;margin-top:2px}
+  .bk-tbl td:nth-child(2) div:first-child{font-size:16px!important;white-space:normal!important}
+  .bk-tbl td:nth-child(2) div:last-child{display:none}
+  .bk-tbl td:nth-child(3){grid-column:1/-1;grid-row:3;font-size:13px!important;margin-top:8px}
+  .bk-tbl td:nth-child(3)::after{content:" · ";color:var(--sub)}
+  .bk-tbl td:nth-child(4){grid-column:1/-1;grid-row:4;font-size:13px!important;margin-top:0;white-space:normal!important}
+  .bk-tbl td:nth-child(5){grid-column:2;grid-row:1/3;align-self:start;justify-self:end}
+  .bk-tbl td:nth-child(6){grid-column:1;grid-row:5;font-size:14px!important;margin-top:10px}
+  .bk-tbl td:nth-child(7){grid-column:2;grid-row:5;margin-top:10px}
   .bk-cta{min-height:40px;padding:8px 14px}
+  #myBkSearch,#myBkStatus{font-size:16px!important;min-height:46px}
 
   /* Gear-list upload — bigger tap targets */
   .rl-upload-pick,.rl-upload-go{min-height:44px}
