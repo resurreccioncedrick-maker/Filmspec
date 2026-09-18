@@ -1278,18 +1278,37 @@ textarea.fi{resize:vertical;min-height:60px}
 
   /* Equipment tiles — 2-column grid, image-top card kept at every mobile width
      (replaces the old flip-to-horizontal-list-row treatment). Same markup as
-     desktop, renderGrid()'s JS is untouched — only these values change. */
-  .eq-card{border-radius:12px}
+     desktop, renderGrid()'s JS is untouched — only these values change.
+     Values here match the approved mobile design artifact exactly, not just
+     scaled-down desktop values. */
+  .eq-card{border-radius:10px}
+  .eq-img{background:linear-gradient(135deg,#0B1A33,#1c2f52)}
+  .eq-cat-icon{color:rgba(255,255,255,.35)}
+  .fav-star{
+    top:8px;left:8px;width:28px;height:28px;border-radius:50%;
+    background:rgba(255,255,255,.92);border:none;
+  }
+  .fav-star svg{width:15px;height:15px;stroke:var(--border2);fill:none}
+  .fav-star.on svg{stroke:#f5a623;fill:#f5a623}
+  .eq-cat-pill{
+    bottom:8px;left:8px;background:rgba(11,26,51,.85);
+    font-size:9px;padding:3px 8px;border-radius:5px;backdrop-filter:none;border:none;
+  }
+  .avail-pill{top:8px;right:8px;padding:3px 8px 3px 7px;backdrop-filter:none}
+  .avail-pill.av{background:rgba(22,163,74,.92);color:#fff;border:none}
+  .avail-pill.av::before{background:#fff}
   .eq-body{padding:10px 11px 11px}
-  .eq-name{font-size:13px;min-height:2.4em;margin-bottom:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .eq-brand{font-size:10px;margin-bottom:8px}
-  .eq-divider{margin-bottom:8px}
-  .eq-op{font-size:9.5px;padding:2px 7px;margin-bottom:8px}
-  .eq-rate{font-size:17px}
-  .eq-rate-sub{font-size:9.5px;margin-bottom:8px}
-  .fav-star{width:32px;height:32px}
-  .fav-star svg{width:15px;height:15px}
-  .req-btn{padding:9px;font-size:11.5px;min-height:38px}
+  .eq-name{font-size:13px;font-weight:700;line-height:1.3;min-height:2.4em;margin-bottom:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .eq-brand{font-size:10.5px;letter-spacing:.04em;margin-bottom:0}
+  /* The artifact groups name+brand+op together, then a divider right before
+     price — the existing .eq-divider sits right after brand instead (fixed
+     markup order), so hide it and put the same rule on .eq-foot instead. */
+  .eq-divider{display:none}
+  .eq-op{font-size:10px;padding:3px 8px;border-radius:999px;margin:4px 0 0}
+  .eq-foot{border-top:1px solid var(--border);margin-top:8px;padding-top:8px}
+  .eq-rate{font-family:var(--font-b);font-size:16px;font-weight:700;letter-spacing:normal;margin-bottom:1px}
+  .eq-rate-sub{font-size:10px;font-weight:600;margin-bottom:0}
+  .req-btn{margin-top:8px;padding:9px;font-size:11.5px;min-height:38px}
 
   /* My Bookings — card layout instead of a horizontally-scrolled 7-column table.
      filterMyBookings() still targets the same tr[data-search]/data-status rows. */
