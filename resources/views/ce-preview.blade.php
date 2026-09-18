@@ -1066,16 +1066,25 @@ function updateLiveCost(multiplier, zone, label) {
 
     const eqAdj    = _BASE_EQUIP * _shootDays * multiplier;
     const transAdj = _BASE_TRANS * multiplier;
-    const grand    = eqAdj + _BASE_CREW + transAdj;
+    // Transportation is never actually charged at booking-submission time — CartController::
+    // submitBooking() always stores transportation_cost=0/transport_multiplier=1.00 and staff
+    // assign the real transport cost later, matching this page's own "Crew TF and
+    // transportation costs will be added after booking confirmation" note. The totals driving
+    // every on-screen figure here must match what the booking actually gets created with, so
+    // transAdj is shown as its own line (an estimate, for the client's reference) but excluded
+    // from grand/sub/vat — it used to be folded in here, silently overstating the total the
+    // client saw versus the equipment-only total the booking was actually created with.
+    const grand    = eqAdj + _BASE_CREW;
     const vat      = grand * VAT_RATE / (1 + VAT_RATE);
     const sub      = grand - vat;
 
     const multNote = multiplier !== 1 ? '× ' + multiplier + ' (' + label + ')' : '';
+    const transNote = multiplier + '× rate · ' + label + ' (est., billed after confirmation)';
 
     document.getElementById('live-eq-val').textContent    = _pesoFmt(eqAdj);
     document.getElementById('live-eq-note').textContent   = multNote;
     document.getElementById('live-trans-val').textContent  = _pesoFmt(transAdj);
-    document.getElementById('live-trans-note').textContent = multiplier + '× rate · ' + label;
+    document.getElementById('live-trans-note').textContent = transNote;
     document.getElementById('live-trans-val').style.color  = '#003D80';
     document.getElementById('live-sub').textContent        = _pesoFmt(sub);
     document.getElementById('live-vat').textContent        = _pesoFmt(vat);
@@ -1086,7 +1095,7 @@ function updateLiveCost(multiplier, zone, label) {
     const eqV = document.getElementById('sum-eq-val');
     if (eqV) eqV.textContent = _pesoFmt(eqAdj);
     const tN = document.getElementById('sum-trans-note');
-    if (tN) tN.textContent = multiplier + '× · ' + label;
+    if (tN) tN.textContent = transNote;
     const tV = document.getElementById('sum-trans-val');
     if (tV) tV.textContent = _pesoFmt(transAdj);
     const sv = document.getElementById('sum-subtotal');

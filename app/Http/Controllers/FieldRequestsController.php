@@ -124,20 +124,14 @@ class FieldRequestsController extends Controller
         // request sitting at 'approved' instead of wrongly flipping it to 'dispatched'.
         if ($req->item_type === 'equipment' && $req->equipment_id) {
             $alreadyOnThisBooking = DB::table('booking_equipment')->where('booking_id', $req->booking_id)->where('equipment_id', $req->equipment_id)->exists();
-            $conflict = DB::table('booking_equipment as be')
-                ->join('bookings as b', 'be.booking_id', '=', 'b.booking_id')
-                ->where('be.equipment_id', $req->equipment_id)->where('be.booking_id', '!=', $req->booking_id)
-                ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
-                ->where('b.shoot_date_start', '<=', $booking->shoot_date_end)
-                ->where('b.shoot_date_end', '>=', $booking->shoot_date_start)
-                ->value('b.booking_reference');
-            if ($conflict) {
-                return ['type' => 'danger', 'text' => 'This equipment is already allocated to booking <strong>' . e($conflict) . '</strong> on overlapping dates. Reject this request or resolve the conflict before dispatching.'];
-            }
+            // A top-up (this exact booking already has some of this equipment, from an earlier
+            // dispatch) skips the availability check entirely — same special case this method
+            // always had, since re-requesting more of an item this booking already holds isn't
+            // a new commitment to check.
             if (! $alreadyOnThisBooking) {
-                $equipStatus = DB::table('equipment')->where('equipment_id', $req->equipment_id)->value('availability_status');
-                if ($equipStatus !== 'available') {
-                    return ['type' => 'danger', 'text' => 'This equipment is not available (status: ' . ucfirst($equipStatus ?? 'unknown') . '). Reject this request or choose different equipment.'];
+                $availError = \App\Support\EquipmentAvailability::check($req->equipment_id, (int) $req->quantity, $req->booking_id, $booking);
+                if ($availError) {
+                    return ['type' => 'danger', 'text' => $availError['text'] . ' Reject this request or resolve the conflict before dispatching.'];
                 }
             }
         }

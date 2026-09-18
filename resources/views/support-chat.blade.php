@@ -151,6 +151,7 @@ function scBubbleHtml(m) {
     + '</div></div>';
 }
 function pollSupportThread() {
+  if (document.hidden) return;
   var container = document.getElementById('scMessages');
   if (!container) return;
   var lastId = parseInt(container.dataset.lastId || '0');
@@ -172,6 +173,7 @@ function pollSupportThread() {
 }
 @if ($activeClientId)
 setInterval(pollSupportThread, 12000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) pollSupportThread(); });
 document.addEventListener('DOMContentLoaded', function () {
   var c = document.getElementById('scMessages');
   if (c) c.scrollTop = c.scrollHeight;

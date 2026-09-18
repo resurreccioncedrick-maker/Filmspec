@@ -458,20 +458,9 @@ class BookingDetailController extends Controller
             return ['type' => 'error', 'text' => 'This equipment is already added to this booking.'];
         }
 
-        $equipStatus = DB::table('equipment')->where('equipment_id', $eid)->value('availability_status');
-        $conflict = DB::table('booking_equipment as be')
-            ->join('bookings as b', 'be.booking_id', '=', 'b.booking_id')
-            ->where('be.equipment_id', $eid)->where('be.booking_id', '!=', $id)
-            ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
-            ->where('b.shoot_date_start', '<=', $booking->shoot_date_end)
-            ->where('b.shoot_date_end', '>=', $booking->shoot_date_start)
-            ->value('b.booking_reference');
-
-        if ($equipStatus !== 'available') {
-            return ['type' => 'error', 'text' => 'This equipment is not available. Current status: ' . ucfirst($equipStatus ?? 'unknown')];
-        }
-        if ($conflict) {
-            return ['type' => 'error', 'text' => 'This equipment is already allocated to booking <strong>' . e($conflict) . '</strong> on overlapping dates. Choose different equipment or adjust the dates.'];
+        $conflictError = \App\Support\EquipmentAvailability::check($eid, $qty, $id, $booking);
+        if ($conflictError) {
+            return $conflictError;
         }
 
         DB::table('booking_equipment')->insert([
@@ -572,25 +561,15 @@ class BookingDetailController extends Controller
             return ['type' => 'error', 'text' => 'Equipment, crew member, and position are all required for field additions.'];
         }
 
-        $equipStatus = DB::table('equipment')->where('equipment_id', $eid)->value('availability_status');
         $crewStatus = DB::table('crew_members')->where('crew_id', $cid)->value('status');
         $dupEquip = DB::table('booking_equipment')->where('booking_id', $id)->where('equipment_id', $eid)->exists();
-        $conflict = DB::table('booking_equipment as be')
-            ->join('bookings as b', 'be.booking_id', '=', 'b.booking_id')
-            ->where('be.equipment_id', $eid)->where('be.booking_id', '!=', $id)
-            ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
-            ->where('b.shoot_date_start', '<=', $booking->shoot_date_end)
-            ->where('b.shoot_date_end', '>=', $booking->shoot_date_start)
-            ->value('b.booking_reference');
 
         if ($dupEquip) {
             return ['type' => 'error', 'text' => 'This equipment is already on this booking.'];
         }
-        if ($equipStatus !== 'available') {
-            return ['type' => 'error', 'text' => 'Equipment is not available (status: ' . ucfirst($equipStatus ?? 'unknown') . ').'];
-        }
-        if ($conflict) {
-            return ['type' => 'error', 'text' => 'Equipment already allocated to booking <strong>' . e($conflict) . '</strong> on overlapping dates.'];
+        $availError = \App\Support\EquipmentAvailability::check($eid, $qty, $id, $booking);
+        if ($availError) {
+            return $availError;
         }
         if ($crewStatus !== 'active') {
             return ['type' => 'error', 'text' => 'Crew member is not active (status: ' . ucfirst($crewStatus ?? 'unknown') . ').'];

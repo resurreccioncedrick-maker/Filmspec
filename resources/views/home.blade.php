@@ -2992,7 +2992,7 @@ function supBubbleHtml(m) {
 }
 
 function pollSupportChat() {
-  if (!IS_LOGIN) return;
+  if (!IS_LOGIN || document.hidden) return;
   var body = document.getElementById('supBody');
   if (!body) return;
   var lastId = parseInt(body.dataset.lastId || '0');
@@ -3021,6 +3021,7 @@ function pollSupportChat() {
     .catch(() => {});
 }
 setInterval(pollSupportChat, 15000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) pollSupportChat(); });
 </script>
 @endif
 

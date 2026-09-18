@@ -98,6 +98,31 @@
           ->count();
   }
 
+  // Global "new messages waiting" counts for the Support Chat and Bookings nav items — the
+  // per-thread unread dot on the Support Chat inbox and BookingDetailController's own
+  // $unreadComments only ever surface once staff is already on that specific page; this reuses
+  // the exact same MessageReadTracker::unreadFlags() logic, just across every thread at once,
+  // so staff notice new client messages from anywhere in the sidebar.
+  $supportChatBadgeCount = 0;
+  if ($canAccess('support_chat')) {
+    $lastPerClient = \Illuminate\Support\Facades\DB::table('client_support_messages')
+      ->where('is_internal', false)
+      ->select('client_id as thread_id', \Illuminate\Support\Facades\DB::raw('MAX(created_at) as created_at'))
+      ->groupBy('client_id')->get();
+    $supportChatBadgeCount = count(array_filter(
+      \App\Support\MessageReadTracker::unreadFlags($navUser->user_id, 'support', $lastPerClient)
+    ));
+  }
+  $bookingsBadgeCount = 0;
+  if ($canAccess('bookings')) {
+    $lastPerBooking = \Illuminate\Support\Facades\DB::table('booking_comments')
+      ->select('booking_id as thread_id', \Illuminate\Support\Facades\DB::raw('MAX(created_at) as created_at'))
+      ->groupBy('booking_id')->get();
+    $bookingsBadgeCount = count(array_filter(
+      \App\Support\MessageReadTracker::unreadFlags($navUser->user_id, 'booking', $lastPerBooking)
+    ));
+  }
+
   $pageUrl = fn (string $page) => route(config("filmspec.ported_pages.$page"));
 
   $curPage = array_search(Route::currentRouteName(), config('filmspec.ported_pages'), true) ?: '';
@@ -159,6 +184,8 @@
             <span>{{ $item['label'] }}</span>
             @if (! empty($item['sa']))<span class="superadmin-badge">SA</span>@endif
             @if ($urlKey === 'billing' && $billingBadgeCount > 0)<span class="superadmin-badge" style="background:var(--orange, #f97316)" title="Pending discount approvals + unbilled confirmed bookings">{{ $billingBadgeCount }}</span>@endif
+            @if ($urlKey === 'support_chat' && $supportChatBadgeCount > 0)<span class="superadmin-badge" style="background:var(--orange, #f97316)" title="Conversations with new messages">{{ $supportChatBadgeCount }}</span>@endif
+            @if ($urlKey === 'bookings' && $bookingsBadgeCount > 0)<span class="superadmin-badge" style="background:var(--orange, #f97316)" title="Bookings with new comments">{{ $bookingsBadgeCount }}</span>@endif
           </a>
         @endif
       @endforeach
