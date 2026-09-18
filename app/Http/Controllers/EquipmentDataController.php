@@ -3,17 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Support\CeAnalytics;
+use App\Support\DataExporter;
 use App\Support\ReportPeriod;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EquipmentDataController extends Controller
 {
     private const DEFAULT_LIMIT = 15;
 
-    public function index(Request $request): View
+    public function index(Request $request): View|StreamedResponse|Response
     {
+        if ($request->filled('export')) {
+            return $this->export($request);
+        }
+
         $period = ReportPeriod::resolve($request);
         $sort = in_array($request->query('sort'), ['pesos', 'quantity', 'days'], true)
             ? $request->query('sort') : 'pesos';
@@ -21,23 +28,7 @@ class EquipmentDataController extends Controller
 
         $confirmedCes = CeAnalytics::confirmedCes($period['from'], $period['to']);
         $bookingIds = $confirmedCes->pluck('booking_id');
-
-        // Owned gear: what each item earned at CE rates, plus the quantity and day counts the
-        // reference shows as "×16 · 5d".
-        $usage = DB::table('booking_equipment as be')
-            ->join('equipment as e', 'be.equipment_id', '=', 'e.equipment_id')
-            ->leftJoin('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
-            ->whereIn('be.booking_id', $bookingIds)
-            ->groupBy('e.equipment_id', 'e.equipment_name', 'e.brand', 'ec.category_name')
-            ->select('e.equipment_id', 'e.equipment_name', 'e.brand', 'ec.category_name')
-            ->selectRaw('COUNT(DISTINCT be.booking_id) AS shoots')
-            ->selectRaw('SUM(be.quantity) AS total_qty')
-            ->selectRaw('SUM(be.days) AS total_days')
-            ->selectRaw('SUM(IF(be.subtotal>0,be.subtotal,be.quantity*be.days*be.daily_rate)) AS earnings')
-            ->get();
-
-        $sortKey = ['pesos' => 'earnings', 'quantity' => 'total_qty', 'days' => 'total_days'][$sort];
-        $usage = $usage->sortByDesc(fn ($r) => (float) $r->{$sortKey})->values();
+        $usage = $this->computeUsage($period, $sort, $bookingIds);
 
         $usageTotalCount = $usage->count();
         $usageShown = $showAll ? $usage : $usage->take(self::DEFAULT_LIMIT);
@@ -132,6 +123,49 @@ class EquipmentDataController extends Controller
                 'chart_months' => $chartMonths,
             ],
         ]);
+    }
+
+    /**
+     * Owned gear: what each item earned at CE rates, plus the quantity and day counts the
+     * reference shows as "×16 · 5d". Shared by index() and export() so both stay identical.
+     */
+    private function computeUsage(array $period, string $sort, $bookingIds)
+    {
+        $usage = DB::table('booking_equipment as be')
+            ->join('equipment as e', 'be.equipment_id', '=', 'e.equipment_id')
+            ->leftJoin('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
+            ->whereIn('be.booking_id', $bookingIds)
+            ->groupBy('e.equipment_id', 'e.equipment_name', 'e.brand', 'ec.category_name')
+            ->select('e.equipment_id', 'e.equipment_name', 'e.brand', 'ec.category_name')
+            ->selectRaw('COUNT(DISTINCT be.booking_id) AS shoots')
+            ->selectRaw('SUM(be.quantity) AS total_qty')
+            ->selectRaw('SUM(be.days) AS total_days')
+            ->selectRaw('SUM(IF(be.subtotal>0,be.subtotal,be.quantity*be.days*be.daily_rate)) AS earnings')
+            ->get();
+
+        $sortKey = ['pesos' => 'earnings', 'quantity' => 'total_qty', 'days' => 'total_days'][$sort];
+
+        return $usage->sortByDesc(fn ($r) => (float) $r->{$sortKey})->values();
+    }
+
+    /** Export ▾ — always the full unbounded usage list, same as "Show all" on screen. */
+    private function export(Request $request): StreamedResponse|Response
+    {
+        $period = ReportPeriod::resolve($request);
+        $sort = in_array($request->query('sort'), ['pesos', 'quantity', 'days'], true)
+            ? $request->query('sort') : 'pesos';
+
+        $bookingIds = CeAnalytics::confirmedCes($period['from'], $period['to'])->pluck('booking_id');
+        $usage = $this->computeUsage($period, $sort, $bookingIds);
+
+        $headers = ['Equipment', 'Category', 'Brand', 'Shoots', 'Total Qty', 'Total Days', 'Earnings'];
+        $rows = $usage->map(fn ($u) => [
+            $u->equipment_name, $u->category_name ?: 'Other', $u->brand,
+            (int) $u->shoots, (int) $u->total_qty, (int) $u->total_days,
+            '₱' . number_format((float) $u->earnings, 2),
+        ])->all();
+
+        return DataExporter::respond($request->query('export'), 'Equipment Data', $headers, $rows, 'equipment-data-export');
     }
 
     /**

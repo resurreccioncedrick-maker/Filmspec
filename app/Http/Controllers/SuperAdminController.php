@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Support\DatabaseBackup;
+use App\Support\DataExporter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SuperAdminController extends Controller
 {
@@ -52,13 +55,17 @@ class SuperAdminController extends Controller
         'Account' => ['profile'],
     ];
 
-    public function index(Request $request): View
+    public function index(Request $request): View|StreamedResponse|Response
     {
         $actorId = $request->user()->user_id;
         $msg = null;
 
         if ($request->isMethod('post')) {
             $msg = $this->handleAction($request, $actorId);
+        }
+
+        if ($request->filled('export')) {
+            return $this->export($request);
         }
 
         // Ensure all defined roles exist (matches legacy's self-healing role seed)
@@ -134,6 +141,49 @@ class SuperAdminController extends Controller
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
             'Content-Length' => (string) strlen($sql),
         ]);
+    }
+
+    /** Export ▾ — two independent datasets: the user list, and the full (uncapped) activity log. */
+    private function export(Request $request): StreamedResponse|Response
+    {
+        $type = $request->query('export', 'users');
+
+        if ($type === 'activity') {
+            $headers = ['Time', 'User', 'Role', 'Action', 'Module', 'Description'];
+            $rows = DB::table('activity_logs as al')
+                ->leftJoin('users as u', 'al.user_id', '=', 'u.user_id')
+                ->leftJoin('roles as r', 'u.role_id', '=', 'r.role_id')
+                ->orderByDesc('al.created_at')
+                ->select('al.created_at', DB::raw("CONCAT(u.first_name,' ',u.last_name) AS user_name"), 'r.role_name', 'al.action', 'al.module', 'al.description')
+                ->get()
+                ->map(fn ($a) => [
+                    Carbon::parse($a->created_at)->format('M j, Y g:ia'),
+                    trim((string) $a->user_name) ?: 'System',
+                    $a->role_name ? ucfirst(str_replace('_', ' ', $a->role_name)) : '—',
+                    ucfirst($a->action), $a->module ?: '—', $a->description,
+                ])
+                ->all();
+
+            return DataExporter::respond($request->query('format', 'csv'), 'Activity Log', $headers, $rows, 'superadmin-activity-export');
+        }
+
+        $headers = ['Name', 'Email', 'Role', 'Status', 'Last Login'];
+        $rows = DB::table('users as u')
+            ->join('roles as r', 'u.role_id', '=', 'r.role_id')
+            ->orderBy('r.role_id')->orderBy('u.last_name')
+            ->select('u.first_name', 'u.last_name', 'u.email', 'r.role_name', 'u.is_active')
+            ->selectRaw("(SELECT MAX(created_at) FROM activity_logs al WHERE al.user_id = u.user_id AND al.action = 'login') AS last_login")
+            ->get()
+            ->map(fn ($u) => [
+                trim($u->first_name . ' ' . $u->last_name),
+                $u->email,
+                $this->rolesDef[$u->role_name]['label'] ?? ucfirst($u->role_name),
+                $u->is_active ? 'Active' : 'Deactivated',
+                $u->last_login ? Carbon::parse($u->last_login)->format('M j, Y g:ia') : 'Never',
+            ])
+            ->all();
+
+        return DataExporter::respond($request->query('format', 'csv'), 'Users', $headers, $rows, 'superadmin-users-export');
     }
 
     private function handleAction(Request $request, int $actorId): ?array

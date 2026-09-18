@@ -7,6 +7,8 @@
 @endsection
 
 @section('topbarActions')
+@include('partials.export-dropdown', ['id' => 'IncidentsList', 'label' => 'Export Incidents', 'exportValue' => 'incidents'])
+@include('partials.export-dropdown', ['id' => 'MaintenanceList', 'label' => 'Export Maintenance', 'exportValue' => 'maintenance'])
 <button onclick="resetNewIncidentForm(); openModal('modalNewIncident')" class="btn btn-primary btn-sm"><i data-feather="plus"></i> New Incident Report</button>
 @endsection
 

@@ -4,9 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Support\BookingCosting;
+use App\Support\DataExporter;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class IncidentsController extends Controller
 {
@@ -28,7 +32,7 @@ class IncidentsController extends Controller
 
     private array $maintStatBadge = ['pending' => 'badge-yellow', 'in_progress' => 'badge-blue', 'completed' => 'badge-green', 'cancelled' => 'badge-gray'];
 
-    public function index(Request $request): View
+    public function index(Request $request): View|StreamedResponse|Response
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
@@ -40,27 +44,16 @@ class IncidentsController extends Controller
             $msg = $this->handleAction($request, $user->user_id, $canManage);
         }
 
+        if ($request->filled('export')) {
+            return $this->export($request);
+        }
+
         $tab = $request->query('tab', 'all');
         $search = $request->query('q', '');
         $page = max(1, (int) $request->query('p', 1));
         $perPage = 20;
 
-        $incQuery = DB::table('incident_reports as ir')
-            ->join('bookings as b', 'ir.booking_id', '=', 'b.booking_id')
-            ->join('equipment as e', 'ir.equipment_id', '=', 'e.equipment_id')
-            ->join('clients as c', 'b.client_id', '=', 'c.client_id');
-        if ($tab !== 'all') {
-            $incQuery->where('ir.status', $tab);
-        }
-        if ($search) {
-            $incQuery->where(function ($w) use ($search) {
-                $w->where('b.booking_reference', 'like', "%$search%")
-                    ->orWhere('e.equipment_name', 'like', "%$search%")
-                    ->orWhere('ir.incident_number', 'like', "%$search%")
-                    ->orWhere('c.contact_person', 'like', "%$search%")
-                    ->orWhere('c.company_name', 'like', "%$search%");
-            });
-        }
+        $incQuery = $this->filteredIncidentsQuery($request);
 
         $total = (clone $incQuery)->count();
         $pages = max(1, (int) ceil($total / $perPage));
@@ -149,13 +142,7 @@ class IncidentsController extends Controller
         }
 
         $maintTab = $request->query('mtab', 'pending');
-        $maintQuery = DB::table('maintenance_schedules as ms')
-            ->join('equipment as e', 'ms.equipment_id', '=', 'e.equipment_id')
-            ->leftJoin('crew_members as cm', 'ms.assigned_crew_id', '=', 'cm.crew_id')
-            ->leftJoin('incident_reports as ir', 'ms.incident_id', '=', 'ir.incident_id');
-        if ($maintTab !== 'all') {
-            $maintQuery->where('ms.status', $maintTab);
-        }
+        $maintQuery = $this->filteredMaintenanceQuery($request);
         $maintenances = $maintQuery
             ->orderBy('ms.scheduled_date')->orderByDesc('ms.created_at')
             ->select('ms.*', 'e.equipment_name', 'e.brand', 'e.serial_number as equip_serial',
@@ -191,6 +178,94 @@ class IncidentsController extends Controller
             'causeLabel' => $this->causeLabel, 'resLabel' => $this->resLabel, 'damageTypes' => $this->damageTypes,
             'maintTypeBadge' => $this->maintTypeBadge, 'maintTypeLabel' => $this->maintTypeLabel, 'maintStatBadge' => $this->maintStatBadge,
         ]);
+    }
+
+    /** Same filters index() applies to the incidents table, shared with export(). */
+    private function filteredIncidentsQuery(Request $request)
+    {
+        $tab = $request->query('tab', 'all');
+        $search = $request->query('q', '');
+
+        $incQuery = DB::table('incident_reports as ir')
+            ->join('bookings as b', 'ir.booking_id', '=', 'b.booking_id')
+            ->join('equipment as e', 'ir.equipment_id', '=', 'e.equipment_id')
+            ->join('clients as c', 'b.client_id', '=', 'c.client_id');
+        if ($tab !== 'all') {
+            $incQuery->where('ir.status', $tab);
+        }
+        if ($search) {
+            $incQuery->where(function ($w) use ($search) {
+                $w->where('b.booking_reference', 'like', "%$search%")
+                    ->orWhere('e.equipment_name', 'like', "%$search%")
+                    ->orWhere('ir.incident_number', 'like', "%$search%")
+                    ->orWhere('c.contact_person', 'like', "%$search%")
+                    ->orWhere('c.company_name', 'like', "%$search%");
+            });
+        }
+
+        return $incQuery;
+    }
+
+    /** Same filter index() applies to the maintenance table, shared with export(). */
+    private function filteredMaintenanceQuery(Request $request)
+    {
+        $maintTab = $request->query('mtab', 'pending');
+
+        $maintQuery = DB::table('maintenance_schedules as ms')
+            ->join('equipment as e', 'ms.equipment_id', '=', 'e.equipment_id')
+            ->leftJoin('crew_members as cm', 'ms.assigned_crew_id', '=', 'cm.crew_id')
+            ->leftJoin('incident_reports as ir', 'ms.incident_id', '=', 'ir.incident_id');
+        if ($maintTab !== 'all') {
+            $maintQuery->where('ms.status', $maintTab);
+        }
+
+        return $maintQuery;
+    }
+
+    /** Export ▾ — two independent datasets (incidents list, maintenance schedule), each unbounded. */
+    private function export(Request $request): StreamedResponse|Response
+    {
+        $type = $request->query('export', 'incidents');
+
+        if ($type === 'maintenance') {
+            $headers = ['Equipment', 'Type', 'Status', 'Scheduled Date', 'Assigned To', 'Related Incident'];
+            $rows = $this->filteredMaintenanceQuery($request)
+                ->orderBy('ms.scheduled_date')->orderByDesc('ms.created_at')
+                ->select('e.equipment_name', 'ms.maintenance_type', 'ms.status', 'ms.scheduled_date',
+                    DB::raw("CONCAT(cm.first_name,' ',cm.last_name) AS assigned_crew_name"), 'ir.incident_number')
+                ->get()
+                ->map(fn ($m) => [
+                    $m->equipment_name,
+                    $this->maintTypeLabel[$m->maintenance_type] ?? ucfirst($m->maintenance_type),
+                    ucfirst(str_replace('_', ' ', $m->status)),
+                    $m->scheduled_date ? Carbon::parse($m->scheduled_date)->format('M j, Y') : '—',
+                    trim((string) $m->assigned_crew_name) ?: '—',
+                    $m->incident_number ?: '—',
+                ])
+                ->all();
+
+            return DataExporter::respond($request->query('format', 'csv'), 'Maintenance Schedule', $headers, $rows, 'maintenance-export');
+        }
+
+        $headers = ['Incident #', 'Booking', 'Equipment', 'Type', 'Status', 'Cause', 'Resolution', 'Charge'];
+        $rows = $this->filteredIncidentsQuery($request)
+            ->orderByDesc('ir.created_at')
+            ->select('ir.incident_number', 'b.booking_reference', 'e.equipment_name', 'ir.incident_type',
+                'ir.status', 'ir.cause', 'ir.resolution', 'ir.charge_amount')
+            ->get()
+            ->map(fn ($i) => [
+                $i->incident_number,
+                $i->booking_reference,
+                $i->equipment_name,
+                $this->typeLabel[$i->incident_type] ?? ucfirst($i->incident_type),
+                ucfirst($i->status),
+                $this->causeLabel[$i->cause] ?? ucfirst((string) $i->cause),
+                $this->resLabel[$i->resolution] ?? ucfirst((string) $i->resolution),
+                '₱' . number_format((float) $i->charge_amount, 2),
+            ])
+            ->all();
+
+        return DataExporter::respond($request->query('format', 'csv'), 'Incidents', $headers, $rows, 'incidents-export');
     }
 
     public function print(int $id): View|\Illuminate\Http\RedirectResponse

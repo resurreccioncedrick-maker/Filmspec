@@ -8,6 +8,7 @@
 @endsection
 
 @section('topbarActions')
+@include('partials.export-dropdown', ['id' => 'Attendance'])
 @if ($filterBooking)
 <a href="{{ route('attendance.print', ['booking_id' => $filterBooking]) }}" target="_blank" class="btn btn-outline btn-sm"><i data-feather="printer"></i> Print Record</a>
 @endif

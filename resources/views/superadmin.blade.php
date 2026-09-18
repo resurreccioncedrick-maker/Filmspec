@@ -7,6 +7,8 @@
 @endsection
 
 @section('topbarActions')
+@include('partials.export-dropdown', ['id' => 'SaUsers', 'label' => 'Export Users', 'exportValue' => 'users'])
+@include('partials.export-dropdown', ['id' => 'SaActivity', 'label' => 'Export Activity', 'exportValue' => 'activity'])
 <span class="badge badge-purple" style="padding:5px 12px;font-size:.75rem">Super Admin Mode</span>
 @endsection
 

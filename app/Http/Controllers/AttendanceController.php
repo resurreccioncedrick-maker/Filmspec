@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Support\DataExporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AttendanceController extends Controller
 {
@@ -20,7 +24,7 @@ class AttendanceController extends Controller
         'no_show' => 'No Show', 'back_out' => 'Back Out',
     ];
 
-    public function index(Request $request): View
+    public function index(Request $request): View|StreamedResponse|Response
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
@@ -29,6 +33,10 @@ class AttendanceController extends Controller
         $msg = null;
         if ($request->isMethod('post')) {
             $msg = $this->handleAction($request, $canManage);
+        }
+
+        if ($request->filled('export')) {
+            return $this->export($request);
         }
 
         $filterBooking = (int) $request->query('booking_id', 0);
@@ -70,11 +78,7 @@ class AttendanceController extends Controller
             ->selectRaw("crew_id, CONCAT(first_name,' ',last_name) AS name, phone")
             ->get();
 
-        $attQuery = DB::table('crew_attendance as ca');
-        if ($filterBooking) $attQuery->where('ca.booking_id', $filterBooking);
-        if ($filterCrew) $attQuery->where('ca.crew_id', $filterCrew);
-        if ($filterDate) $attQuery->where('ca.attendance_date', $filterDate);
-        if ($filterStatus) $attQuery->where('ca.status', $filterStatus);
+        $attQuery = $this->filteredAttendanceQuery($request);
 
         $attTotal = (clone $attQuery)->count();
         $attPages = max(1, (int) ceil($attTotal / $perPage));
@@ -129,6 +133,54 @@ class AttendanceController extends Controller
             'totalDeployed' => $totalDeployed, 'totalNoShows' => $totalNoShows, 'totalOT' => $totalOT,
             'statusBadge' => $this->statusBadge, 'statusLabel' => $this->statusLabel,
         ]);
+    }
+
+    /** Same filters index() applies, shared with export() so the two can never drift apart. */
+    private function filteredAttendanceQuery(Request $request)
+    {
+        $filterBooking = (int) $request->query('booking_id', 0);
+        $filterCrew = (int) $request->query('crew_id', 0);
+        $filterDate = $request->query('date', '');
+        $filterStatus = $request->query('status', '');
+
+        $attQuery = DB::table('crew_attendance as ca');
+        if ($filterBooking) $attQuery->where('ca.booking_id', $filterBooking);
+        if ($filterCrew) $attQuery->where('ca.crew_id', $filterCrew);
+        if ($filterDate) $attQuery->where('ca.attendance_date', $filterDate);
+        if ($filterStatus) $attQuery->where('ca.status', $filterStatus);
+
+        return $attQuery;
+    }
+
+    /** Export ▾ — reuses filteredAttendanceQuery() unbounded (no page/perPage) so it always matches what's on screen. */
+    private function export(Request $request): StreamedResponse|Response
+    {
+        $headers = ['Date', 'Crew Member', 'Position', 'Booking', 'Status', 'Replacement', 'Logged By'];
+
+        $rows = $this->filteredAttendanceQuery($request)
+            ->join('crew_members as cm', 'ca.crew_id', '=', 'cm.crew_id')
+            ->leftJoin('crew_positions as cp', 'cm.primary_position_id', '=', 'cp.position_id')
+            ->join('bookings as b', 'ca.booking_id', '=', 'b.booking_id')
+            ->leftJoin('crew_members as rep', 'ca.replacement_crew_id', '=', 'rep.crew_id')
+            ->leftJoin('users as logger', 'ca.logged_by', '=', 'logger.user_id')
+            ->orderByDesc('ca.attendance_date')->orderByDesc('ca.created_at')
+            ->select('ca.attendance_date', DB::raw("CONCAT(cm.first_name,' ',cm.last_name) AS crew_name"),
+                'cp.position_name', 'b.booking_reference', 'ca.status',
+                DB::raw("CONCAT(rep.first_name,' ',rep.last_name) AS replacement_name"),
+                DB::raw("CONCAT(logger.first_name,' ',logger.last_name) AS logged_by_name"))
+            ->get()
+            ->map(fn ($a) => [
+                Carbon::parse($a->attendance_date)->format('M j, Y'),
+                $a->crew_name,
+                $a->position_name ?: '—',
+                $a->booking_reference,
+                $this->statusLabel[$a->status] ?? ucfirst($a->status),
+                trim((string) $a->replacement_name) ?: '—',
+                trim((string) $a->logged_by_name) ?: '—',
+            ])
+            ->all();
+
+        return DataExporter::respond($request->query('export'), 'Attendance', $headers, $rows, 'attendance-export');
     }
 
     // Printable attendance record for one booking — staff-side counterpart to
