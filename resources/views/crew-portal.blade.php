@@ -21,13 +21,16 @@ body{font-family:var(--font-b);background:var(--bg);color:var(--text);min-height
 a{text-decoration:none;color:inherit}
 button{font-family:var(--font-b);cursor:pointer}
 
-/* ── SHELL (mobile-first, centered column) ── */
-.shell{max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;padding-bottom:78px}
+/* ── SHELL (mobile-first, widens on larger phones instead of centering with dead space) ── */
+.shell{max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;padding-bottom:84px}
+@media(min-width:480px) and (max-width:599px){.shell{max-width:560px}}
 
 /* ── TOP BAR ── */
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
-.brand{font-family:var(--font-d);font-size:19px;letter-spacing:2px;color:var(--blue)}
-.av{width:34px;height:34px;border-radius:9px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0}
+.brand{font-family:var(--font-d);font-size:20px;letter-spacing:2px;color:var(--blue)}
+.av{width:40px;height:40px;border-radius:10px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0}
+.logout-btn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:var(--muted);border-radius:10px}
+.logout-btn:hover{background:var(--s2);color:var(--red)}
 
 /* ── PAGES ── */
 .pg{display:none}
@@ -35,62 +38,67 @@ button{font-family:var(--font-b);cursor:pointer}
 .ctr{padding:18px 16px 8px}
 
 /* ── ALERT ── */
-.alert{padding:12px 15px;border-radius:9px;margin:14px 16px 0;font-size:13px;font-weight:600}
+.alert{padding:13px 16px;border-radius:10px;margin:14px 16px 0;font-size:14px;font-weight:600}
 .alert-success{background:var(--greenlt);color:#15803d;border:1px solid #86efac}
 .alert-danger{background:var(--redlt);color:#b91c1c;border:1px solid #fca5a5}
 
 /* ── CALL SHEET ── */
 .callsheet{margin-bottom:16px;padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;position:relative;overflow:hidden}
 .callsheet::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 100% 0%,rgba(255,255,255,.14),transparent 60%)}
-.cs-label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;opacity:.8;margin-bottom:5px;position:relative}
+.cs-label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;opacity:.8;margin-bottom:5px;position:relative}
 .cs-main{font-family:var(--font-d);font-size:19px;letter-spacing:.3px;line-height:1.15;position:relative}
-.cs-sub{font-family:var(--font-m);font-size:11.5px;opacity:.9;margin-top:6px;position:relative}
+.cs-sub{font-family:var(--font-m);font-size:12.5px;opacity:.9;margin-top:6px;position:relative}
 
 /* ── KPI ── */
 .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
 .kpi{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:14px 15px}
 .kpi.wide{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between}
-.kpi b{font-family:var(--font-d);font-size:26px;color:var(--blue);display:block;line-height:1}
-.kpi span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-top:5px;font-weight:700}
+.kpi b{font-family:var(--font-d);font-size:27px;color:var(--blue);display:block;line-height:1}
+.kpi span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-top:5px;font-weight:700}
 
 /* ── CARD ── */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:13px;margin-bottom:14px;overflow:hidden}
-.ch{padding:13px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:13.5px;display:flex;align-items:center;justify-content:space-between;gap:8px}
-.ch-link{font-size:11.5px;color:var(--blue);font-weight:700}
+.ch{padding:14px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:48px}
+.ch-link{font-size:12.5px;color:var(--blue);font-weight:700}
 
 /* ── PROFILE ROW ── */
 .prow{display:flex;flex-wrap:wrap;gap:14px;padding:14px 16px}
 .pf{min-width:42%}
-.pf div:first-child{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;font-weight:700}
-.pf div:last-child{font-weight:700;font-size:13px}
+.pf div:first-child{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;font-weight:700}
+.pf div:last-child{font-weight:700;font-size:14px}
 .pf.rate div:last-child{font-family:var(--font-m);color:var(--blue)}
 
 /* ── ITEM ROWS (replace tables — one hand, one thumb) ── */
-.item{padding:13px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.item{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:10px;min-height:52px}
 .item:last-child{border-bottom:none}
-.it-ref{font-family:var(--font-m);color:var(--blue);font-size:11px;font-weight:700}
-.it-title{font-weight:700;font-size:13.5px;margin-top:3px;line-height:1.3}
-.it-meta{font-size:11.5px;color:var(--sub);margin-top:4px;line-height:1.5}
+.it-ref{font-family:var(--font-m);color:var(--blue);font-size:12px;font-weight:700}
+.it-title{font-weight:700;font-size:15.5px;margin-top:3px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.it-meta{font-size:13px;color:var(--sub);margin-top:4px;line-height:1.55}
 .it-side{text-align:right;flex-shrink:0}
-.it-rate{font-family:var(--font-m);font-size:12px;color:var(--blue);font-weight:700;white-space:nowrap}
+.it-rate{font-family:var(--font-m);font-size:13px;color:var(--blue);font-weight:700;white-space:nowrap}
 
 /* ── SUB-TABS (within a page, e.g. Check-Out/Check-In, Attendance/Timesheets) ── */
 .subtabs{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto}
-.subtab-btn{font-family:var(--font-b);font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:20px;border:1.5px solid var(--border2);background:var(--surface);color:var(--sub);white-space:nowrap;flex-shrink:0}
+.subtab-btn{font-family:var(--font-b);font-size:13.5px;font-weight:700;padding:10px 18px;border-radius:20px;border:1.5px solid var(--border2);background:var(--surface);color:var(--sub);white-space:nowrap;flex-shrink:0;min-height:40px}
 .subtab-btn.on{background:var(--blue);border-color:var(--blue);color:#fff}
 .subpanel{display:none}
 .subpanel.on{display:block}
-.booking-pick-item{padding:11px 14px;border:1.5px solid var(--border2);border-radius:8px;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:border-color .15s,background .15s}
+.booking-pick-item{padding:14px;border:1.5px solid var(--border2);border-radius:8px;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:border-color .15s,background .15s;min-height:52px}
 .booking-pick-item:hover{border-color:var(--blue)}
 .booking-pick-item.active{border-color:var(--blue);background:var(--bluelt)}
-.booking-pick-item .bp-ref{font-weight:700;font-size:13px}
-.booking-pick-item .bp-title{font-size:11.5px;color:var(--sub);margin-top:2px}
+.booking-pick-item .bp-ref{font-weight:700;font-size:14px}
+.booking-pick-item .bp-title{font-size:13px;color:var(--sub);margin-top:2px}
 .booking-pick-item .bp-check{color:var(--blue);display:none;flex-shrink:0}
 .booking-pick-item.active .bp-check{display:block}
-.bp-empty{padding:16px 14px;text-align:center;color:var(--muted);font-size:12.5px}
+.bp-empty{padding:16px 14px;text-align:center;color:var(--muted);font-size:13px}
+
+/* ── FILTER PILLS ── */
+.filter-pills{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto}
+.filter-pill{font-family:var(--font-b);font-size:13px;font-weight:700;padding:9px 16px;border-radius:20px;border:1.5px solid var(--border2);background:var(--surface);color:var(--sub);white-space:nowrap;flex-shrink:0;min-height:40px;display:flex;align-items:center}
+.filter-pill.on{background:var(--blue);border-color:var(--blue);color:#fff}
 
 /* ── BADGE ── */
-.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:.02em;white-space:nowrap;margin-top:6px}
+.badge{display:inline-flex;align-items:center;padding:4px 11px;border-radius:20px;font-size:11.5px;font-weight:700;letter-spacing:.02em;white-space:nowrap;margin-top:6px}
 .badge-green{background:var(--greenlt);color:#15803d}
 .badge-blue{background:var(--bluelt);color:var(--blue)}
 .badge-yellow{background:var(--yellowlt);color:var(--yellow)}
@@ -100,86 +108,116 @@ button{font-family:var(--font-b);cursor:pointer}
 .badge-purple{background:var(--purplelt);color:var(--purple)}
 
 /* ── EMPTY STATE ── */
-.empty{padding:34px 20px;text-align:center;color:var(--muted);font-size:13px}
+.empty{padding:34px 20px;text-align:center;color:var(--muted);font-size:14px}
 
 /* ── WARNING BANNER ── */
 .no-link-banner{background:var(--orangelt);border:1.5px solid #fdba74;border-radius:13px;padding:20px;text-align:center;margin-bottom:16px}
 
 /* ── SECTION HEADER ── */
 .sec-hd{margin-bottom:14px}
-.sec-title{font-family:var(--font-d);font-size:22px;letter-spacing:.5px}
-.sec-sub{font-size:12.5px;color:var(--sub);margin-top:2px}
+.sec-title{font-family:var(--font-d);font-size:24px;letter-spacing:.5px}
+.sec-sub{font-size:13.5px;color:var(--sub);margin-top:2px}
 
 /* ── TODAY HERO (dashboard) ── */
 .today-hero{margin-bottom:14px;padding:24px 22px;border-radius:20px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;position:relative;overflow:hidden;box-shadow:0 14px 34px rgba(0,96,199,.32)}
 .today-hero::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 100% 0%,rgba(255,255,255,.18),transparent 60%)}
-.th-eyebrow{position:relative;display:flex;align-items:center;gap:7px;margin-bottom:14px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;opacity:.9}
+.th-eyebrow{position:relative;display:flex;align-items:center;gap:7px;margin-bottom:14px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;opacity:.9}
 .th-dot{width:7px;height:7px;border-radius:50%;background:#4ade80;flex-shrink:0}
 .th-date-row{position:relative;display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
 .th-date{font-family:var(--font-d);font-size:52px;line-height:.85}
-.th-year{font-family:var(--font-m);font-size:13px;opacity:.85}
-.th-title{position:relative;font-family:var(--font-d);font-size:23px;letter-spacing:.3px;line-height:1.1;margin-bottom:10px}
+.th-year{font-family:var(--font-m);font-size:13.5px;opacity:.85}
+.th-title{position:relative;font-family:var(--font-d);font-size:24px;letter-spacing:.3px;line-height:1.15;margin-bottom:10px}
 .th-foot{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:14px;border-top:1px solid rgba(255,255,255,.22)}
-.th-ref{font-family:var(--font-m);font-size:11.5px;opacity:.9}
-.th-status{padding:4px 12px;border-radius:20px;font-size:10.5px;font-weight:700;background:rgba(255,255,255,.18);white-space:nowrap}
+.th-ref{font-family:var(--font-m);font-size:13px;opacity:.9}
+.th-status{padding:6px 13px;border-radius:20px;font-size:11.5px;font-weight:700;background:rgba(255,255,255,.18);white-space:nowrap}
 
 /* ── QUICK ACTIONS ── */
 .qa-row{display:flex;gap:10px;margin-bottom:16px}
-.qa-btn{flex:1;padding:13px 8px;border-radius:12px;background:var(--surface);border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:6px;font-family:var(--font-b);min-height:44px}
-.qa-btn span{font-size:11px;font-weight:700;color:var(--text)}
+.qa-btn{flex:1;padding:13px 8px;border-radius:12px;background:var(--surface);border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:6px;font-family:var(--font-b);min-height:52px}
+.qa-btn svg{width:22px;height:22px}
+.qa-btn span{font-size:12px;font-weight:700;color:var(--text)}
 
 /* ── STAT STRIP ── */
-.stat-strip{display:flex;align-items:center;gap:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;flex-wrap:wrap}
+.stat-strip{display:flex;align-items:center;gap:16px;padding:13px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;flex-wrap:wrap}
 .stat-strip .stat{display:flex;align-items:baseline;gap:5px}
-.stat-strip .stat b{font-family:var(--font-m);font-size:15px;font-weight:700}
-.stat-strip .stat span{font-size:10px;color:var(--muted)}
+.stat-strip .stat b{font-family:var(--font-m);font-size:17px;font-weight:700}
+.stat-strip .stat span{font-size:11px;color:var(--muted)}
 .stat-strip .stat-sep{width:1px;height:14px;background:var(--border)}
 
 /* ── SCHEDULE ITEM (secondary bookings on dashboard) ── */
 .sched-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:9px}
-.sched-item{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;margin-bottom:10px}
+.sched-item{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 14px;display:flex;justify-content:space-between;gap:10px;margin-bottom:10px;min-height:52px}
 .sched-item:last-child{margin-bottom:0}
 
 /* ── MORE SHEET ── */
-.more-item{display:flex;align-items:center;gap:13px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.more-group-label{padding:12px 16px 6px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.more-divider{height:1px;background:var(--border);margin:4px 0}
+.more-item{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid var(--border);min-height:56px}
 .more-item:last-child{border-bottom:none}
-.more-item-ico{width:38px;height:38px;border-radius:10px;background:var(--s2);color:var(--blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.more-item span{font-weight:700;font-size:13.5px}
+.more-item-ico{width:44px;height:44px;border-radius:12px;background:var(--s2);color:var(--blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.more-item span{font-weight:700;font-size:15px}
 
 /* ── MAINTENANCE ICON ── */
-.maint-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.maint-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.maint-icon svg{width:19px;height:19px}
 
 /* ── FAB ── */
-.fab{position:sticky;bottom:88px;margin-left:auto;margin-right:16px;width:fit-content;display:flex;justify-content:flex-end;padding-right:0;z-index:50}
-.fab button{background:var(--blue);color:#fff;border:none;border-radius:24px;padding:13px 20px;font-size:13px;font-weight:700;box-shadow:0 8px 20px rgba(0,96,199,.35);display:flex;align-items:center;gap:7px}
+.fab{position:sticky;bottom:92px;margin-left:auto;margin-right:16px;width:fit-content;display:flex;justify-content:flex-end;padding-right:0;z-index:50}
+.fab button{background:var(--blue);color:#fff;border:none;border-radius:24px;padding:14px 22px;font-size:13.5px;font-weight:700;box-shadow:0 8px 20px rgba(0,96,199,.35);display:flex;align-items:center;gap:8px;min-height:48px}
 
 /* ── BOTTOM TAB BAR ── */
 .tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--surface);border-top:1px solid var(--border);display:flex;box-shadow:0 -4px 18px rgba(11,26,51,.06);z-index:200}
-.tabbar button{flex:1;background:none;border:none;padding:9px 2px 10px;text-align:center;color:var(--muted);font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;font-family:var(--font-b)}
+@media(min-width:480px) and (max-width:599px){.tabbar{max-width:560px}}
+.tabbar button{flex:1;background:none;border:none;padding:8px 2px;text-align:center;color:var(--muted);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;font-family:var(--font-b);min-height:56px}
 .tabbar button.on{color:var(--blue)}
-.tabbar .ico{font-size:17px;display:block;margin-bottom:3px;line-height:1}
+.tabbar .ico{display:flex;align-items:center;justify-content:center;margin-bottom:3px}
+.tabbar .ico svg{width:20px;height:20px}
 
 /* ── MODAL ── */
 .mo{display:none;position:fixed;inset:0;background:rgba(11,26,51,.55);z-index:1000;align-items:flex-end;justify-content:center}
 .mo.on{display:flex}
 .mo-box{background:var(--surface);border-radius:18px 18px 0 0;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;box-shadow:0 -10px 40px rgba(0,0,0,.25)}
-@media(min-width:520px){.mo{align-items:center}.mo-box{border-radius:16px;max-height:88vh}}
+@media(min-width:480px) and (max-width:599px){.mo-box{max-width:560px}}
+@media(min-width:600px){.mo{align-items:center}.mo-box{border-radius:16px;max-height:88vh}}
 .mo-head{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface)}
-.mo-title{font-size:15px;font-weight:800;color:var(--text)}
-.mo-close{background:var(--s2);border:none;font-size:16px;cursor:pointer;color:var(--sub);line-height:1;width:28px;height:28px;border-radius:50%}
+.mo-title{font-size:17px;font-weight:800;color:var(--text)}
+.mo-close{background:var(--s2);border:none;font-size:17px;cursor:pointer;color:var(--sub);line-height:1;width:44px;height:44px;border-radius:50%}
 .mo-body{padding:18px}
 .mo-footer{padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
 
 /* ── FORM ── */
 .fg{margin-bottom:14px}
-.fg label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin-bottom:6px}
-.fg input,.fg select,.fg textarea{width:100%;background:var(--s2);border:1.5px solid var(--border);color:var(--text);padding:10px 12px;border-radius:8px;font-size:13.5px;font-family:var(--font-b);outline:none;transition:border-color .15s}
+.fg label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin-bottom:6px}
+.fg input,.fg select,.fg textarea{width:100%;background:var(--s2);border:1.5px solid var(--border);color:var(--text);padding:12px;border-radius:8px;font-size:14px;font-family:var(--font-b);outline:none;transition:border-color .15s;min-height:44px}
 .fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--blue);background:var(--surface)}
-.fg textarea{resize:vertical;min-height:80px}
-.btn{padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .15s;font-family:var(--font-b)}
+.fg textarea{resize:vertical;min-height:84px}
+.btn{padding:12px 20px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;transition:all .15s;font-family:var(--font-b);min-height:48px}
 .btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:var(--blue2)}
 .btn-outline{background:none;border:1.5px solid var(--border);color:var(--sub)}.btn-outline:hover{border-color:var(--blue);color:var(--blue)}
-.btn-sm{padding:7px 14px;font-size:12px}
+.btn-sm{padding:9px 16px;font-size:12.5px;min-height:40px}
+
+/* ── ATTENDANCE: live status summary + per-member card ── */
+.att-summary{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 15px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:0 0 12px}
+.att-summary .stat{display:flex;align-items:baseline;gap:5px}
+.att-summary .stat b{font-family:var(--font-m);font-size:15px}
+.att-summary .stat span{font-size:11.5px;color:var(--muted)}
+.att-card{border:1px solid var(--border);border-radius:10px;padding:12px 13px;margin-bottom:10px;border-left:3px solid var(--border2);transition:border-left-color .15s}
+.att-card[data-status="present"]{border-left-color:var(--green)}
+.att-card[data-status="late"]{border-left-color:var(--yellow)}
+.att-card[data-status="absent"],.att-card[data-status="no_show"],.att-card[data-status="back_out"]{border-left-color:var(--red)}
+.att-member-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.att-member-name{font-weight:700;font-size:14.5px}
+.att-member-role{font-size:12px;color:var(--muted);margin-top:1px}
+
+/* ── ATTENDANCE HISTORY: card-per-day ── */
+.att-day-card{border:1px solid var(--border);border-radius:10px;padding:13px 14px;margin-bottom:10px}
+.att-day-head{font-weight:700;font-size:14.5px;color:var(--text);margin-bottom:8px}
+.att-chip-row{display:flex;flex-wrap:wrap;gap:8px}
+.att-person-chip{display:flex;align-items:center;gap:6px;padding:6px 10px 6px 6px;border-radius:999px;background:var(--s2);min-height:32px}
+.att-person-chip .mini-av{width:20px;height:20px;border-radius:50%;background:var(--s3);color:var(--sub);display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;flex-shrink:0}
+.att-person-chip span{font-size:12.5px;font-weight:600;color:var(--text)}
+.att-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot-green{background:var(--green)}.dot-yellow{background:var(--yellow)}.dot-red{background:var(--red)}
 </style>
 </head>
 <body>
@@ -195,7 +233,9 @@ button{font-family:var(--font-b);cursor:pointer}
       <div style="font-size:10px;color:var(--muted)">{{ $crewMember ? ($crewMember->position_name ?? 'Crew') : 'Crew' }}</div>
     </div>
     <div class="av">{{ strtoupper(substr($user->first_name ?? 'C', 0, 1)) }}</div>
-    <a href="{{ route('logout') }}" title="Logout" style="color:var(--muted);font-size:18px;line-height:1">&#8677;</a>
+    <a href="{{ route('logout') }}" title="Logout" class="logout-btn">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+    </a>
   </div>
 </div>
 
@@ -337,7 +377,13 @@ button{font-family:var(--font-b);cursor:pointer}
     <div class="sched-item" onclick="showPg('maintenance')" style="cursor:pointer">
       <div style="display:flex;gap:12px;align-items:flex-start">
         <div class="maint-icon" style="background:{{ $mt->maintenance_type==='preventive'?'var(--yellowlt)':'var(--bluelt)' }};color:{{ $mt->maintenance_type==='preventive'?'var(--yellow)':'var(--blue)' }}">
-          {{ $mt->maintenance_type==='preventive'?'🔧':($mt->maintenance_type==='corrective'?'🛠️':($mt->maintenance_type==='calibration'?'🎯':'🧹')) }}
+          @if($mt->maintenance_type==='calibration')
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg>
+          @elseif($mt->maintenance_type==='cleaning')
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.5 9.5 4 15a2.1 2.1 0 1 0 3 3l5.5-5.5"/><path d="M14.5 6.5a3 3 0 1 1 3 3l-2 2-3-3z"/></svg>
+          @else
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg>
+          @endif
         </div>
         <div>
           <div class="it-title">{{ $mt->equipment_name }} needs maintenance</div>
@@ -358,12 +404,20 @@ button{font-family:var(--font-b);cursor:pointer}
       <div class="sec-title">My Bookings</div>
       <div class="sec-sub">Every booking you're assigned to.</div>
     </div>
+    @if ($myBookings->isNotEmpty())
+    <div class="filter-pills" id="bookingFilterPills">
+      <button type="button" class="filter-pill on" onclick="filterBookings('all',this)">All</button>
+      <button type="button" class="filter-pill" onclick="filterBookings('confirmed',this)">Upcoming</button>
+      <button type="button" class="filter-pill" onclick="filterBookings('ongoing,pending_inspection',this)">Active</button>
+      <button type="button" class="filter-pill" onclick="filterBookings('returned',this)">Completed</button>
+    </div>
+    @endif
     <div class="card">
       @if ($myBookings->isEmpty())
       <div class="empty">No bookings assigned to you.</div>
       @else
       @foreach ($myBookings as $bk)
-      <div class="item">
+      <div class="item" data-status="{{ $bk->booking_status }}">
         <div>
           <div class="it-ref">{{ $bk->booking_reference }}</div>
           <div class="it-title">{{ $bk->project_title ?: '—' }}</div>
@@ -375,7 +429,7 @@ button{font-family:var(--font-b);cursor:pointer}
         </div>
         <div class="it-side">
           <div class="it-rate">{{ $bk->rate_used ? '₱'.number_format($bk->rate_used, 2) : '—' }}</div>
-          @if($bk->hours_worked)<div style="font-size:10.5px;color:var(--muted);margin-top:2px">{{ $bk->hours_worked }}hr</div>@endif
+          @if($bk->hours_worked)<div style="font-size:11px;color:var(--muted);margin-top:2px">{{ $bk->hours_worked }}hr</div>@endif
           <span class="badge {{ $bookingBadge[$bk->booking_status] ?? 'badge-gray' }}">{{ ucfirst($bk->booking_status) }}</span>
         </div>
       </div>
@@ -436,28 +490,41 @@ button{font-family:var(--font-b);cursor:pointer}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           </a>
         </div>
-        <div class="it-meta" style="margin-bottom:10px">{{ $tb->booking->project_title ?: '—' }} &middot; {{ date('M j, Y') }}</div>
+        <div class="it-meta" style="margin-bottom:12px">{{ $tb->booking->project_title ?: '—' }} &middot; {{ date('M j, Y') }}</div>
         @if (empty($tb->team))
         <div class="empty" style="padding:16px 0">No crew assigned to this booking yet.</div>
         @else
+        @php
+          $presentN = collect($tb->team)->filter(fn ($t) => ($t->existing_attendance->status ?? 'present') === 'present')->count();
+          $lateN = collect($tb->team)->filter(fn ($t) => ($t->existing_attendance->status ?? 'present') === 'late')->count();
+          $flagN = collect($tb->team)->filter(fn ($t) => in_array($t->existing_attendance->status ?? 'present', ['absent', 'no_show', 'back_out'], true))->count();
+        @endphp
+        <div class="att-summary" id="attSummary{{ $tb->booking->booking_id }}">
+          <div class="stat"><b style="color:var(--green)">{{ $presentN }}</b><span>Present</span></div>
+          <div class="stat"><b style="color:var(--yellow)">{{ $lateN }}</b><span>Late</span></div>
+          <div class="stat"><b style="color:var(--red)">{{ $flagN }}</b><span>Flagged</span></div>
+          <div class="stat"><b style="color:var(--muted)">{{ count($tb->team) }}</b><span>Team</span></div>
+        </div>
         @foreach ($tb->team as $tm)
         @php $ex = $tm->existing_attendance; @endphp
-        <div style="border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
-            <div style="font-weight:700;font-size:13px">{{ $tm->crew_name }}</div>
-            <div style="font-size:10.5px;color:var(--muted)">{{ $tm->position_name ?? '—' }}</div>
+        <div class="att-card" id="attCard{{ $tm->crew_id }}" data-status="{{ $ex->status ?? 'present' }}">
+          <div class="att-member-row">
+            <div>
+              <div class="att-member-name">{{ $tm->crew_name }}</div>
+              <div class="att-member-role">{{ $tm->position_name ?? '—' }}</div>
+            </div>
+            <div class="fg" style="margin-bottom:0;min-width:150px">
+              <select name="crew_status[{{ $tm->crew_id }}]" onchange="toggleAttFields({{ $tm->crew_id }}, this.value);updateAttCard({{ $tm->crew_id }}, this.value);updateAttSummary({{ $tb->booking->booking_id }})">
+                @foreach ($attStatusLabel as $val => $lbl)
+                <option value="{{ $val }}" {{ ($ex->status ?? 'present') === $val ? 'selected' : '' }}>{{ $lbl }}</option>
+                @endforeach
+              </select>
+            </div>
           </div>
-          <div class="fg" style="margin-bottom:8px">
-            <select name="crew_status[{{ $tm->crew_id }}]" onchange="toggleAttFields({{ $tm->crew_id }}, this.value)">
-              @foreach ($attStatusLabel as $val => $lbl)
-              <option value="{{ $val }}" {{ ($ex->status ?? 'present') === $val ? 'selected' : '' }}>{{ $lbl }}</option>
-              @endforeach
-            </select>
-          </div>
-          <div id="attReason{{ $tm->crew_id }}" class="fg" style="margin-bottom:8px;display:{{ in_array($ex->status ?? 'present', ['present','late'], true) ? 'none' : 'block' }}">
+          <div id="attReason{{ $tm->crew_id }}" class="fg" style="margin-bottom:0;margin-top:10px;display:{{ in_array($ex->status ?? 'present', ['present','late'], true) ? 'none' : 'block' }}">
             <input type="text" name="crew_reason[{{ $tm->crew_id }}]" value="{{ $ex->reason ?? '' }}" placeholder="Reason…">
           </div>
-          <div id="attRepl{{ $tm->crew_id }}" class="fg" style="margin-bottom:0;display:{{ in_array($ex->status ?? 'present', ['no_show','back_out'], true) ? 'block' : 'none' }}">
+          <div id="attRepl{{ $tm->crew_id }}" class="fg" style="margin-bottom:0;margin-top:10px;display:{{ in_array($ex->status ?? 'present', ['no_show','back_out'], true) ? 'block' : 'none' }}">
             <select name="crew_replacement[{{ $tm->crew_id }}]">
               <option value="">— Replacement (optional) —</option>
               @foreach ($allActiveCrew as $ac)
@@ -601,7 +668,7 @@ button{font-family:var(--font-b);cursor:pointer}
           @foreach ($cb->items as $it)
           @php $isChecked = $dir === 'out' ? $it->co_checked : $it->ci_checked; @endphp
           <label class="item" style="cursor:pointer">
-            <input type="checkbox" name="items[]" value="{{ $it->equipment_id }}" {{ $isChecked ? 'checked' : '' }} style="width:19px;height:19px;accent-color:var(--blue);flex-shrink:0">
+            <input type="checkbox" name="items[]" value="{{ $it->equipment_id }}" {{ $isChecked ? 'checked' : '' }} style="width:22px;height:22px;accent-color:var(--blue);flex-shrink:0">
             <span style="flex:1">
               <span class="it-title" style="margin-top:0">{{ $it->equipment_name }}</span>
               <span class="it-meta">{{ $it->brand }} {{ $it->model }}</span>
@@ -741,9 +808,9 @@ button{font-family:var(--font-b);cursor:pointer}
 
 <!-- BOTTOM TAB BAR (3 tabs — Time/Reports/Repairs live in the More sheet) -->
 <div class="tabbar">
-  <button class="{{ $activeTab === 'dashboard' ? 'on' : '' }}" data-tab="dashboard" onclick="showPg('dashboard',this)"><span class="ico">&#8962;</span>Today</button>
-  <button class="{{ $activeTab === 'bookings' ? 'on' : '' }}" data-tab="bookings" onclick="showPg('bookings',this)"><span class="ico">&#9638;</span>Schedule</button>
-  <button data-tab="more" onclick="openMo('moMore')"><span class="ico">&#8942;</span>More</button>
+  <button class="{{ $activeTab === 'dashboard' ? 'on' : '' }}" data-tab="dashboard" onclick="showPg('dashboard',this)"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg></span>Today</button>
+  <button class="{{ $activeTab === 'bookings' ? 'on' : '' }}" data-tab="bookings" onclick="showPg('bookings',this)"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></span>Schedule</button>
+  <button data-tab="more" onclick="openMo('moMore')"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></span>More</button>
 </div>
 
 </div><!-- /shell -->
@@ -756,14 +823,17 @@ button{font-family:var(--font-b);cursor:pointer}
       <button class="mo-close" onclick="closeMo('moMore')">&times;</button>
     </div>
     <div>
+      <div class="more-group-label">My Shift</div>
       <div class="more-item" style="cursor:pointer" onclick="closeMo('moMore');showPg('attendance')">
-        <div class="more-item-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+        <div class="more-item-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
         <span>Attendance &amp; Timesheets</span>
       </div>
       <div class="more-item" style="cursor:pointer" onclick="closeMo('moMore');showPg('checklist')">
-        <div class="more-item-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <div class="more-item-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
         <span>Equipment Checklist</span>
       </div>
+      <div class="more-divider"></div>
+      <div class="more-group-label">Report Something</div>
       <div class="more-item" style="cursor:pointer" onclick="closeMo('moMore');showPg('incidents')">
         <div class="more-item-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg></div>
         <span>Incident Reports</span>
@@ -843,7 +913,7 @@ button{font-family:var(--font-b);cursor:pointer}
           <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px">
             @foreach ($damageTypes as $val => $lbl)
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:500;color:var(--sub)">
-              <input type="checkbox" name="damage_types[]" value="{{ $val }}" style="width:16px;height:16px;accent-color:var(--blue)">
+              <input type="checkbox" name="damage_types[]" value="{{ $val }}" style="width:19px;height:19px;accent-color:var(--blue)">
               {{ $lbl }}
             </label>
             @endforeach
@@ -1123,6 +1193,34 @@ function toggleAttFields(crewId, status) {
   const replEl = document.getElementById('attRepl' + crewId);
   if (reasonEl) reasonEl.style.display = (status === 'present' || status === 'late') ? 'none' : 'block';
   if (replEl) replEl.style.display = (status === 'no_show' || status === 'back_out') ? 'block' : 'none';
+}
+function updateAttCard(crewId, status) {
+  const card = document.getElementById('attCard' + crewId);
+  if (card) card.dataset.status = status;
+}
+function updateAttSummary(bookingId) {
+  const box = document.getElementById('attSummary' + bookingId);
+  const panel = document.querySelector('.att-booking-panel[data-booking="' + bookingId + '"]');
+  if (!box || !panel) return;
+  const selects = panel.querySelectorAll('select[name^="crew_status"]');
+  let present = 0, late = 0, flagged = 0;
+  selects.forEach(s => {
+    if (s.value === 'present') present++;
+    else if (s.value === 'late') late++;
+    else if (s.value === 'absent' || s.value === 'no_show' || s.value === 'back_out') flagged++;
+  });
+  const stats = box.querySelectorAll('.stat b');
+  if (stats[0]) stats[0].textContent = present;
+  if (stats[1]) stats[1].textContent = late;
+  if (stats[2]) stats[2].textContent = flagged;
+}
+function filterBookings(statusCsv, btn) {
+  document.querySelectorAll('#bookingFilterPills .filter-pill').forEach(p => p.classList.remove('on'));
+  btn.classList.add('on');
+  const statuses = statusCsv.split(',');
+  document.querySelectorAll('#pg-bookings .item[data-status]').forEach(row => {
+    row.style.display = (statusCsv === 'all' || statuses.includes(row.dataset.status)) ? 'flex' : 'none';
+  });
 }
 function openUpdateMaint(schedId, currentStatus) {
   document.getElementById('maintSchedId').value = schedId;
