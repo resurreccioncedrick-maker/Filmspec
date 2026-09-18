@@ -42,6 +42,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .rc-footer{padding:16px 20px;border-top:1px solid var(--border);font-size:10.5px;color:var(--muted);text-align:center;line-height:1.6}
 
 @media print{.top-bar,.no-print{display:none!important}.rc-wrap{margin:0;padding:0}.rc-sheet{box-shadow:none;border:1px solid #ccc}}
+
+@media (max-width:640px){
+  .top-bar{padding:12px 16px;flex-wrap:wrap;gap:10px}
+  .tbtn{min-height:44px;padding:10px 16px;font-size:13px}
+  .rc-header{grid-template-columns:1fr}
+  .rc-header-right{align-items:flex-start;text-align:left}
+  .rc-info-row{grid-template-columns:1fr;min-height:0}
+  .rc-info-lbl{border-right:none;border-bottom:1px solid var(--border);padding:6px 16px 3px}
+  .rc-info-val{padding:3px 16px 8px;font-size:14px}
+  .rc-amount .val{font-size:26px}
+}
 </style>
 </head>
 <body>

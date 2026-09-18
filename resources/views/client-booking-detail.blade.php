@@ -35,6 +35,45 @@ a{text-decoration:none;color:inherit}
 .layout-grid{display:grid;grid-template-columns:1fr 320px;gap:22px;align-items:start}
 @media (max-width:860px){ .layout-grid{grid-template-columns:1fr} .sidebar-col{position:static !important} }
 
+@media (max-width:640px){
+  .nav{padding:0 16px}
+  .side-btn{min-height:44px;padding:10px 14px;font-size:13.5px}
+
+  /* Progress tracker — 4 nowrap labels + fixed dots had no responsive
+     handling and risked clipping at phone width. Same $ptCurrent-driven
+     done/now/warn/active class logic, just smaller and allowed to wrap. */
+  .pt-dot{width:9px;height:9px}
+  .pt-dot.now{box-shadow:0 0 0 3px var(--bluelt)}
+  .pt-dot.now.warn{box-shadow:0 0 0 3px #fef3c7}
+  .pt-label{font-size:9px;white-space:normal;text-align:center;line-height:1.25;max-width:56px}
+  .pt-line{margin:0 4px 15px}
+
+  .tbl th{font-size:.68rem;padding:9px 12px}
+  .tbl td{font-size:.85rem;padding:10px 12px}
+
+  /* Modals — 44px tap targets, 16px inputs (avoids Safari auto-zoom) */
+  .modal-box{max-width:94vw!important}
+  .modal-close{width:36px;height:36px;font-size:20px}
+  .modal-overlay input,.modal-overlay select,.modal-overlay textarea{
+    font-size:16px!important;min-height:44px;
+  }
+  .modal-overlay textarea{min-height:80px}
+  .modal-overlay button[type=submit],.modal-overlay button[type=button]{min-height:44px}
+  .freq-tab,.sig-tab{min-height:40px}
+
+  /* Inline discount-request box (not a modal — its own id-scoped fields) */
+  #requestDiscountBox select,#requestDiscountBox input,#requestDiscountBox textarea{
+    font-size:16px!important;min-height:44px;
+  }
+  #requestDiscountBox textarea{min-height:70px}
+
+  /* Star rating — glyph-sized tap target was well under 44px */
+  .star-btn{font-size:2rem;padding:8px 6px;min-height:44px;min-width:36px}
+
+  /* Signature pad modal — canvas itself is already fluid-width */
+  #sigSubmitBtn,#modalSignContract button[type=button]{min-height:44px}
+}
+
 /* Sidebar */
 .sidebar-col{position:sticky;top:20px}
 .side-ref{font-family:var(--font-d);font-size:1.5rem;letter-spacing:-.01em;color:var(--text);margin-bottom:6px}
