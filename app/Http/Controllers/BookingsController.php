@@ -6,10 +6,14 @@ use App\Models\Booking;
 use App\Models\Client;
 use App\Models\VehicleRate;
 use App\Support\BookingCosting;
+use App\Support\DataExporter;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BookingsController extends Controller
 {
@@ -29,7 +33,7 @@ class BookingsController extends Controller
         'overdue' => 'Overdue', 'refunded' => 'Refunded', 'cancelled' => 'Cancelled',
     ];
 
-    public function index(Request $request): View
+    public function index(Request $request): View|StreamedResponse|Response
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
@@ -37,6 +41,10 @@ class BookingsController extends Controller
 
         if ($request->isMethod('post')) {
             $msg = $this->handleAction($request, $user, $role);
+        }
+
+        if ($request->filled('export')) {
+            return $this->export($request, $user, $role);
         }
 
         $statusFilter = $request->query('status', '');
@@ -47,33 +55,11 @@ class BookingsController extends Controller
         $page = max(1, (int) $request->query('p', 1));
         $perPage = 15;
 
-        $query = Booking::query()->from('bookings as b')
-            ->join('clients as c', 'b.client_id', '=', 'c.client_id');
+        $query = $this->filteredQuery($request, $user, $role);
 
-        if ($statusFilter === 'archived') {
-            $query->where('b.is_archived', true);
-        } else {
-            $query->where('b.is_archived', false);
-            if ($statusFilter) $query->where('b.booking_status', $statusFilter);
-        }
-        if ($payFilter) $query->where('b.payment_status', $payFilter);
         if ($clientFilter) {
-            $query->where('b.client_id', $clientFilter);
             $fc = DB::table('clients')->where('client_id', $clientFilter)->first();
             $clientFilterName = $fc ? ($fc->company_name ?: $fc->contact_person) : "Client #$clientFilter";
-        }
-        if ($search) {
-            $query->where(function ($w) use ($search) {
-                $w->where('b.booking_reference', 'like', "%$search%")
-                    ->orWhere('b.project_title', 'like', "%$search%")
-                    ->orWhere('c.contact_person', 'like', "%$search%")
-                    ->orWhere('c.company_name', 'like', "%$search%");
-            });
-        }
-        if ($role === 'client') {
-            $query->whereIn('b.client_id', function ($sub) use ($user) {
-                $sub->select('client_id')->from('clients')->where('user_id', $user->user_id);
-            });
         }
 
         $total = (clone $query)->count('b.booking_id');
@@ -134,6 +120,69 @@ class BookingsController extends Controller
             'payBadge' => $this->payBadge,
             'payLabel' => $this->payLabel,
         ]);
+    }
+
+    /** Same filters index() applies, shared with export() so the two can never drift apart. */
+    private function filteredQuery(Request $request, $user, string $role)
+    {
+        $statusFilter = $request->query('status', '');
+        $payFilter = $request->query('pay', '');
+        $clientFilter = (int) $request->query('client', 0);
+        $search = $request->query('q', '');
+
+        $query = Booking::query()->from('bookings as b')
+            ->join('clients as c', 'b.client_id', '=', 'c.client_id');
+
+        if ($statusFilter === 'archived') {
+            $query->where('b.is_archived', true);
+        } else {
+            $query->where('b.is_archived', false);
+            if ($statusFilter) $query->where('b.booking_status', $statusFilter);
+        }
+        if ($payFilter) $query->where('b.payment_status', $payFilter);
+        if ($clientFilter) {
+            $query->where('b.client_id', $clientFilter);
+        }
+        if ($search) {
+            $query->where(function ($w) use ($search) {
+                $w->where('b.booking_reference', 'like', "%$search%")
+                    ->orWhere('b.project_title', 'like', "%$search%")
+                    ->orWhere('c.contact_person', 'like', "%$search%")
+                    ->orWhere('c.company_name', 'like', "%$search%");
+            });
+        }
+        if ($role === 'client') {
+            $query->whereIn('b.client_id', function ($sub) use ($user) {
+                $sub->select('client_id')->from('clients')->where('user_id', $user->user_id);
+            });
+        }
+
+        return $query;
+    }
+
+    /** Export ▾ — reuses filteredQuery() unbounded (no page/perPage) so it always matches what's on screen. */
+    private function export(Request $request, $user, string $role): StreamedResponse|Response
+    {
+        $headers = ['Reference', 'Client', 'Project', 'Shoot Start', 'Shoot End', 'Status', 'Payment', 'Amount'];
+
+        $rows = $this->filteredQuery($request, $user, $role)
+            ->select('b.booking_reference', 'b.project_title', 'b.shoot_date_start', 'b.shoot_date_end',
+                'b.booking_status', 'b.payment_status', 'b.final_amount', 'c.company_name', 'c.contact_person')
+            ->orderByDesc('b.created_at')
+            ->get()
+            ->map(fn ($b) => [
+                $b->booking_reference,
+                $b->company_name ?: $b->contact_person,
+                $b->project_title,
+                Carbon::parse($b->shoot_date_start)->format('M j, Y'),
+                Carbon::parse($b->shoot_date_end)->format('M j, Y'),
+                ucfirst(str_replace('_', ' ', $b->booking_status)),
+                $this->payLabel[$b->payment_status] ?? ucfirst($b->payment_status),
+                '₱' . number_format((float) $b->final_amount, 2),
+            ])
+            ->all();
+
+        return DataExporter::respond($request->query('export'), 'Bookings', $headers, $rows, 'bookings-export');
     }
 
     private function handleAction(Request $request, $user, string $role): ?array

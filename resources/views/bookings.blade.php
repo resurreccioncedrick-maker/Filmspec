@@ -7,6 +7,7 @@
 @endsection
 
 @section('topbarActions')
+@include('partials.export-dropdown', ['id' => 'Bookings'])
 <button onclick="openModal('modalAddBooking')" class="btn btn-primary btn-sm"> New Booking</button>
 @endsection
 

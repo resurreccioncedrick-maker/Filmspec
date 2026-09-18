@@ -303,3 +303,21 @@ function showToast(msg, type) {
   requestAnimationFrame(() => requestAnimationFrame(() => item.classList.add('show')));
   setTimeout(() => { item.classList.remove('show'); setTimeout(() => item.remove(), 300); }, 3500);
 }
+
+// ── Export ▾ dropdown (partials/export-dropdown.blade.php) ─────────────────
+// Event-delegated (not hardcoded element ids) so any number of independent dropdowns can
+// coexist on one page — e.g. Billing's 3 per-tab export buttons.
+document.addEventListener('click', e => {
+  const toggle = e.target.closest('.export-toggle');
+  if (toggle) {
+    const menu = document.getElementById(toggle.dataset.target);
+    const wasOpen = menu && menu.classList.contains('open');
+    document.querySelectorAll('.export-menu.open').forEach(m => m.classList.remove('open'));
+    if (menu && !wasOpen) menu.classList.add('open');
+
+    return;
+  }
+  if (!e.target.closest('.export-menu')) {
+    document.querySelectorAll('.export-menu.open').forEach(m => m.classList.remove('open'));
+  }
+});

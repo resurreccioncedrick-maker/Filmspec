@@ -6,11 +6,12 @@
 <span>Clients</span>
 @endsection
 
-@if ($canManage)
 @section('topbarActions')
+@include('partials.export-dropdown', ['id' => 'Clients'])
+@if ($canManage)
 <button onclick="openModal('modalAddClient')" class="btn btn-primary btn-sm"><i data-feather="user-plus" style="width:14px;height:14px;margin-right:4px;vertical-align:middle"></i> Add Client</button>
-@endsection
 @endif
+@endsection
 
 @section('content')
 @php

@@ -3,13 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Support\DataExporter;
 use App\Support\OtpMailTemplates;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ClientsController extends Controller
 {
@@ -36,7 +39,7 @@ class ClientsController extends Controller
         'ngo' => 'badge-orange', 'government' => 'badge-gray',
     ];
 
-    public function index(Request $request): View|RedirectResponse
+    public function index(Request $request): View|RedirectResponse|StreamedResponse|Response
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
@@ -52,23 +55,17 @@ class ClientsController extends Controller
             $msg = $this->handleAction($request);
         }
 
+        if ($request->filled('export')) {
+            return $this->export($request);
+        }
+
         $typeFilter = $request->query('type', '');
         $statusFilter = $request->query('status', '');
         $search = $request->query('q', '');
         $page = max(1, (int) $request->query('p', 1));
         $perPage = 20;
 
-        $query = DB::table('clients as c');
-        if ($typeFilter) $query->where('c.client_type', $typeFilter);
-        if ($statusFilter) $query->where('c.status', $statusFilter);
-        if ($search) {
-            $query->where(function ($w) use ($search) {
-                $w->where('c.contact_person', 'like', "%$search%")
-                    ->orWhere('c.company_name', 'like', "%$search%")
-                    ->orWhere('c.email', 'like', "%$search%")
-                    ->orWhere('c.phone', 'like', "%$search%");
-            });
-        }
+        $query = $this->filteredQuery($request);
 
         $total = (clone $query)->count('c.client_id');
         $pages = max(1, (int) ceil($total / $perPage));
@@ -108,6 +105,60 @@ class ClientsController extends Controller
             'typeBadge' => $this->typeBadge, 'typeLabel' => $this->typeLabel, 'termLabel' => $this->termLabel,
             'entityTypeLabel' => $this->entityTypeLabel, 'entityTypeBadge' => $this->entityTypeBadge,
         ]);
+    }
+
+    /** Same filters index() applies, shared with export() so the two can never drift apart. */
+    private function filteredQuery(Request $request)
+    {
+        $typeFilter = $request->query('type', '');
+        $statusFilter = $request->query('status', '');
+        $search = $request->query('q', '');
+
+        $query = DB::table('clients as c');
+        if ($typeFilter) $query->where('c.client_type', $typeFilter);
+        if ($statusFilter) $query->where('c.status', $statusFilter);
+        if ($search) {
+            $query->where(function ($w) use ($search) {
+                $w->where('c.contact_person', 'like', "%$search%")
+                    ->orWhere('c.company_name', 'like', "%$search%")
+                    ->orWhere('c.email', 'like', "%$search%")
+                    ->orWhere('c.phone', 'like', "%$search%");
+            });
+        }
+
+        return $query;
+    }
+
+    /** Export ▾ — reuses filteredQuery() unbounded (no page/perPage) so it always matches what's on screen. */
+    private function export(Request $request): StreamedResponse|Response
+    {
+        $headers = ['Client', 'Type', 'Contact', 'Bookings', 'Completed', 'Last Booking', 'Payment Terms'];
+
+        $rows = $this->filteredQuery($request)
+            ->orderBy('c.company_name')->orderBy('c.contact_person')
+            ->select('c.*')
+            ->get()
+            ->map(function ($c) {
+                $bookingStats = DB::table('bookings')
+                    ->where('client_id', $c->client_id)
+                    ->selectRaw('COUNT(*) AS total_bookings')
+                    ->selectRaw("SUM(CASE WHEN booking_status='completed' THEN 1 ELSE 0 END) AS completed_bookings")
+                    ->selectRaw('MAX(shoot_date_start) AS last_booking_date')
+                    ->first();
+
+                return [
+                    $c->company_name ?: $c->contact_person,
+                    $this->typeLabel[$c->client_type] ?? ucfirst($c->client_type),
+                    $c->contact_person,
+                    (int) $bookingStats->total_bookings,
+                    (int) $bookingStats->completed_bookings,
+                    $bookingStats->last_booking_date ? \Illuminate\Support\Carbon::parse($bookingStats->last_booking_date)->format('M j, Y') : '—',
+                    $this->termLabel[$c->payment_terms] ?? ucfirst(str_replace('_', ' ', (string) $c->payment_terms)),
+                ];
+            })
+            ->all();
+
+        return DataExporter::respond($request->query('export'), 'Clients', $headers, $rows, 'clients-export');
     }
 
     private function handleAction(Request $request): ?array
