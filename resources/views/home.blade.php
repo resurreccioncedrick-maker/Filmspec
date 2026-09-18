@@ -2027,6 +2027,33 @@ textarea.fi{resize:vertical;min-height:60px}
           </button>
         </form>
       </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px">
+        <div style="font-family:var(--font-d);font-size:18px;letter-spacing:.3px;margin-bottom:4px">Privacy &amp; Data</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.6">
+          Under the Data Privacy Act (R.A. 10173), you may request that we erase your personal
+          account information. Your booking and payment history is kept for legal/accounting
+          reasons, but your name, email, and contact details are anonymized and your account is
+          deactivated. This cannot be undone.
+        </div>
+        @if ($erasurePending)
+        <div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:7px;padding:10px 13px;font-size:12.5px;line-height:1.5">
+          Your data erasure request is pending review by our team.
+        </div>
+        @else
+        <form method="POST" action="{{ route('home') }}"
+              onsubmit="return confirm('Request erasure of your personal account data? Your name, email, and phone will be anonymized and your account deactivated. This cannot be undone. Continue?')">
+          @csrf
+          <input type="hidden" name="action" value="request_data_erasure">
+          <textarea name="erasure_reason" rows="2" placeholder="Reason (optional)"
+                    style="width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);outline:none;box-sizing:border-box;margin-bottom:12px;resize:vertical"></textarea>
+          <button type="submit"
+                  style="background:#fff;color:#dc2626;border:1.5px solid #dc2626;padding:10px 22px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-b)">
+            Request Account Data Erasure
+          </button>
+        </form>
+        @endif
+      </div>
     </div>
   </div>
 </div>

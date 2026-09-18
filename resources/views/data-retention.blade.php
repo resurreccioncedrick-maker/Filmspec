@@ -76,4 +76,63 @@
     </form>
   </div>
 </div>
+
+<div class="card" style="margin-top:22px">
+  <div class="card-header">
+    <h2 class="card-title">Data Erasure Requests <span class="badge badge-gray" style="margin-left:4px">{{ $erasureRequests->count() }}</span></h2>
+  </div>
+  <div class="card-body">
+    <p style="color:var(--text-muted);font-size:.9rem;line-height:1.6;max-width:640px;margin-bottom:16px">
+      Clients can request erasure of their personal data (Data Privacy Act, R.A. 10173) from their
+      Account page. Approving anonymizes their name/email/phone and deactivates their login —
+      booking and payment records are kept for accounting/legal retention. This cannot be undone.
+    </p>
+
+    @if ($erasureRequests->isEmpty())
+    <div class="empty-state">
+      <i data-feather="shield"></i>
+      <h3>No pending requests</h3>
+      <p>Client-submitted data erasure requests will appear here for review.</p>
+    </div>
+    @else
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Client</th><th>Reason</th><th>Requested</th><th style="text-align:right">Actions</th></tr>
+        </thead>
+        <tbody>
+        @foreach ($erasureRequests as $er)
+        <tr>
+          <td>
+            <div style="font-weight:600">{{ $er->company_name ?: $er->contact_person }}</div>
+            <div style="font-size:.75rem;color:var(--text-muted)">{{ $er->email }}</div>
+          </td>
+          <td style="font-size:.85rem;max-width:280px">{{ $er->reason ?: '—' }}</td>
+          <td style="font-size:.8rem;color:var(--text-muted)">{{ \Illuminate\Support\Carbon::parse($er->created_at)->format('M j, Y') }}</td>
+          <td style="text-align:right">
+            <div style="display:flex;gap:6px;justify-content:flex-end">
+              <form method="POST" action="{{ $drBase }}" onsubmit="return confirm('Anonymize {{ addslashes($er->company_name ?: $er->contact_person) }}\'s personal data and deactivate their account? This cannot be undone.')">
+                @csrf
+                <input type="hidden" name="action" value="process_erasure">
+                <input type="hidden" name="request_id" value="{{ $er->request_id }}">
+                <input type="hidden" name="decision" value="approve">
+                <button type="submit" class="btn btn-outline btn-sm" style="border-color:var(--red);color:var(--red)">Approve &amp; Anonymize</button>
+              </form>
+              <form method="POST" action="{{ $drBase }}" onsubmit="return confirm('Reject this erasure request?')">
+                @csrf
+                <input type="hidden" name="action" value="process_erasure">
+                <input type="hidden" name="request_id" value="{{ $er->request_id }}">
+                <input type="hidden" name="decision" value="reject">
+                <button type="submit" class="btn btn-outline btn-sm">Reject</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        @endforeach
+        </tbody>
+      </table>
+    </div>
+    @endif
+  </div>
+</div>
 @endsection

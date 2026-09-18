@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Support\ChatAttachmentUpload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -95,6 +96,21 @@ class HomeController extends Controller
             }
         }
 
+        if ($isLoggedIn && $request->isMethod('post') && $request->input('action') === 'request_data_erasure') {
+            $alreadyPending = $clientId && DB::table('data_erasure_requests')
+                ->where('client_id', $clientId)->where('status', 'pending')->exists();
+            if ($alreadyPending) {
+                $accountMsg = ['type' => 'error', 'text' => 'You already have a pending data erasure request — our team will process it soon.'];
+            } elseif ($clientId) {
+                DB::table('data_erasure_requests')->insert([
+                    'client_id' => $clientId, 'reason' => trim((string) $request->input('erasure_reason', '')) ?: null,
+                    'status' => 'pending', 'created_at' => now(), 'updated_at' => now(),
+                ]);
+                ActivityLog::record($uid, 'create', 'data_retention', 'Client requested account data erasure (Data Privacy Act)', $clientId);
+                $accountMsg = ['type' => 'success', 'text' => 'Your data erasure request has been submitted. Our team will review it and process it shortly — this may take a few business days.'];
+            }
+        }
+
         $supportMessages = collect();
         if ($isLoggedIn && $clientId) {
             $supportMessages = DB::table('client_support_messages as m')
@@ -159,7 +175,10 @@ class HomeController extends Controller
             'ongoing' => ['#16a34a', 'Ongoing'], 'completed' => ['#64748b', 'Completed'], 'cancelled' => ['#dc2626', 'Cancelled'],
         ];
 
-        return view('home', compact('isLoggedIn', 'user', 'categories', 'equipment', 'clientBookings', 'stats', 'statusMap', 'supportMessages', 'supportMsg', 'faqs', 'publicReviews', 'accountMsg'));
+        $erasurePending = $clientId && DB::table('data_erasure_requests')
+            ->where('client_id', $clientId)->where('status', 'pending')->exists();
+
+        return view('home', compact('isLoggedIn', 'user', 'categories', 'equipment', 'clientBookings', 'stats', 'statusMap', 'supportMessages', 'supportMsg', 'faqs', 'publicReviews', 'accountMsg', 'erasurePending'));
     }
 
     /**
