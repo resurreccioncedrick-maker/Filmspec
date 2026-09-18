@@ -28,6 +28,44 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .checkout-side{position:sticky;top:20px}
 @media (max-width:820px){ .checkout-grid{grid-template-columns:1fr} .checkout-side{position:static} }
 
+@media (max-width:640px){
+  /* Booking Details form — 16px avoids Safari's auto-zoom-on-focus, 44px
+     tap targets. Field ids are untouched (doSubmit() reads them by id). */
+  #bf_title,#bf_type,#bf_start,#bf_end,#bf_location,#bf_notes{
+    font-size:16px!important;min-height:44px;padding:11px 12px!important;
+  }
+  #bf_notes{min-height:64px}
+  #submit_lock_btn{padding:10px 18px!important;font-size:13px!important}
+
+  /* Map — shrink from the desktop 340px so it doesn't eat half the screen;
+     Leaflet is re-measured via invalidateSize() (see script block). */
+  #submitBookingMap{height:200px!important}
+
+  /* Live Cost Preview sidebar */
+  .checkout-side .agree-row{gap:12px}
+  .checkout-side .agree-row input[type=checkbox]{width:20px;height:20px}
+  .checkout-side .agree-link{font-size:14px}
+  #submitBtn{width:100%;min-height:48px;font-size:14.5px}
+
+  /* Sheet tabs */
+  .sheet-tabs{overflow-x:auto}
+  .stab{padding:11px 16px;font-size:13px;min-height:44px;display:flex;align-items:center}
+
+  /* CE breakdown — header/info/totals/footer are fixed-width CSS grids with
+     zero responsive handling today; stack them. The .ce-tbl equipment/crew
+     tables already scroll horizontally (existing overflow-x:auto wrappers),
+     this just makes their text legible instead of a full card rebuild. */
+  .ce-header{grid-template-columns:1fr}
+  .ce-header-left,.ce-header-right{padding:14px 16px}
+  .ce-info-row{grid-template-columns:1fr;min-height:0}
+  .ce-info-lbl{border-right:none;border-bottom:1px solid var(--border);padding:6px 12px 3px}
+  .ce-info-val{padding:3px 12px 8px;font-size:13.5px}
+  .ce-tbl th{font-size:10.5px;padding:8px 10px}
+  .ce-tbl td{font-size:13px;padding:8px 10px}
+  .ce-totals table{max-width:none}
+  .ce-footer{grid-template-columns:1fr;gap:26px}
+}
+
 .ce-sheet{background:#fff;border:1px solid #d1d5db;border-radius:4px;overflow:hidden;margin-bottom:28px;box-shadow:0 4px 20px rgba(0,0,0,.06)}
 
 .ce-header{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid #003D80}
@@ -1404,6 +1442,11 @@ function bfSyncEndMin() {
 }
 
 document.addEventListener('DOMContentLoaded', initSubmitMap);
+// Mobile CSS shrinks #submitBookingMap's height at narrow widths — Leaflet
+// needs invalidateSize() after any container resize (orientation change,
+// browser chrome show/hide) or it redraws misaligned/partially blank.
+window.addEventListener('resize', () => { if (_submitMap) _submitMap.invalidateSize(); });
+window.addEventListener('orientationchange', () => { if (_submitMap) setTimeout(() => _submitMap.invalidateSize(), 200); });
 
 let _submitInFlight = false;
 function doSubmit() {
