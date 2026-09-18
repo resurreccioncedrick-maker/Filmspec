@@ -1276,6 +1276,60 @@ textarea.fi{resize:vertical;min-height:60px}
   #eqDetailMo .mdl{flex-direction:column!important;width:92vw!important;max-width:92vw!important;max-height:90vh!important}
   #edImgArea{width:100%!important;height:170px!important;flex-shrink:0!important;border-radius:var(--radius-lg) var(--radius-lg) 0 0!important}
 
+  /* Hamburger menu — slide-in drawer with a tap-outside-to-close backdrop,
+     matching the approved mobile design, instead of a dropdown below the nav
+     bar. toggleMobileMenu() still just toggles .open on #navMobileMenu —
+     the only markup change is one wrapping div (.nav-mobile-drawer) around
+     the existing, unchanged nl buttons. */
+  .nav-mobile-menu{
+    display:flex;position:fixed;inset:0;top:62px;background:rgba(11,26,51,.4);
+    align-items:stretch;justify-content:flex-start;
+    opacity:0;pointer-events:none;transition:opacity .2s ease;
+    padding:0;gap:0;box-shadow:none;border-bottom:none;
+  }
+  .nav-mobile-menu.open{opacity:1;pointer-events:auto}
+  .nav-mobile-drawer{
+    width:78%;max-width:300px;height:100%;background:var(--surface);
+    padding:12px 0;overflow-y:auto;transform:translateX(-100%);
+    transition:transform .25s ease;box-shadow:8px 0 30px rgba(0,30,80,.15);
+  }
+  .nav-mobile-menu.open .nav-mobile-drawer{transform:translateX(0)}
+  .nav-mobile-menu .nl{
+    width:100%;text-align:left;padding:13px 20px;min-height:52px;
+    font-size:15px;font-weight:700;display:flex;align-items:center;
+  }
+  .nav-mobile-menu .nl.on{background:var(--bluelt);color:var(--blue)}
+
+  /* Hero — rebuilt as a compact gradient card matching the approved mobile
+     design, instead of the desktop full-bleed logo+stats split (logo is
+     already shown in the top nav, so it's not repeated here). Same markup,
+     CSS only: hero-left's logo/eyebrow hidden, stats become their own row,
+     hero-right becomes the gradient card. */
+  .hero-inner{display:block;padding:16px}
+  .hero-logo-wrap,.hero-left>div:nth-child(2){display:none}
+  .hero-left{margin-bottom:14px}
+  .hero-stats-strip{
+    justify-content:space-around!important;margin-top:0!important;
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius-md);padding:14px 10px;
+  }
+  .hstat-mini{align-items:center;text-align:center}
+  .hstat-mini-n{font-size:26px}
+  .hero-right{
+    padding:26px 22px!important;border:none;border-radius:16px;position:relative;overflow:hidden;
+    background:linear-gradient(135deg,var(--blue),var(--blue2));
+  }
+  .hero-right::after{content:"";position:absolute;right:-30px;top:-30px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.08)}
+  .hero-tag{display:none}
+  .hero-right h1{position:relative;font-size:28px!important;line-height:1.05!important;color:#fff!important;margin-bottom:12px!important}
+  .hero-right h1 span{color:#bfe0ff!important}
+  .hero-sub{position:relative;font-size:13.5px;color:rgba(255,255,255,.92);opacity:1;max-width:none}
+  .hero-acts{position:relative;margin-top:4px}
+  .hbtn{min-height:48px}
+  .hbtn.blue{background:#fff;color:var(--blue);box-shadow:none}
+  .hbtn.ghost{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.4)}
+  .hero-eq-line{display:none}
+
   /* Equipment tiles — 2-column grid, image-top card kept at every mobile width
      (replaces the old flip-to-horizontal-list-row treatment). Same markup as
      desktop, renderGrid()'s JS is untouched — only these values change.
@@ -1439,16 +1493,18 @@ textarea.fi{resize:vertical;min-height:60px}
     @endif
   </div>
 </nav>
-<div class="nav-mobile-menu" id="navMobileMenu">
-  <button class="nl on" onclick="showPage('home',this);toggleMobileMenu()">Home</button>
-  <button class="nl" onclick="showPage('equipment',this);toggleMobileMenu()">Equipment</button>
-  @if($isLoggedIn)
-  <button class="nl" onclick="showPage('mybookings',this);toggleMobileMenu()">My Bookings</button>
-  @endif
-  <button class="nl" onclick="showPage('help',this);toggleMobileMenu()">Help</button>
-  @if($isLoggedIn)
-  <button class="nl" onclick="showPage('account',this);toggleMobileMenu()">Account</button>
-  @endif
+<div class="nav-mobile-menu" id="navMobileMenu" onclick="if(event.target===this)toggleMobileMenu()">
+  <div class="nav-mobile-drawer">
+    <button class="nl on" onclick="showPage('home',this);toggleMobileMenu()">Home</button>
+    <button class="nl" onclick="showPage('equipment',this);toggleMobileMenu()">Equipment</button>
+    @if($isLoggedIn)
+    <button class="nl" onclick="showPage('mybookings',this);toggleMobileMenu()">My Bookings</button>
+    @endif
+    <button class="nl" onclick="showPage('help',this);toggleMobileMenu()">Help</button>
+    @if($isLoggedIn)
+    <button class="nl" onclick="showPage('account',this);toggleMobileMenu()">Account</button>
+    @endif
+  </div>
 </div>
 
 <!-- ════════ HOME ════════ -->
