@@ -17,6 +17,21 @@ class SupportChatRetention
     }
 
     /**
+     * A client with any booking that isn't finished (not completed/cancelled) is still an
+     * active relationship — their older support-chat messages may still be relevant to a
+     * live shoot or dispute, so cleanup skips them regardless of age until every one of their
+     * bookings reaches a terminal status.
+     */
+    private static function eligibleQuery(\DateTimeInterface $cutoff)
+    {
+        return DB::table('client_support_messages')
+            ->where('created_at', '<', $cutoff)
+            ->whereNotIn('client_id', function ($q) {
+                $q->select('client_id')->from('bookings')->whereNotIn('booking_status', ['completed', 'cancelled']);
+            });
+    }
+
+    /**
      * Counts for the admin page — how many messages exist, how many are currently past the
      * retention window (i.e. what a run right now would delete), and when cleanup last ran.
      */
@@ -28,9 +43,8 @@ class SupportChatRetention
         return [
             'retention_days' => $days,
             'total_messages' => (int) DB::table('client_support_messages')->count(),
-            'eligible_count' => (int) DB::table('client_support_messages')->where('created_at', '<', $cutoff)->count(),
-            'eligible_with_attachment' => (int) DB::table('client_support_messages')
-                ->where('created_at', '<', $cutoff)->whereNotNull('attachment_path')->count(),
+            'eligible_count' => (int) self::eligibleQuery($cutoff)->count(),
+            'eligible_with_attachment' => (int) self::eligibleQuery($cutoff)->whereNotNull('attachment_path')->count(),
             'last_run_at' => DB::table('system_settings')->where('setting_key', 'support_chat_last_prune_at')->value('setting_value'),
             'last_run_deleted' => DB::table('system_settings')->where('setting_key', 'support_chat_last_prune_count')->value('setting_value'),
         ];
@@ -42,10 +56,7 @@ class SupportChatRetention
         $days = self::retentionDays();
         $cutoff = now()->subDays($days);
 
-        $old = DB::table('client_support_messages')
-            ->where('created_at', '<', $cutoff)
-            ->select('message_id', 'attachment_path')
-            ->get();
+        $old = self::eligibleQuery($cutoff)->select('message_id', 'attachment_path')->get();
 
         foreach ($old as $m) {
             if ($m->attachment_path && Storage::disk('local')->exists($m->attachment_path)) {
@@ -53,7 +64,7 @@ class SupportChatRetention
             }
         }
 
-        $deleted = $old->isEmpty() ? 0 : DB::table('client_support_messages')->where('created_at', '<', $cutoff)->delete();
+        $deleted = $old->isEmpty() ? 0 : self::eligibleQuery($cutoff)->delete();
 
         DB::table('system_settings')->updateOrInsert(
             ['setting_key' => 'support_chat_last_prune_at'],

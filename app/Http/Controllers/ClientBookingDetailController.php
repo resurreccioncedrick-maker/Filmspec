@@ -99,7 +99,7 @@ class ClientBookingDetailController extends Controller
             }
 
             if ($act === 'request_extension') {
-                if (in_array($booking->booking_status, ['confirmed', 'ongoing'], true)) {
+                if (in_array($booking->booking_status, ['confirmed', 'ongoing'], true) && ! $booking->is_archived) {
                     $hasPendingExt = DB::table('booking_extension_requests')->where('booking_id', $id)->where('status', 'pending')->exists();
                     if ($hasPendingExt) {
                         $requestMsg = ['type' => 'error', 'text' => 'You already have a pending extension request.'];
@@ -152,7 +152,7 @@ class ClientBookingDetailController extends Controller
             }
 
             if ($act === 'request_field_item') {
-                if (in_array($booking->booking_status, ['confirmed', 'ongoing'], true)) {
+                if (in_array($booking->booking_status, ['confirmed', 'ongoing'], true) && ! $booking->is_archived) {
                     $itemType = in_array($request->input('item_type'), ['equipment', 'accessory', 'crew'], true)
                         ? $request->input('item_type') : 'equipment';
                     $qty = max(1, (int) $request->input('quantity', 1));

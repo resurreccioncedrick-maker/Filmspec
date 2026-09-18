@@ -129,12 +129,21 @@
       {{ $pendingApprovalCount > 0 ? 'Needs review' : 'All clear' }}
     </span>
   </div>
+  @if ($canSeeFinancials)
   <div class="stat-card green">
     <div class="stat-icon" style="background:var(--greenl);color:var(--green)"><i data-feather="dollar-sign"></i></div>
     <div class="stat-value">₱{{ number_format($totalRevenue / 1000, 1) }}k</div>
     <div class="stat-label">Sales This Month</div>
     <span class="stat-delta up"><i data-feather="trending-up"></i> Payments received</span>
   </div>
+  @else
+  <div class="stat-card">
+    <div class="stat-icon"><i data-feather="users"></i></div>
+    <div class="stat-value">{{ $activeCrewCount }}</div>
+    <div class="stat-label">Active Crew</div>
+    <span class="stat-delta up"><i data-feather="check"></i> On roster</span>
+  </div>
+  @endif
   <div class="stat-card">
     <div class="stat-icon"><i data-feather="camera"></i></div>
     <div class="stat-value">{{ $availableEquipment }}<span style="font-size:16px;color:var(--muted)"> / {{ $totalEquipment }}</span></div>
@@ -169,7 +178,7 @@
             <td style="font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $rb->company_name ?: $rb->contact_person }}</td>
             <td style="color:var(--sub);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $rb->project_title ?: '—' }}</td>
             <td style="font-size:11.5px;color:var(--muted);white-space:nowrap">{{ \Carbon\Carbon::parse($rb->shoot_date_start)->format('M j, Y') }}</td>
-            <td style="font-weight:700;color:var(--accent);font-size:12px">{{ $rb->final_amount > 0 ? '₱' . number_format($rb->final_amount, 0) : '—' }}</td>
+            <td style="font-weight:700;color:var(--accent);font-size:12px">{{ $canSeeFinancials && $rb->final_amount > 0 ? '₱' . number_format($rb->final_amount, 0) : '—' }}</td>
             <td>
               <span class="badge {{ $statusBadge[$rb->booking_status] ?? '' }}" style="font-size:10px">
                 {{ ucfirst(str_replace('_', ' ', $rb->booking_status)) }}

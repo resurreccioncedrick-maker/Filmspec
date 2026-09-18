@@ -10,13 +10,19 @@ class DashboardController extends Controller
 {
     public function index(Request $request): View
     {
+        $role = $request->user()->role->role_name ?? '';
+        // Dashboard is one of the few modules a role can have without also having 'billing' (e.g.
+        // traffic) — the revenue KPI and each booking's billed amount are gated on that second,
+        // more specific permission rather than just "can reach this page at all".
+        $canSeeFinancials = in_array('billing', config("filmspec.role_permissions.$role", []), true);
+
         $totalBookings = (int) DB::table('bookings')->where('booking_status', '!=', 'cancelled')->count();
         $activeBookings = (int) DB::table('bookings')->whereIn('booking_status', ['confirmed', 'ongoing'])->count();
         $pendingApprovalCount = (int) DB::table('bookings')->where('approval_status', 'pending_approval')->count();
-        $totalRevenue = (float) DB::table('payments')
+        $totalRevenue = $canSeeFinancials ? (float) DB::table('payments')
             ->whereMonth('payment_date', now()->month)
             ->whereYear('payment_date', now()->year)
-            ->sum('amount');
+            ->sum('amount') : null;
         $totalEquipment = (int) DB::table('equipment')->where('availability_status', '!=', 'retired')->count();
         $availableEquipment = (int) DB::table('equipment')->where('availability_status', 'available')->count();
         $rentedEquipment = (int) DB::table('equipment')->where('availability_status', 'rented')->count();
@@ -42,6 +48,9 @@ class DashboardController extends Controller
             ->orderByDesc('b.created_at')
             ->limit(7)
             ->get();
+        if (! $canSeeFinancials) {
+            $recentBookings->each(fn ($b) => $b->final_amount = null);
+        }
 
         $currentMonth = $request->query('month', now()->format('Y-m'));
 
@@ -99,7 +108,7 @@ class DashboardController extends Controller
             'totalEquipment', 'availableEquipment', 'rentedEquipment', 'activeCrewCount',
             'openIncidents', 'upcomingCount', 'todayShoots', 'recentBookings', 'currentMonth',
             'calendarBookings', 'rentedAll', 'recentActivity', 'statusBadge', 'payBadge',
-            'greeting', 'dashUserName', 'roleColors'
+            'greeting', 'dashUserName', 'roleColors', 'canSeeFinancials'
         ));
     }
 }
