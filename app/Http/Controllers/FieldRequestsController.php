@@ -114,6 +114,34 @@ class FieldRequestsController extends Controller
         }
         $vehicleId = (int) $request->input('vehicle_rate_id', 0);
 
+        $booking = DB::table('bookings')->where('booking_id', $req->booking_id)->first();
+
+        // Same double-booking guard BookingDetailController::addEquipment()/fieldAddEquipment()
+        // use — approveFieldRequest() never checked this, so without it here, dispatching a
+        // field request was the one equipment-assignment path in the app that could hand the
+        // same physical item to two overlapping bookings at once. Checked (and, for a brand
+        // new line, rejected) BEFORE the atomic claim below, so a rejected dispatch leaves the
+        // request sitting at 'approved' instead of wrongly flipping it to 'dispatched'.
+        if ($req->item_type === 'equipment' && $req->equipment_id) {
+            $alreadyOnThisBooking = DB::table('booking_equipment')->where('booking_id', $req->booking_id)->where('equipment_id', $req->equipment_id)->exists();
+            $conflict = DB::table('booking_equipment as be')
+                ->join('bookings as b', 'be.booking_id', '=', 'b.booking_id')
+                ->where('be.equipment_id', $req->equipment_id)->where('be.booking_id', '!=', $req->booking_id)
+                ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
+                ->where('b.shoot_date_start', '<=', $booking->shoot_date_end)
+                ->where('b.shoot_date_end', '>=', $booking->shoot_date_start)
+                ->value('b.booking_reference');
+            if ($conflict) {
+                return ['type' => 'danger', 'text' => 'This equipment is already allocated to booking <strong>' . e($conflict) . '</strong> on overlapping dates. Reject this request or resolve the conflict before dispatching.'];
+            }
+            if (! $alreadyOnThisBooking) {
+                $equipStatus = DB::table('equipment')->where('equipment_id', $req->equipment_id)->value('availability_status');
+                if ($equipStatus !== 'available') {
+                    return ['type' => 'danger', 'text' => 'This equipment is not available (status: ' . ucfirst($equipStatus ?? 'unknown') . '). Reject this request or choose different equipment.'];
+                }
+            }
+        }
+
         // Atomic claim: only proceed if this row is still 'approved' at the moment of the
         // update. A second near-simultaneous submit (double-click, browser back-and-resubmit)
         // will affect 0 rows here and bail out before touching booking_equipment/accessories —
@@ -125,7 +153,6 @@ class FieldRequestsController extends Controller
             return ['type' => 'danger', 'text' => 'This request is no longer awaiting dispatch.'];
         }
 
-        $booking = DB::table('bookings')->where('booking_id', $req->booking_id)->first();
         $numDays = max(1, (new \DateTime($booking->shoot_date_start))->diff(new \DateTime($booking->shoot_date_end))->days + 1);
 
         if ($req->item_type === 'equipment' && $req->equipment_id) {

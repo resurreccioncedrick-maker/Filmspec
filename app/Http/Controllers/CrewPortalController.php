@@ -585,6 +585,14 @@ class CrewPortalController extends Controller
                 return ['type' => 'danger', 'text' => 'That booking is not assigned to you.'];
             }
 
+            // A crew lead's own submitted date, otherwise unbounded — protects the payroll
+            // no-show/back-out deduction logic in CrewDataController from arbitrarily
+            // backdated/forward-dated entries outside the actual shoot.
+            $shootRange = DB::table('bookings')->where('booking_id', $bid)->select('shoot_date_start', 'shoot_date_end')->first();
+            if ($shootRange && ($date < $shootRange->shoot_date_start || $date > $shootRange->shoot_date_end)) {
+                return ['type' => 'danger', 'text' => 'Attendance date must fall within this booking\'s shoot dates (' . $shootRange->shoot_date_start . ' to ' . $shootRange->shoot_date_end . ').'];
+            }
+
             $logged = 0;
             foreach ((array) $request->input('crew_status', []) as $cid => $status) {
                 $cid = (int) $cid;

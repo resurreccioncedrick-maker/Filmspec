@@ -94,7 +94,7 @@ class EquipmentController extends Controller
                 JOIN bookings b ON be.booking_id = b.booking_id
                 WHERE be.equipment_id = e.equipment_id
                   AND b.booking_status IN ('confirmed','pending')
-                  AND b.shoot_date_start >= CURDATE()
+                  AND b.shoot_date_end >= CURDATE()
                   AND (SELECT COUNT(*) FROM equipment_transactions et
                        WHERE et.booking_id = b.booking_id AND et.equipment_id = e.equipment_id
                        AND et.transaction_type = 'checkout') = 0
@@ -110,7 +110,7 @@ class EquipmentController extends Controller
             ->join('bookings as b', 'be.booking_id', '=', 'b.booking_id')
             ->where('e.availability_status', 'available')
             ->whereIn('b.booking_status', ['confirmed', 'pending'])
-            ->where('b.shoot_date_start', '>=', DB::raw('CURDATE()'))
+            ->where('b.shoot_date_end', '>=', DB::raw('CURDATE()'))
             ->whereRaw('(SELECT COUNT(*) FROM equipment_transactions et
                 WHERE et.booking_id = b.booking_id AND et.equipment_id = e.equipment_id
                 AND et.transaction_type = \'checkout\') = 0')
@@ -229,6 +229,16 @@ class EquipmentController extends Controller
                 if ($up['success']) {
                     ImageUpload::deleteOld($old->image_path ?? null);
                     $imgPath = $up['path'];
+                }
+            }
+
+            $newAvailStatus = $request->input('availability_status', 'available');
+            if ($newAvailStatus !== 'under_repair' && $newAvailStatus !== 'retired') {
+                $hasOpenIncident = DB::table('incident_reports')->where('equipment_id', $eid)->where('status', 'open')->exists();
+                $hasActiveRepair = DB::table('repair_purchase_tickets')->where('equipment_id', $eid)
+                    ->whereIn('status', ['requested', 'approved', 'in_progress'])->exists();
+                if ($hasOpenIncident || $hasActiveRepair) {
+                    return ['type' => 'danger', 'text' => 'Cannot change status — this equipment has an open incident or an active repair ticket. Resolve it first before making the item available again.'];
                 }
             }
 

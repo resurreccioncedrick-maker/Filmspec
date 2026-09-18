@@ -184,6 +184,11 @@ class AttendanceController extends Controller
             $date = $request->input('attendance_date');
             $logged = 0;
 
+            $shootRange = DB::table('bookings')->where('booking_id', $bid)->select('shoot_date_start', 'shoot_date_end')->first();
+            if ($shootRange && ($date < $shootRange->shoot_date_start || $date > $shootRange->shoot_date_end)) {
+                return ['type' => 'danger', 'text' => 'Attendance date must fall within this booking\'s shoot dates (' . $shootRange->shoot_date_start . ' to ' . $shootRange->shoot_date_end . ').'];
+            }
+
             foreach ((array) $request->input('crew_status', []) as $cid => $status) {
                 $cid = (int) $cid;
                 $reason = $request->input("crew_reason.$cid", '');
