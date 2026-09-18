@@ -129,6 +129,7 @@
           @if ($search || $payTypeFilter || $payMethFilter || $rcTypeFilter)
           <a href="{{ $billingBase }}?tab=payments" class="btn btn-secondary btn-sm">Clear</a>
           @endif
+          @include('partials.export-dropdown', ['id' => 'BillingPayments', 'exportValue' => 'payments'])
         </div>
       </form>
     </div>
@@ -198,6 +199,7 @@
   <div class="card">
     <div class="card-header">
       <h2 class="card-title">Confirmed / Ongoing Bookings Not Yet Fully Paid <span class="badge badge-orange" style="margin-left:8px">{{ $pendingPayBkgs->count() }}</span></h2>
+      @include('partials.export-dropdown', ['id' => 'BillingUnbilled', 'exportValue' => 'unbilled'])
     </div>
     <div class="table-wrap">
       @if ($pendingPayBkgs->isEmpty())
@@ -267,6 +269,7 @@
           @if ($soaSearch || $soaStatus)
           <a href="{{ $billingBase }}?tab=soa" class="btn btn-secondary btn-sm">Clear</a>
           @endif
+          @include('partials.export-dropdown', ['id' => 'BillingSoa', 'exportValue' => 'soa'])
         </div>
       </form>
     </div>
@@ -360,6 +363,7 @@
           @if ($odSearch)
           <a href="{{ $billingBase }}?tab=overdue" class="btn btn-secondary btn-sm">Clear</a>
           @endif
+          @include('partials.export-dropdown', ['id' => 'BillingOverdue', 'exportValue' => 'overdue'])
         </div>
       </form>
     </div>
@@ -463,6 +467,7 @@
           @if ($ccSearch || $ccType)
           <a href="{{ $billingBase }}?tab=cancellations" class="btn btn-secondary btn-sm">Clear</a>
           @endif
+          @include('partials.export-dropdown', ['id' => 'BillingCancellations', 'exportValue' => 'cancellations'])
         </div>
       </form>
     </div>
@@ -524,6 +529,7 @@
   <div class="card" style="margin-bottom:16px">
     <div class="card-header">
       <h2 class="card-title">Pending Approval <span class="badge badge-yellow" style="margin-left:8px">{{ $pendingDiscounts->count() }}</span></h2>
+      @include('partials.export-dropdown', ['id' => 'BillingDiscounts', 'exportValue' => 'discounts'])
     </div>
     <div class="table-wrap">
       @if ($pendingDiscounts->isEmpty())

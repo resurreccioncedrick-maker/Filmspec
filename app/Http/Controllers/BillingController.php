@@ -3,9 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Support\DataExporter;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BillingController extends Controller
 {
@@ -21,7 +25,7 @@ class BillingController extends Controller
 
     private array $payLabel = ['unpaid' => 'Pending', 'partial' => 'Partially Paid', 'paid' => 'Fully Paid', 'overdue' => 'Overdue', 'refunded' => 'Refunded', 'cancelled' => 'Cancelled'];
 
-    public function index(Request $request): View
+    public function index(Request $request): View|StreamedResponse|Response
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
@@ -43,6 +47,10 @@ class BillingController extends Controller
             $msg = $this->handleAction($request);
         }
 
+        if ($request->filled('export')) {
+            return $this->export($request);
+        }
+
         $tab = $request->query('tab', 'payments');
 
         $search = $request->query('q', '');
@@ -52,20 +60,7 @@ class BillingController extends Controller
         $page = max(1, (int) $request->query('p', 1));
         $perPage = 15;
 
-        $pQuery = DB::table('payments as p')
-            ->join('bookings as b', 'p.booking_id', '=', 'b.booking_id')
-            ->join('clients as c', 'b.client_id', '=', 'c.client_id');
-        if ($search) {
-            $pQuery->where(function ($w) use ($search) {
-                $w->where('b.booking_reference', 'like', "%$search%")
-                    ->orWhere('c.contact_person', 'like', "%$search%")
-                    ->orWhere('c.company_name', 'like', "%$search%")
-                    ->orWhere('p.receipt_number', 'like', "%$search%");
-            });
-        }
-        if ($payTypeFilter) $pQuery->where('p.payment_type', $payTypeFilter);
-        if ($payMethFilter) $pQuery->where('p.payment_method', $payMethFilter);
-        if ($rcTypeFilter) $pQuery->where('p.receipt_type', $rcTypeFilter);
+        $pQuery = $this->filteredPaymentsQuery($request);
 
         $totalPay = (clone $pQuery)->count();
         $payPages = max(1, (int) ceil($totalPay / $perPage));
@@ -78,19 +73,7 @@ class BillingController extends Controller
 
         $soaSearch = $request->query('q_soa', '');
         $soaStatus = $request->query('sstatus', '');
-        $soQuery = DB::table('statement_of_accounts as s')
-            ->join('bookings as b', 's.booking_id', '=', 'b.booking_id')
-            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
-            ->leftJoin('users as u', 's.prepared_by', '=', 'u.user_id');
-        if ($soaSearch) {
-            $soQuery->where(function ($w) use ($soaSearch) {
-                $w->where('b.booking_reference', 'like', "%$soaSearch%")
-                    ->orWhere('c.company_name', 'like', "%$soaSearch%")
-                    ->orWhere('c.contact_person', 'like', "%$soaSearch%")
-                    ->orWhere('s.soa_reference', 'like', "%$soaSearch%");
-            });
-        }
-        if ($soaStatus) $soQuery->where('s.status', $soaStatus);
+        $soQuery = $this->filteredSoaQuery($request);
         $soaList = $soQuery
             ->orderByDesc('s.created_at')
             ->select('s.*', 'b.booking_reference', 'b.project_title', 'c.contact_person', 'c.company_name')
@@ -118,17 +101,7 @@ class BillingController extends Controller
             ->count();
 
         $odSearch = $request->query('q_od', '');
-        $odQuery = DB::table('statement_of_accounts as s')
-            ->join('bookings as b', 's.booking_id', '=', 'b.booking_id')
-            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
-            ->where('s.status', 'overdue')->where('s.balance', '>', 0);
-        if ($odSearch) {
-            $odQuery->where(function ($w) use ($odSearch) {
-                $w->where('b.booking_reference', 'like', "%$odSearch%")
-                    ->orWhere('c.company_name', 'like', "%$odSearch%")
-                    ->orWhere('c.contact_person', 'like', "%$odSearch%");
-            });
-        }
+        $odQuery = $this->filteredOverdueQuery($request);
         $overdueDetailList = $odQuery
             ->orderBy('s.due_date')
             ->select('s.*', 'b.booking_reference', 'b.project_title', 'b.payment_status', 'c.contact_person', 'c.company_name', 'c.phone as client_phone', 'c.email as client_email')
@@ -137,19 +110,7 @@ class BillingController extends Controller
 
         $ccSearch = $request->query('q_cc', '');
         $ccType = $request->query('ctype', '');
-        $ccQuery = DB::table('booking_cancellations as bc')
-            ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
-            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
-            ->leftJoin('users as u', 'bc.approved_by', '=', 'u.user_id')
-            ->where('bc.status', 'approved')->where('bc.penalty_amount', '>', 0);
-        if ($ccSearch) {
-            $ccQuery->where(function ($w) use ($ccSearch) {
-                $w->where('b.booking_reference', 'like', "%$ccSearch%")
-                    ->orWhere('c.company_name', 'like', "%$ccSearch%")
-                    ->orWhere('c.contact_person', 'like', "%$ccSearch%");
-            });
-        }
-        if ($ccType) $ccQuery->where('bc.request_type', $ccType);
+        $ccQuery = $this->filteredCancellationsQuery($request);
         $cancellationCharges = $ccQuery
             ->orderByDesc('bc.approved_at')
             ->select('bc.*', 'b.booking_reference', 'b.project_title', 'c.contact_person', 'c.company_name')
@@ -203,6 +164,227 @@ class BillingController extends Controller
             'soaBadge' => $this->soaBadge, 'rcBadge' => $this->rcBadge, 'pmBadge' => $this->pmBadge,
             'ptBadge' => $this->ptBadge, 'payBadge' => $this->payBadge, 'payLabel' => $this->payLabel,
         ]);
+    }
+
+    /** Same filters index() applies to the Payments tab, shared with export(). */
+    private function filteredPaymentsQuery(Request $request)
+    {
+        $search = $request->query('q', '');
+        $payTypeFilter = $request->query('ptype', '');
+        $payMethFilter = $request->query('pmethod', '');
+        $rcTypeFilter = $request->query('rctype', '');
+
+        $pQuery = DB::table('payments as p')
+            ->join('bookings as b', 'p.booking_id', '=', 'b.booking_id')
+            ->join('clients as c', 'b.client_id', '=', 'c.client_id');
+        if ($search) {
+            $pQuery->where(function ($w) use ($search) {
+                $w->where('b.booking_reference', 'like', "%$search%")
+                    ->orWhere('c.contact_person', 'like', "%$search%")
+                    ->orWhere('c.company_name', 'like', "%$search%")
+                    ->orWhere('p.receipt_number', 'like', "%$search%");
+            });
+        }
+        if ($payTypeFilter) $pQuery->where('p.payment_type', $payTypeFilter);
+        if ($payMethFilter) $pQuery->where('p.payment_method', $payMethFilter);
+        if ($rcTypeFilter) $pQuery->where('p.receipt_type', $rcTypeFilter);
+
+        return $pQuery;
+    }
+
+    /** Same filters index() applies to the Final Billing (SOA) tab, shared with export(). */
+    private function filteredSoaQuery(Request $request)
+    {
+        $soaSearch = $request->query('q_soa', '');
+        $soaStatus = $request->query('sstatus', '');
+
+        $soQuery = DB::table('statement_of_accounts as s')
+            ->join('bookings as b', 's.booking_id', '=', 'b.booking_id')
+            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+            ->leftJoin('users as u', 's.prepared_by', '=', 'u.user_id');
+        if ($soaSearch) {
+            $soQuery->where(function ($w) use ($soaSearch) {
+                $w->where('b.booking_reference', 'like', "%$soaSearch%")
+                    ->orWhere('c.company_name', 'like', "%$soaSearch%")
+                    ->orWhere('c.contact_person', 'like', "%$soaSearch%")
+                    ->orWhere('s.soa_reference', 'like', "%$soaSearch%");
+            });
+        }
+        if ($soaStatus) $soQuery->where('s.status', $soaStatus);
+
+        return $soQuery;
+    }
+
+    /** Same filter index() applies to the Overdue tab, shared with export(). */
+    private function filteredOverdueQuery(Request $request)
+    {
+        $odSearch = $request->query('q_od', '');
+
+        $odQuery = DB::table('statement_of_accounts as s')
+            ->join('bookings as b', 's.booking_id', '=', 'b.booking_id')
+            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+            ->where('s.status', 'overdue')->where('s.balance', '>', 0);
+        if ($odSearch) {
+            $odQuery->where(function ($w) use ($odSearch) {
+                $w->where('b.booking_reference', 'like', "%$odSearch%")
+                    ->orWhere('c.company_name', 'like', "%$odSearch%")
+                    ->orWhere('c.contact_person', 'like', "%$odSearch%");
+            });
+        }
+
+        return $odQuery;
+    }
+
+    /** Same filters index() applies to the Cancellation Charges tab, shared with export(). */
+    private function filteredCancellationsQuery(Request $request)
+    {
+        $ccSearch = $request->query('q_cc', '');
+        $ccType = $request->query('ctype', '');
+
+        $ccQuery = DB::table('booking_cancellations as bc')
+            ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
+            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+            ->leftJoin('users as u', 'bc.approved_by', '=', 'u.user_id')
+            ->where('bc.status', 'approved')->where('bc.penalty_amount', '>', 0);
+        if ($ccSearch) {
+            $ccQuery->where(function ($w) use ($ccSearch) {
+                $w->where('b.booking_reference', 'like', "%$ccSearch%")
+                    ->orWhere('c.company_name', 'like', "%$ccSearch%")
+                    ->orWhere('c.contact_person', 'like', "%$ccSearch%");
+            });
+        }
+        if ($ccType) $ccQuery->where('bc.request_type', $ccType);
+
+        return $ccQuery;
+    }
+
+    /**
+     * Export ▾ — Billing has 6 independent tabs with no shared column shape, so each gets its
+     * own scoped export (?export=<tab>&format=<fmt>) instead of one combined file, mirroring
+     * the Reports/Crew Data multi-dataset convention.
+     */
+    private function export(Request $request): StreamedResponse|Response
+    {
+        $type = $request->query('export', 'payments');
+        $format = $request->query('format', 'csv');
+
+        if ($type === 'soa') {
+            $headers = ['SOA Ref', 'Booking', 'Client', 'Total Charges', 'Paid', 'Balance', 'Due Date', 'Status'];
+            $rows = $this->filteredSoaQuery($request)->orderByDesc('s.created_at')
+                ->select('s.soa_reference', 'b.booking_reference', 'c.company_name', 'c.contact_person',
+                    's.total_charges', 's.total_payments', 's.balance', 's.due_date', 's.status')
+                ->get()
+                ->map(fn ($s) => [
+                    $s->soa_reference, $s->booking_reference, $s->company_name ?: $s->contact_person,
+                    '₱' . number_format((float) $s->total_charges, 2), '₱' . number_format((float) $s->total_payments, 2),
+                    '₱' . number_format((float) $s->balance, 2),
+                    $s->due_date ? Carbon::parse($s->due_date)->format('M j, Y') : '—',
+                    ucfirst($s->status),
+                ])->all();
+
+            return DataExporter::respond($format, 'Billing — Final Billing (SOA)', $headers, $rows, 'billing-soa-export');
+        }
+
+        if ($type === 'overdue') {
+            $headers = ['SOA Ref', 'Booking', 'Client', 'Balance', 'Due Date', 'Days Overdue'];
+            $rows = $this->filteredOverdueQuery($request)->orderBy('s.due_date')
+                ->select('s.soa_reference', 'b.booking_reference', 'c.company_name', 'c.contact_person', 's.balance', 's.due_date')
+                ->selectRaw('DATEDIFF(CURDATE(), s.due_date) AS days_overdue')
+                ->get()
+                ->map(fn ($s) => [
+                    $s->soa_reference, $s->booking_reference, $s->company_name ?: $s->contact_person,
+                    '₱' . number_format((float) $s->balance, 2),
+                    $s->due_date ? Carbon::parse($s->due_date)->format('M j, Y') : '—',
+                    (int) $s->days_overdue,
+                ])->all();
+
+            return DataExporter::respond($format, 'Billing — Overdue', $headers, $rows, 'billing-overdue-export');
+        }
+
+        if ($type === 'cancellations') {
+            $headers = ['Booking', 'Client', 'Request Type', 'Penalty Amount', 'Approved By', 'Approved At'];
+            $rows = $this->filteredCancellationsQuery($request)->orderByDesc('bc.approved_at')
+                ->select('b.booking_reference', 'c.company_name', 'c.contact_person', 'bc.request_type',
+                    'bc.penalty_amount', 'bc.approved_at', DB::raw("CONCAT(u.first_name,' ',u.last_name) AS approved_by_name"))
+                ->get()
+                ->map(fn ($c) => [
+                    $c->booking_reference, $c->company_name ?: $c->contact_person,
+                    ucfirst(str_replace('_', ' ', $c->request_type)),
+                    '₱' . number_format((float) $c->penalty_amount, 2),
+                    trim((string) $c->approved_by_name) ?: '—',
+                    $c->approved_at ? Carbon::parse($c->approved_at)->format('M j, Y') : '—',
+                ])->all();
+
+            return DataExporter::respond($format, 'Billing — Cancellation Charges', $headers, $rows, 'billing-cancellations-export');
+        }
+
+        if ($type === 'unbilled') {
+            $headers = ['Booking', 'Client', 'Payment Status', 'Total', 'Paid So Far'];
+            $rows = DB::table('bookings as b')
+                ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+                ->leftJoin('payments as p', 'b.booking_id', '=', 'p.booking_id')
+                ->whereIn('b.booking_status', ['confirmed', 'ongoing', 'completed'])
+                ->where('b.payment_status', '!=', 'paid')
+                ->where(function ($w) {
+                    $w->whereNull('b.approval_status')->orWhere('b.approval_status', 'approved');
+                })
+                ->groupBy('b.booking_id', 'b.booking_reference', 'b.final_amount', 'b.payment_status', 'c.contact_person', 'c.company_name')
+                ->orderByDesc('b.shoot_date_start')
+                ->select('b.booking_reference', 'c.company_name', 'c.contact_person', 'b.final_amount', 'b.payment_status')
+                ->selectRaw('COALESCE(SUM(p.amount),0) AS paid_so_far')
+                ->get()
+                ->map(fn ($b) => [
+                    $b->booking_reference, $b->company_name ?: $b->contact_person,
+                    $this->payLabel[$b->payment_status] ?? ucfirst($b->payment_status),
+                    '₱' . number_format((float) $b->final_amount, 2), '₱' . number_format((float) $b->paid_so_far, 2),
+                ])->all();
+
+            return DataExporter::respond($format, 'Billing — Unbilled', $headers, $rows, 'billing-unbilled-export');
+        }
+
+        if ($type === 'discounts') {
+            $headers = ['Booking', 'Client', 'Discount', 'Reason', 'Status', 'Proposed By', 'Reviewed By'];
+            $pending = DB::table('booking_discounts as bd')
+                ->join('bookings as b', 'bd.booking_id', '=', 'b.booking_id')
+                ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+                ->leftJoin('users as u', 'bd.proposed_by', '=', 'u.user_id')
+                ->where('bd.status', 'pending')
+                ->select('b.booking_reference', 'c.company_name', 'c.contact_person', 'bd.discount_type', 'bd.discount_value',
+                    'bd.reason', 'bd.status', DB::raw("CONCAT(u.first_name,' ',u.last_name) AS proposed_by_name"), DB::raw('NULL AS reviewed_by_name'))
+                ->get();
+            $history = DB::table('booking_discounts as bd')
+                ->join('bookings as b', 'bd.booking_id', '=', 'b.booking_id')
+                ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+                ->leftJoin('users as u', 'bd.proposed_by', '=', 'u.user_id')
+                ->leftJoin('users as u2', 'bd.approved_by', '=', 'u2.user_id')
+                ->where('bd.status', '!=', 'pending')
+                ->select('b.booking_reference', 'c.company_name', 'c.contact_person', 'bd.discount_type', 'bd.discount_value',
+                    'bd.reason', 'bd.status', DB::raw("CONCAT(u.first_name,' ',u.last_name) AS proposed_by_name"), DB::raw("CONCAT(u2.first_name,' ',u2.last_name) AS reviewed_by_name"))
+                ->get();
+            $rows = $pending->concat($history)->map(fn ($d) => [
+                $d->booking_reference, $d->company_name ?: $d->contact_person,
+                $d->discount_type === 'percent' ? $d->discount_value . '%' : '₱' . number_format((float) $d->discount_value, 2),
+                $d->reason ?: '—', ucfirst($d->status),
+                trim((string) $d->proposed_by_name) ?: '—', trim((string) $d->reviewed_by_name) ?: '—',
+            ])->all();
+
+            return DataExporter::respond($format, 'Billing — Discounts', $headers, $rows, 'billing-discounts-export');
+        }
+
+        // Default: payments
+        $headers = ['Receipt #', 'Booking', 'Client', 'Type', 'Method', 'Amount', 'Date'];
+        $rows = $this->filteredPaymentsQuery($request)->orderByDesc('p.created_at')
+            ->select('p.receipt_number', 'b.booking_reference', 'c.company_name', 'c.contact_person',
+                'p.payment_type', 'p.payment_method', 'p.amount', 'p.payment_date')
+            ->get()
+            ->map(fn ($p) => [
+                $p->receipt_number, $p->booking_reference, $p->company_name ?: $p->contact_person,
+                ucfirst($p->payment_type), ucfirst(str_replace('_', ' ', $p->payment_method)),
+                '₱' . number_format((float) $p->amount, 2),
+                Carbon::parse($p->payment_date)->format('M j, Y'),
+            ])->all();
+
+        return DataExporter::respond($format, 'Billing — Payments', $headers, $rows, 'billing-payments-export');
     }
 
     private function handleAction(Request $request): ?array
