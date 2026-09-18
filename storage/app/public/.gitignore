@@ -1,2 +1,10 @@
 *
 !.gitignore
+!assets
+assets/*
+!assets/uploads
+assets/uploads/*
+!assets/uploads/equipment
+!assets/uploads/equipment/*
+!assets/uploads/accessories
+!assets/uploads/accessories/*
