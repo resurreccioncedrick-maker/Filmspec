@@ -144,13 +144,12 @@ class BookingDetailController extends Controller
         $unreadComments = MessageReadTracker::unreadCount(Auth::id(), 'booking', $id, 'booking_comments', 'booking_id');
         MessageReadTracker::markRead(Auth::id(), 'booking', $id, $comments->last()->created_at ?? null);
 
-        // Documents (Part 18) — contracts, IDs, etc. attached to this booking.
+        // Documents (Part 18) — IDs, permits, etc. attached to this booking.
         $documents = DB::table('documents as d')
             ->leftJoin('users as u', 'd.uploaded_by', '=', 'u.user_id')
-            ->leftJoin('users as su', 'd.signed_by', '=', 'su.user_id')
             ->where('d.booking_id', $id)
             ->orderByDesc('d.created_at')
-            ->select('d.*', DB::raw("CONCAT(u.first_name,' ',u.last_name) AS uploaded_by_name"), DB::raw("CONCAT(su.first_name,' ',su.last_name) AS signed_by_name"))
+            ->select('d.*', DB::raw("CONCAT(u.first_name,' ',u.last_name) AS uploaded_by_name"))
             ->get();
 
         $bookingAccessories = DB::table('booking_accessories as ba')

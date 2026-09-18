@@ -4,8 +4,8 @@
 @php
   $docBookingId = isset($booking) ? $booking->booking_id : null;
   $docClientId = isset($client) ? $client->client_id : null;
-  $docCatBadge = ['contract' => 'badge-blue', 'id' => 'badge-purple', 'permit' => 'badge-orange', 'other' => 'badge-gray'];
-  $docCatLabel = ['contract' => 'Contract', 'id' => 'ID', 'permit' => 'Permit', 'other' => 'Other'];
+  $docCatBadge = ['id' => 'badge-purple', 'permit' => 'badge-orange', 'other' => 'badge-gray'];
+  $docCatLabel = ['id' => 'ID', 'permit' => 'Permit', 'other' => 'Other'];
   // Computed here rather than requiring every host controller to pass it — delete is gated
   // the same way everywhere Documents appears.
   $canManage = $canManage ?? in_array(auth()->user()->role->role_name ?? '', config('filmspec.manage_roles'), true);
@@ -29,7 +29,6 @@
       </div>
       <select id="docCatFilter" class="form-control" style="width:auto;font-size:12px;padding:7px 10px" onchange="listFilter({rowSelector:'#docsCard tbody tr', searchId:'docSearchTbl', filterId:'docCatFilter'})">
         <option value="">All categories</option>
-        <option value="contract">Contract</option>
         <option value="id">ID</option>
         <option value="permit">Permit</option>
         <option value="other">Other</option>
@@ -45,7 +44,7 @@
     <div class="empty-state">
       <i data-feather="file-text"></i>
       <h3>No documents yet</h3>
-      <p>Contracts, IDs and permits uploaded here are only reachable by staff with access to this {{ $docBookingId ? 'booking' : 'client' }}.</p>
+      <p>IDs and permits uploaded here are only reachable by staff with access to this {{ $docBookingId ? 'booking' : 'client' }}.</p>
     </div>
     @else
     <table>
@@ -58,13 +57,6 @@
         <td>
           <div style="font-weight:600">{{ $d->original_name }}</div>
           @if ($d->note)<div style="font-size:.72rem;color:var(--text-muted)">{{ $d->note }}</div>@endif
-          @if ($d->category === 'contract')
-            @if ($d->signed_at)
-            <div style="font-size:.7rem;color:#15803d;font-weight:600;margin-top:2px">Signed by {{ trim((string) $d->signed_by_name) ?: 'client' }} on {{ date('M j, Y', strtotime($d->signed_at)) }}</div>
-            @else
-            <div style="font-size:.7rem;color:var(--text-muted);margin-top:2px">Not yet signed by client</div>
-            @endif
-          @endif
         </td>
         <td><span class="badge {{ $docCatBadge[$d->category] ?? 'badge-gray' }}">{{ $docCatLabel[$d->category] ?? ucfirst($d->category) }}</span></td>
         <td style="font-size:.8rem;color:var(--text-muted)">
@@ -114,7 +106,6 @@
         <div class="form-group">
           <label>Category</label>
           <select name="category" class="form-control">
-            <option value="contract">Contract</option>
             <option value="id">ID</option>
             <option value="permit">Permit</option>
             <option value="other" selected>Other</option>

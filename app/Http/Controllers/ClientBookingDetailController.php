@@ -243,11 +243,6 @@ class ClientBookingDetailController extends Controller
 
         $crewPositions = DB::table('crew_positions')->orderBy('position_name')->get();
 
-        $contractDocuments = DB::table('documents')
-            ->where('booking_id', $id)->where('category', 'contract')
-            ->orderByDesc('created_at')
-            ->get();
-
         $equipmentLines = DB::table('booking_equipment as be')
             ->join('equipment as e', 'be.equipment_id', '=', 'e.equipment_id')
             ->join('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
@@ -286,7 +281,6 @@ class ClientBookingDetailController extends Controller
             'extensionRequests' => $extensionRequests, 'pendingExtension' => $pendingExtension,
             'equipRequests' => $equipRequests, 'availEquipForRequest' => $availEquipForRequest,
             'availAccessoriesForRequest' => $availAccessoriesForRequest, 'crewPositions' => $crewPositions,
-            'contractDocuments' => $contractDocuments,
             'equipmentLines' => $equipmentLines, 'crewLines' => $crewLines, 'payments' => $payments, 'comments' => $comments,
             'discounts' => $discounts, 'canRequestDiscount' => $canRequestDiscount,
             'statusBadge' => $statusBadge, 'payBadge' => $payBadge, 'payLabel' => $payLabel,

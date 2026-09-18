@@ -19,10 +19,9 @@ class ClientDocumentsController extends Controller
 
         $documents = DB::table('documents as d')
             ->leftJoin('users as u', 'd.uploaded_by', '=', 'u.user_id')
-            ->leftJoin('users as su', 'd.signed_by', '=', 'su.user_id')
             ->where('d.client_id', $id)
             ->orderByDesc('d.created_at')
-            ->select('d.*', DB::raw("CONCAT(u.first_name,' ',u.last_name) AS uploaded_by_name"), DB::raw("CONCAT(su.first_name,' ',su.last_name) AS signed_by_name"))
+            ->select('d.*', DB::raw("CONCAT(u.first_name,' ',u.last_name) AS uploaded_by_name"))
             ->get();
 
         $role = $request->user()->role->role_name ?? '';

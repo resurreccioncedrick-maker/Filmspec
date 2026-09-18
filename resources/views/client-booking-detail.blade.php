@@ -69,9 +69,6 @@ a{text-decoration:none;color:inherit}
 
   /* Star rating — glyph-sized tap target was well under 44px */
   .star-btn{font-size:2rem;padding:8px 6px;min-height:44px;min-width:36px}
-
-  /* Signature pad modal — canvas itself is already fluid-width */
-  #sigSubmitBtn,#modalSignContract button[type=button]{min-height:44px}
 }
 
 /* Sidebar */
@@ -437,37 +434,6 @@ footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-al
     @endif
   </div>
 </div>
-
-@if ($contractDocuments->isNotEmpty())
-<!-- Contract -->
-<div class="card" style="margin-bottom:18px">
-  <div class="card-header">
-    <div class="card-title">Contract</div>
-  </div>
-  <div class="card-body" style="padding:0">
-    @foreach ($contractDocuments as $doc)
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 18px;{{ ! $loop->last ? 'border-bottom:1px solid var(--border)' : '' }}">
-      <div style="min-width:0">
-        <div style="font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ $doc->original_name }}</div>
-        <div style="font-size:11.5px;color:var(--muted)">Uploaded {{ \Illuminate\Support\Carbon::parse($doc->created_at)->format('M j, Y') }}</div>
-        @if ($doc->signed_at)
-        <div style="font-size:11.5px;color:#15803d;font-weight:600;margin-top:2px">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:-1px"><path d="M20 6 9 17l-5-5"/></svg>
-          Signed on {{ \Illuminate\Support\Carbon::parse($doc->signed_at)->format('M j, Y \a\t g:ia') }}
-        </div>
-        @endif
-      </div>
-      <div style="display:flex;gap:8px;flex-shrink:0">
-        <a href="{{ route('documents.download', $doc->document_id) }}" class="side-btn" style="width:auto;padding:8px 14px;font-size:12.5px">Download</a>
-        @if (! $doc->signed_at)
-        <button type="button" onclick="openSignModal({{ $doc->document_id }})" class="side-btn primary" style="width:auto;padding:8px 14px;font-size:12.5px">Sign Contract</button>
-        @endif
-      </div>
-    </div>
-    @endforeach
-  </div>
-</div>
-@endif
 
 <!-- Equipment -->
 <div class="card">
@@ -1182,58 +1148,9 @@ document.addEventListener('keydown', e => { if(e.key==='Escape') { closeCancelMo
   </div>
 </div>
 
-<!-- Sign Contract Modal -->
-<div id="modalSignContract" class="modal-overlay" onclick="if(event.target===this)closeSignModal()">
-  <div class="modal-box" style="max-width:520px">
-    <div class="modal-head">
-      <h3>Sign Contract</h3>
-      <button class="modal-close" onclick="closeSignModal()">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:7px;padding:10px 13px;margin-bottom:14px;font-size:12.5px;color:#15803d;line-height:1.5">
-        By signing, you agree to the terms of this contract document. Download and review it first if you haven't already.
-      </div>
-      <div style="display:flex;gap:6px;margin-bottom:14px">
-        <button type="button" class="sig-tab on" data-mode="drawn" onclick="sigSwitch('drawn')">Draw Signature</button>
-        <button type="button" class="sig-tab" data-mode="typed" onclick="sigSwitch('typed')">Type Name</button>
-      </div>
-      <form method="POST" id="signForm" action="">
-        @csrf
-        <input type="hidden" name="signature_type" id="sigType" value="drawn">
-        <input type="hidden" name="signature_data" id="sigData" value="">
-
-        <div id="sigPanel-drawn">
-          <canvas id="sigCanvas" width="472" height="160" style="width:100%;height:160px;border:1.5px dashed var(--border);border-radius:7px;background:#fff;touch-action:none;cursor:crosshair"></canvas>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
-            <span style="font-size:11px;color:var(--muted)">Draw your signature above</span>
-            <button type="button" onclick="sigClear()" style="background:none;border:none;color:var(--blue,#0060C7);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font-b)">Clear</button>
-          </div>
-        </div>
-        <div id="sigPanel-typed" style="display:none">
-          <input type="text" id="sigTypedName" placeholder="Type your full legal name"
-                 style="width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:12px;border-radius:7px;font-size:20px;font-family:'Segoe Script',cursive,var(--font-b);outline:none;box-sizing:border-box">
-        </div>
-
-        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
-          <button type="button" onclick="closeSignModal()"
-                  style="background:var(--s2);color:var(--sub);border:1.5px solid var(--border);padding:9px 18px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-b)">
-            Cancel
-          </button>
-          <button type="submit" id="sigSubmitBtn" disabled
-                  style="background:#16a34a;color:#fff;border:none;padding:9px 20px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font-b)">
-            Sign & Submit
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
 <style>
 .freq-tab{flex:1;background:var(--s2,#f1f5f9);border:1.5px solid var(--border);color:var(--sub);padding:8px 10px;border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--font-b)}
 .freq-tab.on{background:#16a34a;border-color:#16a34a;color:#fff}
-.sig-tab{flex:1;background:var(--s2,#f1f5f9);border:1.5px solid var(--border);color:var(--sub);padding:8px 10px;border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:var(--font-b)}
-.sig-tab.on{background:#16a34a;border-color:#16a34a;color:#fff}
 </style>
 <script>
 function freqSwitch(type) {
@@ -1262,86 +1179,6 @@ function toggleDiscReqInput() {
   note.style.display = type === 'package' ? '' : 'none';
 }
 
-// ── Sign Contract ────────────────────────────
-let sigCtx = null, sigDrawing = false, sigHasStroke = false;
-
-function openSignModal(docId) {
-  document.getElementById('signForm').action = '/documents/' + docId + '/sign';
-  sigSwitch('drawn');
-  sigClear();
-  document.getElementById('sigTypedName').value = '';
-  document.getElementById('modalSignContract').style.display = 'flex';
-  if (!sigCtx) sigInit();
-}
-function closeSignModal() {
-  document.getElementById('modalSignContract').style.display = 'none';
-}
-
-function sigSwitch(mode) {
-  document.getElementById('sigType').value = mode;
-  document.querySelectorAll('.sig-tab').forEach(t => t.classList.toggle('on', t.dataset.mode === mode));
-  document.getElementById('sigPanel-drawn').style.display = mode === 'drawn' ? '' : 'none';
-  document.getElementById('sigPanel-typed').style.display = mode === 'typed' ? '' : 'none';
-  sigUpdateSubmitState();
-}
-
-function sigInit() {
-  const canvas = document.getElementById('sigCanvas');
-  const ratio = window.devicePixelRatio || 1;
-  canvas.width = canvas.clientWidth * ratio;
-  canvas.height = canvas.clientHeight * ratio;
-  sigCtx = canvas.getContext('2d');
-  sigCtx.scale(ratio, ratio);
-  sigCtx.lineWidth = 2.2;
-  sigCtx.lineCap = 'round';
-  sigCtx.strokeStyle = '#0B1A33';
-
-  const pos = e => {
-    const r = canvas.getBoundingClientRect();
-    return [e.clientX - r.left, e.clientY - r.top];
-  };
-  canvas.addEventListener('pointerdown', e => {
-    sigDrawing = true;
-    const [x, y] = pos(e);
-    sigCtx.beginPath();
-    sigCtx.moveTo(x, y);
-  });
-  canvas.addEventListener('pointermove', e => {
-    if (!sigDrawing) return;
-    const [x, y] = pos(e);
-    sigCtx.lineTo(x, y);
-    sigCtx.stroke();
-    sigHasStroke = true;
-    sigUpdateSubmitState();
-  });
-  ['pointerup', 'pointerleave'].forEach(ev => canvas.addEventListener(ev, () => { sigDrawing = false; }));
-}
-
-function sigClear() {
-  sigHasStroke = false;
-  if (sigCtx) {
-    const canvas = document.getElementById('sigCanvas');
-    sigCtx.clearRect(0, 0, canvas.width, canvas.height);
-  }
-  sigUpdateSubmitState();
-}
-
-document.getElementById('sigTypedName')?.addEventListener('input', sigUpdateSubmitState);
-
-function sigUpdateSubmitState() {
-  const mode = document.getElementById('sigType').value;
-  const ready = mode === 'drawn' ? sigHasStroke : document.getElementById('sigTypedName').value.trim().length >= 2;
-  document.getElementById('sigSubmitBtn').disabled = !ready;
-}
-
-document.getElementById('signForm')?.addEventListener('submit', function (e) {
-  const mode = document.getElementById('sigType').value;
-  if (mode === 'drawn') {
-    document.getElementById('sigData').value = document.getElementById('sigCanvas').toDataURL('image/png');
-  } else {
-    document.getElementById('sigData').value = document.getElementById('sigTypedName').value.trim();
-  }
-});
 </script>
 
 </body>

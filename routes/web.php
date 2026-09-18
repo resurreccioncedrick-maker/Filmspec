@@ -249,10 +249,6 @@ Route::delete('/documents/{id}', [DocumentController::class, 'destroy'])
     ->middleware(['auth'])
     ->whereNumber('id')
     ->name('documents.destroy');
-Route::post('/documents/{id}/sign', [DocumentController::class, 'sign'])
-    ->middleware(['auth'])
-    ->whereNumber('id')
-    ->name('documents.sign');
 
 // Same "controller self-checks access" contract as Documents above — staff via
 // role_permissions.billing, client via booking ownership.

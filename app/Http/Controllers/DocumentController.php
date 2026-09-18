@@ -62,7 +62,7 @@ class DocumentController extends Controller
         }
 
         $category = $request->input('category', 'other');
-        if (! in_array($category, ['contract', 'id', 'permit', 'other'], true)) {
+        if (! in_array($category, ['id', 'permit', 'other'], true)) {
             $category = 'other';
         }
 
@@ -106,48 +106,6 @@ class DocumentController extends Controller
         abort_unless(Storage::disk('local')->exists('documents/' . $doc->stored_name), 404);
 
         return Storage::disk('local')->download('documents/' . $doc->stored_name, $doc->original_name);
-    }
-
-    /**
-     * Client-side e-signature (Part 6). Only the client who owns the booking can sign their own
-     * contract, only while it's still unsigned — re-signing (or signing someone else's contract)
-     * is rejected outright rather than silently overwritten.
-     */
-    public function sign(Request $request, int $id)
-    {
-        $user = $request->user();
-        $role = $user->role->role_name ?? '';
-        abort_unless($role === 'client', 403);
-
-        $doc = DB::table('documents')->where('document_id', $id)->first();
-        if (! $doc || ! $doc->booking_id || ! $this->canClientAccessBooking($user->user_id, (int) $doc->booking_id)) {
-            abort(404);
-        }
-        if ($doc->category !== 'contract') {
-            return back()->with('doc_msg', ['type' => 'danger', 'text' => 'Only contract documents can be signed.']);
-        }
-        if ($doc->signed_at) {
-            return back()->with('doc_msg', ['type' => 'danger', 'text' => 'This contract has already been signed.']);
-        }
-
-        $type = $request->input('signature_type') === 'drawn' ? 'drawn' : 'typed';
-        $data = trim((string) $request->input('signature_data', ''));
-        if ($data === '') {
-            return back()->with('doc_msg', ['type' => 'danger', 'text' => 'Please provide a signature before submitting.']);
-        }
-        if ($type === 'drawn' && ! str_starts_with($data, 'data:image/png;base64,')) {
-            return back()->with('doc_msg', ['type' => 'danger', 'text' => 'Invalid signature data.']);
-        }
-
-        DB::table('documents')->where('document_id', $id)->update([
-            'signed_at' => now(), 'signed_by' => $user->user_id,
-            'signature_data' => $data, 'signature_type' => $type,
-            'updated_at' => now(),
-        ]);
-
-        ActivityLog::record($user->user_id, 'sign', 'booking', 'Signed contract "' . $doc->original_name . '".', $doc->booking_id);
-
-        return back()->with('doc_msg', ['type' => 'success', 'text' => 'Contract signed. Thank you!']);
     }
 
     public function destroy(Request $request, int $id)
