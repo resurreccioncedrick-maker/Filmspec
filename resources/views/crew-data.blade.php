@@ -6,6 +6,11 @@
 <span>Crew Data</span>
 @endsection
 
+@section('topbarActions')
+@include('partials.export-dropdown', ['id' => 'CrewDataByPerson', 'label' => 'Export By-Crew', 'exportValue' => 'by_person'])
+@include('partials.export-dropdown', ['id' => 'CrewDataByRole', 'label' => 'Export By-Role', 'exportValue' => 'by_role'])
+@endsection
+
 @push('head')
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 @endpush

@@ -6,12 +6,13 @@
 <span>Equipment</span>
 @endsection
 
-@if ($canManage)
 @section('topbarActions')
+@include('partials.export-dropdown', ['id' => 'Equipment'])
+@if ($canManage)
 <button onclick="openModal('modalAddCat')" class="btn btn-outline btn-sm"><i data-feather="tag"></i> Category</button>
 <button onclick="openModal('modalAddEquip')" class="btn btn-primary btn-sm"><i data-feather="plus"></i> Add Equipment</button>
-@endsection
 @endif
+@endsection
 
 @section('content')
 @php

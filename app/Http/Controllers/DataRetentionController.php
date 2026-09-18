@@ -4,15 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Support\ClientErasure;
+use App\Support\DataExporter;
 use App\Support\SupportChatRetention;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DataRetentionController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|StreamedResponse|Response
     {
+        if ($request->filled('export')) {
+            return $this->export($request);
+        }
+
         $msg = null;
         $actorId = $request->user()->user_id;
 
@@ -52,5 +60,21 @@ class DataRetentionController extends Controller
             'stats' => SupportChatRetention::stats(),
             'erasureRequests' => ClientErasure::pendingRequests(),
         ]);
+    }
+
+    private function export(Request $request): StreamedResponse|Response
+    {
+        $headers = ['Client', 'Email', 'Reason', 'Requested'];
+
+        $rows = ClientErasure::pendingRequests()
+            ->map(fn ($r) => [
+                $r->company_name ?: $r->contact_person,
+                $r->email,
+                $r->reason ?: '—',
+                Carbon::parse($r->created_at)->format('M j, Y g:ia'),
+            ])
+            ->all();
+
+        return DataExporter::respond($request->query('export'), 'Data Erasure Requests', $headers, $rows, 'data-retention-export');
     }
 }

@@ -6,6 +6,10 @@
 <span>Field Requests</span>
 @endsection
 
+@section('topbarActions')
+@include('partials.export-dropdown', ['id' => 'FieldRequests'])
+@endsection
+
 @section('content')
 @php
   $base = route('field-requests');

@@ -4,9 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Support\BookingCosting;
+use App\Support\DataExporter;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Cross-booking staff queue for field follow-up requests (equipment/accessory/crew) once
@@ -17,7 +21,7 @@ use Illuminate\View\View;
  */
 class FieldRequestsController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|StreamedResponse|Response
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
@@ -31,23 +35,13 @@ class FieldRequestsController extends Controller
             $msg = $this->handleAction($request, $user->user_id);
         }
 
+        if ($request->filled('export')) {
+            return $this->export($request);
+        }
+
         $statusFilter = $request->query('status', 'active');
 
-        $query = DB::table('booking_equipment_requests as r')
-            ->join('bookings as b', 'r.booking_id', '=', 'b.booking_id')
-            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
-            ->leftJoin('equipment as e', 'r.equipment_id', '=', 'e.equipment_id')
-            ->leftJoin('accessories as acc', 'r.accessory_id', '=', 'acc.accessory_id')
-            ->leftJoin('crew_positions as pos', 'r.position_id', '=', 'pos.position_id')
-            ->leftJoin('crew_members as cm', 'r.crew_id', '=', 'cm.crew_id')
-            ->leftJoin('vehicle_rates as vr', 'r.vehicle_rate_id', '=', 'vr.vehicle_id')
-            ->leftJoin('crew_members as drv', 'r.driver_crew_id', '=', 'drv.crew_id');
-
-        if ($statusFilter === 'active') {
-            $query->whereIn('r.status', ['approved', 'dispatched']);
-        } elseif ($statusFilter !== 'all') {
-            $query->where('r.status', $statusFilter);
-        }
+        $query = $this->filteredQuery($request);
 
         $requests = $query->orderByRaw("FIELD(r.status,'approved','dispatched','pending','delivered','rejected')")
             ->orderByDesc('r.created_at')
@@ -79,6 +73,68 @@ class FieldRequestsController extends Controller
             'msg' => $msg, 'requests' => $requests, 'stats' => $stats, 'statusFilter' => $statusFilter,
             'vehicleRates' => $vehicleRates, 'activeDrivers' => $activeDrivers,
         ]);
+    }
+
+    /** Same filters index() applies, shared with export() so the two can never drift apart. */
+    private function filteredQuery(Request $request)
+    {
+        $statusFilter = $request->query('status', 'active');
+
+        $query = DB::table('booking_equipment_requests as r')
+            ->join('bookings as b', 'r.booking_id', '=', 'b.booking_id')
+            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+            ->leftJoin('equipment as e', 'r.equipment_id', '=', 'e.equipment_id')
+            ->leftJoin('accessories as acc', 'r.accessory_id', '=', 'acc.accessory_id')
+            ->leftJoin('crew_positions as pos', 'r.position_id', '=', 'pos.position_id')
+            ->leftJoin('crew_members as cm', 'r.crew_id', '=', 'cm.crew_id')
+            ->leftJoin('vehicle_rates as vr', 'r.vehicle_rate_id', '=', 'vr.vehicle_id')
+            ->leftJoin('crew_members as drv', 'r.driver_crew_id', '=', 'drv.crew_id');
+
+        if ($statusFilter === 'active') {
+            $query->whereIn('r.status', ['approved', 'dispatched']);
+        } elseif ($statusFilter !== 'all') {
+            $query->where('r.status', $statusFilter);
+        }
+
+        return $query;
+    }
+
+    /** Export ▾ — reuses filteredQuery(), already unbounded (no pagination on this page at all). */
+    private function export(Request $request): StreamedResponse|Response
+    {
+        $headers = ['Booking', 'Client', 'Type', 'Item', 'Qty', 'Status', 'Dispatch Info'];
+
+        $rows = $this->filteredQuery($request)
+            ->orderByRaw("FIELD(r.status,'approved','dispatched','pending','delivered','rejected')")
+            ->orderByDesc('r.created_at')
+            ->select(
+                'r.*', 'b.booking_reference', 'c.company_name', 'c.contact_person',
+                'e.equipment_name', 'acc.accessory_name', 'pos.position_name',
+                DB::raw("CONCAT(cm.first_name,' ',cm.last_name) AS crew_name"),
+                'vr.label as vehicle_label',
+                DB::raw("CONCAT(drv.first_name,' ',drv.last_name) AS driver_name")
+            )
+            ->get()
+            ->map(function ($r) {
+                $item = $r->item_type === 'equipment' ? $r->equipment_name
+                    : ($r->item_type === 'accessory' ? $r->accessory_name : $r->position_name);
+                $dispatch = $r->status === 'dispatched'
+                    ? trim(($r->vehicle_label ?: '') . ' · ' . trim((string) $r->driver_name) . ($r->eta ? ' · ETA ' . Carbon::parse($r->eta)->format('M j, g:ia') : ''), ' ·')
+                    : '—';
+
+                return [
+                    $r->booking_reference,
+                    $r->company_name ?: $r->contact_person,
+                    ucfirst($r->item_type),
+                    $item ?: '—',
+                    (int) $r->quantity,
+                    ucfirst($r->status),
+                    $dispatch ?: '—',
+                ];
+            })
+            ->all();
+
+        return DataExporter::respond($request->query('export'), 'Field Requests', $headers, $rows, 'field-requests-export');
     }
 
     private function handleAction(Request $request, int $uid): ?array

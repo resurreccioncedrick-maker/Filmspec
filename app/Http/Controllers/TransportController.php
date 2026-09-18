@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\DataExporter;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TransportController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|StreamedResponse|Response
     {
         $role = $request->user()->role->role_name ?? '';
         $canManage = in_array($role, ['super_admin', 'admin', 'operations_manager'], true);
@@ -18,11 +21,32 @@ class TransportController extends Controller
             $msg = $this->handleAction($request);
         }
 
+        if ($request->filled('export')) {
+            return $this->export($request);
+        }
+
         $vehicleRates = DB::table('vehicle_rates')->orderBy('base_rate')->get();
 
         return view('transport', [
             'msg' => $msg, 'canManage' => $canManage, 'vehicleRates' => $vehicleRates,
         ]);
+    }
+
+    private function export(Request $request): StreamedResponse|Response
+    {
+        $headers = ['Label', 'Type Key', 'Description', 'Base Rate', 'Status'];
+
+        $rows = DB::table('vehicle_rates')->orderBy('base_rate')->get()
+            ->map(fn ($v) => [
+                $v->label,
+                $v->vehicle_type,
+                $v->description ?: '—',
+                '₱' . number_format((float) $v->base_rate, 2),
+                $v->is_active ? 'Active' : 'Inactive',
+            ])
+            ->all();
+
+        return DataExporter::respond($request->query('export'), 'Transport', $headers, $rows, 'transport-export');
     }
 
     private function handleAction(Request $request): ?array

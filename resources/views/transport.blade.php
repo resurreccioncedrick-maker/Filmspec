@@ -6,6 +6,10 @@
 <span>Transport</span>
 @endsection
 
+@section('topbarActions')
+@include('partials.export-dropdown', ['id' => 'Transport'])
+@endsection
+
 @section('content')
 @php $transportBase = route('transport'); @endphp
 

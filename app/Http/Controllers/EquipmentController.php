@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Support\DataExporter;
 use App\Support\ImageUpload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EquipmentController extends Controller
 {
@@ -25,7 +28,7 @@ class EquipmentController extends Controller
         'under_repair' => 'Under Repair', 'retired' => 'Retired',
     ];
 
-    public function index(Request $request): View|JsonResponse
+    public function index(Request $request): View|JsonResponse|StreamedResponse|Response
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
@@ -59,6 +62,10 @@ class EquipmentController extends Controller
             $msg = $this->handleAction($request, $user, $role);
         }
 
+        if ($request->filled('export')) {
+            return $this->export($request);
+        }
+
         $positions = DB::table('crew_positions')->orderBy('position_name')->get();
 
         $catFilter = (int) $request->query('cat', 0);
@@ -68,19 +75,7 @@ class EquipmentController extends Controller
         $page = max(1, (int) $request->query('p', 1));
         $perPage = $viewMode === 'grid' ? 18 : 20;
 
-        $query = DB::table('equipment as e')
-            ->join('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
-            ->where('e.availability_status', '!=', 'retired');
-        if ($catFilter) $query->where('e.category_id', $catFilter);
-        if ($statusFilter) $query->where('e.availability_status', $statusFilter);
-        if ($search) {
-            $query->where(function ($w) use ($search) {
-                $w->where('e.equipment_name', 'like', "%$search%")
-                    ->orWhere('e.brand', 'like', "%$search%")
-                    ->orWhere('e.model', 'like', "%$search%")
-                    ->orWhere('e.serial_number', 'like', "%$search%");
-            });
-        }
+        $query = $this->filteredQuery($request);
 
         $total = (clone $query)->count('e.equipment_id');
         $pages = max(1, (int) ceil($total / $perPage));
@@ -133,6 +128,56 @@ class EquipmentController extends Controller
             'catFilter' => $catFilter, 'statusFilter' => $statusFilter, 'viewMode' => $viewMode, 'search' => $search,
             'condBadge' => $this->condBadge, 'availBadge' => $this->availBadge, 'availLabel' => $this->availLabel,
         ]);
+    }
+
+    /** Same filters index() applies, shared with export() so the two can never drift apart. */
+    private function filteredQuery(Request $request)
+    {
+        $catFilter = (int) $request->query('cat', 0);
+        $statusFilter = $request->query('status', '');
+        $search = $request->query('q', '');
+
+        $query = DB::table('equipment as e')
+            ->join('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
+            ->where('e.availability_status', '!=', 'retired');
+        if ($catFilter) $query->where('e.category_id', $catFilter);
+        if ($statusFilter) $query->where('e.availability_status', $statusFilter);
+        if ($search) {
+            $query->where(function ($w) use ($search) {
+                $w->where('e.equipment_name', 'like', "%$search%")
+                    ->orWhere('e.brand', 'like', "%$search%")
+                    ->orWhere('e.model', 'like', "%$search%")
+                    ->orWhere('e.serial_number', 'like', "%$search%");
+            });
+        }
+
+        return $query;
+    }
+
+    /** Export ▾ — reuses filteredQuery() unbounded (no page/perPage) so it always matches what's on screen. */
+    private function export(Request $request): StreamedResponse|Response
+    {
+        $headers = ['Equipment', 'Category', 'Brand', 'Model', 'Serial', 'Rate/Day', 'Qty', 'Condition', 'Status'];
+
+        $rows = $this->filteredQuery($request)
+            ->select('e.equipment_name', 'ec.category_name', 'e.brand', 'e.model', 'e.serial_number',
+                'e.daily_rate', 'e.stock_quantity', 'e.condition_status', 'e.availability_status')
+            ->orderBy('ec.category_name')->orderBy('e.equipment_name')
+            ->get()
+            ->map(fn ($e) => [
+                $e->equipment_name,
+                $e->category_name,
+                $e->brand,
+                $e->model,
+                $e->serial_number ?: '—',
+                '₱' . number_format((float) $e->daily_rate, 2),
+                (int) $e->stock_quantity,
+                ucfirst(str_replace('_', ' ', $e->condition_status)),
+                $this->availLabel[$e->availability_status] ?? ucfirst($e->availability_status),
+            ])
+            ->all();
+
+        return DataExporter::respond($request->query('export'), 'Equipment', $headers, $rows, 'equipment-export');
     }
 
     private function handleAjaxAction(Request $request): JsonResponse

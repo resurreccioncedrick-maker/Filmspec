@@ -7,6 +7,7 @@
 @endsection
 
 @section('topbarActions')
+@include('partials.export-dropdown', ['id' => 'RepairPurchase'])
 @if ($canPost)
 <button onclick="resetNewTicketForm(); openModal('modalNewTicket')" class="btn btn-primary btn-sm"><i data-feather="plus"></i> New Ticket</button>
 @endif

@@ -7,6 +7,7 @@
 @endsection
 
 @section('topbarActions')
+@include('partials.export-dropdown', ['id' => 'DataRetention'])
 <span class="badge badge-purple" style="padding:5px 12px;font-size:.75rem">Super Admin Mode</span>
 @endsection
 

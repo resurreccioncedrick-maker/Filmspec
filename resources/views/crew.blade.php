@@ -6,8 +6,9 @@
 <span>Crew</span>
 @endsection
 
-@if ($canManage)
 @section('topbarActions')
+@include('partials.export-dropdown', ['id' => 'Crew'])
+@if ($canManage)
 <a href="{{ route('attendance') }}" class="btn btn-outline btn-sm">
   <i data-feather="clock"></i> Attendance
 </a>
@@ -17,8 +18,8 @@
 <button onclick="openModal('modalAddCrew')" class="btn btn-primary btn-sm">
   <i data-feather="user-plus"></i> Add Crew Member
 </button>
-@endsection
 @endif
+@endsection
 
 @section('content')
 @php

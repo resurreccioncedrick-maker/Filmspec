@@ -3,18 +3,101 @@
 namespace App\Http\Controllers;
 
 use App\Support\CeAnalytics;
+use App\Support\DataExporter;
 use App\Support\ReportPeriod;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CrewDataController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|StreamedResponse|Response
     {
+        if ($request->filled('export')) {
+            return $this->export($request);
+        }
+
         $period = ReportPeriod::resolve($request);
         $search = trim((string) $request->query('q', ''));
 
+        [$byPerson, $byRole, $crewLines, $bookingIds] = $this->crewByPersonAndRole($period, $search);
+
+        $spendTotal = (float) $crewLines->sum(fn ($r) => $r->rate_used * $r->paid_days);
+
+        // Chart window is independent of the table period (see ReportPeriod).
+        $chartMonths = $period['chart_months'];
+        $chartKeys = ReportPeriod::chartMonthKeys($chartMonths);
+        $chartCes = CeAnalytics::confirmedCes(
+            ReportPeriod::chartFrom($chartMonths)->toDateTimeString(),
+            now()->endOfDay()->toDateTimeString()
+        );
+        $chartBookingIds = $chartCes->pluck('booking_id');
+        $chartCrewLines = DB::table('booking_crew')
+            ->whereIn('booking_id', $chartBookingIds)
+            ->select('booking_id', 'crew_id', 'rate_used', 'hours_worked')
+            ->get();
+        $chartNoShowDays = DB::table('crew_attendance')
+            ->whereIn('booking_id', $chartBookingIds)
+            ->whereIn('status', ['no_show', 'back_out'])
+            ->select('booking_id', 'crew_id')
+            ->get()
+            ->countBy(fn ($r) => $r->booking_id . '-' . $r->crew_id);
+        foreach ($chartCrewLines as $line) {
+            $bad = $chartNoShowDays->get($line->booking_id . '-' . $line->crew_id, 0);
+            $line->paid_days = max(0.0, (float) $line->hours_worked - $bad);
+        }
+
+        $monthly = collect($chartKeys)->map(function ($key) use ($chartCes, $chartCrewLines) {
+            $ids = $chartCes->filter(fn ($c) => \Illuminate\Support\Carbon::parse($c->confirmed_at)->format('Y-m') === $key)
+                ->pluck('booking_id');
+
+            return (object) [
+                'sort_key' => $key,
+                'label' => \Illuminate\Support\Carbon::createFromFormat('Y-m', $key)->format('M Y'),
+                'spend' => (float) $chartCrewLines->whereIn('booking_id', $ids)->sum(fn ($r) => $r->rate_used * $r->paid_days),
+            ];
+        });
+
+        $monthsInWindow = max(1, $monthly->count());
+        $crewBooked = $crewLines->pluck('crew_id')->unique()->count();
+
+        // "vs last period" pills on Crew Spend and Crew Booked — not Average Per Month, which
+        // is already an average across the chart window, so comparing it to itself wouldn't
+        // mean much. Null for 'all' mode, where the view just omits the pill.
+        $prevPeriod = ReportPeriod::previous($period);
+        $crewDeltas = ['spend' => null, 'crew_booked' => null];
+        if ($prevPeriod) {
+            $prev = $this->spendAndCrewBooked($prevPeriod['from'], $prevPeriod['to']);
+            $crewDeltas['spend'] = ReportPeriod::delta($spendTotal, $prev['spend']);
+            $crewDeltas['crew_booked'] = ReportPeriod::delta($crewBooked, $prev['crew_booked']);
+        }
+
+        return view('crew-data', [
+            'period' => $period, 'search' => $search,
+            'byPerson' => $byPerson, 'byRole' => $byRole, 'monthly' => $monthly,
+            'crewDeltas' => $crewDeltas,
+            'kpis' => [
+                'spend' => $spendTotal,
+                'shoots' => $bookingIds->count(),
+                // Distinct people booked across the window, not line count.
+                'crew_booked' => $crewBooked,
+                'avg_per_month' => round((float) $monthly->sum('spend') / $monthsInWindow, 2),
+                'chart_months' => $chartMonths,
+            ],
+        ]);
+    }
+
+    /**
+     * Shared by index() and export() — the paid-days-minus-no-shows computation that produces
+     * the by-person and by-role tables, factored out so export() can never drift from what's
+     * actually shown on screen for the same period/search.
+     *
+     * @return array{0: \Illuminate\Support\Collection, 1: \Illuminate\Support\Collection, 2: \Illuminate\Support\Collection, 3: \Illuminate\Support\Collection}
+     */
+    private function crewByPersonAndRole(array $period, string $search): array
+    {
         $confirmedCes = CeAnalytics::confirmedCes($period['from'], $period['to']);
         $bookingIds = $confirmedCes->pluck('booking_id');
 
@@ -81,69 +164,37 @@ class CrewDataController extends Controller
             $byRole = $byRole->filter(fn ($r) => str_contains(mb_strtolower($r->role), $needle))->values();
         }
 
-        $spendTotal = (float) $crewLines->sum(fn ($r) => $r->rate_used * $r->paid_days);
+        return [$byPerson, $byRole, $crewLines, $bookingIds];
+    }
 
-        // Chart window is independent of the table period (see ReportPeriod).
-        $chartMonths = $period['chart_months'];
-        $chartKeys = ReportPeriod::chartMonthKeys($chartMonths);
-        $chartCes = CeAnalytics::confirmedCes(
-            ReportPeriod::chartFrom($chartMonths)->toDateTimeString(),
-            now()->endOfDay()->toDateTimeString()
-        );
-        $chartBookingIds = $chartCes->pluck('booking_id');
-        $chartCrewLines = DB::table('booking_crew')
-            ->whereIn('booking_id', $chartBookingIds)
-            ->select('booking_id', 'crew_id', 'rate_used', 'hours_worked')
-            ->get();
-        $chartNoShowDays = DB::table('crew_attendance')
-            ->whereIn('booking_id', $chartBookingIds)
-            ->whereIn('status', ['no_show', 'back_out'])
-            ->select('booking_id', 'crew_id')
-            ->get()
-            ->countBy(fn ($r) => $r->booking_id . '-' . $r->crew_id);
-        foreach ($chartCrewLines as $line) {
-            $bad = $chartNoShowDays->get($line->booking_id . '-' . $line->crew_id, 0);
-            $line->paid_days = max(0.0, (float) $line->hours_worked - $bad);
+    /** Export ▾ — two datasets (by-crew, by-role), same computation index() uses. */
+    private function export(Request $request): StreamedResponse|Response
+    {
+        $period = ReportPeriod::resolve($request);
+        $search = trim((string) $request->query('q', ''));
+        $type = $request->query('export', 'by_person');
+
+        [$byPerson, $byRole] = $this->crewByPersonAndRole($period, $search);
+
+        if ($type === 'by_role') {
+            $headers = ['Role', 'Shoots', 'Headcount', 'Paid'];
+            $rows = $byRole->map(fn ($r) => [
+                $r->role, $r->shoots, $r->headcount, '₱' . number_format($r->paid, 2),
+            ])->all();
+            $title = 'Crew Data — By Role';
+            $filename = 'crew-data-by-role';
+        } else {
+            $headers = ['Crew Member', 'Positions', 'Shoots', 'Paid Days', 'Paid', 'No-Shows', 'Last Worked'];
+            $rows = $byPerson->map(fn ($p) => [
+                $p->name, $p->positions ?: '—', $p->shoots, $p->days,
+                '₱' . number_format($p->paid, 2), $p->no_shows,
+                $p->last_worked ? \Illuminate\Support\Carbon::parse($p->last_worked)->format('M j, Y') : '—',
+            ])->all();
+            $title = 'Crew Data — By Crew Member';
+            $filename = 'crew-data-by-person';
         }
 
-        $monthly = collect($chartKeys)->map(function ($key) use ($chartCes, $chartCrewLines) {
-            $ids = $chartCes->filter(fn ($c) => \Illuminate\Support\Carbon::parse($c->confirmed_at)->format('Y-m') === $key)
-                ->pluck('booking_id');
-
-            return (object) [
-                'sort_key' => $key,
-                'label' => \Illuminate\Support\Carbon::createFromFormat('Y-m', $key)->format('M Y'),
-                'spend' => (float) $chartCrewLines->whereIn('booking_id', $ids)->sum(fn ($r) => $r->rate_used * $r->paid_days),
-            ];
-        });
-
-        $monthsInWindow = max(1, $monthly->count());
-        $crewBooked = $crewLines->pluck('crew_id')->unique()->count();
-
-        // "vs last period" pills on Crew Spend and Crew Booked — not Average Per Month, which
-        // is already an average across the chart window, so comparing it to itself wouldn't
-        // mean much. Null for 'all' mode, where the view just omits the pill.
-        $prevPeriod = ReportPeriod::previous($period);
-        $crewDeltas = ['spend' => null, 'crew_booked' => null];
-        if ($prevPeriod) {
-            $prev = $this->spendAndCrewBooked($prevPeriod['from'], $prevPeriod['to']);
-            $crewDeltas['spend'] = ReportPeriod::delta($spendTotal, $prev['spend']);
-            $crewDeltas['crew_booked'] = ReportPeriod::delta($crewBooked, $prev['crew_booked']);
-        }
-
-        return view('crew-data', [
-            'period' => $period, 'search' => $search,
-            'byPerson' => $byPerson, 'byRole' => $byRole, 'monthly' => $monthly,
-            'crewDeltas' => $crewDeltas,
-            'kpis' => [
-                'spend' => $spendTotal,
-                'shoots' => $bookingIds->count(),
-                // Distinct people booked across the window, not line count.
-                'crew_booked' => $crewBooked,
-                'avg_per_month' => round((float) $monthly->sum('spend') / $monthsInWindow, 2),
-                'chart_months' => $chartMonths,
-            ],
-        ]);
+        return DataExporter::respond($request->query('format', 'csv'), $title, $headers, $rows, $filename);
     }
 
     /** Same paid-days-minus-no-shows logic as the main query, for an arbitrary window — used

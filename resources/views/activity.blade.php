@@ -6,6 +6,10 @@
 <span>Activity</span>
 @endsection
 
+@section('topbarActions')
+@include('partials.export-dropdown', ['id' => 'Activity'])
+@endsection
+
 @section('content')
 @php $activityBase = route('activity'); @endphp
 

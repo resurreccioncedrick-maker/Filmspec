@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Support\DataExporter;
 use App\Support\ImageUpload;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CrewController extends Controller
 {
@@ -18,7 +21,7 @@ class CrewController extends Controller
 
     private array $typeLabel = ['staff' => 'Staff', 'freelance' => 'Freelance', 'on_call' => 'On Call'];
 
-    public function index(Request $request): View
+    public function index(Request $request): View|StreamedResponse|Response
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
@@ -29,6 +32,10 @@ class CrewController extends Controller
             $msg = $this->handleAction($request);
         }
 
+        if ($request->filled('export')) {
+            return $this->export($request);
+        }
+
         $statusFilter = $request->query('status', '');
         $posFilter = (int) $request->query('pos', 0);
         $etFilter = $request->query('et', '');
@@ -36,20 +43,7 @@ class CrewController extends Controller
         $page = max(1, (int) $request->query('p', 1));
         $perPage = 20;
 
-        $query = DB::table('crew_members as cm')
-            ->leftJoin('crew_positions as cp', 'cm.primary_position_id', '=', 'cp.position_id')
-            ->leftJoin('users as lu', 'cm.user_id', '=', 'lu.user_id');
-        if ($statusFilter) $query->where('cm.status', $statusFilter);
-        if ($posFilter) $query->where('cm.primary_position_id', $posFilter);
-        if ($etFilter) $query->where('cm.employment_type', $etFilter);
-        if ($search) {
-            $query->where(function ($w) use ($search) {
-                $w->where('cm.first_name', 'like', "%$search%")
-                    ->orWhere('cm.last_name', 'like', "%$search%")
-                    ->orWhere('cm.phone', 'like', "%$search%")
-                    ->orWhere('cp.position_name', 'like', "%$search%");
-            });
-        }
+        $query = $this->filteredQuery($request);
 
         $total = (clone $query)->count('cm.crew_id');
         $pages = max(1, (int) ceil($total / $perPage));
@@ -115,6 +109,56 @@ class CrewController extends Controller
             'currentAssignments' => $currentAssignments,
             'statusBadge' => $this->statusBadge, 'typeBadge' => $this->typeBadge, 'typeLabel' => $this->typeLabel,
         ]);
+    }
+
+    /** Same filters index() applies, shared with export() so the two can never drift apart. */
+    private function filteredQuery(Request $request)
+    {
+        $statusFilter = $request->query('status', '');
+        $posFilter = (int) $request->query('pos', 0);
+        $etFilter = $request->query('et', '');
+        $search = $request->query('q', '');
+
+        $query = DB::table('crew_members as cm')
+            ->leftJoin('crew_positions as cp', 'cm.primary_position_id', '=', 'cp.position_id')
+            ->leftJoin('users as lu', 'cm.user_id', '=', 'lu.user_id');
+        if ($statusFilter) $query->where('cm.status', $statusFilter);
+        if ($posFilter) $query->where('cm.primary_position_id', $posFilter);
+        if ($etFilter) $query->where('cm.employment_type', $etFilter);
+        if ($search) {
+            $query->where(function ($w) use ($search) {
+                $w->where('cm.first_name', 'like', "%$search%")
+                    ->orWhere('cm.last_name', 'like', "%$search%")
+                    ->orWhere('cm.phone', 'like', "%$search%")
+                    ->orWhere('cp.position_name', 'like', "%$search%");
+            });
+        }
+
+        return $query;
+    }
+
+    /** Export ▾ — reuses filteredQuery() unbounded (no page/perPage) so it always matches what's on screen. */
+    private function export(Request $request): StreamedResponse|Response
+    {
+        $headers = ['Crew Member', 'Position', 'Department', 'Type', 'Rate (12hr)', 'Phone', 'Status'];
+
+        $rows = $this->filteredQuery($request)
+            ->select('cm.first_name', 'cm.last_name', 'cp.position_name', 'cp.department',
+                'cm.employment_type', 'cm.base_rate_12hr', 'cm.phone', 'cm.status')
+            ->orderBy('cm.last_name')->orderBy('cm.first_name')
+            ->get()
+            ->map(fn ($c) => [
+                trim($c->first_name . ' ' . $c->last_name),
+                $c->position_name ?: '—',
+                $c->department ?: '—',
+                $this->typeLabel[$c->employment_type] ?? ucfirst($c->employment_type),
+                '₱' . number_format((float) $c->base_rate_12hr, 2),
+                $c->phone ?: '—',
+                ucfirst($c->status),
+            ])
+            ->all();
+
+        return DataExporter::respond($request->query('export'), 'Crew Registry', $headers, $rows, 'crew-export');
     }
 
     private function handleAction(Request $request): ?array

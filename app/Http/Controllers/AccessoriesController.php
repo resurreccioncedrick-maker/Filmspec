@@ -3,15 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Support\DataExporter;
 use App\Support\ImageUpload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AccessoriesController extends Controller
 {
-    public function index(Request $request): View|JsonResponse
+    public function index(Request $request): View|JsonResponse|StreamedResponse|Response
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
@@ -40,21 +43,14 @@ class AccessoriesController extends Controller
             return $this->handleAjaxAction($request);
         }
 
+        if ($request->filled('export')) {
+            return $this->export($request);
+        }
+
         $search = $request->query('q', '');
         $inclFilter = $request->query('incl', '');
 
-        $query = DB::table('accessories as a');
-        if ($search) {
-            $query->where(function ($w) use ($search) {
-                $w->where('a.accessory_name', 'like', "%$search%")
-                    ->orWhere('a.description', 'like', "%$search%");
-            });
-        }
-        if ($inclFilter !== '') {
-            $query->where('a.is_included', (int) $inclFilter);
-        }
-
-        $accessories = $query->orderBy('a.accessory_name')->select('a.*')->get();
+        $accessories = $this->filteredQuery($request)->orderBy('a.accessory_name')->select('a.*')->get();
 
         foreach ($accessories as $acc) {
             $linked = DB::table('equipment_accessory_links as eal')
@@ -93,6 +89,64 @@ class AccessoriesController extends Controller
             'accessories' => $accessories, 'allEquipment' => $allEquipment, 'stats' => $stats,
             'search' => $search, 'inclFilter' => $inclFilter,
         ]);
+    }
+
+    /** Same filters index() applies, shared with export() so the two can never drift apart. */
+    private function filteredQuery(Request $request)
+    {
+        $search = $request->query('q', '');
+        $inclFilter = $request->query('incl', '');
+
+        $query = DB::table('accessories as a');
+        if ($search) {
+            $query->where(function ($w) use ($search) {
+                $w->where('a.accessory_name', 'like', "%$search%")
+                    ->orWhere('a.description', 'like', "%$search%");
+            });
+        }
+        if ($inclFilter !== '') {
+            $query->where('a.is_included', (int) $inclFilter);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Export ▾ — this page renders as a card grid, but export flattens it to the same tabular
+     * shape as every other page (there's no sane way to export a card layout as CSV/Excel).
+     */
+    private function export(Request $request): StreamedResponse|Response
+    {
+        $headers = ['Accessory', 'Category', 'Rate/Day', 'Stock', 'In Use', 'Available', 'Linked Equipment'];
+
+        $rows = $this->filteredQuery($request)->orderBy('a.accessory_name')->select('a.*')->get()
+            ->map(function ($acc) {
+                $linked = DB::table('equipment_accessory_links as eal')
+                    ->join('equipment as e', 'e.equipment_id', '=', 'eal.equipment_id')
+                    ->where('eal.accessory_id', $acc->accessory_id)
+                    ->where('e.availability_status', '!=', 'retired')
+                    ->orderBy('e.equipment_name')
+                    ->pluck('e.equipment_name');
+                $inUse = (int) DB::table('booking_accessories as ba')
+                    ->join('bookings as b', 'ba.booking_id', '=', 'b.booking_id')
+                    ->where('ba.accessory_id', $acc->accessory_id)
+                    ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
+                    ->sum('ba.quantity');
+                $stock = (int) ($acc->quantity ?? 1);
+
+                return [
+                    $acc->accessory_name,
+                    $acc->is_included ? 'Included' : 'Add-on',
+                    '₱' . number_format((float) $acc->daily_rate, 2),
+                    $stock,
+                    $inUse,
+                    max(0, $stock - $inUse),
+                    $linked->implode(', ') ?: '—',
+                ];
+            })
+            ->all();
+
+        return DataExporter::respond($request->query('export'), 'Accessories', $headers, $rows, 'accessories-export');
     }
 
     private function handleAjaxAction(Request $request): JsonResponse

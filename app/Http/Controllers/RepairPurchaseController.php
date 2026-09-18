@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Support\DataExporter;
 use App\Support\PageActivity;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RepairPurchaseController extends Controller
 {
@@ -42,7 +46,7 @@ class RepairPurchaseController extends Controller
 
     private array $priorityBadge = ['low' => 'badge-gray', 'normal' => 'badge-blue', 'high' => 'badge-orange', 'urgent' => 'badge-red'];
 
-    public function index(Request $request): View
+    public function index(Request $request): View|StreamedResponse|Response
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
@@ -62,27 +66,17 @@ class RepairPurchaseController extends Controller
             $msg = $this->handleAction($request, $user->user_id, $canManage);
         }
 
+        if ($request->filled('export')) {
+            return $this->export($request);
+        }
+
         $tab = $request->query('tab', 'all');
         $typeFilter = $request->query('type', '');
         $search = $request->query('q', '');
         $page = max(1, (int) $request->query('p', 1));
         $perPage = 20;
 
-        $query = DB::table('repair_purchase_tickets as t')
-            ->leftJoin('equipment as e', 't.equipment_id', '=', 'e.equipment_id');
-        if ($tab !== 'all') {
-            $query->where('t.status', $tab);
-        }
-        if ($typeFilter) {
-            $query->where('t.type', $typeFilter);
-        }
-        if ($search) {
-            $query->where(function ($w) use ($search) {
-                $w->where('t.ticket_number', 'like', "%$search%")
-                    ->orWhere('t.title', 'like', "%$search%")
-                    ->orWhere('t.vendor_supplier', 'like', "%$search%");
-            });
-        }
+        $query = $this->filteredQuery($request);
 
         $total = (clone $query)->count('t.ticket_id');
         $pages = max(1, (int) ceil($total / $perPage));
@@ -148,6 +142,58 @@ class RepairPurchaseController extends Controller
             'statusBadge' => $this->statusBadge, 'statusLabel' => $this->statusLabel,
             'priorityBadge' => $this->priorityBadge,
         ]);
+    }
+
+    /** Same filters index() applies, shared with export() so the two can never drift apart. */
+    private function filteredQuery(Request $request)
+    {
+        $tab = $request->query('tab', 'all');
+        $typeFilter = $request->query('type', '');
+        $search = $request->query('q', '');
+
+        $query = DB::table('repair_purchase_tickets as t')
+            ->leftJoin('equipment as e', 't.equipment_id', '=', 'e.equipment_id');
+        if ($tab !== 'all') {
+            $query->where('t.status', $tab);
+        }
+        if ($typeFilter) {
+            $query->where('t.type', $typeFilter);
+        }
+        if ($search) {
+            $query->where(function ($w) use ($search) {
+                $w->where('t.ticket_number', 'like', "%$search%")
+                    ->orWhere('t.title', 'like', "%$search%")
+                    ->orWhere('t.vendor_supplier', 'like', "%$search%");
+            });
+        }
+
+        return $query;
+    }
+
+    /** Export ▾ — reuses filteredQuery() unbounded (no page/perPage) so it always matches what's on screen. */
+    private function export(Request $request): StreamedResponse|Response
+    {
+        $headers = ['Ticket #', 'Type', 'Title', 'Equipment', 'Status', 'Priority', 'Est. Cost', 'Actual Cost', 'Target Date'];
+
+        $rows = $this->filteredQuery($request)
+            ->select('t.ticket_number', 't.type', 't.title', 'e.equipment_name', 't.status', 't.priority',
+                't.estimated_cost', 't.actual_cost', 't.target_date')
+            ->orderByDesc('t.created_at')
+            ->get()
+            ->map(fn ($t) => [
+                $t->ticket_number,
+                $this->typeLabel[$t->type] ?? ucfirst($t->type),
+                $t->title,
+                $t->equipment_name ?: '—',
+                $this->statusLabelByType[$t->type][$t->status] ?? ($this->statusLabel[$t->status] ?? ucfirst($t->status)),
+                ucfirst($t->priority),
+                $t->estimated_cost !== null ? '₱' . number_format((float) $t->estimated_cost, 2) : '—',
+                $t->actual_cost !== null ? '₱' . number_format((float) $t->actual_cost, 2) : '—',
+                $t->target_date ? Carbon::parse($t->target_date)->format('M j, Y') : '—',
+            ])
+            ->all();
+
+        return DataExporter::respond($request->query('export'), 'Repair / Purchase', $headers, $rows, 'repair-purchase-export');
     }
 
     private function generateTicketNumber(): string
