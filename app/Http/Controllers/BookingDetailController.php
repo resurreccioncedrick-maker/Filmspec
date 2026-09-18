@@ -378,7 +378,7 @@ class BookingDetailController extends Controller
             $msg = $this->confirmInspection($id, $booking);
         } elseif ($action === 'complete_booking' && in_array($role, ['operations_manager', 'admin', 'super_admin'], true)) {
             $msg = $this->completeBooking($id, $booking, $uid);
-        } elseif ($action === 'record_payment' && in_array($role, ['admin', 'operations_manager', 'super_admin', 'accounting'], true)) {
+        } elseif ($action === 'record_payment' && in_array($role, ['admin', 'operations_manager', 'super_admin'], true)) {
             $msg = $this->recordPayment($request, $id, $uid);
         } elseif ($action === 'update_incident' && in_array($role, ['operations_manager', 'admin', 'super_admin'], true)) {
             $msg = $this->updateIncident($request, $id);
@@ -396,11 +396,11 @@ class BookingDetailController extends Controller
             $msg = $this->approveExtension($request, $id, $booking, $uid);
         } elseif ($action === 'reject_extension' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
             $msg = $this->rejectExtension($request, $id, $uid);
-        } elseif ($action === 'approve_discount' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'accounting', 'traffic'], true)) {
+        } elseif ($action === 'approve_discount' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
             $msg = BookingCosting::approveDiscount($id, (int) $request->input('discount_id'), $uid, trim((string) $request->input('review_notes', '')) ?: null);
-        } elseif ($action === 'reject_discount' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'accounting', 'traffic'], true)) {
+        } elseif ($action === 'reject_discount' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
             $msg = BookingCosting::rejectDiscount($id, (int) $request->input('discount_id'), $uid, trim((string) $request->input('review_notes', '')) ?: null);
-        } elseif ($action === 'set_discount' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'accounting', 'traffic'], true)) {
+        } elseif ($action === 'set_discount' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
             $msg = BookingCosting::setDiscount(
                 $id, $uid,
                 (string) $request->input('discount_type', 'flat'),
@@ -479,6 +479,10 @@ class BookingDetailController extends Controller
         ]);
         BookingCosting::updateBookingTotal($id);
         BookingCosting::generateCostEstimate($id, Auth::id());
+
+        if (($booking->cost_approval_status ?? null) === 'client_approved') {
+            DB::table('bookings')->where('booking_id', $id)->update(['cost_approval_status' => 'pending_client', 'updated_at' => now()]);
+        }
 
         return ['type' => 'success', 'text' => 'Equipment added and cost estimate updated.'];
     }
@@ -608,7 +612,12 @@ class BookingDetailController extends Controller
             'booking_id' => $id, 'equipment_id' => $eid, 'direction' => 'out', 'quantity_expected' => $qty,
             'quantity_actual' => $qty, 'condition_out' => 'good', 'checked' => 1, 'checked_by' => $uid, 'checked_at' => now(),
         ]);
+        BookingCosting::updateBookingTotal($id);
         BookingCosting::generateCostEstimate($id, $uid);
+
+        if (($booking->cost_approval_status ?? null) === 'client_approved') {
+            DB::table('bookings')->where('booking_id', $id)->update(['cost_approval_status' => 'pending_client', 'updated_at' => now()]);
+        }
 
         $eqName = DB::table('equipment')->where('equipment_id', $eid)->value('equipment_name');
         $posName = DB::table('crew_positions')->where('position_id', $posid)->value('position_name');
@@ -918,7 +927,7 @@ class BookingDetailController extends Controller
 
     private function recordPayment(Request $request, int $id, int $uid): array
     {
-        $ptype = $request->input('payment_type', 'full');
+        $ptype = $request->input('payment_type', 'final');
         $pmethod = $request->input('payment_method', 'cash');
         $amount = (float) $request->input('amount', 0);
         $ref = $request->input('reference_number', '');
@@ -932,19 +941,20 @@ class BookingDetailController extends Controller
             return ['type' => 'danger', 'text' => 'Payment amount must be greater than zero.'];
         }
 
-        $bkTotal = (float) (DB::table('bookings')->where('booking_id', $id)->value('final_amount') ?? 0);
-        $bkPaid = (float) DB::table('payments')->where('booking_id', $id)->sum('amount');
-        $remaining = round($bkTotal - $bkPaid, 2);
-        if ($bkTotal > 0 && $amount > $remaining + 0.005) {
-            return ['type' => 'danger', 'text' => 'Payment of <strong>₱' . number_format($amount, 2) . '</strong> exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong>.'];
-        }
+        // The remaining-balance check and the insert both happen inside the same
+        // booking-row-locked transaction — otherwise two near-simultaneous payment
+        // submissions for the same booking could each read the same stale "amount paid
+        // so far", both pass the "doesn't exceed the balance" check, and both insert,
+        // together overpaying the booking. Locking the bookings row for this id
+        // serializes any concurrent recordPayment() calls for the same booking.
+        $error = DB::transaction(function () use ($rctype, $rcPrefix, $id, $ptype, $pmethod, $amount, $ref, $pdate, $uid, $isVat, $notes) {
+            $bkTotal = (float) (DB::table('bookings')->where('booking_id', $id)->lockForUpdate()->value('final_amount') ?? 0);
+            $bkPaid = (float) DB::table('payments')->where('booking_id', $id)->sum('amount');
+            $remaining = round($bkTotal - $bkPaid, 2);
+            if ($bkTotal > 0 && $amount > $remaining + 0.005) {
+                return ['type' => 'danger', 'text' => 'Payment of <strong>₱' . number_format($amount, 2) . '</strong> exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong>.'];
+            }
 
-        // Count and insert locked together in one transaction — see BillingController::
-        // handleAction()'s record_payment branch for why (two near-simultaneous payments of the
-        // same receipt_type could otherwise read the same count and generate the same
-        // receipt_number; locking only the count in a transaction that commits before the
-        // insert would give no protection at all).
-        DB::transaction(function () use ($rctype, $rcPrefix, $id, $ptype, $pmethod, $amount, $ref, $pdate, $uid, $isVat, $notes) {
             $rcSeq = (int) DB::table('payments')->where('receipt_type', $rctype)->lockForUpdate()->count() + 1;
             $rcnum = $rcPrefix . '-' . str_pad((string) $rcSeq, 5, '0', STR_PAD_LEFT);
 
@@ -953,7 +963,13 @@ class BookingDetailController extends Controller
                 'reference_number' => $ref, 'payment_date' => $pdate, 'received_by' => $uid, 'is_vat' => $isVat,
                 'receipt_number' => $rcnum, 'receipt_type' => $rctype, 'notes' => $notes,
             ]);
+
+            return null;
         });
+
+        if ($error !== null) {
+            return $error;
+        }
 
         $paid = (float) DB::table('payments')->where('booking_id', $id)->sum('amount');
         $total = (float) (DB::table('bookings')->where('booking_id', $id)->value('final_amount') ?? 0);
@@ -1580,7 +1596,12 @@ class BookingDetailController extends Controller
             'booking_id' => $id, 'accessory_id' => $aid, 'quantity' => $qty, 'days' => $days,
             'daily_rate' => $rate, 'is_included' => (int) $acc->is_included, 'subtotal' => $sub, 'notes' => $notes,
         ]);
+        BookingCosting::updateBookingTotal($id);
         BookingCosting::generateCostEstimate($id, Auth::id());
+
+        if (DB::table('bookings')->where('booking_id', $id)->value('cost_approval_status') === 'client_approved') {
+            DB::table('bookings')->where('booking_id', $id)->update(['cost_approval_status' => 'pending_client', 'updated_at' => now()]);
+        }
 
         return ['type' => 'success', 'text' => '<strong>' . e($acc->accessory_name) . '</strong> added to booking. Cost estimate updated.'];
     }
@@ -1598,6 +1619,7 @@ class BookingDetailController extends Controller
             ->value('a.accessory_name');
 
         DB::table('booking_accessories')->where('ba_id', $baid)->where('booking_id', $id)->delete();
+        BookingCosting::updateBookingTotal($id);
         BookingCosting::generateCostEstimate($id, Auth::id());
 
         return ['type' => 'success', 'text' => '<strong>' . e($accName ?? 'Accessory') . '</strong> removed from booking.'];

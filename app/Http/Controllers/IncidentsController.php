@@ -391,6 +391,10 @@ class IncidentsController extends Controller
         }
 
         if ($action === 'resolve_incident') {
+            if (! $canManage) {
+                return ['type' => 'danger', 'text' => 'You do not have permission to resolve incidents.'];
+            }
+
             $iid = (int) $request->input('incident_id', 0);
             $resolution = $request->input('resolution', 'pending');
             $charge = (float) $request->input('charge_amount', 0);

@@ -230,16 +230,19 @@ class BillingController extends Controller
                 return ['type' => 'danger', 'text' => 'Booking not found.'];
             }
 
-            $bkTotal = (float) (DB::table('bookings')->where('booking_id', $bid)->value('final_amount') ?? 0);
-            $bkPaid = (float) DB::table('payments')->where('booking_id', $bid)->sum('amount');
-            $remaining = round($bkTotal - $bkPaid, 2);
-            if ($bkTotal > 0 && $amount > $remaining + 0.005) {
-                return ['type' => 'danger', 'text' => 'Payment of <strong>₱' . number_format($amount, 2) . '</strong> exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong>. Please enter the correct amount.'];
-            }
+            // The remaining-balance check and the insert both happen inside the same
+            // booking-row-locked transaction — otherwise two near-simultaneous payment
+            // submissions for the same booking could each read the same stale "amount paid
+            // so far", both pass the "doesn't exceed the balance" check, and both insert,
+            // together overpaying the booking.
+            $error = DB::transaction(function () use ($rctype, $rcPrefix, $bid, $ptype, $pmethod, $amount, $ref, $pdate, $uid, $isVat, $notes) {
+                $bkTotal = (float) (DB::table('bookings')->where('booking_id', $bid)->lockForUpdate()->value('final_amount') ?? 0);
+                $bkPaid = (float) DB::table('payments')->where('booking_id', $bid)->sum('amount');
+                $remaining = round($bkTotal - $bkPaid, 2);
+                if ($bkTotal > 0 && $amount > $remaining + 0.005) {
+                    return ['type' => 'danger', 'text' => 'Payment of <strong>₱' . number_format($amount, 2) . '</strong> exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong>. Please enter the correct amount.'];
+                }
 
-            // Locked inside a transaction so two near-simultaneous payments of the same
-            // receipt_type can't read the same count and generate the same receipt_number.
-            DB::transaction(function () use ($rctype, $rcPrefix, $bid, $ptype, $pmethod, $amount, $ref, $pdate, $uid, $isVat, $notes) {
                 $rcSeq = (int) DB::table('payments')->where('receipt_type', $rctype)->lockForUpdate()->count() + 1;
                 $rcnum = $rcPrefix . '-' . str_pad((string) $rcSeq, 5, '0', STR_PAD_LEFT);
 
@@ -248,7 +251,13 @@ class BillingController extends Controller
                     'reference_number' => $ref, 'payment_date' => $pdate, 'received_by' => $uid, 'is_vat' => $isVat,
                     'receipt_number' => $rcnum, 'receipt_type' => $rctype, 'notes' => $notes,
                 ]);
+
+                return null;
             });
+
+            if ($error !== null) {
+                return $error;
+            }
 
             $paid = (float) DB::table('payments')->where('booking_id', $bid)->sum('amount');
             $total = (float) DB::table('bookings')->where('booking_id', $bid)->value('final_amount');

@@ -71,9 +71,41 @@
         </div>
       </div>
 
+      <div class="row">
+        <div class="col-md-4">
+          <div class="form-group">
+            <label>Amount Received <span style="color:var(--red,#dc2626)">*</span></label>
+            <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required placeholder="0.00">
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="form-group">
+            <label>Payment Method</label>
+            <select name="payment_method" class="form-control">
+              <option value="cash">Cash</option>
+              <option value="gcash">GCash</option>
+              <option value="bank_transfer">Bank Transfer</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="form-group">
+            <label>Reference Number</label>
+            <input type="text" name="reference_number" class="form-control" placeholder="Optional">
+          </div>
+        </div>
+      </div>
+
       <div class="form-group">
         <label>Notes</label>
         <textarea name="notes" class="form-control" rows="2" placeholder="Special requirements, delivery notes, etc."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer">
+          <input type="checkbox" name="is_vat" value="1">
+          Issue as Official Receipt (VAT)
+        </label>
       </div>
 
       <div class="form-group">
