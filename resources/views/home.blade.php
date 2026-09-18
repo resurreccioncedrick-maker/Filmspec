@@ -1244,13 +1244,16 @@ textarea.fi{resize:vertical;min-height:60px}
 }
 @media(max-width:640px){
   .nav-links{display:none}
-  .nav-hamburger{display:block}
+  .nav-hamburger{display:flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0}
   .nav{padding:0 16px;gap:10px}
+  .nav-logo{cursor:pointer}
+  .nav-mobile-menu .nl{min-height:44px;display:flex;align-items:center}
   .rl-btn span.rl-label{display:none}
-  .rl-btn{padding:8px 10px}
+  .rl-btn{padding:8px 10px;min-height:44px}
   .user-chip span.uname{display:none}
-  .user-chip{padding:6px 8px}
-  .eq-grid{grid-template-columns:1fr 1fr}
+  .user-chip{padding:6px 8px;min-height:44px;display:flex;align-items:center}
+  .pill{padding:9px 16px;min-height:40px;display:inline-flex;align-items:center}
+  .eq-grid{grid-template-columns:1fr 1fr;gap:12px}
   .rl-panel{width:100%;right:-100%}
   .bk-summary{grid-template-columns:1fr 1fr}
   .eq-page-header{flex-direction:row;align-items:center;justify-content:space-between;padding:16px 20px;gap:12px}
@@ -1267,34 +1270,50 @@ textarea.fi{resize:vertical;min-height:60px}
   .frow{grid-template-columns:1fr}
   .eq-toolbar{flex-wrap:wrap;padding:8px 16px;position:static}
   .cat-pills{width:100%;order:1}
-  .search-bar{width:100%;order:2;margin:6px 0 8px}
+  .search-bar{width:100%;order:2;margin:6px 0 8px;min-height:44px}
+  .search-bar input{font-size:16px}
   .eq-toolbar-sep{display:none}
   #eqDetailMo .mdl{flex-direction:column!important;width:92vw!important;max-width:92vw!important;max-height:90vh!important}
   #edImgArea{width:100%!important;height:170px!important;flex-shrink:0!important;border-radius:var(--radius-lg) var(--radius-lg) 0 0!important}
+
+  /* Equipment tiles — 2-column grid, image-top card kept at every mobile width
+     (replaces the old flip-to-horizontal-list-row treatment). Same markup as
+     desktop, renderGrid()'s JS is untouched — only these values change. */
+  .eq-card{border-radius:12px}
+  .eq-body{padding:10px 11px 11px}
+  .eq-name{font-size:13px;min-height:2.4em;margin-bottom:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .eq-brand{font-size:10px;margin-bottom:8px}
+  .eq-divider{margin-bottom:8px}
+  .eq-op{font-size:9.5px;padding:2px 7px;margin-bottom:8px}
+  .eq-rate{font-size:17px}
+  .eq-rate-sub{font-size:9.5px;margin-bottom:8px}
+  .fav-star{width:32px;height:32px}
+  .fav-star svg{width:15px;height:15px}
+  .req-btn{padding:9px;font-size:11.5px;min-height:38px}
+
+  /* My Bookings — card layout instead of a horizontally-scrolled 7-column table.
+     filterMyBookings() still targets the same tr[data-search]/data-status rows. */
+  .table-wrap{overflow-x:visible}
+  .bk-tbl,.bk-tbl thead,.bk-tbl tbody{display:block;width:100%}
+  .bk-tbl thead{display:none}
+  .bk-tbl tr{display:flex;flex-direction:column;gap:7px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px 15px;margin-bottom:10px}
+  .bk-tbl tbody tr.row-action td:first-child,.bk-tbl tbody tr.row-pending td:first-child,
+  .bk-tbl tbody tr.row-confirmed td:first-child,.bk-tbl tbody tr.row-completed td:first-child{box-shadow:none}
+  .bk-tbl td{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 0;border-bottom:none;font-size:13.5px;max-width:none!important}
+  .bk-tbl td[data-label]::before{content:attr(data-label);font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;flex-shrink:0}
+  .bk-tbl td:last-child{justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border);margin-top:2px}
+  .bk-cta{min-height:40px;padding:8px 14px}
+
+  /* Gear-list upload — bigger tap targets */
+  .rl-upload-pick,.rl-upload-go{min-height:44px}
+  .rl-upload-days input{min-height:44px;font-size:16px}
+
+  /* Account forms — 16px avoids Safari's auto-zoom-on-focus */
+  .acct-input{font-size:16px!important;min-height:44px}
 }
 @media(max-width:420px){
-  .eq-grid{grid-template-columns:1fr}
-  /* List-style cards (thumbnail left, info right) instead of stacked cards — same
-     markup, restructured with CSS only so renderGrid()'s JS stays untouched. */
-  .eq-card{flex-direction:row;align-items:stretch}
-  .eq-img{width:88px;aspect-ratio:1/1;flex-shrink:0}
-  .eq-cat-pill{display:none}
-  .fav-star{width:22px;height:22px;top:6px;left:6px}
-  .fav-star svg{width:11px;height:11px}
-  .avail-pill{top:auto;bottom:6px;right:6px;left:auto;width:9px;height:9px;padding:0;border-radius:50%;font-size:0;overflow:hidden}
-  .avail-pill::before{margin:0}
-  /* eq-foot (rate) and the button are siblings, not nested — pinning both to the
-     bottom corners of a relatively-positioned body puts them on one row without
-     needing to change renderGrid()'s markup order. */
-  .eq-body{padding:10px 12px 38px;flex:1;min-width:0;position:relative}
-  .eq-name{font-size:13px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .eq-brand{margin-bottom:0}
-  .eq-divider{display:none}
-  .eq-op{display:none}
-  .eq-foot{position:absolute;left:12px;bottom:10px;margin:0}
-  .eq-rate{font-size:16px}
-  .eq-rate-sub{display:none}
-  .req-btn{position:absolute;right:12px;bottom:8px;left:auto;width:auto;padding:6px 12px;font-size:11px;margin-top:0}
+  .eq-grid{gap:10px}
+  .eq-body{padding:9px 10px 10px}
 }
 
 /* Support chat (client-only, sticky bottom-right) */
@@ -1355,7 +1374,7 @@ textarea.fi{resize:vertical;min-height:60px}
   <button class="nav-hamburger" onclick="toggleMobileMenu()" title="Menu" aria-label="Menu">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
-  <div class="nav-logo"><img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:34px;object-fit:contain;display:block"></div>
+  <div class="nav-logo" onclick="showPage('home',null)"><img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:34px;object-fit:contain;display:block"></div>
   <div class="nav-links">
     <button class="nl on"  onclick="showPage('home',this)">Home</button>
     <button class="nl"     onclick="showPage('equipment',this)">Equipment</button>
@@ -1680,14 +1699,14 @@ textarea.fi{resize:vertical;min-height:60px}
             $rowClass = $needsApproval ? 'row-action' : ('row-' . $bk->booking_status);
           @endphp
           <tr class="{{ $rowClass }}" data-search="{{ strtolower($bk->booking_reference . ' ' . ($bk->project_title ?: '')) }}" data-status="{{ $bk->booking_status }}">
-            <td><strong style="font-family:var(--font-m);font-size:.8rem;color:var(--blue)">{{ $bk->booking_reference }}</strong></td>
-            <td style="max-width:160px">
+            <td data-label="Reference"><strong style="font-family:var(--font-m);font-size:.8rem;color:var(--blue)">{{ $bk->booking_reference }}</strong></td>
+            <td data-label="Project" style="max-width:160px">
               <div style="font-weight:700;font-size:.875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ $bk->project_title ?: 'Booking Request' }}</div>
               <div style="font-size:.72rem;color:var(--muted);margin-top:1px">{{ ucfirst(str_replace('_', ' ', $bk->booking_type)) }}</div>
             </td>
-            <td style="font-size:.8rem;color:var(--sub)">{{ $bk->equip_count }} equip &middot; {{ $bk->crew_count }} crew</td>
-            <td style="font-size:.78rem;color:var(--sub);white-space:nowrap">{{ \Carbon\Carbon::parse($bk->shoot_date_start)->format('M j') }} – {{ \Carbon\Carbon::parse($bk->shoot_date_end)->format('M j') }}</td>
-            <td>
+            <td data-label="Items" style="font-size:.8rem;color:var(--sub)">{{ $bk->equip_count }} equip &middot; {{ $bk->crew_count }} crew</td>
+            <td data-label="Dates" style="font-size:.78rem;color:var(--sub);white-space:nowrap">{{ \Carbon\Carbon::parse($bk->shoot_date_start)->format('M j') }} – {{ \Carbon\Carbon::parse($bk->shoot_date_end)->format('M j') }}</td>
+            <td data-label="Status">
               @if ($needsApproval)
               <span class="bk-pill action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg> Action Required</span>
               @elseif ($bk->booking_status === 'pending')
@@ -1700,7 +1719,7 @@ textarea.fi{resize:vertical;min-height:60px}
               <span class="bk-pill" style="background:var(--s3);color:var(--sub)">{{ ucfirst($bk->booking_status) }}</span>
               @endif
             </td>
-            <td style="font-family:var(--font-m);font-weight:700;color:var(--blue)">
+            <td data-label="Total" style="font-family:var(--font-m);font-weight:700;color:var(--blue)">
               @if ($needsApproval)
               <span style="color:var(--orange);font-size:.78rem;font-family:var(--font-b)">Review cost</span>
               @elseif ($bk->final_amount > 0)
@@ -1857,23 +1876,23 @@ textarea.fi{resize:vertical;min-height:60px}
           <div class="frow" style="margin-bottom:14px">
             <div>
               <label class="form-label">First Name</label>
-              <input type="text" name="first_name" value="{{ $user->first_name }}" required
+              <input type="text" name="first_name" value="{{ $user->first_name }}" required class="acct-input"
                      style="width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);outline:none;box-sizing:border-box">
             </div>
             <div>
               <label class="form-label">Last Name</label>
-              <input type="text" name="last_name" value="{{ $user->last_name }}" required
+              <input type="text" name="last_name" value="{{ $user->last_name }}" required class="acct-input"
                      style="width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);outline:none;box-sizing:border-box">
             </div>
           </div>
           <div style="margin-bottom:14px">
             <label class="form-label">Phone</label>
-            <input type="text" name="phone" value="{{ $user->phone }}" placeholder="09171234567"
+            <input type="text" name="phone" value="{{ $user->phone }}" placeholder="09171234567" class="acct-input"
                    style="width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);outline:none;box-sizing:border-box">
           </div>
           <div style="margin-bottom:18px">
             <label class="form-label">Email</label>
-            <input type="text" value="{{ $user->email }}" disabled
+            <input type="text" value="{{ $user->email }}" disabled class="acct-input"
                    style="width:100%;background:var(--s2);border:1.5px solid var(--border);color:var(--muted);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);outline:none;box-sizing:border-box">
             <div style="font-size:11px;color:var(--muted);margin-top:4px">Contact support to change your email.</div>
           </div>
@@ -1892,18 +1911,18 @@ textarea.fi{resize:vertical;min-height:60px}
           <input type="hidden" name="action" value="change_password">
           <div style="margin-bottom:14px">
             <label class="form-label">Current Password</label>
-            <input type="password" name="current_password" required
+            <input type="password" name="current_password" required class="acct-input"
                    style="width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);outline:none;box-sizing:border-box">
           </div>
           <div class="frow" style="margin-bottom:18px">
             <div>
               <label class="form-label">New Password</label>
-              <input type="password" name="new_password" required minlength="8"
+              <input type="password" name="new_password" required minlength="8" class="acct-input"
                      style="width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);outline:none;box-sizing:border-box">
             </div>
             <div>
               <label class="form-label">Confirm New Password</label>
-              <input type="password" name="confirm_password" required minlength="8"
+              <input type="password" name="confirm_password" required minlength="8" class="acct-input"
                      style="width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);outline:none;box-sizing:border-box">
             </div>
           </div>
