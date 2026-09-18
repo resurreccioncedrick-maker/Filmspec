@@ -1305,9 +1305,10 @@ textarea.fi{resize:vertical;min-height:60px}
      already shown in the top nav, so it's not repeated here). Same markup,
      CSS only: hero-left's logo/eyebrow hidden, stats become their own row,
      hero-right becomes the gradient card. */
-  .hero-inner{display:block;padding:16px}
+  .hero-inner{display:flex;flex-direction:column;padding:16px}
   .hero-logo-wrap,.hero-left>div:nth-child(2){display:none}
-  .hero-left{margin-bottom:14px}
+  .hero-left{margin-bottom:0;margin-top:14px;order:2}
+  .hero-right{order:1}
   .hero-stats-strip{
     justify-content:space-around!important;margin-top:0!important;
     background:var(--surface);border:1px solid var(--border);
@@ -1480,7 +1481,8 @@ textarea.fi{resize:vertical;min-height:60px}
   <div class="nav-right">
     @if($isLoggedIn)
       <button class="rl-btn" onclick="togglePanel()" title="View your booking request list">
-        &#9776;&nbsp; <span class="rl-label">Request List</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px;flex-shrink:0"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        <span class="rl-label">Request List</span>
         <span class="rl-count" id="rlCount" style="display:none">0</span>
       </button>
       <div class="user-chip" onclick="showPage('account',null)" style="cursor:pointer" title="Account settings">
