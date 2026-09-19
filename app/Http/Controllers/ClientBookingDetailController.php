@@ -271,7 +271,7 @@ class ClientBookingDetailController extends Controller
 
         $statusBadge = ['pending' => 'badge-yellow', 'confirmed' => 'badge-blue', 'ongoing' => 'badge-green', 'completed' => 'badge-gray', 'cancelled' => 'badge-red'];
         $payBadge = ['unpaid' => 'badge-yellow', 'partial' => 'badge-orange', 'paid' => 'badge-green', 'overdue' => 'badge-red', 'refunded' => 'badge-purple', 'cancelled' => 'badge-gray'];
-        $payLabel = ['unpaid' => 'Pending', 'partial' => 'Partially Paid', 'paid' => 'Fully Paid', 'overdue' => 'Overdue', 'refunded' => 'Refunded', 'cancelled' => 'Cancelled'];
+        $payLabel = ['unpaid' => 'Unpaid', 'partial' => 'Partially Paid', 'paid' => 'Fully Paid', 'overdue' => 'Overdue', 'refunded' => 'Refunded', 'cancelled' => 'Cancelled'];
 
         return view('client-booking-detail', [
             'booking' => $booking, 'id' => $id,

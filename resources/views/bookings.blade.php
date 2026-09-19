@@ -88,7 +88,7 @@
         </select>
         <select name="pay" class="form-control" style="width:auto">
           <option value="">All Payment</option>
-          <option value="unpaid" {{ $payFilter === 'unpaid' ? 'selected' : '' }}>Pending</option>
+          <option value="unpaid" {{ $payFilter === 'unpaid' ? 'selected' : '' }}>Unpaid</option>
           <option value="partial" {{ $payFilter === 'partial' ? 'selected' : '' }}>Partially Paid</option>
           <option value="paid" {{ $payFilter === 'paid' ? 'selected' : '' }}>Fully Paid</option>
           <option value="overdue" {{ $payFilter === 'overdue' ? 'selected' : '' }}>Overdue</option>

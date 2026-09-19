@@ -28,7 +28,7 @@ class BookingDetailController extends Controller
     ];
 
     private array $payLabel = [
-        'unpaid' => 'Pending', 'partial' => 'Partially Paid', 'paid' => 'Fully Paid',
+        'unpaid' => 'Unpaid', 'partial' => 'Partially Paid', 'paid' => 'Fully Paid',
         'overdue' => 'Overdue', 'refunded' => 'Refunded', 'cancelled' => 'Cancelled',
     ];
 
