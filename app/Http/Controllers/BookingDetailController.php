@@ -344,8 +344,6 @@ class BookingDetailController extends Controller
             $msg = ['type' => 'success', 'text' => 'Cost estimate generated.'];
         } elseif ($action === 'confirm_ce' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
             $msg = BookingCosting::confirmCe($id, $uid);
-        } elseif ($action === 'mark_cost_approved' && in_array($role, config('filmspec.manage_roles'), true)) {
-            $msg = $this->markCostApproved($id, $uid);
         } elseif ($action === 'update_ce_pricing' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
             $msg = $this->updateCePricing($request, $id, $uid);
         } elseif ($action === 'update_project_details' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
@@ -611,12 +609,9 @@ class BookingDetailController extends Controller
         $condOut = $request->input('condition_out', 'good');
         $notes = $request->input('notes', '');
 
-        $costStatus = $booking->cost_approval_status ?? null;
-        if ($costStatus === 'pending_client') {
-            return ['type' => 'error', 'text' => 'Cannot release — awaiting <strong>client cost approval</strong>. The client must approve the assigned crew and transport costs before equipment can leave.'];
-        }
-        if ($costStatus === 'client_rejected') {
-            return ['type' => 'error', 'text' => 'Cannot release — the client <strong>rejected the cost estimate</strong>. Adjust the crew/transport assignment and resend for approval.'];
+        $ceConfirmed = DB::table('cost_estimates')->where('booking_id', $id)->orderByDesc('ce_id')->value('status') === 'confirmed';
+        if ($booking->booking_status === 'confirmed' && ! $ceConfirmed) {
+            return ['type' => 'error', 'text' => 'Cannot release — the cost estimate must be <strong>confirmed</strong> first. Use Confirm CE, then try again.'];
         }
 
         $crewCount = DB::table('booking_crew')->where('booking_id', $id)->count();
@@ -726,9 +721,9 @@ class BookingDetailController extends Controller
 
     private function bulkCheckout(int $id, $booking, int $uid): array
     {
-        $costStatus = $booking->cost_approval_status ?? null;
-        if (in_array($costStatus, ['pending_client', 'client_rejected'], true)) {
-            return ['type' => 'error', 'text' => 'Cannot release — client cost approval required first.'];
+        $ceConfirmed = DB::table('cost_estimates')->where('booking_id', $id)->orderByDesc('ce_id')->value('status') === 'confirmed';
+        if ($booking->booking_status === 'confirmed' && ! $ceConfirmed) {
+            return ['type' => 'error', 'text' => 'Cannot release — the cost estimate must be confirmed first.'];
         }
         if (DB::table('booking_crew')->where('booking_id', $id)->count() === 0) {
             return ['type' => 'error', 'text' => 'Cannot release — no crew assigned.'];
@@ -1602,22 +1597,6 @@ class BookingDetailController extends Controller
         BookingCosting::generateCostEstimate($id, Auth::id());
 
         return ['type' => 'success', 'text' => '<strong>' . e($accName ?? 'Accessory') . '</strong> removed from booking.'];
-    }
-
-    // Staff override for cost_approval_status — client_approved is normally only set by the
-    // client themselves, from their own portal (ClientBookingDetailController). Walk-in
-    // clients have no portal login at all, and even portal clients sometimes approve by
-    // phone/email instead of clicking through — without this, equipment could never be
-    // checked out for either case (Checklist OUT is gated on client_approved for confirmed
-    // bookings). Manage-roles only, and logged, since it's bypassing the client's own consent.
-    private function markCostApproved(int $id, int $uid): array
-    {
-        DB::table('bookings')->where('booking_id', $id)->update([
-            'cost_approval_status' => 'client_approved', 'updated_at' => now(),
-        ]);
-        ActivityLog::record($uid, 'update', 'booking', "Cost estimate marked client-approved by staff for booking $id", $id);
-
-        return ['type' => 'success', 'text' => 'Cost estimate marked as client-approved. Equipment can now be checked out.'];
     }
 
     private function updateCePricing(Request $request, int $id, int $uid): array

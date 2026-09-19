@@ -193,22 +193,14 @@
       $costApproval = $booking->cost_approval_status ?? null;
       $hasCrew = $crewLines->count() > 0;
       $hasTransport = (float) ($booking->transportation_cost ?? 0) > 0;
-      $costBlocked = ($st === 'confirmed' && $costApproval !== 'client_approved');
+      $ceConfirmed = $ce && $ce->status === 'confirmed';
+      $costBlocked = ($st === 'confirmed' && ! $ceConfirmed);
     @endphp
 
     @if ($costBlocked && $isAdmin)
-    @php
-      if (! $costApproval) {
-          $blockMsg = '<strong>Cost estimate not sent.</strong> Send the cost breakdown to the client and obtain their approval before releasing any equipment.';
-      } elseif ($costApproval === 'pending_client') {
-          $blockMsg = '<strong>Awaiting client approval.</strong> The cost estimate has been sent. Equipment cannot be released until the client approves.';
-      } else {
-          $blockMsg = '<strong>Client rejected the cost estimate.</strong> Adjust the cost breakdown and resend before releasing equipment.';
-      }
-    @endphp
     <div style="background:#18120a;border:1.5px solid #b91c1c;color:#fca5a5;padding:11px 15px;border-radius:7px;font-size:12.5px;display:flex;align-items:center;gap:10px;margin-top:12px">
       <i data-feather="lock" style="width:15px;height:15px;flex-shrink:0;color:#f87171"></i>
-      <div>{!! $blockMsg !!}</div>
+      <div>{!! $ce ? '<strong>Cost estimate not confirmed.</strong> Confirm the CE above before releasing any equipment.' : '<strong>No cost estimate yet.</strong> Generate and confirm a cost estimate before releasing any equipment.' !!}</div>
     </div>
     @endif
 
@@ -279,18 +271,10 @@
             <a href="{{ route('ce-preview', ['booking_id' => $id]) }}"><i data-feather="file-text"></i> View Cost Estimate</a>
             @endif
             <div class="action-menu-divider"></div>
-            @if (($booking->cost_approval_status ?? null) === 'client_approved')
+            @if ($ce && $ce->status === 'confirmed')
             <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'out']) }}"><i data-feather="clipboard"></i> Checklist OUT</a>
             @else
-            <button type="button" disabled title="Client must approve the cost estimate before equipment can be released"><i data-feather="lock"></i> Checklist OUT</button>
-            @endif
-            @if (($booking->cost_approval_status ?? null) !== 'client_approved' && in_array($role, config('filmspec.manage_roles'), true))
-            <form method="POST" action="{{ $actionUrl }}"
-                  onsubmit="return confirm('Mark the cost estimate as approved by the client?\n\nOnly do this if they actually approved it — by phone, email, in person, or the client has no portal login. This unblocks Checklist OUT.')">
-              @csrf
-              <input type="hidden" name="action" value="mark_cost_approved">
-              <button type="submit" class="amber"><i data-feather="user-check"></i> Mark Cost Approved</button>
-            </form>
+            <button type="button" disabled title="Confirm the cost estimate before equipment can be released"><i data-feather="lock"></i> Checklist OUT</button>
             @endif
             <form method="POST" action="{{ $actionUrl }}">
               @csrf

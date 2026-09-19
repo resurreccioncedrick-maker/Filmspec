@@ -96,11 +96,12 @@ class ChecklistController extends Controller
             return redirect()->route('bookings');
         }
 
-        if ($dir === 'out' && ($booking->cost_approval_status ?? null) !== 'client_approved' && $booking->booking_status === 'confirmed') {
+        $ceConfirmed = DB::table('cost_estimates')->where('booking_id', $bid)->orderByDesc('ce_id')->value('status') === 'confirmed';
+        if ($dir === 'out' && ! $ceConfirmed && $booking->booking_status === 'confirmed') {
             $request->session()->flash('bd_flash', [
                 'type' => 'danger',
-                'text' => "Equipment can't be checked out yet — the client hasn't approved the cost estimate. "
-                    . 'Use <strong>Mark Cost Approved</strong> below if they approved it another way (phone, email, in person).',
+                'text' => "Equipment can't be checked out yet — the cost estimate hasn't been confirmed. "
+                    . 'Use <strong>Confirm CE</strong> on the booking page first.',
             ]);
 
             return redirect()->route('booking-detail', $bid);

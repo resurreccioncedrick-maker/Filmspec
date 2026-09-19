@@ -513,8 +513,7 @@ class BookingCosting
     }
 
     // For when a client calls in and staff agree a discount on the spot — no separate
-    // approval step needed, since the phone call itself is the authorization (the same
-    // reasoning as markCostApproved()'s staff override for a phone-approved cost estimate).
+    // approval step needed, since the phone call itself is the authorization.
     // Records a booking_discounts row that's already 'approved' (proposed_by and approved_by
     // both the acting staff member) and applies it immediately.
     public static function setDiscount(int $bookingId, int $staffId, string $type, float $value, string $reason): array
