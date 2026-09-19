@@ -566,7 +566,11 @@ textarea.form-control { resize:vertical; min-height:72px; }
 
 .modal {
   background:var(--surface); border:1px solid var(--border2);
-  border-radius:var(--radius-lg); width:560px; max-width:94vw; max-height:90vh;
+  border-radius:var(--radius-lg); width:560px; max-width:94vw;
+  /* var(--vvh) tracks the real visible height (keyboard-aware.js) so the modal
+     shrinks along with the keyboard instead of staying sized to the full,
+     un-shrunk layout viewport — which is what traps fields behind the keyboard. */
+  max-height:calc(var(--vvh, 100vh) - 40px);
   overflow-y:auto; transform:scale(.96); transition:transform .2s;
   box-shadow:var(--shadow-lg);
 }

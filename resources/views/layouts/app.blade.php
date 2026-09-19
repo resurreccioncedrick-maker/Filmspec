@@ -257,6 +257,7 @@
 </div>
 
 <div class="toast-container"></div>
+<script src="{{ asset('assets/js/keyboard-aware.js') }}"></script>
 <script src="{{ asset('assets/js/app.js') }}"></script>
 @stack('scripts')
 </body>

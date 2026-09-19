@@ -1098,7 +1098,10 @@ button{font-family:var(--font-b);cursor:pointer}
   border-radius:var(--radius-lg);
   width:500px;
   max-width:94vw;
-  max-height:88vh;
+  /* var(--vvh) tracks the real visible height (keyboard-aware.js) so the modal
+     shrinks with the on-screen keyboard instead of staying sized to the full
+     layout viewport. */
+  max-height:calc(var(--vvh, 88vh) - 24px);
   overflow-y:auto;
   transform:scale(.96);
   transition:transform .2s;
@@ -3034,5 +3037,6 @@ document.addEventListener('visibilitychange', function () { if (!document.hidden
     <div class="footer-copy">&copy; {{ date('Y') }} FilmSpec. All rights reserved.</div>
   </div>
 </footer>
+<script src="{{ asset('assets/js/keyboard-aware.js') }}"></script>
 </body>
 </html>

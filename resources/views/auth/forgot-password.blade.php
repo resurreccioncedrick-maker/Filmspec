@@ -24,6 +24,12 @@ h2{font-size:16px;font-weight:700;color:#0B1A33;margin-bottom:6px}
 .err{background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:14px;line-height:1.5}
 .back{display:block;text-align:center;margin-top:14px;font-size:12px;color:#7695B0;text-decoration:none;transition:color .15s}
 .back:hover{color:#0060C7}
+@media(max-width:880px){
+  /* Centering against 100vh traps a focused input under the keyboard once the
+     card is taller than the visible (keyboard-shrunk) viewport — align to the top
+     instead so the page scrolls normally. */
+  body{align-items:flex-start}
+}
 </style>
 </head>
 <body>
@@ -56,5 +62,6 @@ h2{font-size:16px;font-weight:700;color:#0B1A33;margin-bottom:6px}
 <footer style="position:fixed;bottom:0;left:0;width:100%;padding:9px 20px;text-align:center;color:#7695B0;font-size:11px;font-family:'DM Sans',sans-serif;letter-spacing:.3px;z-index:1">
   &copy; {{ date('Y') }} FilmSpec &mdash; Integrated Film Operations Platform
 </footer>
+<script src="{{ asset('assets/js/keyboard-aware.js') }}"></script>
 </body>
 </html>

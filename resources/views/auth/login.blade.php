@@ -341,6 +341,7 @@ function updateSignupBtn(){
   if (btn) btn.disabled = !document.getElementById('dpaConsent').checked;
 }
 </script>
+<script src="{{ asset('assets/js/keyboard-aware.js') }}"></script>
 
 <div id="dpaMo" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)">
   <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 12px 48px rgba(15,23,42,.18)">

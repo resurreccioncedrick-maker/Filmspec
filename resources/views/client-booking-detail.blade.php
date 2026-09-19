@@ -127,7 +127,9 @@ a{text-decoration:none;color:inherit}
 
 /* Cancel modal */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(7,14,26,.55);z-index:1000;align-items:center;justify-content:center;padding:20px}
-.modal-box{background:#fff;border-radius:12px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+/* var(--vvh) tracks the real visible height (keyboard-aware.js) so the modal shrinks
+   with the on-screen keyboard instead of staying sized to the full layout viewport. */
+.modal-box{background:#fff;border-radius:12px;width:100%;max-width:440px;max-height:calc(var(--vvh, 100vh) - 40px);overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}
 .modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .modal-head h3{font-size:.95rem;font-weight:700;color:var(--text)}
 .modal-body{padding:20px}
@@ -1181,5 +1183,6 @@ function toggleDiscReqInput() {
 
 </script>
 
+<script src="{{ asset('assets/js/keyboard-aware.js') }}"></script>
 </body>
 </html>

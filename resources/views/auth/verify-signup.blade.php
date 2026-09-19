@@ -34,6 +34,12 @@ h2{font-size:16px;font-weight:700;color:#0B1A33;margin-bottom:6px}
   .otp-row{gap:5px}
   .otp-row input{width:36px;height:48px;font-size:19px}
 }
+@media(max-width:880px){
+  /* Centering against 100vh traps a focused input under the keyboard once the
+     card is taller than the visible (keyboard-shrunk) viewport — align to the top
+     instead so the page scrolls normally. */
+  body{align-items:flex-start}
+}
 </style>
 </head>
 <body>
@@ -108,5 +114,6 @@ function tryAutoSubmit(){
 <footer style="position:fixed;bottom:0;left:0;width:100%;padding:9px 20px;text-align:center;color:#7695B0;font-size:11px;font-family:'DM Sans',sans-serif;letter-spacing:.3px;z-index:1">
   &copy; {{ date('Y') }} FilmSpec &mdash; Integrated Film Operations Platform
 </footer>
+<script src="{{ asset('assets/js/keyboard-aware.js') }}"></script>
 </body>
 </html>

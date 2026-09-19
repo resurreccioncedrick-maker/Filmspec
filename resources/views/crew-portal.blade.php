@@ -176,9 +176,11 @@ button{font-family:var(--font-b);cursor:pointer}
 /* ── MODAL ── */
 .mo{display:none;position:fixed;inset:0;background:rgba(11,26,51,.55);z-index:1000;align-items:flex-end;justify-content:center}
 .mo.on{display:flex}
-.mo-box{background:var(--surface);border-radius:18px 18px 0 0;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;box-shadow:0 -10px 40px rgba(0,0,0,.25)}
+/* var(--vvh) tracks the real visible height (keyboard-aware.js) so the sheet shrinks
+   with the on-screen keyboard instead of staying sized to the full layout viewport. */
+.mo-box{background:var(--surface);border-radius:18px 18px 0 0;width:100%;max-width:480px;max-height:calc(var(--vvh, 92vh) - 16px);overflow-y:auto;box-shadow:0 -10px 40px rgba(0,0,0,.25)}
 @media(min-width:480px) and (max-width:599px){.mo-box{max-width:560px}}
-@media(min-width:600px){.mo{align-items:center}.mo-box{border-radius:16px;max-height:88vh}}
+@media(min-width:600px){.mo{align-items:center}.mo-box{border-radius:16px;max-height:calc(var(--vvh, 88vh) - 40px)}}
 .mo-head{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface)}
 .mo-title{font-size:17px;font-weight:800;color:var(--text)}
 .mo-close{background:var(--s2);border:none;font-size:17px;cursor:pointer;color:var(--sub);line-height:1;width:44px;height:44px;border-radius:50%}
@@ -1236,5 +1238,6 @@ function openUpdateMaint(schedId, currentStatus) {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.mo.on').forEach(m => m.classList.remove('on')); });
 </script>
+<script src="{{ asset('assets/js/keyboard-aware.js') }}"></script>
 </body>
 </html>
