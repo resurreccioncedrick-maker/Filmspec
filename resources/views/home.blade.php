@@ -1249,6 +1249,9 @@ textarea.fi{resize:vertical;min-height:60px}
   .nav-links{display:none}
   .nav-hamburger{display:flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0}
   .nav{padding:0 16px;gap:10px}
+  /* .nav-links was the flex:1 spacer that pushed nav-right to the edge on desktop —
+     hidden here, so nav-right needs its own push to stay pinned right. */
+  .nav-right{margin-left:auto}
   .nav-logo{cursor:pointer}
   .nav-mobile-menu .nl{min-height:44px;display:flex;align-items:center}
   .rl-btn span.rl-label{display:none}
