@@ -264,8 +264,13 @@ class ChecklistController extends Controller
             if ($totalEquip > 0 && $returnedCount >= $totalEquip) {
                 $curStatus = DB::table('bookings')->where('booking_id', $bid)->value('booking_status');
                 if (in_array($curStatus, ['ongoing', 'confirmed'], true)) {
-                    DB::table('bookings')->where('booking_id', $bid)->update(['booking_status' => 'returned', 'updated_at' => now()]);
-                    ActivityLog::record($uid, 'status_change', 'booking', "Booking #$bid marked returned via checklist-in", $bid);
+                    // Matches BookingDetailController::checkin()'s per-item path: all equipment
+                    // back in moves the booking to pending_inspection, not straight to returned —
+                    // "returned" only happens once staff deliberately confirm the inspection (or
+                    // skip it via Complete Booking). Bulk checklist saves used to jump straight to
+                    // returned, silently bypassing that inspection gate.
+                    DB::table('bookings')->where('booking_id', $bid)->update(['booking_status' => 'pending_inspection', 'updated_at' => now()]);
+                    ActivityLog::record($uid, 'status_change', 'booking', "Booking #$bid pending inspection — all equipment checked in via checklist", $bid);
                 }
             }
         }
