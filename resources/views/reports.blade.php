@@ -17,6 +17,8 @@
   $compareActiveQ = request('compare', '');
   $filterBase = collect(request()->query())->except(['export'])->all();
 
+  // format defaults to 'csv' server-side (DataExporter::respond()'s default) — the client-side
+  // format-pill selector below rewrites these links' ?format= to xlsx/pdf without a page reload.
   $exportLink = function (string $type) use ($filterBase, $reportsBase) {
       return $reportsBase . '?' . http_build_query(array_merge($filterBase, ['export' => $type]));
   };
@@ -37,12 +39,9 @@
 .preset-btn:hover,.preset-btn.active { background:var(--accent);border-color:var(--accent);color:#fff; }
 .compare-btn { background:var(--s2);color:var(--sub);border:1.5px solid var(--border);padding:5px 13px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;transition:all .15s;white-space:nowrap; }
 .compare-btn:hover,.compare-btn.active { background:#7c3aed;border-color:#7c3aed;color:#fff; }
-.export-btn { position:relative; }
-.export-menu { display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:5px;min-width:200px;box-shadow:var(--shadow-md);z-index:200; }
-.export-menu.open { display:block; }
-.export-opt { display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;font-size:12.5px;color:var(--text);text-decoration:none;transition:background .12s; }
-.export-opt:hover { background:var(--s2);color:var(--accent); }
-.export-opt svg { flex-shrink:0;color:var(--muted); }
+.export-fmt-row { display:flex;gap:4px;padding:4px 8px 8px;border-bottom:1px solid var(--border);margin-bottom:4px; }
+.export-fmt-pill { flex:1;padding:4px 0;border-radius:6px;font-size:11px;font-weight:700;border:1.5px solid var(--border);background:var(--s2);color:var(--sub);cursor:pointer; }
+.export-fmt-pill.active { background:var(--accent);border-color:var(--accent);color:#fff; }
 .rpt-section {
   display:flex;align-items:center;gap:10px;margin:28px 0 14px;
 }
@@ -117,17 +116,22 @@
   </span>
 
   <div class="export-btn" id="exportBtnWrap">
-    <button type="button" class="btn btn-outline btn-sm" onclick="toggleExportMenu()" style="font-size:12px">
+    <button type="button" class="btn btn-outline btn-sm export-toggle" data-target="reportsExportMenu" style="font-size:12px">
       <i data-feather="download" style="width:13px;height:13px"></i> Export
     </button>
-    <div class="export-menu" id="exportMenu">
+    <div class="export-menu" id="reportsExportMenu">
+      <div class="export-fmt-row">
+        <button type="button" class="export-fmt-pill active" data-fmt="csv" onclick="rptSetExportFormat('csv')">CSV</button>
+        <button type="button" class="export-fmt-pill" data-fmt="xlsx" onclick="rptSetExportFormat('xlsx')">Excel</button>
+        <button type="button" class="export-fmt-pill" data-fmt="pdf" onclick="rptSetExportFormat('pdf')">PDF</button>
+      </div>
       @foreach ([
-          'sales' => 'Monthly Sales (CSV)', 'collection' => 'Payment Collection (CSV)',
-          'bookings' => 'Bookings by Type (CSV)', 'equipment' => 'Top Equipment (CSV)',
-          'availability' => 'Equipment Availability (CSV)', 'crew' => 'Crew Performance (CSV)',
-          'clients' => 'Top Clients (CSV)', 'incidents' => 'Incidents Report (CSV)',
+          'sales' => 'Monthly Sales', 'collection' => 'Payment Collection',
+          'bookings' => 'Bookings by Type', 'equipment' => 'Top Equipment',
+          'availability' => 'Equipment Availability', 'crew' => 'Crew Performance',
+          'clients' => 'Top Clients', 'incidents' => 'Incidents Report',
       ] as $type => $label)
-      <a href="{{ $exportLink($type) }}" class="export-opt">
+      <a href="{{ $exportLink($type) }}" class="export-opt" data-type="{{ $type }}">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>{{ $label }}
       </a>
       @endforeach
@@ -722,15 +726,17 @@ new Chart(document.getElementById('collectionChart'), {
 });
 @endif
 
-function toggleExportMenu(){
-  document.getElementById('exportMenu').classList.toggle('open');
+// Export ▾ open/close is handled by the shared .export-toggle delegated listener in
+// public/assets/js/app.js — this page only needs its own format-pill behavior, since it's
+// the one page offering 8 different datasets from a single dropdown instead of one dataset.
+function rptSetExportFormat(fmt) {
+  document.querySelectorAll('.export-fmt-pill').forEach(b => b.classList.toggle('active', b.dataset.fmt === fmt));
+  document.querySelectorAll('#reportsExportMenu .export-opt[data-type]').forEach(a => {
+    const url = new URL(a.href, window.location.origin);
+    url.searchParams.set('format', fmt);
+    a.href = url.toString();
+  });
 }
-document.addEventListener('click', e => {
-  const wrap = document.getElementById('exportBtnWrap');
-  if (wrap && !wrap.contains(e.target)) {
-    document.getElementById('exportMenu').classList.remove('open');
-  }
-});
 </script>
 @endpush
 @endsection

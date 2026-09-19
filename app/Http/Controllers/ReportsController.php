@@ -2,14 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\DataExporter;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportsController extends Controller
 {
-    public function index(Request $request): View|StreamedResponse
+    public function index(Request $request): View|StreamedResponse|Response
     {
         [$dateFrom, $dateTo] = $this->resolveDateRange($request);
         $dbFrom = $dateFrom;
@@ -120,7 +122,7 @@ class ReportsController extends Controller
         [$comparePreset, $compFrom, $compTo, $compareRevenueData] = $this->resolveComparison($request, $dateFrom, $dateTo);
 
         if ($request->has('export')) {
-            return $this->exportCsv($request->query('export'), compact(
+            return $this->export($request->query('export'), $request->query('format', 'csv'), compact(
                 'revenueData', 'collectionData', 'bookingsByType', 'totalBookingsByType',
                 'topEquipment', 'equipAvail', 'crewPerf', 'topClients', 'damagedReport'
             ));
@@ -191,49 +193,29 @@ class ReportsController extends Controller
         return [$comparePreset, $compFrom, $compTo, $compareRevenueData];
     }
 
-    private function exportCsv(string $type, array $data): StreamedResponse
+    private function export(string $type, string $format, array $data): StreamedResponse|Response
     {
-        $filename = 'filmspec-' . $type . '-' . now()->toDateString() . '.csv';
+        [$title, $headers, $rows] = match ($type) {
+            'collection' => ['Collection', ['Month', 'Payments', 'Collected (PHP)'],
+                $data['collectionData']->map(fn ($r) => [$r->label, $r->transactions, $r->collected])->all()],
+            'bookings' => ['Bookings by Type', ['Project Type', 'Count', 'Share %'],
+                $data['bookingsByType']->map(fn ($bt) => [ucfirst(str_replace('_', ' ', $bt->project_type)), $bt->total, round($bt->total / $data['totalBookingsByType'] * 100, 1)])->all()],
+            'equipment' => ['Top Equipment', ['Equipment', 'Brand', 'Rentals', 'Total Revenue (PHP)'],
+                $data['topEquipment']->map(fn ($te) => [$te->equipment_name, $te->brand ?? '', $te->rental_count, $te->total_revenue])->all()],
+            'availability' => ['Equipment Availability', ['Status', 'Count'],
+                collect(['Available' => $data['equipAvail']['available'], 'Booked' => $data['equipAvail']['booked'], 'In Use' => $data['equipAvail']['rented'], 'Under Repair' => $data['equipAvail']['under_repair'], 'Retired' => $data['equipAvail']['retired']])
+                    ->map(fn ($v, $k) => [$k, $v])->values()->all()],
+            'crew' => ['Crew Performance', ['Name', 'Position', 'Total Shoots', 'No Shows'],
+                $data['crewPerf']->map(fn ($cp) => [$cp->first_name . ' ' . $cp->last_name, $cp->position_name ?? '', $cp->total_shoots, $cp->no_shows])->all()],
+            'clients' => ['Top Clients', ['Client', 'Type', 'Completed', 'All Bookings', 'Spend (PHP)'],
+                $data['topClients']->map(fn ($tc) => [$tc->company_name ?: $tc->contact_person, $tc->client_type, $tc->completed_count, $tc->total_bookings, $tc->total_spend])->all()],
+            'incidents' => ['Incidents Report', ['Date', 'Equipment', 'Booking', 'Type', 'Charge (PHP)', 'Status'],
+                $data['damagedReport']->map(fn ($dr) => [date('Y-m-d', strtotime($dr->incident_date)), $dr->equipment_name, $dr->booking_reference, $dr->incident_type, $dr->charge_amount, $dr->status])->all()],
+            // 'ce_financials' moved to CostEstimatesController::exportFinancials() in Part 11.
+            default => ['Monthly Sales', ['Month', 'Transactions', 'Revenue (PHP)'],
+                $data['revenueData']->map(fn ($r) => [$r->label, $r->transactions, $r->total])->all()],
+        };
 
-        return response()->streamDownload(function () use ($type, $data) {
-            $out = fopen('php://output', 'w');
-            switch ($type) {
-                case 'sales':
-                    fputcsv($out, ['Month', 'Transactions', 'Revenue (PHP)']);
-                    foreach ($data['revenueData'] as $r) fputcsv($out, [$r->label, $r->transactions, $r->total]);
-                    break;
-                case 'collection':
-                    fputcsv($out, ['Month', 'Payments', 'Collected (PHP)']);
-                    foreach ($data['collectionData'] as $r) fputcsv($out, [$r->label, $r->transactions, $r->collected]);
-                    break;
-                case 'bookings':
-                    fputcsv($out, ['Project Type', 'Count', 'Share %']);
-                    foreach ($data['bookingsByType'] as $bt) fputcsv($out, [ucfirst(str_replace('_', ' ', $bt->project_type)), $bt->total, round($bt->total / $data['totalBookingsByType'] * 100, 1)]);
-                    break;
-                case 'equipment':
-                    fputcsv($out, ['Equipment', 'Brand', 'Rentals', 'Total Revenue (PHP)']);
-                    foreach ($data['topEquipment'] as $te) fputcsv($out, [$te->equipment_name, $te->brand ?? '', $te->rental_count, $te->total_revenue]);
-                    break;
-                case 'availability':
-                    fputcsv($out, ['Status', 'Count']);
-                    foreach (['Available' => $data['equipAvail']['available'], 'Booked' => $data['equipAvail']['booked'], 'In Use' => $data['equipAvail']['rented'], 'Under Repair' => $data['equipAvail']['under_repair'], 'Retired' => $data['equipAvail']['retired']] as $k => $v) fputcsv($out, [$k, $v]);
-                    break;
-                case 'crew':
-                    fputcsv($out, ['Name', 'Position', 'Total Shoots', 'No Shows']);
-                    foreach ($data['crewPerf'] as $cp) fputcsv($out, [$cp->first_name . ' ' . $cp->last_name, $cp->position_name ?? '', $cp->total_shoots, $cp->no_shows]);
-                    break;
-                case 'clients':
-                    fputcsv($out, ['Client', 'Type', 'Completed', 'All Bookings', 'Spend (PHP)']);
-                    foreach ($data['topClients'] as $tc) fputcsv($out, [$tc->company_name ?: $tc->contact_person, $tc->client_type, $tc->completed_count, $tc->total_bookings, $tc->total_spend]);
-                    break;
-                case 'incidents':
-                    fputcsv($out, ['Date', 'Equipment', 'Booking', 'Type', 'Charge (PHP)', 'Status']);
-                    foreach ($data['damagedReport'] as $dr) fputcsv($out, [date('Y-m-d', strtotime($dr->incident_date)), $dr->equipment_name, $dr->booking_reference, $dr->incident_type, $dr->charge_amount, $dr->status]);
-                    break;
-                // 'ce_financials' moved to CostEstimatesController::exportFinancials() in
-                // Part 11, along with the data it exports.
-            }
-            fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv; charset=utf-8']);
+        return DataExporter::respond($format, $title, $headers, $rows, 'filmspec-' . $type);
     }
 }

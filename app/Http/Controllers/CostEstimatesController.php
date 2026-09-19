@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Support\CeAnalytics;
+use App\Support\DataExporter;
 use App\Support\ReportPeriod;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -16,7 +18,7 @@ class CostEstimatesController extends Controller
         'revised' => 'badge-orange', 'confirmed' => 'badge-green',
     ];
 
-    public function index(Request $request): View|StreamedResponse
+    public function index(Request $request): View|StreamedResponse|Response
     {
         $period = ReportPeriod::resolve($request);
         $tab = $request->query('tab', 'all');
@@ -125,7 +127,7 @@ class CostEstimatesController extends Controller
         $ceMonthly = CeAnalytics::monthly($chartCes, ReportPeriod::chartMonthKeys($chartMonths));
 
         if ($request->query('export') === 'ce_financials') {
-            return $this->exportFinancials($confirmedCes);
+            return $this->exportFinancials($confirmedCes, $request->query('format', 'csv'));
         }
 
         return view('cost-estimates', [
@@ -141,22 +143,22 @@ class CostEstimatesController extends Controller
     }
 
     // Moved from ReportsController in Part 11 so the export follows its data.
-    private function exportFinancials($confirmedCes): StreamedResponse
+    private function exportFinancials($confirmedCes, string $format = 'csv'): StreamedResponse|Response
     {
-        return response()->streamDownload(function () use ($confirmedCes) {
-            $out = fopen('php://output', 'w');
-            fputcsv($out, ['CE Reference', 'Booking', 'Project', 'Client', 'Confirmed',
-                'Gross (PHP)', 'Package Cost (PHP)', 'Crew (PHP)', 'Net (PHP)']);
-            foreach ($confirmedCes as $ce) {
-                // outsourced_total is still subtracted here (not displayed) so Net stays accurate
-                // for old confirmed CEs from before outsourced/partner equipment was removed as a
-                // feature -- see CeAnalytics::financials() for the same reasoning.
-                $net = (float) $ce->subtotal - (float) $ce->crew_total - (float) $ce->outsourced_total;
-                fputcsv($out, [$ce->ce_reference, $ce->booking_reference, $ce->project_title, $ce->client_name,
-                    date('Y-m-d', strtotime($ce->confirmed_at)), $ce->grand_total, $ce->subtotal,
-                    $ce->crew_total, $net]);
-            }
-            fclose($out);
-        }, 'ce-financials-' . date('Ymd') . '.csv', ['Content-Type' => 'text/csv; charset=utf-8']);
+        $headers = ['CE Reference', 'Booking', 'Project', 'Client', 'Confirmed',
+            'Gross (PHP)', 'Package Cost (PHP)', 'Crew (PHP)', 'Net (PHP)'];
+
+        $rows = $confirmedCes->map(function ($ce) {
+            // outsourced_total is still subtracted here (not displayed) so Net stays accurate
+            // for old confirmed CEs from before outsourced/partner equipment was removed as a
+            // feature -- see CeAnalytics::financials() for the same reasoning.
+            $net = (float) $ce->subtotal - (float) $ce->crew_total - (float) $ce->outsourced_total;
+
+            return [$ce->ce_reference, $ce->booking_reference, $ce->project_title, $ce->client_name,
+                date('Y-m-d', strtotime($ce->confirmed_at)), $ce->grand_total, $ce->subtotal,
+                $ce->crew_total, $net];
+        })->all();
+
+        return DataExporter::respond($format, 'Cost Estimates — Financials', $headers, $rows, 'ce-financials');
     }
 }

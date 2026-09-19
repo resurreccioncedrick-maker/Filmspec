@@ -73,4 +73,86 @@ class DataExporter
 
         return Pdf::loadHTML($html)->setPaper('a4', $orientation)->download($filename);
     }
+
+    /**
+     * For structured multi-section documents (e.g. Profit & Loss) that don't fit one flat
+     * table — a sequence of labeled blocks instead. Each section is
+     * ['title' => ?string, 'headers' => ?string[], 'rows' => array<array<int,string>>]:
+     * a section with no 'headers' is just plain label/value lines (no header row rendered).
+     */
+    public static function respondSections(string $format, string $title, array $sections, string $filenameBase): StreamedResponse|Response
+    {
+        $stamp = now()->format('Y-m-d_His');
+
+        return match ($format) {
+            'xlsx' => self::sectionsXlsx($title, $sections, "$filenameBase-$stamp.xlsx"),
+            'pdf' => self::sectionsPdf($title, $sections, "$filenameBase-$stamp.pdf"),
+            default => self::sectionsCsv($sections, "$filenameBase-$stamp.csv"),
+        };
+    }
+
+    private static function sectionsCsv(array $sections, string $filename): StreamedResponse
+    {
+        return response()->streamDownload(function () use ($sections) {
+            $out = fopen('php://output', 'w');
+            foreach ($sections as $section) {
+                if (! empty($section['title'])) {
+                    fputcsv($out, [$section['title']], ',', '"', '\\');
+                }
+                if (! empty($section['headers'])) {
+                    fputcsv($out, $section['headers'], ',', '"', '\\');
+                }
+                foreach ($section['rows'] as $row) {
+                    fputcsv($out, $row, ',', '"', '\\');
+                }
+                fputcsv($out, [], ',', '"', '\\');
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    private static function sectionsXlsx(string $title, array $sections, string $filename): StreamedResponse
+    {
+        $sheet = new Spreadsheet();
+        $ws = $sheet->getActiveSheet();
+        $ws->setTitle(mb_substr(preg_replace('/[\\\\\/\?\*\[\]:]/', ' ', $title), 0, 31) ?: 'Export');
+
+        $r = 1;
+        $maxCols = 1;
+        foreach ($sections as $section) {
+            if (! empty($section['title'])) {
+                $ws->setCellValue("A$r", $section['title']);
+                $ws->getStyle("A$r")->getFont()->setBold(true);
+                $r++;
+            }
+            if (! empty($section['headers'])) {
+                $ws->fromArray($section['headers'], null, "A$r");
+                $ws->getStyle("A$r:" . $ws->getHighestColumn($r) . $r)->getFont()->setBold(true);
+                $maxCols = max($maxCols, count($section['headers']));
+                $r++;
+            }
+            foreach ($section['rows'] as $row) {
+                $ws->fromArray($row, null, "A$r");
+                $maxCols = max($maxCols, count($row));
+                $r++;
+            }
+            $r++; // blank separator row
+        }
+        foreach (range('A', \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($maxCols)) as $col) {
+            $ws->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $writer = IOFactory::createWriter($sheet, 'Xlsx');
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
+    private static function sectionsPdf(string $title, array $sections, string $filename): Response
+    {
+        $html = view('exports.sections-pdf', ['title' => $title, 'sections' => $sections])->render();
+
+        return Pdf::loadHTML($html)->setPaper('a4', 'portrait')->download($filename);
+    }
 }

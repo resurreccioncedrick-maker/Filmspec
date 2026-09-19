@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\DataExporter;
 use App\Support\ReportPeriod;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -22,7 +24,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ProfitLossController extends Controller
 {
-    public function index(Request $request): View|StreamedResponse
+    public function index(Request $request): View|StreamedResponse|Response
     {
         $period = ReportPeriod::resolve($request);
         $from = substr($period['from'], 0, 10);
@@ -45,7 +47,7 @@ class ProfitLossController extends Controller
         });
 
         if ($request->query('export') === 'pl') {
-            return $this->exportCsv($pl, $monthly, $period['label']);
+            return $this->exportCsv($pl, $monthly, $period['label'], $request->query('format', 'csv'));
         }
 
         // "vs last period" pills on Revenue and Net Profit — not the margin percentages, which
@@ -148,39 +150,41 @@ class ProfitLossController extends Controller
         ];
     }
 
-    private function exportCsv(array $pl, $monthly, string $label): StreamedResponse
+    private function exportCsv(array $pl, $monthly, string $label, string $format = 'csv'): StreamedResponse|Response
     {
-        return response()->streamDownload(function () use ($pl, $monthly, $label) {
-            $out = fopen('php://output', 'w');
-            fputcsv($out, ['PROFIT & LOSS', $label]);
-            fputcsv($out, ['Basis', 'Revenue = payments received; costs attributed to the shoot']);
-            fputcsv($out, ['Period', $pl['from'] . ' to ' . $pl['to']]);
-            fputcsv($out, []);
-            fputcsv($out, ['REVENUE']);
-            foreach ($pl['revenue_by_type'] as $r) {
-                fputcsv($out, [$r['label'], $r['count'], $r['amount']]);
-            }
-            fputcsv($out, ['Total revenue', '', $pl['revenue_total']]);
-            fputcsv($out, []);
-            fputcsv($out, ['DIRECT COSTS']);
-            fputcsv($out, ['Crew talent fees', '', $pl['crew_cost']]);
-            fputcsv($out, ['Transportation', '', $pl['transport_cost']]);
-            fputcsv($out, ['Total direct costs', '', $pl['direct_total']]);
-            fputcsv($out, []);
-            fputcsv($out, ['Gross profit', $pl['gross_margin'] . '%', $pl['gross_profit']]);
-            fputcsv($out, []);
-            fputcsv($out, ['OPERATING EXPENSES']);
-            fputcsv($out, ['Repairs & purchases', '', $pl['repair_spend']]);
-            fputcsv($out, ['Total operating expenses', '', $pl['opex_total']]);
-            fputcsv($out, []);
-            fputcsv($out, ['NET PROFIT', $pl['net_margin'] . '%', $pl['net_profit']]);
-            fputcsv($out, []);
-            fputcsv($out, ['MONTHLY TREND']);
-            fputcsv($out, ['Month', 'Revenue', 'Costs', 'Net']);
-            foreach ($monthly as $m) {
-                fputcsv($out, [$m->label, $m->revenue, $m->costs, $m->net]);
-            }
-            fclose($out);
-        }, 'profit-loss-' . date('Ymd') . '.csv', ['Content-Type' => 'text/csv; charset=utf-8']);
+        $revenueRows = [];
+        foreach ($pl['revenue_by_type'] as $r) {
+            $revenueRows[] = [$r['label'], $r['count'], $r['amount']];
+        }
+        $revenueRows[] = ['Total revenue', '', $pl['revenue_total']];
+
+        $sections = [
+            ['title' => null, 'headers' => null, 'rows' => [
+                ['PROFIT & LOSS', $label],
+                ['Basis', 'Revenue = payments received; costs attributed to the shoot'],
+                ['Period', $pl['from'] . ' to ' . $pl['to']],
+            ]],
+            ['title' => 'REVENUE', 'headers' => null, 'rows' => $revenueRows],
+            ['title' => 'DIRECT COSTS', 'headers' => null, 'rows' => [
+                ['Crew talent fees', '', $pl['crew_cost']],
+                ['Transportation', '', $pl['transport_cost']],
+                ['Total direct costs', '', $pl['direct_total']],
+            ]],
+            ['title' => null, 'headers' => null, 'rows' => [
+                ['Gross profit', $pl['gross_margin'] . '%', $pl['gross_profit']],
+            ]],
+            ['title' => 'OPERATING EXPENSES', 'headers' => null, 'rows' => [
+                ['Repairs & purchases', '', $pl['repair_spend']],
+                ['Total operating expenses', '', $pl['opex_total']],
+            ]],
+            ['title' => null, 'headers' => null, 'rows' => [
+                ['NET PROFIT', $pl['net_margin'] . '%', $pl['net_profit']],
+            ]],
+            ['title' => 'MONTHLY TREND', 'headers' => ['Month', 'Revenue', 'Costs', 'Net'], 'rows' =>
+                $monthly->map(fn ($m) => [$m->label, $m->revenue, $m->costs, $m->net])->all(),
+            ],
+        ];
+
+        return DataExporter::respondSections($format, 'Profit & Loss — ' . $label, $sections, 'profit-loss');
     }
 }

@@ -25,8 +25,7 @@
       the next therefore shows its sales and its costs in different months.
     </p>
   </div>
-  <a href="{{ route('profit-loss', ['period' => $period['mode'], 'm' => $period['month'], 'export' => 'pl']) }}"
-     class="btn btn-outline btn-sm"><i data-feather="download"></i> Export CSV</a>
+  @include('partials.export-dropdown', ['id' => 'ProfitLoss', 'exportValue' => 'pl'])
 </div>
 
 @include('partials.report-period-bar', ['periodRoute' => 'profit-loss'])

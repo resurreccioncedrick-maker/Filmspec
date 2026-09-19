@@ -181,8 +181,7 @@
     <h2 class="card-title">Saved Cost Estimates</h2>
     <div style="display:flex;align-items:center;gap:10px">
       <span style="font-size:.78rem;color:var(--text-muted)">{{ $total }} record{{ $total === 1 ? '' : 's' }}</span>
-      <a href="{{ route('cost-estimates', array_filter(['period' => $period['mode'], 'm' => $period['month'], 'export' => 'ce_financials'])) }}"
-         class="btn btn-outline btn-sm"><i data-feather="download"></i> Export Financials</a>
+      @include('partials.export-dropdown', ['id' => 'CeFinancials', 'label' => 'Export Financials', 'exportValue' => 'ce_financials'])
     </div>
   </div>
   <div class="card-body" style="padding-bottom:0">
