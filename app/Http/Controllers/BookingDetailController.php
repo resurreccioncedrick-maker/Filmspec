@@ -232,6 +232,23 @@ class BookingDetailController extends Controller
         $equipRequestsCount = $equipRequests->count();
         $pendingEquipRequestsCount = $pendingEquipRequests->count();
 
+        // Field-added equipment/accessories — cost was actually added to the booking at
+        // Dispatch (see FieldRequestsController::dispatch()), so anything still 'approved'
+        // (awaiting dispatch) hasn't affected the total yet and is left out here.
+        $fieldAddNumDays = max(1, (new \DateTime($booking->shoot_date_start))->diff(new \DateTime($booking->shoot_date_end))->days + 1);
+        $fieldAdditions = $equipRequests
+            ->whereIn('item_type', ['equipment', 'accessory'])
+            ->whereIn('status', ['dispatched', 'delivered'])
+            ->map(function ($r) use ($fieldAddNumDays) {
+                $r->item_name = $r->item_type === 'accessory' ? $r->accessory_name : $r->equipment_name;
+                $r->line_cost = (float) $r->quantity * $fieldAddNumDays * (float) $r->daily_rate;
+                $r->followed_up_at = $r->delivered_at ?? $r->approved_at ?? $r->created_at;
+
+                return $r;
+            })
+            ->sortByDesc('followed_up_at')
+            ->values();
+
         $feedback = DB::table('booking_feedback as bf')
             ->join('users as u', 'bf.submitted_by', '=', 'u.user_id')
             ->where('bf.booking_id', $id)
@@ -298,6 +315,7 @@ class BookingDetailController extends Controller
             'extensionRequestsCount' => $extensionRequestsCount, 'pendingExtensionCount' => $pendingExtensionCount,
             'equipRequests' => $equipRequests, 'pendingEquipRequests' => $pendingEquipRequests,
             'equipRequestsCount' => $equipRequestsCount, 'pendingEquipRequestsCount' => $pendingEquipRequestsCount,
+            'fieldAdditions' => $fieldAdditions,
             'feedback' => $feedback,
             'availEquip' => $availEquip, 'availCrew' => $availCrew, 'positions' => $positions, 'vehicleRates' => $vehicleRates,
             'driverNeeded' => $driverNeeded, 'driverCount' => $driverCount,

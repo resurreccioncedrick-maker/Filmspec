@@ -431,7 +431,8 @@
 
 <!-- Tabs -->
 <div class="tabs">
-  <button class="tab-btn active" data-tab="tab-equipment">Equipment <span class="badge badge-blue" style="margin-left:4px">{{ $equipmentLines->count() }}</span></button>
+  <button class="tab-btn active" data-tab="tab-project-details">Project Details</button>
+  <button class="tab-btn" data-tab="tab-equipment">Equipment <span class="badge badge-blue" style="margin-left:4px">{{ $equipmentLines->count() }}</span></button>
   <button class="tab-btn" data-tab="tab-accessories">Accessories <span class="badge {{ $bookingAccessoriesCount > 0 ? 'badge-blue' : 'badge-gray' }}" style="margin-left:4px">{{ $bookingAccessoriesCount }}</span></button>
   <button class="tab-btn" data-tab="tab-crew">Crew <span class="badge badge-blue" style="margin-left:4px">{{ $crewLines->count() }}</span></button>
   <button class="tab-btn" data-tab="tab-payments">Payments <span class="badge badge-blue" style="margin-left:4px">{{ $payments->count() }}</span></button>
@@ -452,21 +453,76 @@
   <button class="tab-btn" data-tab="tab-documents">Documents <span class="badge badge-blue" style="margin-left:4px">{{ $documents->count() }}</span></button>
 </div>
 
-{{-- Jump to — Part 9. Tab targets reuse the existing [data-tab] click handler in app.js;
-     card targets are plain scrolls. --}}
-<div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 14px;font-size:11.5px">
-  <span style="color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700">Jump to:</span>
-  <a href="#" onclick="jumpTo(event,'card','card-project-details')" style="color:var(--accent)">Project details</a>
-  <a href="#" onclick="jumpTo(event,'tab','tab-equipment')" style="color:var(--accent)">Equipment</a>
-  <a href="#" onclick="jumpTo(event,'tab','tab-crew')" style="color:var(--accent)">Crew</a>
-  <a href="#" onclick="jumpTo(event,'card','card-package-totals')" style="color:var(--accent)">Package &amp; totals</a>
-  <a href="#" onclick="jumpTo(event,'card','card-saved-ces')" style="color:var(--accent)">Saved CEs</a>
-</div>
-
 <div data-tab-panes>
 
+<!-- PROJECT DETAILS TAB -->
+<div id="tab-project-details" class="tab-pane active">
+  <div class="card" id="card-project-details">
+    <div class="card-header">
+      <h2 class="card-title">Project Details</h2>
+    </div>
+    <div class="card-body">
+      @php
+        $ceTypeOptions = ['fs_front' => 'FS Front', 'client_direct' => 'Client Direct', 'partner_front' => 'Partner Front'];
+      @endphp
+      @if (in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true) && $booking->booking_status !== 'cancelled')
+      <form method="POST" action="{{ $actionUrl }}">
+        @csrf
+        <input type="hidden" name="action" value="update_project_details">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Type</label>
+            <select name="ce_type" class="form-control">
+              @foreach ($ceTypeOptions as $k => $label)
+              <option value="{{ $k }}" {{ ($booking->ce_type ?? 'fs_front') === $k ? 'selected' : '' }}>{{ $label }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Due Date <span style="font-weight:400;color:var(--text-muted);font-size:11px">(leave blank for none)</span></label>
+            <input type="date" name="ce_due_date" class="form-control" value="{{ $booking->ce_due_date ?? '' }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Director / DOP</label>
+          <input type="text" name="ce_director_dop" class="form-control" value="{{ $booking->ce_director_dop ?? '' }}" placeholder="e.g. Direk Peter Frac">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Contact Person</label>
+            <input type="text" name="ce_contact_person" class="form-control" value="{{ $booking->ce_contact_person ?? '' }}"
+                   placeholder="{{ $booking->contact_person ?: '— from client record —' }}">
+          </div>
+          <div class="form-group">
+            <label>Contact Number</label>
+            <input type="text" name="ce_contact_number" class="form-control" value="{{ $booking->ce_contact_number ?? '' }}"
+                   placeholder="{{ $booking->client_phone ?: '— from client record —' }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" name="ce_contact_email" class="form-control" value="{{ $booking->ce_contact_email ?? '' }}"
+                 placeholder="{{ $booking->client_email ?: '— from client record —' }}">
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">
+          Leave a contact field blank to use the client record on the CE document.
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm"><i data-feather="save"></i> Save Project Details</button>
+      </form>
+      @else
+      <div style="font-size:13px">
+        <div><strong>Type:</strong> {{ $ceTypeOptions[$booking->ce_type ?? 'fs_front'] ?? 'FS Front' }}</div>
+        <div><strong>Due Date:</strong> {{ $booking->ce_due_date ? date('M j, Y', strtotime($booking->ce_due_date)) : '—' }}</div>
+        <div><strong>Director / DOP:</strong> {{ $booking->ce_director_dop ?: '—' }}</div>
+        <div><strong>Contact:</strong> {{ $booking->ce_contact_person ?: ($booking->contact_person ?: '—') }}</div>
+      </div>
+      @endif
+    </div>
+  </div>
+</div>
+
 <!-- EQUIPMENT TAB -->
-<div id="tab-equipment" class="tab-pane active">
+<div id="tab-equipment" class="tab-pane">
   @php $canAct = $isAdmin && in_array($booking->booking_status, ['confirmed', 'ongoing']); @endphp
   <div class="card">
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -698,101 +754,6 @@
     </div>
   </div>
 
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-header">
-      <h2 class="card-title" id="card-saved-ces">Saved Cost Estimates <span class="badge badge-gray" style="margin-left:4px">{{ $ceHistory->count() }}</span></h2>
-    </div>
-    <div class="card-body">
-      @if ($ceHistory->count() === 0)
-      <div class="empty-state"><i data-feather="file-text"></i><h3>No cost estimate generated yet</h3></div>
-      @else
-      @php
-        // First five inline, the rest behind a no-JS <details> — same collapse used in Parts 4b/5a.
-        $ceLatestId = $ceHistory->first()->ce_id;
-        $ceShown = $ceHistory->take(5);
-        $ceRest = $ceHistory->slice(5);
-        $ceCanErase = in_array($role, config('filmspec.manage_roles'), true);
-      @endphp
-
-      @foreach ($ceShown as $row)
-        @include('partials.saved-ce-row', ['row' => $row, 'ceLatestId' => $ceLatestId, 'ceCanErase' => $ceCanErase])
-      @endforeach
-
-      @if ($ceRest->count() > 0)
-      <details style="margin-top:8px">
-        <summary style="font-size:12px;color:var(--muted);cursor:pointer">Show all ({{ $ceHistory->count() }})</summary>
-        @foreach ($ceRest as $row)
-          @include('partials.saved-ce-row', ['row' => $row, 'ceLatestId' => $ceLatestId, 'ceCanErase' => $ceCanErase])
-        @endforeach
-      </details>
-      @endif
-      @endif
-    </div>
-  </div>
-
-  <!-- CE Project Details (Part 7) -->
-  <div class="card" id="card-project-details" style="margin-bottom:16px">
-    <div class="card-header">
-      <h2 class="card-title">Project Details</h2>
-    </div>
-    <div class="card-body">
-      @php
-        $ceTypeOptions = ['fs_front' => 'FS Front', 'client_direct' => 'Client Direct', 'partner_front' => 'Partner Front'];
-      @endphp
-      @if (in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true) && $booking->booking_status !== 'cancelled')
-      <form method="POST" action="{{ $actionUrl }}">
-        @csrf
-        <input type="hidden" name="action" value="update_project_details">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Type</label>
-            <select name="ce_type" class="form-control">
-              @foreach ($ceTypeOptions as $k => $label)
-              <option value="{{ $k }}" {{ ($booking->ce_type ?? 'fs_front') === $k ? 'selected' : '' }}>{{ $label }}</option>
-              @endforeach
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Due Date <span style="font-weight:400;color:var(--text-muted);font-size:11px">(leave blank for none)</span></label>
-            <input type="date" name="ce_due_date" class="form-control" value="{{ $booking->ce_due_date ?? '' }}">
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Director / DOP</label>
-          <input type="text" name="ce_director_dop" class="form-control" value="{{ $booking->ce_director_dop ?? '' }}" placeholder="e.g. Direk Peter Frac">
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Contact Person</label>
-            <input type="text" name="ce_contact_person" class="form-control" value="{{ $booking->ce_contact_person ?? '' }}"
-                   placeholder="{{ $booking->contact_person ?: '— from client record —' }}">
-          </div>
-          <div class="form-group">
-            <label>Contact Number</label>
-            <input type="text" name="ce_contact_number" class="form-control" value="{{ $booking->ce_contact_number ?? '' }}"
-                   placeholder="{{ $booking->client_phone ?: '— from client record —' }}">
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Email</label>
-          <input type="email" name="ce_contact_email" class="form-control" value="{{ $booking->ce_contact_email ?? '' }}"
-                 placeholder="{{ $booking->client_email ?: '— from client record —' }}">
-        </div>
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">
-          Leave a contact field blank to use the client record on the CE document.
-        </div>
-        <button type="submit" class="btn btn-primary btn-sm"><i data-feather="save"></i> Save Project Details</button>
-      </form>
-      @else
-      <div style="font-size:13px">
-        <div><strong>Type:</strong> {{ $ceTypeOptions[$booking->ce_type ?? 'fs_front'] ?? 'FS Front' }}</div>
-        <div><strong>Due Date:</strong> {{ $booking->ce_due_date ? date('M j, Y', strtotime($booking->ce_due_date)) : '—' }}</div>
-        <div><strong>Director / DOP:</strong> {{ $booking->ce_director_dop ?: '—' }}</div>
-        <div><strong>Contact:</strong> {{ $booking->ce_contact_person ?: ($booking->contact_person ?: '—') }}</div>
-      </div>
-      @endif
-    </div>
-  </div>
 
   <!-- Preview list — what the client sees, grouped the way the CE document prints -->
   <div class="card" style="margin-bottom:16px">
@@ -871,10 +832,30 @@
         $isDiscounted = $bd['pricing_mode'] !== 'no_discount';
         $vatLabel = $bd['vat_exempt'] && $isDiscounted ? 'VAT (exempt)' : '12% VAT';
         $pkRow = fn ($label, $value, $style = '') => '<div style="display:flex;justify-content:space-between;gap:16px;padding:5px 0;' . $style . '"><span>' . $label . '</span><span style="font-family:monospace;white-space:nowrap">₱' . number_format($value, 2) . '</span></div>';
+        // Equipment cost split by category (Camera, Lighting, Audio, ...) for display —
+        // the underlying discount/VAT math below still runs on the aggregate totals, this
+        // just itemizes what fs_equipment is made of.
+        $pkCatGroups = [];
+        foreach ($equipmentLines as $ln) {
+            $cat = trim((string) ($ln->category_name ?? '')) ?: 'Others';
+            $lineCost = (float) $ln->subtotal > 0 ? (float) $ln->subtotal : ((float) $ln->quantity * (float) $ln->days * (float) $ln->daily_rate);
+            $pkCatGroups[$cat] = ($pkCatGroups[$cat] ?? 0) + $lineCost;
+        }
+        ksort($pkCatGroups);
+        $pkAccessoriesTotal = (float) $bookingAccessories->sum('subtotal');
       @endphp
 
       <div style="font-size:13px;margin-bottom:14px">
-        {!! $pkRow('FS equipment', $bd['fs_equipment'], 'color:var(--text-muted)') !!}
+        @if (empty($pkCatGroups) && $pkAccessoriesTotal <= 0)
+          {!! $pkRow('FS equipment', $bd['fs_equipment'], 'color:var(--text-muted)') !!}
+        @else
+          @foreach ($pkCatGroups as $pkCat => $pkCatCost)
+            {!! $pkRow($pkCat, $pkCatCost, 'color:var(--text-muted)') !!}
+          @endforeach
+          @if ($pkAccessoriesTotal > 0)
+            {!! $pkRow('Accessories', $pkAccessoriesTotal, 'color:var(--text-muted)') !!}
+          @endif
+        @endif
         {!! $pkRow('Net items (ex. transport)', $bd['net_items'], 'color:var(--text-muted)') !!}
         {!! $pkRow('Transportation', $bd['transportation'], 'color:var(--text-muted)') !!}
         {!! $pkRow('Sub total (equipment CE)', $bd['equip_subtotal'], 'font-weight:700;border-top:1px solid var(--border);padding-top:7px') !!}
@@ -910,6 +891,34 @@
           {!! $pkRow('Summary grand total (incl. VAT)', $bd['summary_grand'], 'font-weight:800;font-size:15px;color:var(--blue-700);border-top:2px solid var(--blue-700);margin-top:6px;padding-top:8px') !!}
         </div>
       </div>
+
+      @if ($fieldAdditions->isNotEmpty())
+      {{-- Equipment/accessories requested and delivered to the field mid-shoot, on top of the
+           original booking — already folded into the totals above (added at Dispatch), listed
+           out here so it's clear which items these are and when each was followed up. --}}
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--blue-700);margin-bottom:6px">
+          FIELD ADDITIONS
+          <span style="float:right;font-weight:400;color:var(--text-muted)">{{ $fieldAdditions->count() }} item{{ $fieldAdditions->count() === 1 ? '' : 's' }}</span>
+        </div>
+        @foreach ($fieldAdditions as $fa)
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;font-size:12.5px;padding:5px 0;border-bottom:1px solid var(--border)">
+          <div>
+            <span style="font-family:monospace;color:var(--text-muted)">{{ $fa->quantity }}×</span> {{ $fa->item_name ?: ucfirst($fa->item_type) }}
+            <span class="badge {{ $fa->status === 'delivered' ? 'badge-green' : 'badge-blue' }}" style="margin-left:4px;font-size:.65rem">{{ ucfirst($fa->status) }}</span>
+            <div style="font-size:.72rem;color:var(--muted)">
+              {{ $fa->status === 'delivered' ? 'Delivered' : 'Dispatched' }} {{ \Carbon\Carbon::parse($fa->followed_up_at)->format('M j, Y g:ia') }}
+            </div>
+          </div>
+          <span style="font-family:monospace;white-space:nowrap;font-weight:600">₱{{ number_format($fa->line_cost, 2) }}</span>
+        </div>
+        @endforeach
+        <div style="display:flex;justify-content:space-between;gap:16px;padding-top:6px;font-weight:700;font-size:12.5px">
+          <span>Field additions total</span>
+          <span style="font-family:monospace">₱{{ number_format($fieldAdditions->sum('line_cost'), 2) }}</span>
+        </div>
+      </div>
+      @endif
 
       {{-- Client response — the closest signal we have to their "Check inbox": we can't read
            a mailbox, but the portal approve/reject flow already records the answer. --}}
@@ -3305,21 +3314,6 @@ function prepareCrewBatch() {
     });
   });
   return true;
-}
-
-// ── Jump-to rail (Part 9) ──────────────────────────────────────────────────
-function jumpTo(e, kind, target) {
-  e.preventDefault();
-  if (kind === 'tab') {
-    // Reuse app.js's existing [data-tab] handler rather than duplicating tab logic.
-    const btn = document.querySelector('[data-tab="' + target + '"]');
-    if (btn) btn.click();
-    const pane = document.getElementById(target);
-    if (pane) pane.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    return;
-  }
-  const el = document.getElementById(target);
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ── Equipment catalog quick-add panel (Part 9) ─────────────────────────────
