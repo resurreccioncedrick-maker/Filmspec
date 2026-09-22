@@ -1,141 +1,119 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Receipt {{ $payment->receipt_number ?: '#' . $payment->payment_id }} — FilmSpec</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-:root{--accent:#003D80;--acclight:#D0E8FF;--text:#0f172a;--sub:#475569;--muted:#94a3b8;--border:#e2e8f0;--surface:#ffffff;--bg:#f8fafc}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Receipt {{ $payment->receipt_number ?: '#' . $payment->payment_id }} — FilmSpec</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'DM Sans',sans-serif; font-size:13px; color:#0f172a; background:white; padding:24px; }
+    .doc { max-width:680px; margin:0 auto; }
 
-.top-bar{background:var(--accent);color:#fff;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.top-bar-logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;display:flex;align-items:center;gap:10px}
-.top-bar-actions{display:flex;gap:8px}
-.tbtn{padding:7px 16px;border-radius:5px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;font-family:'DM Sans',sans-serif;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center}
-.tbtn:hover{background:rgba(255,255,255,.25)}
-.tbtn.primary{background:#fff;color:var(--accent);border-color:#fff}
-.tbtn.primary:hover{background:var(--acclight)}
+    .doc-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:28px; padding-bottom:18px; border-bottom:3px solid #003D80; }
+    .brand { display:flex; align-items:center; gap:10px; }
+    .brand-sub { font-size:10px; color:#64748b; margin-top:2px; }
 
-.rc-wrap{max-width:640px;margin:28px auto;padding:0 16px 40px}
-.rc-sheet{background:#fff;border:1px solid #d1d5db;border-radius:4px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.06)}
+    .doc-title { text-align:right; }
+    .doc-type { font-family:'Syne',sans-serif; font-size:1.1rem; font-weight:800; color:#003D80; text-transform:uppercase; letter-spacing:1px; }
+    .doc-ref { font-size:11px; color:#64748b; margin-top:4px; }
 
-.rc-header{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid var(--accent)}
-.rc-header-left{background:var(--accent);color:#fff;padding:16px 20px;display:flex;flex-direction:column;justify-content:center}
-.rc-header-left .brand{font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:3px;line-height:1}
-.rc-header-left .addr{font-size:9px;color:rgba(255,255,255,.7);margin-top:5px;line-height:1.5}
-.rc-header-right{background:var(--acclight);padding:16px 20px;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;text-align:right}
-.rc-type{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:2px;color:var(--accent);line-height:1}
-.rc-num{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--accent);font-weight:700;margin-top:4px}
+    .meta-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px; }
+    .meta-block label { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:#94a3b8; font-weight:600; display:block; margin-bottom:3px; }
+    .meta-block value { font-size:13px; font-weight:600; color:#0f172a; }
 
-.rc-info-row{display:grid;grid-template-columns:170px 1fr;border-bottom:1px solid #f1f5f9;min-height:32px;align-items:center}
-.rc-info-row:last-child{border-bottom:none}
-.rc-info-lbl{padding:7px 16px;font-size:10.5px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;background:#f8fafc;border-right:1px solid var(--border)}
-.rc-info-val{padding:7px 16px;font-size:13px;font-weight:600;color:var(--text)}
+    .total-row { display:flex; justify-content:flex-end; }
+    .total-table { min-width:280px; }
+    .total-table td:first-child { color:#475569; }
+    .total-table td:last-child { text-align:right; font-weight:600; }
+    .grand-total td { background:#0d1f3c; color:white !important; font-family:'Syne',sans-serif; font-weight:800; font-size:15px; padding:12px 14px; }
 
-.rc-amount{padding:22px 20px;background:var(--accent);color:#fff;text-align:center}
-.rc-amount .lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;opacity:.75}
-.rc-amount .val{font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:800;margin-top:4px}
+    .footer-note { margin-top:28px; padding-top:14px; border-top:1px solid #e2e8f0; font-size:10px; color:#94a3b8; text-align:center; }
+    .sig-area { display:grid; grid-template-columns:1fr 1fr; gap:40px; margin-top:40px; }
+    .sig-line { border-top:1px solid #94a3b8; padding-top:6px; font-size:11px; color:#475569; text-align:center; }
 
-.rc-notes{padding:12px 16px;background:#fffbeb;border-top:1px solid #fde68a;font-size:11px;color:#92400e;line-height:1.7}
-.rc-footer{padding:16px 20px;border-top:1px solid var(--border);font-size:10.5px;color:var(--muted);text-align:center;line-height:1.6}
+    @media print {
+      body { padding:0; }
+      .no-print { display:none !important; }
+    }
 
-@media print{.top-bar,.no-print{display:none!important}.rc-wrap{margin:0;padding:0}.rc-sheet{box-shadow:none;border:1px solid #ccc}}
-
-@media (max-width:640px){
-  .top-bar{padding:12px 16px;flex-wrap:wrap;gap:10px}
-  .tbtn{min-height:44px;padding:10px 16px;font-size:13px}
-  .rc-header{grid-template-columns:1fr}
-  .rc-header-right{align-items:flex-start;text-align:left}
-  .rc-info-row{grid-template-columns:1fr;min-height:0}
-  .rc-info-lbl{border-right:none;border-bottom:1px solid var(--border);padding:6px 16px 3px}
-  .rc-info-val{padding:3px 16px 8px;font-size:14px}
-  .rc-amount .val{font-size:26px}
-}
-</style>
+    @media (max-width:640px) {
+      .doc-header { flex-direction:column; gap:14px; }
+      .doc-title { text-align:left; }
+      .meta-grid { grid-template-columns:1fr; }
+      .sig-area { grid-template-columns:1fr; gap:24px; }
+    }
+  </style>
 </head>
 <body>
 
-<div class="top-bar no-print">
-  <div class="top-bar-logo">
-    <img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:26px;object-fit:contain;background:rgba(255,255,255,.92);padding:2px 8px;border-radius:4px">
-    <span>— Receipt</span>
-  </div>
-  <div class="top-bar-actions">
-    <button class="tbtn primary" onclick="window.print()">Print / Save as PDF</button>
-    @if ($role === 'client')
-    <a href="{{ route('client-booking-detail', $payment->booking_id) }}" class="tbtn">&larr; Booking</a>
-    @else
-    <a href="{{ route('booking-detail', $payment->booking_id) }}" class="tbtn">&larr; Booking</a>
-    @endif
-  </div>
+<div class="no-print" style="margin-bottom:20px;display:flex;gap:10px">
+  <button onclick="window.print()" style="padding:8px 18px;background:#003D80;color:white;border:none;border-radius:6px;cursor:pointer;font-family:inherit">Print / Save as PDF</button>
+  @if ($role === 'client')
+  <a href="{{ route('client-booking-detail', $payment->booking_id) }}" style="padding:8px 18px;background:#f1f5f9;color:#0f172a;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center">&larr; Booking</a>
+  @else
+  <a href="{{ route('booking-detail', $payment->booking_id) }}" style="padding:8px 18px;background:#f1f5f9;color:#0f172a;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center">&larr; Booking</a>
+  @endif
 </div>
 
-<div class="rc-wrap">
-  <div class="rc-sheet">
-    <div class="rc-header">
-      <div class="rc-header-left">
-        <div class="brand">FILMSPEC</div>
-        <div class="addr">Film Equipment Rental &amp; Crew Management<br>Metro Manila, Philippines<br>TIN: {{ config('filmspec.company_tin') }}</div>
-      </div>
-      <div class="rc-header-right">
-        <div class="rc-type">{{ $receiptTypeLabel[$payment->receipt_type] ?? 'Receipt' }}</div>
-        <div class="rc-num">{{ $payment->receipt_number ?: 'No. —' }}</div>
+<div class="doc">
+  <div class="doc-header">
+    <div class="brand">
+      <img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:48px;max-width:180px;object-fit:contain">
+      <div>
+        <div class="brand-sub">Equipment Resource Ecosystem</div>
+        <div class="brand-sub">TIN: {{ config('filmspec.company_tin') }}</div>
       </div>
     </div>
-
-    <div class="rc-info">
-      <div class="rc-info-row">
-        <div class="rc-info-lbl">Received From</div>
-        <div class="rc-info-val">{{ $payment->company_name ?: $payment->contact_person }}</div>
-      </div>
-      <div class="rc-info-row">
-        <div class="rc-info-lbl">Booking Reference</div>
-        <div class="rc-info-val" style="font-family:'JetBrains Mono',monospace">{{ $payment->booking_reference }}</div>
-      </div>
-      <div class="rc-info-row">
-        <div class="rc-info-lbl">Project</div>
-        <div class="rc-info-val">{{ $payment->project_title ?: '—' }}</div>
-      </div>
-      <div class="rc-info-row">
-        <div class="rc-info-lbl">Payment Date</div>
-        <div class="rc-info-val">{{ \Illuminate\Support\Carbon::parse($payment->payment_date)->format('F j, Y') }}</div>
-      </div>
-      <div class="rc-info-row">
-        <div class="rc-info-lbl">Payment Type</div>
-        <div class="rc-info-val">{{ $typeLabel[$payment->payment_type] ?? ($payment->payment_type ? ucfirst($payment->payment_type) : '—') }}</div>
-      </div>
-      <div class="rc-info-row">
-        <div class="rc-info-lbl">Payment Method</div>
-        <div class="rc-info-val">{{ $methodLabel[$payment->payment_method] ?? ($payment->payment_method ? ucfirst($payment->payment_method) : '—') }}</div>
-      </div>
-      @if ($payment->reference_number)
-      <div class="rc-info-row">
-        <div class="rc-info-lbl">Reference No.</div>
-        <div class="rc-info-val" style="font-family:'JetBrains Mono',monospace">{{ $payment->reference_number }}</div>
-      </div>
-      @endif
-      @if ($payment->received_by_name && trim($payment->received_by_name) !== '')
-      <div class="rc-info-row">
-        <div class="rc-info-lbl">Received By</div>
-        <div class="rc-info-val">{{ $payment->received_by_name }}</div>
-      </div>
-      @endif
+    <div class="doc-title">
+      <div class="doc-type">{{ $receiptTypeLabel[$payment->receipt_type] ?? 'Receipt' }}</div>
+      <div class="doc-ref">No. {{ $payment->receipt_number ?: 'N/A' }} &nbsp;·&nbsp; {{ \Illuminate\Support\Carbon::parse($payment->payment_date)->format('F j, Y') }}</div>
     </div>
+  </div>
 
-    <div class="rc-amount">
-      <div class="lbl">Amount {{ $payment->is_vat ? '(VAT Inclusive)' : '' }}</div>
-      <div class="val">&#8369;{{ number_format($payment->amount, 2) }}</div>
-    </div>
-
-    @if ($payment->notes)
-    <div class="rc-notes">{{ $payment->notes }}</div>
+  <div class="meta-grid">
+    <div class="meta-block"><label>Received From</label><value>{{ $payment->company_name ?: $payment->contact_person }}</value></div>
+    <div class="meta-block"><label>Booking Reference</label><value>{{ $payment->booking_reference }}</value></div>
+    <div class="meta-block"><label>Project</label><value>{{ $payment->project_title ?: '—' }}</value></div>
+    <div class="meta-block"><label>Payment Method</label><value>{{ $methodLabel[$payment->payment_method] ?? ($payment->payment_method ? ucwords(str_replace('_',' ',$payment->payment_method)) : '—') }}</value></div>
+    <div class="meta-block"><label>Reference No.</label><value>{{ $payment->reference_number ?: '—' }}</value></div>
+    <div class="meta-block"><label>Payment Type</label><value>{{ $typeLabel[$payment->payment_type] ?? ($payment->payment_type ? ucfirst($payment->payment_type) : '—') }}</value></div>
+    @if ($payment->received_by_name && trim($payment->received_by_name) !== '')
+    <div class="meta-block"><label>Received By</label><value>{{ $payment->received_by_name }}</value></div>
     @endif
+  </div>
 
-    <div class="rc-footer">
-      This receipt was generated by the FilmSpec Operations Platform on {{ \Illuminate\Support\Carbon::parse($payment->created_at)->format('F j, Y g:ia') }}.
+  <div class="total-row">
+    <table class="total-table">
+      <tr><td style="padding:8px 0">Amount Received</td><td>₱{{ number_format($payment->amount,2) }}</td></tr>
+      @if ($payment->is_vat)
+      <tr><td style="padding:8px 0;color:#64748b">Net of VAT</td><td>₱{{ number_format($payment->amount/1.12,2) }}</td></tr>
+      <tr><td style="padding:8px 0;color:#64748b">VAT (12%)</td><td>₱{{ number_format($payment->amount-($payment->amount/1.12),2) }}</td></tr>
+      @endif
+      <tr class="grand-total"><td>TOTAL AMOUNT PAID</td><td>₱{{ number_format($payment->amount,2) }}</td></tr>
+    </table>
+  </div>
+
+  @if ($payment->notes)
+  <p style="margin-top:14px;font-size:12px;color:#475569"><strong>Notes:</strong> {{ $payment->notes }}</p>
+  @endif
+
+  <div class="sig-area">
+    <div>
+      <div style="height:36px"></div>
+      <div class="sig-line">Prepared by / Cashier</div>
     </div>
+    <div>
+      <div style="height:36px"></div>
+      <div class="sig-line">Received by / Client Signature</div>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    FilmSpec — Equipment Resource Ecosystem &nbsp;·&nbsp; This is a computer-generated document.
+    @if ($payment->is_vat)
+    This serves as an Official Receipt for VAT purposes.
+    @endif
   </div>
 </div>
 
