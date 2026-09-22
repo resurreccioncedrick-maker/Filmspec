@@ -163,6 +163,9 @@
               <i data-feather="x" style="width:13px;height:13px"></i>
             </button>
             @endif
+            <a href="{{ route('client-detail', $c->client_id) }}" class="btn btn-sm btn-primary" title="View">
+              <i data-feather="eye" style="width:13px;height:13px"></i>
+            </a>
             <button class="btn btn-sm btn-secondary"
               onclick='editClient(@json($c))'
               title="Edit">
@@ -253,21 +256,11 @@
           Companies are subject to 12% VAT on all fees.
         </div>
         <div class="form-group">
-          <label>Payment Terms</label>
-          <select name="payment_terms" class="form-control">
-            <option value="50_downpayment">50% Downpayment</option>
-            <option value="90_days">90 Days</option>
-            <option value="6_months">6 Months</option>
-            <option value="2_weeks_crew">2 Weeks (Crew)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Loyalty Discount (%) <span style="font-size:.72rem;font-weight:400;color:var(--text-muted)">— applied automatically on CE</span></label>
-          <input type="number" name="discount_pct" class="form-control" min="0" max="100" step="0.5" value="0" placeholder="0">
-        </div>
-        <div class="form-group">
           <label>Notes</label>
           <textarea name="notes" class="form-control" rows="2" placeholder="Internal notes…"></textarea>
+        </div>
+        <div style="font-size:.75rem;color:var(--text-muted);background:var(--s2);border-radius:6px;padding:8px 10px">
+          Payment Terms and Loyalty Discount are set from the client's <strong>Billing</strong> tab after they're added.
         </div>
       </div>
       <div class="modal-footer">
@@ -338,21 +331,11 @@
           Companies are subject to 12% VAT on all fees.
         </div>
         <div class="form-group">
-          <label>Payment Terms</label>
-          <select name="payment_terms" id="edit_cterms" class="form-control">
-            <option value="50_downpayment">50% Downpayment</option>
-            <option value="90_days">90 Days</option>
-            <option value="6_months">6 Months</option>
-            <option value="2_weeks_crew">2 Weeks (Crew)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Loyalty Discount (%) <span style="font-size:.72rem;font-weight:400;color:var(--text-muted)">— applied automatically on CE</span></label>
-          <input type="number" name="discount_pct" id="edit_cdisc" class="form-control" min="0" max="100" step="0.5" value="0">
-        </div>
-        <div class="form-group">
           <label>Notes</label>
           <textarea name="notes" id="edit_cnotes" class="form-control" rows="2"></textarea>
+        </div>
+        <div style="font-size:.75rem;color:var(--text-muted);background:var(--s2);border-radius:6px;padding:8px 10px">
+          Payment Terms and Loyalty Discount are managed on the client's <a href="#" id="edit_cbilling_link">Billing tab</a>.
         </div>
       </div>
       <div class="modal-footer">
@@ -403,9 +386,9 @@ function editClient(c) {
   document.getElementById('edit_caddress').value = c.address        || '';
   document.getElementById('edit_centity').value  = c.entity_type    || 'individual';
   document.getElementById('edit_ctype').value    = c.client_type    || 'first_time';
-  document.getElementById('edit_cterms').value   = c.payment_terms  || '50_downpayment';
-  document.getElementById('edit_cdisc').value    = c.discount_pct   || 0;
   document.getElementById('edit_cnotes').value   = c.notes          || '';
+  const billingLink = document.getElementById('edit_cbilling_link');
+  if (billingLink) billingLink.href = '/clients/' + c.client_id + '?tab=billing';
 
   onEditEntityTypeChange(c.entity_type || 'individual');
 

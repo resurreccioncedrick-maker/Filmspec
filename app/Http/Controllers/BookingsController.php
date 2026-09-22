@@ -96,6 +96,23 @@ class BookingsController extends Controller
             ? (int) Booking::where('approval_status', 'pending_approval')->where('is_archived', false)->count()
             : 0;
 
+        // Same derivation as Dashboard's KPI strip: overdue-for-return is a booking still
+        // 'ongoing' past its own shoot end date, since there's no dedicated status for it.
+        $overdueReturnsCount = (int) $baseCountQuery()
+            ->where('is_archived', false)->where('booking_status', 'ongoing')
+            ->where('shoot_date_end', '<', now()->toDateString())->count();
+        $openIncidentsCount = (int) DB::table('incident_reports as ir')
+            ->join('bookings as b', 'ir.booking_id', '=', 'b.booking_id')
+            ->where('ir.status', 'open')
+            ->when($role === 'client', fn ($q) => $q->whereIn('b.client_id', function ($sub) use ($user) {
+                $sub->select('client_id')->from('clients')->where('user_id', $user->user_id);
+            }))
+            ->count();
+        $upcomingBookingsCount = (int) $baseCountQuery()
+            ->where('is_archived', false)->whereIn('booking_status', ['confirmed', 'ongoing'])
+            ->whereBetween('shoot_date_start', [now()->toDateString(), now()->addDays(30)->toDateString()])
+            ->count();
+
         $baseTransportRate = (float) (DB::table('system_settings')->where('setting_key', 'base_transportation_rate')->value('setting_value') ?: 0);
 
         return view('bookings', [
@@ -116,6 +133,9 @@ class BookingsController extends Controller
             'counts' => $counts,
             'archivedCount' => $archivedCount,
             'pendingApprovalCount' => $pendingApprovalCount,
+            'overdueReturnsCount' => $overdueReturnsCount,
+            'openIncidentsCount' => $openIncidentsCount,
+            'upcomingBookingsCount' => $upcomingBookingsCount,
             'statusBadge' => $this->statusBadge,
             'payBadge' => $this->payBadge,
             'payLabel' => $this->payLabel,

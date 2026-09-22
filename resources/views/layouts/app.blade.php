@@ -42,7 +42,7 @@
       'bookings'  => ['icon' => 'calendar', 'label' => 'Bookings', 'mod' => 'bookings'],
       'clients'   => ['icon' => 'briefcase', 'label' => 'Clients', 'mod' => 'clients'],
       'billing'   => ['icon' => 'file-text', 'label' => 'Billing & POS', 'mod' => 'billing'],
-      'field-requests' => ['icon' => 'truck', 'label' => 'Field Requests', 'mod' => 'field_requests'],
+      'field-requests' => ['icon' => 'truck', 'label' => 'Field Resource Requests', 'mod' => 'field_requests'],
       'support-chat' => ['icon' => 'message-circle', 'label' => 'Support Chat', 'mod' => 'support_chat'],
     ],
     'Inventory' => [
@@ -51,7 +51,7 @@
       'transport'   => ['icon' => 'truck', 'label' => 'Transport', 'mod' => 'transport'],
     ],
     'Crew' => [
-      'crew'       => ['icon' => 'users', 'label' => 'Crew Registry', 'mod' => 'crew'],
+      'crew'       => ['icon' => 'users', 'label' => 'Crew Management', 'mod' => 'crew'],
       'attendance' => ['icon' => 'clock', 'label' => 'Attendance', 'mod' => 'attendance'],
     ],
     // A single 'Analytics' row with a flyout of the 6 real pages, rather than 6 flat rows —
@@ -62,10 +62,10 @@
       'analytics' => ['icon' => 'pie-chart', 'label' => 'Analytics', 'flyout' => [
         'reports' => ['icon' => 'bar-chart-2', 'label' => 'Reports', 'mod' => 'reports'],
         'cost-estimates' => ['icon' => 'file-text', 'label' => 'Cost Estimates', 'mod' => 'cost_estimates'],
-        'crew-data' => ['icon' => 'user-check', 'label' => 'Crew Data', 'mod' => 'crew_data'],
-        'equipment-data' => ['icon' => 'trending-up', 'label' => 'Equipment Data', 'mod' => 'equipment_data'],
+        'crew-data' => ['icon' => 'user-check', 'label' => 'Crew Analytics', 'mod' => 'crew_data'],
+        'equipment-data' => ['icon' => 'trending-up', 'label' => 'Equipment Analytics', 'mod' => 'equipment_data'],
         'profit-loss' => ['icon' => 'dollar-sign', 'label' => 'Profit and Loss', 'mod' => 'profit_loss'],
-        'calendar-data' => ['icon' => 'calendar', 'label' => 'Calendar Data', 'mod' => 'calendar_data'],
+        'calendar-data' => ['icon' => 'calendar', 'label' => 'Calendar Analytics', 'mod' => 'calendar_data'],
       ]],
     ],
     'Team' => [

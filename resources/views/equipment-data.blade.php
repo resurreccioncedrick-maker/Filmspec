@@ -1,9 +1,9 @@
 @extends('layouts.app')
 
-@section('pageTitle', 'Equipment Data')
+@section('pageTitle', 'Equipment Analytics')
 
 @section('breadcrumb')
-<span>Equipment Data</span>
+<span>Equipment Analytics</span>
 @endsection
 
 @section('topbarActions')
@@ -21,7 +21,7 @@
 @endphp
 
 <div style="margin-bottom:14px">
-  <h1 style="font-size:1.4rem;margin:0 0 4px">Equipment data</h1>
+  <h1 style="font-size:1.4rem;margin:0 0 4px">Equipment Analytics</h1>
   <p style="font-size:.85rem;color:var(--text-muted);max-width:680px;margin:0">
     Every shoot with a <strong>confirmed</strong> cost estimate, straight from the CE — ours and
     partner-fronted alike, since both rent out our gear. Nothing is loaded by hand.
@@ -36,30 +36,38 @@
 <div style="font-size:1.1rem;font-weight:700;color:var(--blue-700);margin-bottom:14px">{{ $period['label'] }}</div>
 
 <!-- KPIs -->
-<div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:22px">
+<div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
   <div class="stat-card">
     @include('partials.stat-comparison', ['delta' => $equipDeltas['fs_earned']])
     <div class="stat-icon"><i data-feather="dollar-sign"></i></div>
     <div class="stat-value">₱{{ number_format($kpis['fs_earned'], 2) }}</div>
-    <div class="stat-label">Earned on FS Gear · {{ $period['label'] }}</div>
+    <div class="stat-label">Confirmed Equipment Value · {{ $period['label'] }}</div>
   </div>
   <div class="stat-card">
     @include('partials.stat-comparison', ['delta' => $equipDeltas['shoots']])
     <div class="stat-icon"><i data-feather="film"></i></div>
     <div class="stat-value">{{ $kpis['shoots'] }}</div>
-    <div class="stat-label">Confirmed Shoots</div>
+    <div class="stat-label">Confirmed CE Shoots</div>
   </div>
   <div class="stat-card">
     <div class="stat-icon"><i data-feather="camera"></i></div>
     <div class="stat-value">{{ $usageTotalCount }}</div>
-    <div class="stat-label">Distinct Items Used</div>
+    <div class="stat-label">Equipment Models Quoted</div>
   </div>
+  <div class="stat-card">
+    <div class="stat-icon"><i data-feather="calendar"></i></div>
+    <div class="stat-value">{{ $kpis['quoted_days'] }}</div>
+    <div class="stat-label">Quoted Rental Days</div>
+  </div>
+</div>
+<div style="font-size:11px;color:var(--text-muted);margin:-14px 0 22px">
+  Data shown is based on current confirmed Cost Estimates — FilmSpec-owned and partner-supplied gear alike.
 </div>
 
 <!-- Earnings trend -->
 <div class="card" style="margin-bottom:22px">
   <div class="card-header">
-    <h2 class="card-title">Earnings Trend
+    <h2 class="card-title">Confirmed Equipment Value Trend
       <span style="font-weight:400;color:var(--text-muted);font-size:.8rem">
         {{ $monthly->first()->label ?? '' }} – {{ $monthly->last()->label ?? '' }}
       </span>
@@ -79,7 +87,7 @@
 <!-- Top equipment -->
 <div class="card" style="margin-bottom:22px">
   <div class="card-header">
-    <h2 class="card-title">Top Equipment · {{ $period['label'] }}</h2>
+    <h2 class="card-title">Top Equipment by Confirmed Value · {{ $period['label'] }}</h2>
   </div>
   <div class="card-body">
     @if ($topEquipment->isEmpty())
@@ -104,7 +112,7 @@
 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
   <span style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700">Sort by</span>
   <div class="tabs" style="margin-bottom:0">
-    @foreach (['pesos' => 'Pesos', 'quantity' => 'Quantity', 'days' => 'Days'] as $k => $l)
+    @foreach (['pesos' => 'Value', 'quantity' => 'Quantity', 'days' => 'Quoted Days'] as $k => $l)
     <a href="{{ $linkWith(['sort' => $k]) }}" class="tab-btn {{ $sort === $k ? 'active' : '' }}">{{ strtoupper($l) }}</a>
     @endforeach
   </div>
@@ -117,8 +125,8 @@
 <!-- Most used, grouped by category -->
 <div class="card">
   <div class="card-header">
-    <h2 class="card-title">Most Used</h2>
-    <span style="font-size:.72rem;color:var(--text-muted)">your own gear — what it earned, at CE prices</span>
+    <h2 class="card-title">Equipment Breakdown</h2>
+    <span style="font-size:.72rem;color:var(--text-muted)">quoted value on confirmed CEs, at CE rates</span>
   </div>
   <div class="card-body">
     @if ($byCategory->isEmpty())
@@ -137,7 +145,7 @@
       </div>
       <div style="text-align:right;white-space:nowrap">
         <span style="font-weight:700;color:var(--blue-700)">₱{{ number_format($r->earnings, 2) }}</span>
-        <div style="font-size:.72rem;color:var(--text-muted)">×{{ (int) $r->total_qty }} · {{ (int) $r->total_days }}d</div>
+        <div style="font-size:.72rem;color:var(--text-muted)">Qty: {{ (int) $r->total_qty }} · Quoted Days: {{ (int) $r->total_days }}</div>
       </div>
     </div>
     @endforeach
@@ -164,14 +172,14 @@
 <!-- Past Shoots (Part 12) -->
 <div style="margin-top:26px">
   <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:6px">
-    <h2 style="font-size:1.1rem;margin:0">Past Shoots</h2>
+    <h2 style="font-size:1.1rem;margin:0">Bookings with Confirmed Equipment CEs</h2>
     <div style="font-size:.8rem;color:var(--text-muted)">
-      {{ $shootTotals['shoots'] }} shoot{{ $shootTotals['shoots'] === 1 ? '' : 's' }} ·
-      {{ $shootTotals['matched'] }} matched
+      {{ $shootTotals['shoots'] }} Confirmed CE Shoot{{ $shootTotals['shoots'] === 1 ? '' : 's' }} ·
+      {{ $shootTotals['matched'] }} Equipment Line{{ $shootTotals['matched'] === 1 ? '' : 's' }} Matched
     </div>
   </div>
   <p style="font-size:.8rem;color:var(--text-muted);margin:0 0 14px;max-width:680px">
-    FilmSpec equipment lines from each confirmed cost estimate, matched to the catalog automatically.
+    FilmSpec equipment lines from each confirmed cost estimate, matched to the catalog automatically. "Equipment Lines Matched" is a sum across all shoots below, not a count of shoots.
   </p>
 
   @if ($pastShoots->isEmpty())
@@ -201,13 +209,15 @@
         <div style="font-size:.85rem">
           <span style="font-family:monospace;font-weight:700">CE# {{ $s->ce_reference }}</span>
           — {{ $s->project_title }} —
-          <strong>{{ $s->matched_count }} matched</strong>
+          <strong>{{ $s->matched_count }} equipment line{{ $s->matched_count === 1 ? '' : 's' }} matched</strong>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0">
           <a href="{{ route('ce-preview', ['booking_id' => $s->booking_id, 'ce_id' => $s->ce_id]) }}"
              style="font-size:.8rem;color:var(--accent);text-decoration:underline">View CE</a>
           <a href="{{ route('booking-detail', $s->booking_id) }}"
-             style="font-size:.8rem;color:var(--accent);text-decoration:underline">Edit on CE page</a>
+             style="font-size:.8rem;color:var(--accent);text-decoration:underline">View Booking</a>
+          <a href="{{ route('ce-preview', ['booking_id' => $s->booking_id, 'ce_id' => $s->ce_id]) }}"
+             style="font-size:.8rem;color:var(--accent);text-decoration:underline" title="Adding/editing lines on the CE page creates a new revision once a CE is confirmed">Create Revision</a>
         </div>
       </div>
 
@@ -215,7 +225,7 @@
         <summary style="font-size:12px;color:var(--muted);cursor:pointer">View list</summary>
         <div style="margin-top:8px">
           <div style="font-size:.72rem;font-weight:700;letter-spacing:.06em;color:var(--blue-700);text-transform:uppercase;margin-bottom:4px">
-            Matched ({{ $s->matched_count }})
+            Equipment Lines Matched ({{ $s->matched_count }})
           </div>
           @forelse ($s->matched as $m)
           <div style="font-size:.8rem;padding:2px 0;border-bottom:1px solid var(--border)">
@@ -243,7 +253,7 @@
       type: 'bar',
       data: {
         labels: @json($monthly->pluck('label')),
-        datasets: [{ label: 'Earnings', data: @json($monthly->pluck('earnings')), backgroundColor: '#0060C7', borderRadius: 4 }]
+        datasets: [{ label: 'Confirmed Value', data: @json($monthly->pluck('earnings')), backgroundColor: '#0060C7', borderRadius: 4 }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -259,7 +269,7 @@
       type: 'bar',
       data: {
         labels: @json($topEquipment->map(fn ($r) => $r->equipment_name)),
-        datasets: [{ label: 'Earnings', data: @json($topEquipment->pluck('earnings')), backgroundColor: '#0060C7', borderRadius: 4 }]
+        datasets: [{ label: 'Confirmed Value', data: @json($topEquipment->pluck('earnings')), backgroundColor: '#0060C7', borderRadius: 4 }]
       },
       options: {
         indexAxis: 'y',

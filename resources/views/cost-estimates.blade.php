@@ -24,7 +24,7 @@
     @include('partials.stat-comparison', ['delta' => $ceDeltas['packaged_cost']])
     <div class="stat-icon"><i data-feather="package"></i></div>
     <div class="stat-value">₱{{ number_format($ceFinancials['packaged_cost'], 2) }}</div>
-    <div class="stat-label">Packaged Cost · {{ $ceFinancials['count'] }} confirmed CE{{ $ceFinancials['count'] === 1 ? '' : 's' }}</div>
+    <div class="stat-label">Packaged Cost (ex-VAT) · {{ $ceFinancials['count'] }} confirmed CE{{ $ceFinancials['count'] === 1 ? '' : 's' }}</div>
   </div>
   <div class="stat-card green">
     @include('partials.stat-comparison', ['delta' => $ceDeltas['crew_total']])
@@ -248,6 +248,8 @@
         <td>
           @if ($r->booking_status === 'cancelled')
             <span class="badge badge-red">Cancelled</span>
+          @elseif ($r->status === 'confirmed' && $r->is_superseded)
+            <span class="badge badge-gray" title="A newer revision of this booking's CE has since been confirmed">Superseded</span>
           @else
             <span class="badge {{ $statusBadge[$r->status] ?? 'badge-gray' }}">{{ ucfirst($r->status) }}</span>
             @if ($r->confirmed_by_name)

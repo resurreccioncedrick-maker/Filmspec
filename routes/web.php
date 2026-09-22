@@ -9,6 +9,7 @@ use App\Http\Controllers\BillingPrintController;
 use App\Http\Controllers\BookingDetailController;
 use App\Http\Controllers\BookingsController;
 use App\Http\Controllers\CalendarDataController;
+use App\Http\Controllers\ClientDetailController;
 use App\Http\Controllers\ClientDocumentsController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CePreviewController;
@@ -228,8 +229,20 @@ Route::match(['get', 'post'], '/clients', [ClientsController::class, 'index'])
     ->middleware(['auth'])
     ->name('clients');
 
-// A single client's documents (Part 18) — not a general client-detail page, this app has
-// none; reached via a "Documents" button on the clients list.
+// Client Detail — Overview/Bookings/Billing/Documents/Activity tabs. Billing Profile
+// (Payment Terms/Loyalty Discount) lives in the Billing tab, gated behind the same
+// 'billing' role-permission check the Dashboard/Payment Receipt already use.
+Route::get('/clients/{id}', [ClientDetailController::class, 'show'])
+    ->middleware(['auth', 'can_access:clients'])
+    ->whereNumber('id')
+    ->name('client-detail');
+Route::post('/clients/{id}/billing', [ClientDetailController::class, 'updateBilling'])
+    ->middleware(['auth', 'can_access:clients'])
+    ->whereNumber('id')
+    ->name('client-detail.billing');
+
+// A single client's documents (Part 18) — embedded via iframe as the Client Detail page's
+// Documents tab, and still reachable directly.
 Route::get('/clients/{id}/documents', [ClientDocumentsController::class, 'show'])
     ->middleware(['auth', 'can_access:clients'])
     ->whereNumber('id')

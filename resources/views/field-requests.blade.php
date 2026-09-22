@@ -1,9 +1,9 @@
 @extends('layouts.app')
 
-@section('pageTitle', 'Field Requests')
+@section('pageTitle', 'Field Resource Requests')
 
 @section('breadcrumb')
-<span>Field Requests</span>
+<span>Field Resource Requests</span>
 @endsection
 
 @section('topbarActions')
@@ -28,14 +28,26 @@
   Every approved field request (equipment, accessory, or crew follow-up) across all active bookings, in one place. Approve/Reject a new request from the booking's own Requests tab — once approved, dispatch and delivery are tracked here.
 </div>
 
-<div class="stats-grid" style="margin-bottom:20px">
-  <div class="stat-card">
-    <div class="stat-value" style="color:var(--green)">{{ $stats['approved'] }}</div>
-    <div class="stat-label">Awaiting Dispatch</div>
+<div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+  <div class="stat-card {{ $stats['pending'] > 0 ? 'orange' : '' }}">
+    <div class="stat-icon" style="{{ $stats['pending'] > 0 ? 'background:var(--orangel);color:var(--orange)' : '' }}"><i data-feather="file-text"></i></div>
+    <div class="stat-value">{{ $stats['pending'] }}</div>
+    <div class="stat-label">Awaiting Review</div>
   </div>
   <div class="stat-card">
-    <div class="stat-value" style="color:var(--blue)">{{ $stats['dispatched'] }}</div>
-    <div class="stat-label">Out for Delivery</div>
+    <div class="stat-icon"><i data-feather="package"></i></div>
+    <div class="stat-value" style="color:var(--green)">{{ $stats['approved'] }}</div>
+    <div class="stat-label">Allocation Needed <span style="font-weight:400;color:var(--muted)">· Equipment/Accessories</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><i data-feather="users"></i></div>
+    <div class="stat-value" style="color:var(--accent)">{{ $stats['ready_crew'] }}</div>
+    <div class="stat-label">Ready for Dispatch <span style="font-weight:400;color:var(--muted)">· Crew</span></div>
+  </div>
+  <div class="stat-card {{ $stats['overdue'] > 0 ? 'red' : '' }}">
+    <div class="stat-icon" style="{{ $stats['overdue'] > 0 ? 'background:var(--redl);color:var(--red)' : '' }}"><i data-feather="alert-triangle"></i></div>
+    <div class="stat-value">{{ $stats['overdue'] }}</div>
+    <div class="stat-label">Overdue <span style="font-weight:400;color:var(--muted)">· Past ETA, not delivered</span></div>
   </div>
 </div>
 
@@ -90,7 +102,7 @@
           <td>
             @if ($r->status === 'approved')
             <button class="btn btn-primary btn-sm" style="font-size:.72rem;padding:4px 10px"
-                    onclick="openDispatch({{ $r->request_id }}, '{{ addslashes($itemLabel) }}')">Dispatch</button>
+                    onclick="openDispatch({{ $r->request_id }}, '{{ addslashes($itemLabel) }}', '{{ $r->item_type }}')">{{ $r->item_type === 'crew' ? 'Assign Crew' : 'Dispatch' }}</button>
             @elseif ($r->status === 'dispatched')
             <form method="POST" onsubmit="return confirm('Mark this delivered?')">
               @csrf
@@ -158,9 +170,11 @@
 
 @push('scripts')
 <script>
-function openDispatch(reqId, desc) {
+function openDispatch(reqId, desc, itemType) {
+  const isCrew = itemType === 'crew';
   document.getElementById('dispatchReqId').value = reqId;
-  document.getElementById('dispatchDesc').textContent = 'Dispatching: ' + desc;
+  document.getElementById('dispatchTitle').lastChild.textContent = isCrew ? 'Assign Crew' : 'Dispatch';
+  document.getElementById('dispatchDesc').textContent = (isCrew ? 'Assigning: ' : 'Dispatching: ') + desc;
   openModal('modalDispatch');
 }
 </script>

@@ -14,8 +14,17 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EquipmentController extends Controller
 {
+    // Display-only relabel — the stored enum values (excellent/good/fair/under_repair,
+    // available/booked/rented/under_repair/retired) are unchanged everywhere they're compared
+    // or filtered on (75+ call sites across the app), only the human-facing label/badge text
+    // changes: condition Fair→Serviceable, under_repair(as condition)→Damaged; availability
+    // booked→Allocated, rented→"In Field", under_repair(as status)→"Under Maintenance".
     private array $condBadge = [
         'excellent' => 'badge-green', 'good' => 'badge-blue', 'fair' => 'badge-yellow', 'under_repair' => 'badge-red',
+    ];
+
+    private array $condLabel = [
+        'excellent' => 'Excellent', 'good' => 'Good', 'fair' => 'Serviceable', 'under_repair' => 'Damaged',
     ];
 
     private array $availBadge = [
@@ -24,8 +33,28 @@ class EquipmentController extends Controller
     ];
 
     private array $availLabel = [
-        'available' => 'Available', 'booked' => 'Booked', 'rented' => 'In Use',
-        'under_repair' => 'Under Repair', 'retired' => 'Retired',
+        'available' => 'Available', 'booked' => 'Allocated', 'rented' => 'In Field',
+        'under_repair' => 'Under Maintenance', 'retired' => 'Retired',
+    ];
+
+    // Physical Units (equipment_units) is a brand-new per-unit table, so it uses the new
+    // vocabulary directly in its own stored values — no legacy values to stay compatible with.
+    private array $unitCondLabel = [
+        'excellent' => 'Excellent', 'good' => 'Good', 'serviceable' => 'Serviceable', 'damaged' => 'Damaged',
+    ];
+
+    private array $unitCondBadge = [
+        'excellent' => 'badge-green', 'good' => 'badge-blue', 'serviceable' => 'badge-yellow', 'damaged' => 'badge-red',
+    ];
+
+    private array $unitStatusLabel = [
+        'available' => 'Available', 'allocated' => 'Allocated', 'in_field' => 'In Field',
+        'inspection_pending' => 'Inspection Pending', 'under_maintenance' => 'Under Maintenance', 'retired' => 'Retired',
+    ];
+
+    private array $unitStatusBadge = [
+        'available' => 'badge-green', 'allocated' => 'badge-blue', 'in_field' => 'badge-yellow',
+        'inspection_pending' => 'badge-purple', 'under_maintenance' => 'badge-red', 'retired' => 'badge-gray',
     ];
 
     public function index(Request $request): View|JsonResponse|StreamedResponse|Response
@@ -49,6 +78,13 @@ class EquipmentController extends Controller
                 ->orderBy('a.accessory_name')
                 ->select('a.*')
                 ->get();
+
+            return response()->json($rows);
+        }
+
+        if ($request->has('get_units')) {
+            $eid = (int) $request->query('get_units');
+            $rows = DB::table('equipment_units')->where('equipment_id', $eid)->orderBy('asset_tag')->get();
 
             return response()->json($rows);
         }
@@ -84,6 +120,7 @@ class EquipmentController extends Controller
         $equipment = (clone $query)
             ->select('e.*', 'ec.category_name')
             ->selectRaw('(SELECT COUNT(*) FROM equipment_operators eo WHERE eo.equipment_id = e.equipment_id) AS operator_count')
+            ->selectRaw("(SELECT COUNT(*) FROM equipment_units eu WHERE eu.equipment_id = e.equipment_id AND eu.status != 'retired') AS unit_count")
             ->selectRaw("(SELECT b.booking_reference
                 FROM booking_equipment be
                 JOIN bookings b ON be.booking_id = b.booking_id
@@ -126,7 +163,10 @@ class EquipmentController extends Controller
             'stats' => $stats, 'categories' => $categories, 'positions' => $positions,
             'equipment' => $equipment, 'total' => $total, 'pages' => $pages, 'page' => $page, 'offset' => $offset,
             'catFilter' => $catFilter, 'statusFilter' => $statusFilter, 'viewMode' => $viewMode, 'search' => $search,
-            'condBadge' => $this->condBadge, 'availBadge' => $this->availBadge, 'availLabel' => $this->availLabel,
+            'condBadge' => $this->condBadge, 'condLabel' => $this->condLabel,
+            'availBadge' => $this->availBadge, 'availLabel' => $this->availLabel,
+            'unitCondLabel' => $this->unitCondLabel, 'unitCondBadge' => $this->unitCondBadge,
+            'unitStatusLabel' => $this->unitStatusLabel, 'unitStatusBadge' => $this->unitStatusBadge,
         ]);
     }
 
@@ -224,6 +264,59 @@ class EquipmentController extends Controller
             return response()->json(['success' => true]);
         }
 
+        if ($action === 'add_unit') {
+            $eid = (int) $request->input('equipment_id');
+            $tag = trim($request->input('asset_tag', ''));
+            if (! $eid || ! $tag) {
+                return response()->json(['success' => false, 'error' => 'Asset tag is required.']);
+            }
+            if (DB::table('equipment_units')->where('asset_tag', $tag)->exists()) {
+                return response()->json(['success' => false, 'error' => 'This asset tag is already in use.']);
+            }
+
+            $unitId = DB::table('equipment_units')->insertGetId([
+                'equipment_id' => $eid, 'asset_tag' => $tag,
+                'serial_no' => trim($request->input('serial_no', '')) ?: null,
+                'condition' => in_array($request->input('condition'), array_keys($this->unitCondLabel), true) ? $request->input('condition') : 'good',
+                'status' => in_array($request->input('status'), array_keys($this->unitStatusLabel), true) ? $request->input('status') : 'available',
+                'location' => trim($request->input('location', '')) ?: null,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            ActivityLog::record($request->user()->user_id, 'create', 'equipment', "Added physical unit $tag", $eid);
+
+            return response()->json(['success' => true, 'unit_id' => $unitId]);
+        }
+
+        if ($action === 'update_unit') {
+            $unitId = (int) $request->input('unit_id');
+            $unit = DB::table('equipment_units')->where('unit_id', $unitId)->first();
+            if (! $unit) {
+                return response()->json(['success' => false, 'error' => 'Unit not found.']);
+            }
+
+            DB::table('equipment_units')->where('unit_id', $unitId)->update([
+                'condition' => in_array($request->input('condition'), array_keys($this->unitCondLabel), true) ? $request->input('condition') : $unit->condition,
+                'status' => in_array($request->input('status'), array_keys($this->unitStatusLabel), true) ? $request->input('status') : $unit->status,
+                'location' => trim($request->input('location', '')) ?: null,
+                'updated_at' => now(),
+            ]);
+            ActivityLog::record($request->user()->user_id, 'update', 'equipment', "Updated physical unit {$unit->asset_tag}", $unit->equipment_id);
+
+            return response()->json(['success' => true]);
+        }
+
+        if ($action === 'retire_unit') {
+            $unitId = (int) $request->input('unit_id');
+            $unit = DB::table('equipment_units')->where('unit_id', $unitId)->first();
+            if (! $unit) {
+                return response()->json(['success' => false, 'error' => 'Unit not found.']);
+            }
+            DB::table('equipment_units')->where('unit_id', $unitId)->update(['status' => 'retired', 'updated_at' => now()]);
+            ActivityLog::record($request->user()->user_id, 'update', 'equipment', "Retired physical unit {$unit->asset_tag}", $unit->equipment_id);
+
+            return response()->json(['success' => true]);
+        }
+
         return response()->json(['success' => false, 'error' => 'Unknown action']);
     }
 
@@ -251,6 +344,7 @@ class EquipmentController extends Controller
                     'condition_status' => $request->input('condition_status', 'good'),
                     'date_acquired' => $request->input('date_acquired') ?: null,
                     'notes' => $request->input('notes', ''),
+                    'operator_note' => $request->input('operator_note', '') ?: null,
                     'image_path' => $imgPath,
                     'stock_quantity' => max(1, (int) $request->input('stock_quantity', 1)),
                     'requires_operator' => 1,
@@ -299,6 +393,7 @@ class EquipmentController extends Controller
                     'condition_status' => $request->input('condition_status', 'good'),
                     'availability_status' => $request->input('availability_status', 'available'),
                     'notes' => $request->input('notes', ''),
+                    'operator_note' => $request->input('operator_note', '') ?: null,
                     'image_path' => $imgPath,
                     'stock_quantity' => max(1, (int) $request->input('stock_quantity', 1)),
                     'requires_operator' => 1,

@@ -38,6 +38,17 @@ class ReminderController extends Controller
             ->orderBy('reminder_date')
             ->get();
 
+        $today = now()->toDateString();
+        $kpis = [
+            'open_tasks' => $todos->count(),
+            'overdue' => $todos->filter(fn ($t) => $t->reminder_date < $today)->count(),
+            'upcoming_meetings' => $meeting ? 1 : 0,
+            'completed_this_month' => (int) DB::table('reminders')
+                ->where('is_done', true)
+                ->whereYear('done_at', now()->year)->whereMonth('done_at', now()->month)
+                ->count(),
+        ];
+
         $done = DB::table('reminders')
             ->where('is_done', true)
             ->orderByDesc('done_at')
@@ -54,6 +65,7 @@ class ReminderController extends Controller
             'meeting' => $meeting,
             'todos' => $todos,
             'done' => $done,
+            'kpis' => $kpis,
             'pageActivity' => PageActivity::forModule('reminders'),
             'activityModule' => 'reminders',
             'accessLog' => PageActivity::recentAccess(),
@@ -74,6 +86,7 @@ class ReminderController extends Controller
 
             $id = DB::table('reminders')->insertGetId([
                 'type' => $type,
+                'priority' => $request->input('priority') === 'high' ? 'high' : 'normal',
                 'title' => $title,
                 'reminder_date' => $date,
                 'meeting_time' => $type === 'partners_meeting' ? ($request->input('meeting_time') ?: null) : null,
@@ -110,6 +123,7 @@ class ReminderController extends Controller
 
             DB::table('reminders')->where('reminder_id', $id)->update([
                 'type' => $type,
+                'priority' => $request->input('priority') === 'high' ? 'high' : 'normal',
                 'title' => $title,
                 'reminder_date' => $date,
                 'meeting_time' => $type === 'partners_meeting' ? ($request->input('meeting_time') ?: null) : null,

@@ -1,9 +1,9 @@
 @extends('layouts.app')
 
-@section('pageTitle', 'Crew Data')
+@section('pageTitle', 'Crew Analytics')
 
 @section('breadcrumb')
-<span>Crew Data</span>
+<span>Crew Analytics</span>
 @endsection
 
 @section('topbarActions')
@@ -18,7 +18,7 @@
 @section('content')
 
 <div style="margin-bottom:14px">
-  <h1 style="font-size:1.4rem;margin:0 0 4px">Crew data</h1>
+  <h1 style="font-size:1.4rem;margin:0 0 4px">Crew Analytics</h1>
   <p style="font-size:.85rem;color:var(--text-muted);max-width:640px;margin:0">
     Shoots and talent fees per person, from the crew assigned to every booking with a confirmed
     cost estimate. Reassigning crew updates this page straight away.
@@ -33,36 +33,53 @@
 <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:14px">
   <div style="font-size:1.1rem;font-weight:700;color:var(--blue-700)">{{ $period['label'] }}</div>
   <div style="font-size:.83rem;color:var(--text-muted)">
-    {{ $kpis['shoots'] }} confirmed shoot{{ $kpis['shoots'] === 1 ? '' : 's' }} ·
-    crew spend ₱{{ number_format($kpis['spend'], 2) }}
+    {{ $kpis['shoots'] }} Confirmed Shoot{{ $kpis['shoots'] === 1 ? '' : 's' }} ·
+    ₱{{ number_format($kpis['spend'], 2) }} Confirmed Crew Cost
   </div>
 </div>
 
 <!-- KPIs -->
-<div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:22px">
+<div class="stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:22px">
   <div class="stat-card green">
     @include('partials.stat-comparison', ['delta' => $crewDeltas['spend']])
     <div class="stat-icon"><i data-feather="dollar-sign"></i></div>
     <div class="stat-value">₱{{ number_format($kpis['spend'], 2) }}</div>
-    <div class="stat-label" title="Recalculated live from current crew assignments, with no-show/back-out days deducted — will differ from Cost Estimates' frozen quoted figure if anything changed after the estimate was confirmed.">Crew Spend (Live) · {{ $period['label'] }}</div>
+    <div class="stat-label" title="From confirmed cost estimates' bookings, recalculated live from current crew assignments with no-show/back-out days deducted — will differ from Cost Estimates' frozen quoted figure if anything changed after the estimate was confirmed.">Confirmed Crew Cost · {{ $period['label'] }}</div>
   </div>
   <div class="stat-card">
     @include('partials.stat-comparison', ['delta' => $crewDeltas['crew_booked']])
     <div class="stat-icon"><i data-feather="users"></i></div>
     <div class="stat-value">{{ $kpis['crew_booked'] }}</div>
-    <div class="stat-label">Crew Booked · people in this window</div>
+    <div class="stat-label">Unique Crew Assigned · people in this window</div>
   </div>
   <div class="stat-card">
-    <div class="stat-icon"><i data-feather="calendar"></i></div>
-    <div class="stat-value">₱{{ number_format($kpis['avg_per_month'], 2) }}</div>
-    <div class="stat-label">Average Per Month · over {{ $kpis['chart_months'] }} months</div>
+    <div class="stat-icon"><i data-feather="video"></i></div>
+    <div class="stat-value">{{ $kpis['crew_assigned_shoots'] }}</div>
+    <div class="stat-label">Crew-Assigned Shoots · confirmed shoots with crew</div>
+  </div>
+  <div class="stat-card {{ $kpis['shoots_needing_crew'] > 0 ? 'orange' : '' }}">
+    <div class="stat-icon" style="{{ $kpis['shoots_needing_crew'] > 0 ? 'background:var(--orangel);color:var(--orange)' : '' }}"><i data-feather="alert-triangle"></i></div>
+    <div class="stat-value">{{ $kpis['shoots_needing_crew'] }}</div>
+    <div class="stat-label">Shoots Needing Crew · confirmed shoot, no crew yet</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><i data-feather="trending-up"></i></div>
+    <div class="stat-value">₱{{ number_format($kpis['avg_per_shoot'], 2) }}</div>
+    <div class="stat-label">Average Crew Cost Per Shoot · based on {{ $kpis['crew_assigned_shoots'] }} crew-assigned shoots</div>
   </div>
 </div>
+
+@if ($kpis['shoots_needing_crew'] > 0)
+<div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:10px 16px;border-radius:8px;margin-bottom:16px;font-size:13px;display:flex;align-items:center;gap:8px">
+  <i data-feather="alert-triangle" style="width:14px;height:14px;flex-shrink:0"></i>
+  {{ $kpis['shoots_needing_crew'] }} confirmed shoot{{ $kpis['shoots_needing_crew'] === 1 ? '' : 's' }} in this period {{ $kpis['shoots_needing_crew'] === 1 ? 'has' : 'have' }} no crew assigned. Please review and assign crew to ensure complete data.
+</div>
+@endif
 
 <!-- Spend chart -->
 <div class="card" style="margin-bottom:22px">
   <div class="card-header">
-    <h2 class="card-title">Crew Spend
+    <h2 class="card-title">Confirmed Crew Cost Trend
       <span style="font-weight:400;color:var(--text-muted);font-size:.8rem">
         {{ $monthly->first()->label ?? '' }} – {{ $monthly->last()->label ?? '' }}
       </span>
@@ -101,14 +118,14 @@
   <!-- People -->
   <div class="card">
     <div class="card-header">
-      <h2 class="card-title">People <span class="badge badge-gray" style="margin-left:4px">{{ $byPerson->count() }}</span></h2>
+      <h2 class="card-title">Crew Members <span class="badge badge-gray" style="margin-left:4px">{{ $byPerson->count() }}</span></h2>
     </div>
     <div class="table-wrap">
       @if ($byPerson->isEmpty())
       <div class="empty-state"><i data-feather="users"></i><h3>No crew in this period</h3></div>
       @else
       <table>
-        <thead><tr><th>Name</th><th style="text-align:right">Shoots</th><th style="text-align:right">Days</th><th style="text-align:right">No-Shows</th><th style="text-align:right">Paid</th></tr></thead>
+        <thead><tr><th>Crew Member</th><th style="text-align:right">Shoots</th><th style="text-align:right">Shoot Days</th><th style="text-align:right">Attendance Exceptions</th><th style="text-align:right">Confirmed Crew Cost</th></tr></thead>
         <tbody>
         @foreach ($byPerson as $p)
         <tr>
@@ -140,14 +157,14 @@
   <!-- Roles -->
   <div class="card">
     <div class="card-header">
-      <h2 class="card-title">Roles <span class="badge badge-gray" style="margin-left:4px">{{ $byRole->count() }}</span></h2>
+      <h2 class="card-title">Crew by Role <span class="badge badge-gray" style="margin-left:4px">{{ $byRole->count() }}</span></h2>
     </div>
     <div class="table-wrap">
       @if ($byRole->isEmpty())
       <div class="empty-state"><i data-feather="briefcase"></i><h3>No roles in this period</h3></div>
       @else
       <table>
-        <thead><tr><th>Role</th><th style="text-align:right">Shoots</th><th style="text-align:right">Headcount</th><th style="text-align:right">Paid</th></tr></thead>
+        <thead><tr><th>Production Role</th><th style="text-align:right">Shoots</th><th style="text-align:right">Unique Crew</th><th style="text-align:right">Confirmed Crew Cost</th></tr></thead>
         <tbody>
         @foreach ($byRole as $r)
         <tr>
@@ -175,7 +192,7 @@
     type: 'bar',
     data: {
       labels: @json($monthly->pluck('label')),
-      datasets: [{ label: 'Crew spend', data: @json($monthly->pluck('spend')), backgroundColor: '#2e9e7a', borderRadius: 4 }]
+      datasets: [{ label: 'Confirmed Crew Cost', data: @json($monthly->pluck('spend')), backgroundColor: '#2e9e7a', borderRadius: 4 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,

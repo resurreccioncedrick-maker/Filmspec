@@ -36,6 +36,8 @@ class CrewController extends Controller
             return $this->export($request);
         }
 
+        $tab = in_array($request->query('tab'), ['members', 'positions', 'schedule', 'attendance'], true) ? $request->query('tab') : 'members';
+
         $statusFilter = $request->query('status', '');
         $posFilter = (int) $request->query('pos', 0);
         $etFilter = $request->query('et', '');
@@ -100,13 +102,39 @@ class CrewController extends Controller
             }
         }
 
+        // Positions tab — how many crew members currently hold each position as their primary
+        // role, so staff can see at a glance which positions are actually staffed.
+        $positionsWithCounts = DB::table('crew_positions as cp')
+            ->leftJoin('crew_members as cm', function ($j) {
+                $j->on('cm.primary_position_id', '=', 'cp.position_id')->where('cm.status', 'active');
+            })
+            ->groupBy('cp.position_id', 'cp.position_name', 'cp.department', 'cp.description')
+            ->orderBy('cp.department')->orderBy('cp.position_name')
+            ->select('cp.*')
+            ->selectRaw('COUNT(cm.crew_id) AS crew_count')
+            ->get();
+
+        // Schedule tab — a month calendar of confirmed/ongoing crew assignments, same
+        // day-map-building approach as Dashboard's and Calendar Analytics' calendars.
+        $scheduleMonth = $request->query('smonth', now()->format('Y-m'));
+        $scheduleAssignments = DB::table('booking_crew as bc')
+            ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
+            ->join('crew_members as cm', 'bc.crew_id', '=', 'cm.crew_id')
+            ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
+            ->whereNotIn('bc.assignment_status', ['declined', 'replaced', 'back_out'])
+            ->select('bc.crew_id', 'b.booking_id', 'b.booking_reference', 'b.project_title',
+                'b.shoot_date_start', 'b.shoot_date_end', 'b.booking_status',
+                DB::raw("CONCAT(cm.first_name,' ',cm.last_name) AS crew_name"))
+            ->get();
+
         return view('crew', [
-            'msg' => $msg, 'canManage' => $canManage,
-            'stats' => $stats, 'crew' => $crew, 'positions' => $positions,
+            'msg' => $msg, 'canManage' => $canManage, 'tab' => $tab,
+            'stats' => $stats, 'crew' => $crew, 'positions' => $positions, 'positionsWithCounts' => $positionsWithCounts,
             'total' => $total, 'pages' => $pages, 'page' => $page,
             'statusFilter' => $statusFilter, 'posFilter' => $posFilter, 'etFilter' => $etFilter, 'search' => $search,
             'upcomingBlocks' => $upcomingBlocks, 'allUpcomingBlocks' => $allUpcomingBlocks,
             'currentAssignments' => $currentAssignments,
+            'scheduleMonth' => $scheduleMonth, 'scheduleAssignments' => $scheduleAssignments,
             'statusBadge' => $this->statusBadge, 'typeBadge' => $this->typeBadge, 'typeLabel' => $this->typeLabel,
         ]);
     }
@@ -270,7 +298,8 @@ class CrewController extends Controller
             if ($cid && $dateFrom && $dateTo && strtotime($dateTo) >= strtotime($dateFrom)) {
                 DB::table('crew_unavailability')->insert([
                     'crew_id' => $cid, 'date_from' => $dateFrom, 'date_to' => $dateTo,
-                    'reason' => $reason, 'created_by' => $uid,
+                    'reason' => $reason, 'reason_category' => trim($request->input('reason_category', '')) ?: null,
+                    'internal_note' => trim($request->input('internal_note', '')) ?: null, 'created_by' => $uid,
                 ]);
                 $crewName = DB::table('crew_members')->where('crew_id', $cid)->selectRaw("CONCAT(first_name,' ',last_name) AS name")->value('name');
                 ActivityLog::record($uid, 'create', 'crew', "Blocked availability for $crewName: $dateFrom – $dateTo", $cid);

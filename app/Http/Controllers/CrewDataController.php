@@ -63,6 +63,11 @@ class CrewDataController extends Controller
         $monthsInWindow = max(1, $monthly->count());
         $crewBooked = $crewLines->pluck('crew_id')->unique()->count();
 
+        // Crew-Assigned Shoots = confirmed-CE bookings in this window that actually have a
+        // crew line; Shoots Needing Crew = the remainder (confirmed but nobody assigned yet).
+        $crewAssignedShoots = $crewLines->pluck('booking_id')->unique()->count();
+        $shootsNeedingCrew = max(0, $bookingIds->count() - $crewAssignedShoots);
+
         // "vs last period" pills on Crew Spend and Crew Booked — not Average Per Month, which
         // is already an average across the chart window, so comparing it to itself wouldn't
         // mean much. Null for 'all' mode, where the view just omits the pill.
@@ -83,7 +88,10 @@ class CrewDataController extends Controller
                 'shoots' => $bookingIds->count(),
                 // Distinct people booked across the window, not line count.
                 'crew_booked' => $crewBooked,
+                'crew_assigned_shoots' => $crewAssignedShoots,
+                'shoots_needing_crew' => $shootsNeedingCrew,
                 'avg_per_month' => round((float) $monthly->sum('spend') / $monthsInWindow, 2),
+                'avg_per_shoot' => $crewAssignedShoots ? round($spendTotal / $crewAssignedShoots, 2) : 0.0,
                 'chart_months' => $chartMonths,
             ],
         ]);

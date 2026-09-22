@@ -103,6 +103,7 @@
                   <th style="padding:8px;text-align:left;color:var(--blue-800);font-size:.75rem;text-transform:uppercase;letter-spacing:.06em">Position</th>
                   <th style="padding:8px;text-align:center;color:var(--blue-800);font-size:.75rem;text-transform:uppercase;letter-spacing:.06em">Status</th>
                   <th style="padding:8px;text-align:left;color:var(--blue-800);font-size:.75rem;text-transform:uppercase;letter-spacing:.06em">Reason (if absent)</th>
+                  <th style="padding:8px;text-align:left;color:var(--blue-800);font-size:.75rem;text-transform:uppercase;letter-spacing:.06em">Category</th>
                   <th style="padding:8px;text-align:left;color:var(--blue-800);font-size:.75rem;text-transform:uppercase;letter-spacing:.06em">Replacement</th>
                 </tr>
               </thead>
@@ -132,6 +133,16 @@
                            style="font-size:.83rem{{ in_array($existAtt->status ?? 'present', ['present', 'late']) ? ';display:none' : '' }}"
                            value="{{ $existAtt->reason ?? '' }}"
                            placeholder="Reason…">
+                  </td>
+                  <td style="padding:10px 8px">
+                    <select name="crew_reason_category[{{ $bc->crew_id }}]"
+                            class="form-control reason-category-field-{{ $bc->crew_id }}"
+                            style="font-size:.83rem{{ in_array($existAtt->status ?? 'present', ['present', 'late']) ? ';display:none' : '' }}">
+                      <option value="">—</option>
+                      @foreach (['Personal' => 'Personal', 'Emergency' => 'Emergency', 'Prior Notice' => 'Prior Notice', 'Other' => 'Other'] as $catVal => $catLabel)
+                      <option value="{{ $catVal }}" {{ ($existAtt->reason_category ?? '') === $catVal ? 'selected' : '' }}>{{ $catLabel }}</option>
+                      @endforeach
+                    </select>
                   </td>
                   <td style="padding:10px 8px">
                     <select name="crew_replacement[{{ $bc->crew_id }}]"
@@ -244,7 +255,7 @@
         <thead>
           <tr>
             <th>Date</th><th>Crew Member</th><th>Position</th><th>Booking</th>
-            <th>Status</th><th>Reason</th><th>Replacement</th><th>Logged By</th>
+            <th>Status</th><th>Reason</th><th>Category</th><th>Replacement</th><th>Logged By</th>
           </tr>
         </thead>
         <tbody>
@@ -262,6 +273,7 @@
             </td>
             <td><span class="badge {{ $statusBadge[$att->status] ?? 'badge-gray' }}">{{ $statusLabel[$att->status] ?? ucfirst($att->status) }}</span></td>
             <td style="font-size:.83rem;color:var(--text-muted)">{{ $att->reason ?? '—' }}</td>
+            <td style="font-size:.83rem;color:var(--text-muted)">{{ $att->reason_category ?? '—' }}</td>
             <td style="font-size:.83rem">
               @if ($att->replacement_name)<span class="badge badge-blue">{{ $att->replacement_name }}</span>@else—@endif
             </td>
@@ -391,11 +403,15 @@
 @push('scripts')
 <script>
 function toggleReason(sel, crewId) {
-  var val     = sel.value;
-  var reason  = document.querySelector('.reason-field-' + crewId);
-  var replace = document.querySelector('.replacement-field-' + crewId);
+  var val      = sel.value;
+  var reason   = document.querySelector('.reason-field-' + crewId);
+  var category = document.querySelector('.reason-category-field-' + crewId);
+  var replace  = document.querySelector('.replacement-field-' + crewId);
   if (reason) {
     reason.style.display  = (val === 'present' || val === 'late') ? 'none' : 'block';
+  }
+  if (category) {
+    category.style.display = (val === 'present' || val === 'late') ? 'none' : 'block';
   }
   if (replace) {
     replace.style.display = (val === 'no_show' || val === 'back_out') ? 'block' : 'none';

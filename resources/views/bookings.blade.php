@@ -34,6 +34,30 @@
 </div>
 @endif
 
+<!-- KPI strip -->
+<div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
+  <div class="stat-card {{ $pendingApprovalCount > 0 ? 'orange' : '' }}">
+    <div class="stat-icon" style="{{ $pendingApprovalCount > 0 ? 'background:var(--orangel);color:var(--orange)' : '' }}"><i data-feather="file-text"></i></div>
+    <div class="stat-value">{{ $pendingApprovalCount }}</div>
+    <div class="stat-label">Requests Awaiting Review</div>
+  </div>
+  <div class="stat-card {{ $overdueReturnsCount > 0 ? 'red' : '' }}">
+    <div class="stat-icon" style="{{ $overdueReturnsCount > 0 ? 'background:var(--redl);color:var(--red)' : '' }}"><i data-feather="rotate-ccw"></i></div>
+    <div class="stat-value">{{ $overdueReturnsCount }}</div>
+    <div class="stat-label">Overdue Returns</div>
+  </div>
+  <div class="stat-card {{ $openIncidentsCount > 0 ? 'red' : '' }}">
+    <div class="stat-icon" style="{{ $openIncidentsCount > 0 ? 'background:var(--redl);color:var(--red)' : '' }}"><i data-feather="alert-triangle"></i></div>
+    <div class="stat-value">{{ $openIncidentsCount }}</div>
+    <div class="stat-label">Open Incidents</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><i data-feather="calendar"></i></div>
+    <div class="stat-value">{{ $upcomingBookingsCount }}</div>
+    <div class="stat-label">Upcoming Bookings <span style="font-weight:400;color:var(--muted)">· Next 30 days</span></div>
+  </div>
+</div>
+
 @if ($pendingApprovalCount > 0)
 <div style="background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.4);border-radius:8px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
   <i data-feather="alert-circle" style="width:16px;height:16px;color:#fb923c;flex-shrink:0"></i>
@@ -56,7 +80,7 @@
   @php $cq = $clientFilter ? '&client=' . $clientFilter : ''; @endphp
   <a href="{{ $bookingsBase }}{{ $clientFilter ? '?client=' . $clientFilter : '' }}" class="tab-btn {{ ! $statusFilter ? 'active' : '' }}">All <span class="badge badge-gray" style="margin-left:4px">{{ $total }}</span></a>
   @php
-    $statusTabLabel = ['pending' => 'Pending', 'confirmed' => 'Confirmed', 'ongoing' => 'In Field', 'pending_inspection' => 'Inspection', 'returned' => 'Returned', 'completed' => 'Completed', 'cancelled' => 'Cancelled'];
+    $statusTabLabel = ['pending' => 'Awaiting Review', 'confirmed' => 'Confirmed', 'ongoing' => 'In Field', 'pending_inspection' => 'Inspection', 'returned' => 'Returned', 'completed' => 'Completed', 'cancelled' => 'Cancelled'];
   @endphp
   @foreach ($counts as $s => $c)
   <a href="{{ $bookingsBase }}?status={{ $s }}{{ $cq }}" class="tab-btn {{ $statusFilter === $s ? 'active' : '' }}">
@@ -82,8 +106,8 @@
         </div>
         <select name="status" class="form-control" style="width:auto">
           <option value="">All Status</option>
-          @foreach (['pending', 'confirmed', 'ongoing', 'completed', 'cancelled'] as $s)
-          <option value="{{ $s }}" {{ $statusFilter === $s ? 'selected' : '' }}>{{ ucfirst($s) }}</option>
+          @foreach (['pending', 'confirmed', 'ongoing', 'pending_inspection', 'returned', 'completed', 'cancelled'] as $s)
+          <option value="{{ $s }}" {{ $statusFilter === $s ? 'selected' : '' }}>{{ $statusTabLabel[$s] ?? ucfirst($s) }}</option>
           @endforeach
         </select>
         <select name="pay" class="form-control" style="width:auto">
@@ -159,7 +183,7 @@
           </td>
           <td>{{ \Carbon\Carbon::parse($bk->shoot_date_start)->format('M j, Y') }}</td>
           <td>{{ \Carbon\Carbon::parse($bk->shoot_date_end)->format('M j, Y') }}</td>
-          <td><span class="badge {{ $statusBadge[$bk->booking_status] }}">{{ ucfirst($bk->booking_status) }}</span></td>
+          <td><span class="badge {{ $statusBadge[$bk->booking_status] }}">{{ $statusTabLabel[$bk->booking_status] ?? ucfirst($bk->booking_status) }}</span></td>
           <td>@if ($bk->booking_status === 'cancelled') — @else <span class="badge {{ $payBadge[$bk->payment_status] ?? 'badge-gray' }}">{{ $payLabel[$bk->payment_status] ?? ucfirst($bk->payment_status) }}</span> @endif</td>
           <td style="font-weight:600;color:var(--accent)">
             {{ $bk->final_amount > 0 ? '₱' . number_format($bk->final_amount, 2) : '—' }}

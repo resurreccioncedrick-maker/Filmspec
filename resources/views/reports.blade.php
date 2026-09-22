@@ -126,7 +126,7 @@
         <button type="button" class="export-fmt-pill" data-fmt="pdf" onclick="rptSetExportFormat('pdf')">PDF</button>
       </div>
       @foreach ([
-          'sales' => 'Monthly Sales', 'collection' => 'Payment Collection',
+          'sales' => 'Daily Payments Trend', 'collection' => 'Payment Collection',
           'bookings' => 'Bookings by Type', 'equipment' => 'Top Equipment',
           'availability' => 'Equipment Availability', 'crew' => 'Crew Performance',
           'clients' => 'Top Clients', 'incidents' => 'Incidents Report',
@@ -149,26 +149,36 @@
 @endif
 
 <!-- KPI STRIP -->
-<div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
+<div class="stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:22px">
   <div class="stat-card green">
     <div class="stat-icon" style="background:var(--greenl);color:var(--green)"><i data-feather="trending-up"></i></div>
-    <div class="stat-value">₱{{ number_format($kpis['period_revenue'] / 1000, 1) }}k</div>
+    <div class="stat-value">₱{{ number_format($kpis['period_sales'] / 1000, 1) }}k</div>
     <div class="stat-label">Period Sales</div>
+    <div style="font-size:10px;color:var(--muted);margin-top:2px">Booking value created in period, excl. cancelled</div>
   </div>
-  <div class="stat-card">
-    <div class="stat-icon"><i data-feather="calendar"></i></div>
-    <div class="stat-value">{{ $kpis['total_bookings'] }}</div>
-    <div class="stat-label">Total Bookings</div>
-  </div>
-  <div class="stat-card" style="--sb:var(--green)">
-    <div class="stat-icon" style="background:var(--greenl);color:var(--green)"><i data-feather="check-circle"></i></div>
-    <div class="stat-value">{{ $kpis['completed'] }}</div>
-    <div class="stat-label">Completed</div>
+  <div class="stat-card" style="--sb:var(--blue-600, #2563eb)">
+    <div class="stat-icon" style="background:var(--bluel,#eff6ff);color:var(--blue-600,#2563eb)"><i data-feather="credit-card"></i></div>
+    <div class="stat-value">₱{{ number_format($kpis['payments_collected'] / 1000, 1) }}k</div>
+    <div class="stat-label">Payments Collected</div>
+    <div style="font-size:10px;color:var(--muted);margin-top:2px">Cash received in period, any booking</div>
   </div>
   <div class="stat-card orange">
     <div class="stat-icon" style="background:var(--orangel);color:var(--orange)"><i data-feather="alert-circle"></i></div>
     <div class="stat-value">₱{{ number_format($kpis['outstanding_bal'] / 1000, 1) }}k</div>
     <div class="stat-label">Outstanding</div>
+    <div style="font-size:10px;color:var(--muted);margin-top:2px">Unpaid balance as of today, all time</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon"><i data-feather="calendar"></i></div>
+    <div class="stat-value">{{ $kpis['total_bookings'] }}</div>
+    <div class="stat-label">Total Bookings</div>
+    <div style="font-size:10px;color:var(--muted);margin-top:2px">Created in period, any status</div>
+  </div>
+  <div class="stat-card" style="--sb:var(--green)">
+    <div class="stat-icon" style="background:var(--greenl);color:var(--green)"><i data-feather="check-circle"></i></div>
+    <div class="stat-value">{{ $kpis['completed'] }}</div>
+    <div class="stat-label">Completed Bookings</div>
+    <div style="font-size:10px;color:var(--muted);margin-top:2px">Created in period, status = completed</div>
   </div>
 </div>
 
@@ -181,9 +191,9 @@
 <div class="hero-chart-card" style="margin-bottom:16px">
   <div class="hero-chart-head">
     <div>
-      <div class="hero-chart-title">Monthly Sales</div>
-      <div class="hero-chart-value">₱{{ number_format($kpis['period_revenue'], 2) }}</div>
-      <div class="hero-chart-sub">{{ \Illuminate\Support\Carbon::parse($dateFrom)->format('M j, Y') }} — {{ \Illuminate\Support\Carbon::parse($dateTo)->format('M j, Y') }}</div>
+      <div class="hero-chart-title">Payments Received — Daily Trend</div>
+      <div class="hero-chart-value">₱{{ number_format($kpis['payments_collected'], 2) }}</div>
+      <div class="hero-chart-sub">Cash received {{ \Illuminate\Support\Carbon::parse($dateFrom)->format('M j, Y') }} — {{ \Illuminate\Support\Carbon::parse($dateTo)->format('M j, Y') }} (not booking value)</div>
     </div>
     @if ($revenueData->isNotEmpty())
     @php $revTotal = $revenueData->sum('total'); $txTotal = $revenueData->sum('transactions'); @endphp
@@ -285,6 +295,10 @@
     <div class="card-header">
       <h2 class="card-title"><i data-feather="pie-chart" style="width:14px;height:14px"></i> Bookings by Project Type</h2>
       <span class="badge badge-blue">{{ $bookingsByType->sum('total') }} bookings</span>
+    </div>
+    <div style="padding:6px 20px 0;font-size:10.5px;color:var(--muted)">
+      Created {{ \Illuminate\Support\Carbon::parse($dateFrom)->format('M j') }} – {{ \Illuminate\Support\Carbon::parse($dateTo)->format('M j, Y') }}, excludes cancelled
+      ({{ $kpis['total_bookings'] }} total bookings created in period, including cancelled)
     </div>
     @if ($bookingsByType->isEmpty())
     <div class="empty-state" style="padding:32px 0"><i data-feather="layers"></i><h3>No bookings in this period</h3></div>

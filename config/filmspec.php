@@ -11,6 +11,23 @@ return [
     // 000 for head office) once available.
     'company_tin' => env('FILMSPEC_COMPANY_TIN', '412-587-963-000'),
 
+    // Film Spec Incorporated's own billing identity for the printed Invoice — matches the
+    // company's actual invoice template exactly (a different registered office/TIN than the
+    // one on the CE document's letterhead, which is the address on file for that document).
+    'invoice_from' => [
+        'name' => 'Film Spec Incorporated',
+        'address' => "Unit 8 Southern Hills Residences\nPutatan 1772\nMuntinlupa City",
+        'tin' => env('FILMSPEC_INVOICE_TIN', '603-308-544-00000'),
+    ],
+
+    // Bank remittance details on the printed Invoice.
+    'invoice_bank' => [
+        'account_name' => 'Film Spec Incorporated',
+        'account_number' => '0003 1003 7300',
+        'bank' => 'Union Bank of the Philippines',
+        'currency' => 'PHP',
+    ],
+
     // How long a client support chat message (and its uploaded attachment file, if any) is
     // kept before support-chat:prune deletes it — see app/Console/Commands/PruneSupportChatMessages.php.
     'support_chat_retention_days' => (int) env('FILMSPEC_SUPPORT_CHAT_RETENTION_DAYS', 90),

@@ -215,15 +215,16 @@ class ClientsController extends Controller
             $company = strtoupper(trim($request->input('company_name', '')));
             $contact = strtoupper(trim($request->input('contact_person', '')));
             $type = in_array($request->input('client_type'), ['regular', 'first_time'], true) ? $request->input('client_type') : 'first_time';
-            $terms = in_array($request->input('payment_terms'), $validTerms, true) ? $request->input('payment_terms') : '50_downpayment';
             $entityType = in_array($request->input('entity_type'), array_keys($this->entityTypeLabel), true) ? $request->input('entity_type') : 'individual';
 
+            // payment_terms/discount_pct are deliberately NOT touched here — they moved to the
+            // Billing tab's own restricted save (ClientDetailController::updateBilling()), so
+            // this basic edit form must never overwrite them back to a default.
             DB::table('clients')->where('client_id', $cid)->update([
                 'company_name' => $company ?: null, 'contact_person' => $contact, 'email' => $email, 'phone' => $phone,
-                'address' => trim($request->input('address', '')), 'client_type' => $type, 'payment_terms' => $terms,
+                'address' => trim($request->input('address', '')), 'client_type' => $type,
                 'is_vat_registered' => $entityType === 'company' ? 1 : 0, 'entity_type' => $entityType,
                 'notes' => trim($request->input('notes', '')),
-                'discount_pct' => min(100, max(0, (float) $request->input('discount_pct', 0))),
             ]);
             ActivityLog::record($uid, 'update', 'clients', "Updated client ID: $cid", $cid);
 

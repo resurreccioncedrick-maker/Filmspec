@@ -21,6 +21,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .tbtn.primary{background:#fff;color:var(--accent);border-color:#fff}
 .tbtn.primary:hover{background:#D0E8FF}
 
+.ce-export-wrap{position:relative}
+.ce-export-menu{display:none;position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px;min-width:190px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:200}
+.ce-export-menu.open{display:block}
+.ce-export-opt{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;font-size:12.5px;color:var(--text);text-decoration:none;transition:background .12s}
+.ce-export-opt:hover{background:var(--bg);color:var(--accent)}
+.ce-export-opt svg{flex-shrink:0;color:var(--muted)}
+
 .ce-wrap{max-width:860px;margin:24px auto;padding:0 16px 40px}
 .ce-wrap.cart-wide{max-width:1080px}
 
@@ -66,62 +73,69 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   .ce-footer{grid-template-columns:1fr;gap:26px}
 }
 
-.ce-sheet{background:#fff;border:1px solid #d1d5db;border-radius:4px;overflow:hidden;margin-bottom:28px;box-shadow:0 4px 20px rgba(0,0,0,.06)}
+{{-- This block matches FilmSpec's actual Excel/PDF cost-estimate template (the document the
+     company sends to clients) — Arial throughout, black-bordered tables, a plain white ground
+     with the FilmSpec blue used only for the "COST ESTIMATE" banner and the red "FS Front" tag,
+     no rounded corners or shadows. Only the client-facing/print document changes; the internal
+     editor cards (.editor-grid/.ecard etc.) below are untouched. --}}
+.ce-sheet{background:#fff;border:1.5px solid #000;border-radius:0;overflow:hidden;margin-bottom:28px;box-shadow:none;font-family:Arial,Helvetica,sans-serif;color:#000;--muted:#000;--sub:#000;--border:#000}
 
-.ce-header{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid #003D80}
-.ce-header-left{background:#003D80;color:#fff;padding:14px 18px;display:flex;flex-direction:column;justify-content:center}
-.ce-header-left .brand{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:3px;line-height:1}
-.ce-header-left .addr{font-size:9px;color:rgba(255,255,255,.7);margin-top:4px;line-height:1.5}
-.ce-header-right{background:#E5F0FF;padding:14px 18px;display:flex;flex-direction:column;justify-content:space-between}
-.ce-type{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:2px;color:#003D80;line-height:1}
-.ce-num{font-family:'JetBrains Mono',monospace;font-size:12px;color:#003D80;font-weight:700;margin-top:3px}
-.ce-meta{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:11px;margin-top:6px}
-.ce-meta .lbl{color:var(--muted);font-weight:600}
-.ce-meta .val{color:#003D80;font-weight:700;font-family:'JetBrains Mono',monospace}
+.ce-header{display:grid;grid-template-columns:1fr 1fr;border-bottom:1.5px solid #000}
+.ce-header-left{background:#fff;color:#000;padding:14px 18px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;border-right:1.5px solid #000}
+.ce-header-left .addr{font-size:10px;font-weight:700;font-style:italic;margin-top:6px;line-height:1.6}
+.ce-header-right{background:#fff;padding:0;display:flex;flex-direction:column}
+.ce-type{font-family:Arial,Helvetica,sans-serif;font-size:19px;letter-spacing:.5px;color:#fff;line-height:1;font-weight:700;background:#003D80;padding:10px 14px;text-align:center}
+.ce-num{font-size:12px;color:#000;font-weight:700;font-style:italic;text-align:center;padding:6px 14px;border-bottom:1px solid #000}
+.ce-meta{display:grid;grid-template-columns:auto 1fr;font-size:11px;border-collapse:collapse}
+.ce-meta .lbl{color:#000;font-weight:400;padding:3px 8px;border-top:1px solid #000;text-align:right}
+.ce-meta .val{color:#000;font-weight:700;font-style:italic;padding:3px 8px;border-top:1px solid #000;text-align:left}
+.ce-meta .fsfront{grid-column:1/-1;text-align:center;color:#c0392b;font-weight:700;font-style:italic;font-size:13px;padding:5px 8px;border-top:1px solid #000}
 
-.ce-info{border-bottom:1px solid var(--border)}
-.ce-info-row{display:grid;grid-template-columns:160px 1fr;border-bottom:1px solid #f1f5f9;min-height:26px;align-items:center}
+.ce-info{border-bottom:1.5px solid #000}
+.ce-info-row{display:grid;grid-template-columns:160px 1fr;border-bottom:1px solid #000;min-height:22px;align-items:center}
 .ce-info-row:last-child{border-bottom:none}
-.ce-info-lbl{padding:5px 12px;font-size:10.5px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;background:#f8fafc;border-right:1px solid var(--border)}
-.ce-info-val{padding:5px 14px;font-size:12.5px;font-weight:600;color:var(--text)}
+.ce-info-lbl{padding:3px 10px;font-size:11px;font-weight:700;color:#000;text-transform:uppercase;letter-spacing:0;background:#fff;border-right:none}
+.ce-info-val{padding:3px 12px;font-size:11px;font-weight:700;font-style:italic;color:#000}
 
-.ce-section-hdr{background:#003D80;color:#fff;padding:7px 14px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}
+.ce-section-hdr{background:#fff;color:#000;padding:6px 14px;font-size:11px;font-weight:700;font-style:italic;letter-spacing:0;text-transform:uppercase;text-align:center;border-bottom:1.5px solid #000}
 
-.ce-tbl{width:100%;border-collapse:collapse}
-.ce-tbl th{background:#D0E8FF;color:#003D80;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:7px 10px;text-align:left;border:1px solid #A8D0FF}
+.ce-tbl{width:100%;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif}
+.ce-tbl th{background:#fff;color:#000;font-size:10.5px;font-weight:700;letter-spacing:0;text-transform:uppercase;padding:5px 10px;text-align:left;border:1px solid #000}
 .ce-tbl th.right{text-align:right}
-.ce-tbl td{padding:6px 10px;font-size:12px;border:1px solid #e2e8f0;vertical-align:middle}
-.ce-tbl td.right{text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px}
-.ce-tbl td.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
-.ce-tbl tr:nth-child(even) td{background:#f9fbff}
-.ce-tbl tr:hover td{background:#E5F0FF}
-.ce-tbl .subtot td{background:#D0E8FF!important;font-weight:700;color:#003D80}
-.ce-tbl .grandtot td{background:#003D80!important;color:#fff!important;font-weight:800;font-size:13px}
-.ce-tbl .grandtot td.right{font-family:'JetBrains Mono',monospace}
+.ce-tbl td{padding:4px 10px;font-size:11px;border:1px solid #000;vertical-align:middle;color:#000}
+.ce-tbl td.right{text-align:right;font-family:Arial,Helvetica,sans-serif;font-size:11px}
+.ce-tbl td.mono{font-family:Arial,Helvetica,sans-serif;font-size:11px}
+.ce-tbl tr:nth-child(even) td{background:#fff}
+.ce-tbl tr:hover td{background:#fff}
+.ce-tbl .subtot td{background:#fff!important;font-weight:700;color:#000;font-style:italic}
+.ce-tbl .grandtot td{background:#fff!important;color:#000!important;font-weight:700;font-size:11px}
+.ce-tbl .grandtot td.right{font-family:Arial,Helvetica,sans-serif}
+.ce-tbl .catgroup td{background:#fff!important;color:#000!important;font-weight:700;font-style:italic;border:none;border-top:1px solid #000;padding-top:8px}
 
-.ce-totals{padding:14px 16px;background:#f8fafc;border-top:2px solid var(--border)}
+.ce-totals{padding:10px 16px;background:#fff;border-top:none}
 .ce-totals table{width:100%;max-width:380px;margin-left:auto;border-collapse:collapse}
-.ce-totals td{padding:5px 10px;font-size:12.5px}
-.ce-totals td.lbl{color:var(--sub);font-weight:600}
-.ce-totals td.val{text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--text)}
-.ce-totals .vat td.lbl{color:var(--muted)}
-.ce-totals .vat td.val{color:var(--muted)}
-.ce-totals .grand td{background:#003D80;color:#fff;font-weight:800;font-size:14px;padding:9px 12px}
-.ce-totals .grand td.val{font-family:'JetBrains Mono',monospace;text-align:right}
+.ce-totals td{padding:4px 10px;font-size:11.5px}
+.ce-totals td.lbl{color:#000;font-weight:700;font-style:italic}
+.ce-totals td.val{text-align:right;font-family:Arial,Helvetica,sans-serif;font-weight:700;font-style:italic;color:#000}
+.ce-totals .vat td.lbl{color:#000}
+.ce-totals .vat td.val{color:#000}
+.ce-totals .grand td{background:#fff;color:#000;font-weight:700;font-size:12.5px;padding:8px 10px;border-top:1.5px solid #000}
+.ce-totals .grand td.val{font-family:Arial,Helvetica,sans-serif;text-align:right}
 
-.ce-words{padding:10px 16px;border-top:1px solid var(--border);font-size:11.5px;font-style:italic;color:#003D80;font-weight:700;background:#E5F0FF}
+.ce-words{padding:10px 16px;border-top:none;font-size:11px;font-style:italic;color:#000;font-weight:700;background:#fff;text-align:center;text-decoration:underline}
 
-.ce-footer{padding:14px 16px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:40px}
-.ce-sig{border-top:1px solid var(--text);padding-top:5px;font-size:10.5px;color:var(--sub);text-align:center;margin-top:32px}
+.ce-footer{padding:18px 16px 14px;border-top:none;display:grid;grid-template-columns:1fr 1fr;gap:40px;font-family:Arial,Helvetica,sans-serif}
+.ce-sig{border-top:1px solid #000;padding-top:4px;font-size:10px;color:#000;text-align:center;margin-top:30px}
 
-.ce-notes{padding:10px 14px;background:#fffbeb;border-top:1px solid #fde68a;font-size:10.5px;color:#92400e;line-height:1.7}
+.ce-notes{padding:8px 14px;background:#fff;border-top:none;font-size:10.5px;font-weight:700;font-style:italic;color:#000;line-height:1.7;text-align:center}
 
-.ce-summary-row{display:grid;grid-template-columns:1fr auto;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border)}
+.ce-summary-row{display:grid;grid-template-columns:1fr auto;align-items:center;padding:5px 14px;border-bottom:1px solid #000}
 .ce-summary-row:last-child{border-bottom:none}
-.ce-summary-lbl{font-size:12.5px;font-weight:600;color:var(--sub)}
-.ce-summary-val{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#003D80}
-.ce-summary-row.grand .ce-summary-lbl{color:var(--text);font-size:14px}
-.ce-summary-row.grand .ce-summary-val{font-size:16px;color:#003D80}
+.ce-summary-lbl{font-size:11.5px;font-weight:700;font-style:italic;color:#000}
+.ce-summary-val{font-family:Arial,Helvetica,sans-serif;font-size:11.5px;font-weight:700;font-style:italic;color:#000}
+.ce-summary-row.grand{border-top:1.5px solid #000}
+.ce-summary-row.grand .ce-summary-lbl{color:#000;font-size:13px}
+.ce-summary-row.grand .ce-summary-val{font-size:14px;color:#000}
 
 .sheet-tabs{display:flex;gap:0;margin-bottom:0;border-bottom:none}
 .stab{padding:9px 24px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--muted);border:1px solid var(--border);border-bottom:none;border-radius:6px 6px 0 0;margin-right:4px;background:var(--bg);transition:all .15s}
@@ -139,7 +153,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .abtn.outline{background:#fff;color:var(--sub);border:1.5px solid var(--border)}
 .abtn.outline:hover{border-color:#003D80;color:#003D80}
 
-@media print{.top-bar,.action-bar,.sheet-tabs,.no-print{display:none!important}.ce-wrap{margin:0;padding:0}.ce-sheet{box-shadow:none;border:1px solid #ccc;page-break-inside:avoid}.sheet-content{display:block!important}}
+@media print{.top-bar,.action-bar,.sheet-tabs,.no-print,.addline-btn,.edit-mini-btn{display:none!important}.ce-wrap{margin:0;padding:0}.ce-sheet{box-shadow:none;border:1px solid #ccc;page-break-inside:avoid}.sheet-content{display:block!important}.editor-grid{grid-template-columns:1fr!important}.sum-panel{position:static!important;border-width:1.5px!important;box-shadow:none!important}.ecard{box-shadow:none!important;page-break-inside:avoid}}
 
 .agree-wrap{margin-top:14px;padding:14px 16px;background:#f8fafc;border-radius:7px;border:1.5px solid #e2e8f0;display:flex;flex-direction:column;gap:9px}
 .agree-row{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--sub);line-height:1.5;cursor:pointer}
@@ -164,6 +178,60 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .doc-foot{padding:14px 22px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;background:#f8fafc}
 .doc-accept-btn{padding:9px 22px;background:#003D80;color:#fff;border:none;border-radius:6px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s}
 .doc-accept-btn:hover{background:#004499}
+
+/* ═══ Booking-mode editor layout (mode=booking) ═══ */
+.bcrumb{font-size:12px;color:rgba(255,255,255,.75);margin-bottom:2px}
+.bcrumb a{color:rgba(255,255,255,.85);text-decoration:none}
+.bcrumb a:hover{text-decoration:underline}
+.ce-editor-head{background:#fff;border:1px solid #d1d5db;border-radius:8px;padding:18px 22px;margin-bottom:16px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.ce-editor-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ce-editor-title .num{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:800;color:#003D80}
+.vbadge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.3px;background:#E5F0FF;color:#003D80;border:1px solid #A8D0FF}
+.stbadge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}
+.stbadge.draft{background:#f1f5f9;color:#475569;border:1px solid #cbd5e1}
+.stbadge.confirmed{background:#dcfce7;color:#166534;border:1px solid #86efac}
+.stbadge.superseded{background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0}
+.rel-booking-row{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12.5px;color:var(--sub)}
+.rel-booking-row a{color:#003D80;font-weight:700;text-decoration:none;font-family:'JetBrains Mono',monospace}
+.rel-booking-row a:hover{text-decoration:underline}
+
+.editor-grid{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
+@media (max-width:900px){.editor-grid{grid-template-columns:1fr}}
+
+.ecard{background:#fff;border:1px solid #d1d5db;border-radius:8px;margin-bottom:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.ecard-head{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ecard-head h3{font-size:13.5px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px}
+.ecard-body{padding:16px 18px}
+.addline-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;background:#003D80;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s}
+.addline-btn:hover{background:#004499}
+.edit-mini-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;background:#fff;color:#003D80;border:1.5px solid #A8D0FF;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
+.edit-mini-btn:hover{background:#f0f7ff}
+
+.etbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.etbl th{background:#f8fafc;color:var(--sub);font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:7px 10px;text-align:left;border-bottom:1.5px solid var(--border)}
+.etbl th.r,.etbl td.r{text-align:right}
+.etbl td{padding:8px 10px;border-bottom:1px solid #f1f5f9}
+.etbl tr:last-child td{border-bottom:none}
+.etbl .amt{font-family:'JetBrains Mono',monospace;font-weight:600}
+
+.sum-panel{background:#fff;border:2px solid #003D80;border-radius:8px;padding:18px 20px;margin-bottom:16px;box-shadow:0 2px 10px rgba(0,61,128,.1)}
+.sum-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:12.5px}
+.sum-row .lbl{color:var(--sub);font-weight:600}
+.sum-row .val{font-family:'JetBrains Mono',monospace;font-weight:700;color:#0f172a}
+.sum-row.grand{border-top:2px solid #003D80;border-bottom:none;margin-top:6px;padding-top:12px}
+.sum-row.grand .lbl{font-size:14px;color:#003D80;font-weight:800}
+.sum-row.grand .val{font-size:16px;color:#003D80}
+
+.terms-box{background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:12px 14px;margin-bottom:16px;font-size:11.5px;color:var(--sub);line-height:1.6}
+.client-preview-wrap{background:#f1f5f9;border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:16px}
+.client-preview-label{font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+{{-- The client-view document is a full desktop layout — embedding it at the sidebar's ~320px
+     width with no scaling squished every 2-column grid and wrapped/truncated every cell (the
+     bug reported). Render it at its natural width inside a fixed-size clipping viewport, then
+     scale the whole thing down with a CSS transform so it's a proper shrunk thumbnail instead
+     of a forced reflow — 960px natural width * 1/3 = 320px, matching the sidebar column. --}}
+.client-preview-viewport{width:100%;height:560px;overflow:hidden;position:relative;border:1px solid var(--border);border-radius:6px;background:#fff}
+.client-preview-frame{width:960px;height:2400px;border:none;transform:scale(.3333);transform-origin:top left;position:absolute;top:0;left:0}
 </style>
 </head>
 <body>
@@ -174,10 +242,30 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   $vatRate = (float) config('filmspec.vat_rate');
 @endphp
 
+{{-- ?embed=1 is how the Client Preview thumbnail (below) loads this same page — its own
+     toolbar (Internal/For Client toggle, Print, Export, Back to Booking) has no room in a
+     ~320px sidebar and duplicates buttons the surrounding page already has, so it's skipped
+     entirely there. The thumbnail's "View" link opens the full page (no embed param) when a
+     real, unscaled look is actually wanted. --}}
+@unless (request()->boolean('embed'))
 <div class="top-bar no-print">
-  <div class="top-bar-logo" style="display:flex;align-items:center;gap:10px">
-    <img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:26px;object-fit:contain;background:rgba(255,255,255,.92);padding:2px 8px;border-radius:4px">
-    <span>— Cost Estimate</span>
+  <div style="display:flex;flex-direction:column;gap:3px">
+    @if ($mode === 'booking')
+    <div class="bcrumb">
+      @if ($role === 'client')
+      <a href="{{ route('home') }}">My Bookings</a> &rsaquo;
+      <a href="{{ route('client-booking-detail', $bid) }}">{{ $booking->booking_reference }}</a> &rsaquo;
+      @else
+      <a href="{{ route('bookings') }}">Bookings</a> &rsaquo;
+      <a href="{{ route('booking-detail', $bid) }}">{{ $booking->booking_reference }}</a> &rsaquo;
+      @endif
+      Cost Estimate
+    </div>
+    @endif
+    <div class="top-bar-logo" style="display:flex;align-items:center;gap:10px">
+      <img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:26px;object-fit:contain;background:rgba(255,255,255,.92);padding:2px 8px;border-radius:4px">
+      <span>— Cost Estimate</span>
+    </div>
   </div>
   <div class="top-bar-actions">
     @if ($mode === 'booking' && $role !== 'client')
@@ -189,10 +277,40 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     </span>
     @endif
     <button class="tbtn" onclick="window.print()">Print</button>
+    @if ($mode === 'booking')
+    {{-- Same Export ▾ pattern every other staff page uses (partials/export-dropdown.blade.php),
+         hand-built here with inline SVGs instead of data-feather — this standalone document page
+         never loads the feather-icons script the shared partial relies on (see Print above,
+         which does the same for the same reason). Links straight to this URL + &export=fmt,
+         handled by CePreviewController::exportDocument(). --}}
+    @php
+      $ceExportBase = collect(request()->query())->except('export')->all();
+      $ceExportIcons = [
+        'csv' => '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
+        'xlsx' => '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 8l8 8M16 8l-8 8"/>',
+        'pdf' => '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/>',
+      ];
+      $ceExportLabels = ['csv' => 'CSV (.csv)', 'xlsx' => 'Excel (.xlsx)', 'pdf' => 'PDF (.pdf)'];
+    @endphp
+    <div class="ce-export-wrap no-print">
+      <button type="button" class="tbtn" onclick="ceToggleExportMenu()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export
+      </button>
+      <div class="ce-export-menu" id="ceExportMenu">
+        @foreach (['csv', 'xlsx', 'pdf'] as $fmt)
+        <a href="{{ request()->url() . '?' . http_build_query(array_merge($ceExportBase, ['export' => $fmt])) }}" class="ce-export-opt">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">{!! $ceExportIcons[$fmt] !!}</svg>{{ $ceExportLabels[$fmt] }}
+        </a>
+        @endforeach
+      </div>
+    </div>
+    @else
     <button onclick="window.print()" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#c0392b;color:white;border:none;border-radius:6px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer">
       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       Save as PDF
     </button>
+    @endif
     @if ($mode === 'booking' && $role === 'client')
     <a href="{{ route('client-booking-detail', $bid) }}"><button class="tbtn">&larr; Booking</button></a>
     @elseif ($mode === 'booking')
@@ -202,6 +320,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     @endif
   </div>
 </div>
+@endunless
 
 <div class="ce-wrap {{ $mode === 'cart' ? 'cart-wide' : '' }}">
 
@@ -211,6 +330,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div>
 @endif
 
+{{-- The Excel/PDF-matching official document (.ce-sheet tabs below) was already written to
+     support both modes' data (see the safe cart-mode defaults passed in for booking mode), but
+     was only ever wired to cart mode — booking-mode client view fell through to the internal
+     editor cards instead. Client view (any mode) now gets the official document; the internal
+     editor cards stay exactly as they were, for staff building the quote. --}}
+@if ($mode === 'cart' || ($mode === 'booking' && $isClientView))
 @if ($mode === 'cart')
 <div class="checkout-grid no-print">
 <div>
@@ -346,8 +471,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <div class="no-print" style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase;padding:4px 0">— Full Cost Breakdown —</div>
 @endif
 
-<!-- Sheet Tabs -->
-<div class="sheet-tabs">
+<!-- Sheet Tabs — mirrors the company's actual 3-sheet Excel workbook (Equipment / Crew TF / Summary) -->
+<div class="sheet-tabs no-print">
   <div class="stab on" onclick="showSheet('equipment',this)">Equipment (E)</div>
   <div class="stab" onclick="showSheet('crew',this)">Crew TF (M)</div>
   <div class="stab" onclick="showSheet('summary',this)">Summary (S)</div>
@@ -357,19 +482,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <div class="ce-sheet sheet-content on" id="sheet-equipment">
 
   <div class="ce-header">
-    <div class="ce-header-left" style="background:#fff;border-right:2px solid #003D80">
-      <img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:46px;max-width:170px;object-fit:contain;display:block;margin-bottom:8px">
-      <div class="addr" style="color:#64748b">Gate 1, 9110 La Campana St. cor Trabajo St., Olympia, Makati City<br>Cel: +63927 5056461 · Tel: +632 70004683</div>
+    <div class="ce-header-left">
+      <img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:46px;max-width:170px;object-fit:contain;display:block;margin:0 auto 4px">
+      <div class="addr">Gate 1, 9110 La Campana St. cor Trabajo St., Olympia, Makati City<br>Cel No. +63927 5056461&nbsp;&nbsp;&nbsp;Tel No. : +632 70004683</div>
     </div>
     <div class="ce-header-right">
-      <div>
-        <div class="ce-type">COST ESTIMATE</div>
-        <div class="ce-num">CE# {{ $ceNumber }}(E)</div>
-      </div>
+      <div class="ce-type">COST ESTIMATE</div>
+      <div class="ce-num">CE# {{ $ceNumber }}(E)</div>
       <div class="ce-meta">
-        <span class="lbl">DATE:</span><span class="val">{{ date('F d, Y') }}</span>
-        <span class="lbl">DUE DATE:</span><span class="val">{{ date('F d, Y', strtotime('+30 days')) }}</span>
-        <span class="lbl">FS FRONT:</span><span class="val">PREPARED BY: Glen Resurreccion</span>
+        <span class="lbl">Date:</span><span class="val">{{ date('F d, Y') }}</span>
+        <span class="lbl">DUE Date:</span><span class="val">{{ date('F d, Y', strtotime('+30 days')) }}</span>
+        <div class="fsfront">FS Front</div>
+        <span class="lbl">PREPARED BY:</span><span class="val">Glen Resurreccion</span>
       </div>
     </div>
   </div>
@@ -383,7 +507,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     @endforeach
   </div>
 
-  <div class="ce-section-hdr">DETAILED COST BREAKDOWN — LIGHT & GRIPS (FS)</div>
+  <div class="ce-section-hdr">DETAILED COST BREAKDOWN</div>
   <div style="overflow-x:auto">
   <table class="ce-tbl">
     <thead>
@@ -399,10 +523,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       @if ($mode === 'booking')
         @foreach ($equipGroups as $catName => $catLines)
         @php $groupSub = 0; @endphp
-        <tr>
-          <td colspan="5" style="background:#f9fbff;font-weight:700;color:#003D80;letter-spacing:.5px">
-            {{ strtoupper($catName) }} (FS)
-            <span style="float:right;font-weight:400;color:var(--muted);font-size:11px">{{ count($catLines) }} item{{ count($catLines) === 1 ? '' : 's' }}</span>
+        <tr class="catgroup">
+          <td colspan="5">
+            {{ strtoupper($catName) }} (FS):
+            <span style="float:right;font-weight:400;font-style:normal;color:#000;font-size:10.5px">{{ count($catLines) }} item{{ count($catLines) === 1 ? '' : 's' }}</span>
           </td>
         </tr>
         @foreach ($catLines as $eq)
@@ -501,15 +625,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     *** For more inquiries please call FILM SPEC Cellphone No. 0927 5056461 ***
   </div>
 
-  <div class="ce-footer">
-    <div>
-      <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">Prepared by:</div>
-      <div class="ce-sig">Glen Resurreccion</div>
-    </div>
-    <div>
-      <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">Received &amp; Conformed by:</div>
-      <div class="ce-sig">(Signature over printed name)</div>
-    </div>
+  <div class="ce-footer" style="grid-template-columns:1fr 1fr;padding-bottom:0">
+    <div style="font-size:11px;font-style:italic;font-weight:700">Prepared by: &nbsp;Glen Resurreccion</div>
+    <div style="font-size:11px;font-style:italic;font-weight:700">Noted by: <span class="ce-sig" style="display:inline-block;min-width:160px;margin-top:0;border-top:none;padding-top:0"></span></div>
+  </div>
+  <div style="padding:18px 16px 16px;font-family:Arial,Helvetica,sans-serif">
+    <div style="font-size:11px;font-style:italic;font-weight:700;margin-bottom:2px">Received &amp; Conformed by:</div>
+    <div class="ce-sig" style="max-width:260px;margin-top:26px;text-align:center">(Signature over printed name)</div>
+    <div style="font-size:11px;font-style:italic;font-weight:700;margin-top:16px">Date Received: <span class="ce-sig" style="display:inline-block;min-width:160px;margin-top:0;border-top:none;padding-top:0"></span></div>
   </div>
 </div>
 
@@ -523,19 +646,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   @endif
 
   <div class="ce-header">
-    <div class="ce-header-left" style="background:#fff;border-right:2px solid #003D80">
-      <img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:46px;max-width:170px;object-fit:contain;display:block;margin-bottom:8px">
-      <div class="addr" style="color:#64748b">Gate 1, 9110 La Campana St. cor Trabajo St., Olympia, Makati City<br>Cel: +63927 5056461 · Tel: +632 70004683</div>
+    <div class="ce-header-left">
+      <img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:46px;max-width:170px;object-fit:contain;display:block;margin:0 auto 4px">
+      <div class="addr">Gate 1, 9110 La Campana St. cor Trabajo St., Olympia, Makati City<br>Cel No. +63927 5056461&nbsp;&nbsp;&nbsp;Tel No. : +632 70004683</div>
     </div>
     <div class="ce-header-right">
-      <div>
-        <div class="ce-type">COST ESTIMATE</div>
-        <div class="ce-num">CE# {{ $ceNumber }}(M)</div>
-      </div>
+      <div class="ce-type">COST ESTIMATE</div>
+      <div class="ce-num">CE# {{ $ceNumber }}(M)</div>
       <div class="ce-meta">
-        <span class="lbl">DATE:</span><span class="val">{{ date('F d, Y') }}</span>
-        <span class="lbl">DUE DATE:</span><span class="val">{{ date('F d, Y', strtotime('+30 days')) }}</span>
-        <span class="lbl">FS FRONT:</span><span class="val">PREPARED BY: Glen Resurreccion</span>
+        <span class="lbl">Date:</span><span class="val">{{ date('F d, Y') }}</span>
+        <span class="lbl">DUE Date:</span><span class="val">{{ date('F d, Y', strtotime('+30 days')) }}</span>
+        <div class="fsfront">FS Front</div>
+        <span class="lbl">PREPARED BY:</span><span class="val">Glen Resurreccion</span>
       </div>
     </div>
   </div>
@@ -549,13 +671,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     @endforeach
   </div>
 
-  <div class="ce-section-hdr">DETAILED COST BREAKDOWN — CREW TALENT FEE</div>
-  <div style="padding:6px 12px;background:#fffbeb;border-bottom:1px solid #fde68a;font-size:11px;color:#92400e">
+  <div class="ce-section-hdr">DETAILED COST BREAKDOWN</div>
+  <div style="padding:6px 14px 0;font-size:11px;font-weight:700;font-style:italic;color:#000;font-family:Arial,Helvetica,sans-serif">
+    CREW TF :
+    <div style="font-size:10.5px;font-weight:700;font-style:italic;margin-top:2px">
     @if ($mode === 'cart')
-      {{ count($estimatedCrewLines) }} Position(s) estimated based on equipment requirements · Actual crew assigned after booking · OT after 12Hrs
+      {{ count($estimatedCrewLines) }} - Crew (Estimated based on equipment requirements · Actual crew assigned after booking · OT after 12Hrs)
     @else
-      {{ count($crewLines) }} Crew member(s) · OT after 12Hrs · Double Pay after 22Hrs
+      {{ count($crewLines) }} - Crew (OT after 12Hrs &amp; Double after 22Hrs)
     @endif
+    </div>
   </div>
   <div style="overflow-x:auto">
   <table class="ce-tbl">
@@ -678,15 +803,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     The Crew Talent Fee shall be due and payable in full upon receipt.
     @endif
   </div>
-  <div class="ce-footer">
-    <div>
-      <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">Prepared by:</div>
-      <div class="ce-sig">Glen Resurreccion</div>
-    </div>
-    <div>
-      <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">Received &amp; Conformed by:</div>
-      <div class="ce-sig">(Signature over printed name)</div>
-    </div>
+  <div class="ce-footer" style="grid-template-columns:1fr 1fr;padding-bottom:0">
+    <div style="font-size:11px;font-style:italic;font-weight:700">Prepared by: &nbsp;Glen Resurreccion</div>
+    <div style="font-size:11px;font-style:italic;font-weight:700">Noted by: <span class="ce-sig" style="display:inline-block;min-width:160px;margin-top:0;border-top:none;padding-top:0"></span></div>
+  </div>
+  <div style="padding:18px 16px 16px;font-family:Arial,Helvetica,sans-serif">
+    <div style="font-size:11px;font-style:italic;font-weight:700;margin-bottom:2px">Received &amp; Conformed by:</div>
+    <div class="ce-sig" style="max-width:260px;margin-top:26px;text-align:center">(Signature over printed name)</div>
+    <div style="font-size:11px;font-style:italic;font-weight:700;margin-top:16px">Date Received: <span class="ce-sig" style="display:inline-block;min-width:160px;margin-top:0;border-top:none;padding-top:0"></span></div>
   </div>
 </div>
 
@@ -694,19 +818,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <div class="ce-sheet sheet-content" id="sheet-summary">
 
   <div class="ce-header">
-    <div class="ce-header-left" style="background:#fff;border-right:2px solid #003D80">
-      <img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:46px;max-width:170px;object-fit:contain;display:block;margin-bottom:8px">
-      <div class="addr" style="color:#64748b">Gate 1, 9110 La Campana St. cor Trabajo St., Olympia, Makati City<br>Cel: +63927 5056461 · Tel: +632 70004683</div>
+    <div class="ce-header-left">
+      <img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:46px;max-width:170px;object-fit:contain;display:block;margin:0 auto 4px">
+      <div class="addr">Gate 1, 9110 La Campana St. cor Trabajo St., Olympia, Makati City<br>Cel No. +63927 5056461&nbsp;&nbsp;&nbsp;Tel No. : +632 70004683</div>
     </div>
     <div class="ce-header-right">
-      <div>
-        <div class="ce-type">COST ESTIMATE</div>
-        <div class="ce-num">CE# {{ $ceNumber }}(S) — SUMMARY</div>
-      </div>
+      <div class="ce-type">COST ESTIMATE</div>
+      <div class="ce-num">CE# {{ $ceNumber }}(S)</div>
       <div class="ce-meta">
-        <span class="lbl">DATE:</span><span class="val">{{ date('F d, Y') }}</span>
-        <span class="lbl">DUE DATE:</span><span class="val">{{ date('F d, Y', strtotime('+30 days')) }}</span>
-        <span class="lbl">FS FRONT:</span><span class="val">PREPARED BY: Glen Resurreccion</span>
+        <span class="lbl">Date:</span><span class="val">{{ date('F d, Y') }}</span>
+        <span class="lbl">DUE Date:</span><span class="val">{{ date('F d, Y', strtotime('+30 days')) }}</span>
+        <div class="fsfront">FS Front</div>
+        <span class="lbl">PREPARED BY:</span><span class="val">Glen Resurreccion</span>
       </div>
     </div>
   </div>
@@ -720,7 +843,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     @endforeach
   </div>
 
-  <div class="ce-section-hdr">SUMMARY OF ALL COSTS</div>
+  <div class="ce-section-hdr">SUMMARY</div>
 
   <div>
     <div class="ce-summary-row">
@@ -769,9 +892,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         'discount_flat' => '₱' . number_format($cePricingInput, 2) . ' flat discount off itemized total',
       ];
     @endphp
-    <div class="ce-summary-row" style="background:#eff6ff">
-      <div class="ce-summary-lbl" style="color:#1e40af">Package Deal{{ $ceVatExempt ? ' (VAT-exempt)' : '' }}</div>
-      <div class="ce-summary-val" style="color:#1e40af;font-size:12px">{{ $pricingLabels[$cePricingMode] ?? '' }}</div>
+    <div class="ce-summary-row">
+      <div class="ce-summary-lbl">Package Deal{{ $ceVatExempt ? ' (VAT-exempt)' : '' }}</div>
+      <div class="ce-summary-val" style="font-size:11px">{{ $pricingLabels[$cePricingMode] ?? '' }}</div>
     </div>
     @endif
     @if ($ceBdDiscounted)
@@ -794,22 +917,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="ce-summary-val" style="font-weight:700">₱{{ number_format($ceBd['crew_grand'], 2) }}</div>
     </div>
     @endif
-    <div class="ce-summary-row" style="background:#f8fafc">
-      <div class="ce-summary-lbl" style="font-weight:700;color:var(--text)">
+    <div class="ce-summary-row">
+      <div class="ce-summary-lbl" style="font-weight:700">
         Net Amount (ex-VAT)
         @if ($mode === 'cart')
-        <span style="font-size:10px;font-weight:400;color:var(--muted)">(equipment only)</span>
+        <span style="font-size:10px;font-weight:400">(equipment only)</span>
         @endif
       </div>
       <div class="ce-summary-val" id="sum-subtotal">₱{{ number_format($subtotal, 2) }}</div>
     </div>
-    <div class="ce-summary-row" style="background:#fffbeb">
-      <div class="ce-summary-lbl" style="color:#92400e">{{ ($cePricingMode !== 'no_discount' && $cePricingInput !== null) ? 'VAT (' . round($vatRate * 100) . '% added)' : 'VAT (' . round($vatRate * 100) . '/' . (100 + round($vatRate * 100)) . ') — Included' }}</div>
-      <div class="ce-summary-val" style="color:#92400e" id="sum-vat">₱{{ number_format($vat, 2) }}</div>
+    <div class="ce-summary-row">
+      <div class="ce-summary-lbl">{{ ($cePricingMode !== 'no_discount' && $cePricingInput !== null) ? 'VAT (' . round($vatRate * 100) . '% added)' : 'VAT (' . round($vatRate * 100) . '/' . (100 + round($vatRate * 100)) . ') — Included' }}</div>
+      <div class="ce-summary-val" id="sum-vat">₱{{ number_format($vat, 2) }}</div>
     </div>
-    <div class="ce-summary-row grand" style="background:#003D80;border-radius:0">
-      <div class="ce-summary-lbl" style="color:#fff;font-size:15px">{{ $mode === 'cart' ? 'EQUIPMENT TOTAL (VAT Incl.)' : 'GRAND TOTAL (VAT Incl.)' }}</div>
-      <div class="ce-summary-val" style="color:#fff;font-size:18px" id="sum-grand">₱{{ number_format($grand, 2) }}</div>
+    <div class="ce-summary-row grand">
+      <div class="ce-summary-lbl" style="font-size:14px">{{ $mode === 'cart' ? 'EQUIPMENT TOTAL (VAT Incl.)' : 'GRAND TOTAL (VAT Incl.)' }}</div>
+      <div class="ce-summary-val" style="font-size:15px" id="sum-grand">₱{{ number_format($grand, 2) }}</div>
     </div>
   </div>
 
@@ -828,17 +951,421 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <strong>Payment Terms:</strong> Regular Clients — 90-day or 6-month credit terms. New Customers — 50% downpayment required.
   </div>
 
-  <div class="ce-footer">
-    <div>
-      <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">Prepared by:</div>
-      <div class="ce-sig">Glen Resurreccion</div>
+  <div class="ce-footer" style="grid-template-columns:1fr 1fr;padding-bottom:0">
+    <div style="font-size:11px;font-style:italic;font-weight:700">Prepared by: &nbsp;Glen Resurreccion</div>
+    <div style="font-size:11px;font-style:italic;font-weight:700">Noted by: <span class="ce-sig" style="display:inline-block;min-width:160px;margin-top:0;border-top:none;padding-top:0"></span></div>
+  </div>
+  <div style="padding:18px 16px 16px;font-family:Arial,Helvetica,sans-serif">
+    <div style="font-size:11px;font-style:italic;font-weight:700;margin-bottom:2px">Received &amp; Conformed by:</div>
+    <div class="ce-sig" style="max-width:260px;margin-top:26px;text-align:center">(Signature over printed name)</div>
+    <div style="font-size:11px;font-style:italic;font-weight:700;margin-top:16px">Date Received: <span class="ce-sig" style="display:inline-block;min-width:160px;margin-top:0;border-top:none;padding-top:0"></span></div>
+  </div>
+</div>
+@else
+{{-- ═══════════════════ BOOKING-MODE CE EDITOR (matches the reference mockup) ═══════════════════ --}}
+@php $flash = session('bd_flash'); @endphp
+@if ($flash)
+<div class="no-print" style="background:{{ $flash['type'] === 'success' ? '#f0fdf4' : '#fef2f2' }};border:1px solid {{ $flash['type'] === 'success' ? '#bbf7d0' : '#fca5a5' }};color:{{ $flash['type'] === 'success' ? '#166534' : '#b91c1c' }};padding:10px 16px;border-radius:8px;margin-bottom:14px;font-size:13px;font-weight:600">
+  {!! $flash['text'] !!}
+</div>
+@endif
+
+<div class="ce-editor-head">
+  <div>
+    <div class="ce-editor-title">
+      <span class="num">{{ $ceNumber }}</span>
+      <span class="vbadge">Version {{ $ceVersion }}</span>
+      @if ($isSuperseded)
+      <span class="stbadge superseded">Superseded</span>
+      @elseif ($ceStatus === 'confirmed')
+      <span class="stbadge confirmed">Confirmed</span>
+      @else
+      <span class="stbadge draft">Draft</span>
+      @endif
     </div>
-    <div>
-      <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">Received &amp; Conformed by:</div>
-      <div class="ce-sig">(Signature over printed name)</div>
+    <div class="rel-booking-row">
+      Related Booking: <a href="{{ $role === 'client' ? route('client-booking-detail', $bid) : route('booking-detail', $bid) }}">{{ $booking->booking_reference }}</a>
+      <span class="stbadge draft" style="background:#eff6ff;color:#1e40af;border-color:#bfdbfe">{{ ucfirst($booking->booking_status) }}</span>
+      <span style="color:var(--muted)">·</span>
+      Payment: <span style="font-weight:700;color:#0f172a">{{ ucfirst($booking->payment_status ?? 'unpaid') }}</span>
     </div>
   </div>
 </div>
+
+<div class="editor-grid">
+  <div>
+    <!-- Client & Project Information -->
+    <div class="ecard">
+      <div class="ecard-head">
+        <h3><i data-feather="user" style="width:14px;height:14px"></i> Client &amp; Project Information</h3>
+        @if ($canManage)
+        <button type="button" class="edit-mini-btn" onclick="openDocMo('moEditInfo')"><i data-feather="edit-2" style="width:11px;height:11px"></i> Edit</button>
+        @endif
+      </div>
+      <div class="ecard-body" style="padding:0">
+        <div class="ce-info">
+          @foreach ($infoRows as $l => $v)
+          <div class="ce-info-row">
+            <div class="ce-info-lbl">{{ $l }}:</div>
+            <div class="ce-info-val">{{ $v }}</div>
+          </div>
+          @endforeach
+        </div>
+      </div>
+    </div>
+
+    <!-- Cost Breakdown -->
+    <div class="ecard">
+      <div class="ecard-head"><h3><i data-feather="camera" style="width:14px;height:14px"></i> Equipment Rental</h3>
+        @if ($canManage)<button type="button" class="addline-btn" onclick="ceOpenAddEquip()"><i data-feather="plus" style="width:12px;height:12px"></i> Add Equipment</button>@endif
+      </div>
+      <div class="ecard-body">
+        <div style="overflow-x:auto">
+        <table class="etbl">
+          <thead><tr><th style="width:44px">Qty</th><th>Item</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
+          <tbody>
+          @php $anyEquip = false; @endphp
+          @foreach ($equipGroups as $catLines)
+          @foreach ($catLines as $eq)
+          @php $anyEquip = true; $rowAmt = (float) $eq->quantity * (float) $eq->daily_rate; @endphp
+          <tr>
+            <td>{{ $eq->quantity }}</td>
+            <td>{{ $eq->equipment_name }}{{ $eq->brand ? ' ('.$eq->brand.')' : '' }}</td>
+            <td class="r">{{ $eq->days }}</td>
+            <td class="r amt">₱{{ number_format($eq->daily_rate, 2) }}</td>
+            <td class="r amt">₱{{ number_format($rowAmt, 2) }}</td>
+          </tr>
+          @endforeach
+          @endforeach
+          @if (! $anyEquip)
+          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px;font-style:italic">No equipment items</td></tr>
+          @endif
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="ecard">
+      <div class="ecard-head"><h3><i data-feather="users" style="width:14px;height:14px"></i> Crew Talent Fee</h3>
+        @if ($canManage)<button type="button" class="addline-btn" onclick="ceOpenAddCrew()"><i data-feather="plus" style="width:12px;height:12px"></i> Add Crew</button>@endif
+      </div>
+      <div class="ecard-body">
+        <div style="overflow-x:auto">
+        <table class="etbl">
+          <thead><tr><th>Position / Name</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / 12H</th><th class="r" style="width:110px">Amount</th></tr></thead>
+          <tbody>
+          @forelse ($crewLines as $cl)
+          @php $clAmt = (float) $cl->rate_used * (float) $cl->hours_worked; @endphp
+          <tr>
+            <td><div style="font-weight:600">{{ $cl->position_name ?? 'Crew' }}</div><div style="font-size:11px;color:var(--muted)">{{ $cl->crew_name }}</div></td>
+            <td class="r">{{ $cl->hours_worked }}</td>
+            <td class="r amt">₱{{ number_format($cl->rate_used, 2) }}</td>
+            <td class="r amt">₱{{ number_format($clAmt, 2) }}</td>
+          </tr>
+          @empty
+          <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px;font-style:italic">No crew assigned</td></tr>
+          @endforelse
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="ecard">
+      <div class="ecard-head"><h3><i data-feather="package" style="width:14px;height:14px"></i> Accessories &amp; Add-ons</h3>
+        @if ($canManage)<button type="button" class="addline-btn" onclick="openDocMo('moAddAcc')"><i data-feather="plus" style="width:12px;height:12px"></i> Add Accessories</button>@endif
+      </div>
+      <div class="ecard-body">
+        <div style="overflow-x:auto">
+        <table class="etbl">
+          <thead><tr><th style="width:44px">Qty</th><th>Item</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
+          <tbody>
+          @forelse ($accLines as $ac)
+          <tr>
+            <td>{{ $ac->quantity }}</td>
+            <td>{{ $ac->accessory_name }}{{ $ac->is_included ? ' (Included)' : '' }}</td>
+            <td class="r">{{ $ac->days }}</td>
+            <td class="r amt">₱{{ number_format($ac->daily_rate, 2) }}</td>
+            <td class="r amt">₱{{ number_format($ac->subtotal, 2) }}</td>
+          </tr>
+          @empty
+          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px;font-style:italic">No accessories added</td></tr>
+          @endforelse
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="ecard">
+      <div class="ecard-head"><h3><i data-feather="truck" style="width:14px;height:14px"></i> Transportation</h3>
+        @if ($canManage)<button type="button" class="addline-btn" onclick="ceOpenTransport()"><i data-feather="edit-2" style="width:12px;height:12px"></i> {{ $transCost > 0 ? 'Edit' : 'Add' }} Transport</button>@endif
+      </div>
+      <div class="ecard-body" style="font-size:12.5px">
+        @if ($transCost > 0 || $transZone)
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span>{{ $zoneLabels[$transZone] ?? 'Zone not set' }} @if ($transMult > 1) <span style="color:var(--muted)">· {{ $transMult }}× multiplier</span>@endif</span>
+          <span class="amt" style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#003D80">₱{{ number_format($transCost, 2) }}</span>
+        </div>
+        @else
+        <span style="color:var(--muted);font-style:italic">No transportation assigned</span>
+        @endif
+      </div>
+    </div>
+
+    <div class="ecard">
+      <div class="ecard-head"><h3><i data-feather="percent" style="width:14px;height:14px"></i> Discount</h3>
+        @if ($canDiscount)<button type="button" class="addline-btn" onclick="openDocMo('moDiscount')"><i data-feather="plus" style="width:12px;height:12px"></i> Add Discount</button>@endif
+      </div>
+      <div class="ecard-body" style="font-size:12.5px">
+        @if ($cePricingMode !== 'no_discount' && $cePricingInput !== null)
+        @php
+          $pricingLabels = [
+            'package_price' => 'Package Price: ₱' . number_format($cePricingInput, 2) . ' (all-in, incl. crew)',
+            'discount_percent' => number_format($cePricingInput, 2) . '% discount off itemized total',
+            'discount_flat' => '₱' . number_format($cePricingInput, 2) . ' flat discount off itemized total',
+          ];
+        @endphp
+        <span style="color:#1e40af;font-weight:600">{{ $pricingLabels[$cePricingMode] ?? '' }}</span>
+        @else
+        <span style="color:var(--muted);font-style:italic">No discount applied</span>
+        @endif
+      </div>
+    </div>
+
+    <div class="terms-box">
+      <strong style="color:#0f172a">Payment Terms:</strong> Regular Clients — 90-day or 6-month credit terms. New Customers — 50% downpayment required.<br>
+      *** All Equipment Returned will be charged as Regular after Pull Out *** &nbsp; For more inquiries call FILM SPEC Cellphone No. 0927 5056461.
+    </div>
+
+    <div class="ce-footer" style="border:1px solid var(--border);border-radius:8px;background:#fff;margin-bottom:16px">
+      <div>
+        <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">Prepared by:</div>
+        <div class="ce-sig">Glen Resurreccion</div>
+      </div>
+      <div>
+        <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">Received &amp; Conformed by:</div>
+        <div class="ce-sig">(Signature over printed name)</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="sum-panel">
+      <div class="sum-row"><span class="lbl">Equipment Subtotal</span><span class="val">₱{{ number_format($equipTotal, 2) }}</span></div>
+      <div class="sum-row"><span class="lbl">Crew Subtotal</span><span class="val">₱{{ number_format($crewTotal, 2) }}</span></div>
+      <div class="sum-row"><span class="lbl">Accessories Subtotal</span><span class="val">₱{{ number_format($accTotal, 2) }}</span></div>
+      <div class="sum-row"><span class="lbl">Transportation Subtotal</span><span class="val">₱{{ number_format($transCost, 2) }}</span></div>
+      @if ($cePricingMode !== 'no_discount' && $cePricingInput !== null)
+      <div class="sum-row"><span class="lbl">Discount</span><span class="val">{{ $pricingLabels[$cePricingMode] ?? '—' }}</span></div>
+      @endif
+      <div class="sum-row" style="margin-top:6px;padding-top:10px;border-top:1px solid var(--border)"><span class="lbl">Net Amount (ex-VAT)</span><span class="val">₱{{ number_format($subtotal, 2) }}</span></div>
+      <div class="sum-row"><span class="lbl">VAT ({{ round((float) config('filmspec.vat_rate') * 100) }}%)</span><span class="val">₱{{ number_format($vat, 2) }}</span></div>
+      <div class="sum-row grand"><span class="lbl">GRAND TOTAL (VAT Incl.)</span><span class="val">₱{{ number_format($grand, 2) }}</span></div>
+      <div style="margin-top:10px;font-size:10.5px;color:var(--muted);font-style:italic">{{ \App\Support\Money::amtWords($grand) }} PESOS ONLY</div>
+    </div>
+
+    @if (! $isClientView)
+    <div class="client-preview-wrap no-print">
+      <div class="client-preview-label" style="justify-content:space-between">
+        <span style="display:flex;align-items:center;gap:6px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          Client Preview — what the client sees
+        </span>
+        <a href="{{ route('ce-preview', ['booking_id' => $bid, 'ce_id' => $ceId, 'view' => 'client']) }}" target="_blank" style="font-size:10.5px;font-weight:700;color:var(--accent);text-decoration:none;text-transform:none;letter-spacing:0">View &rarr;</a>
+      </div>
+      <div class="client-preview-viewport">
+        <iframe class="client-preview-frame" src="{{ route('ce-preview', ['booking_id' => $bid, 'ce_id' => $ceId, 'view' => 'client', 'embed' => 1]) }}" loading="lazy"></iframe>
+      </div>
+    </div>
+    @endif
+  </div>
+</div>
+
+@if ($canManage)
+<!-- EDIT CLIENT & PROJECT INFO -->
+<div class="doc-mo" id="moEditInfo"><div class="doc-box" style="width:520px">
+  <div class="doc-head"><h3>Edit Client &amp; Project Info</h3><button class="doc-close" onclick="closeDocMo('moEditInfo')">&times;</button></div>
+  <form method="POST" action="{{ $actionUrl }}">
+    @csrf
+    <input type="hidden" name="action" value="update_project_details">
+    <input type="hidden" name="return_to" value="ce_preview"><input type="hidden" name="return_ce_id" value="{{ $ceId }}"><input type="hidden" name="return_view" value="{{ $isClientView ? 'client' : 'internal' }}">
+    <div class="doc-body" style="display:flex;flex-direction:column;gap:10px">
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">CE Type</label>
+        <select name="ce_type" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px">
+          <option value="fs_front" {{ ($booking->ce_type ?? 'fs_front') === 'fs_front' ? 'selected' : '' }}>FS Front</option>
+          <option value="client_direct" {{ ($booking->ce_type ?? '') === 'client_direct' ? 'selected' : '' }}>Client Direct</option>
+          <option value="partner_front" {{ ($booking->ce_type ?? '') === 'partner_front' ? 'selected' : '' }}>Partner Front</option>
+        </select>
+      </div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Due Date</label>
+        <input type="date" name="ce_due_date" value="{{ $booking->ce_due_date ?? '' }}" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Director / DOP</label>
+        <input type="text" name="ce_director_dop" value="{{ $booking->ce_director_dop ?? '' }}" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Contact Person</label>
+        <input type="text" name="ce_contact_person" value="{{ $booking->ce_contact_person ?? '' }}" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Contact Number</label>
+        <input type="text" name="ce_contact_number" value="{{ $booking->ce_contact_number ?? '' }}" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Contact Email</label>
+        <input type="email" name="ce_contact_email" value="{{ $booking->ce_contact_email ?? '' }}" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+    </div>
+    <div class="doc-foot"><button type="button" class="tbtn" style="background:#f1f5f9;color:#334155" onclick="closeDocMo('moEditInfo')">Cancel</button><button type="submit" class="doc-accept-btn">Save Changes</button></div>
+  </form>
+</div></div>
+
+<!-- ADD EQUIPMENT -->
+<div class="doc-mo" id="moAddEquip"><div class="doc-box" style="width:520px">
+  <div class="doc-head"><h3>Add Equipment</h3><button class="doc-close" onclick="closeDocMo('moAddEquip')">&times;</button></div>
+  <form method="POST" action="{{ $actionUrl }}">
+    @csrf
+    <input type="hidden" name="action" value="add_equipment">
+    <input type="hidden" name="return_to" value="ce_preview"><input type="hidden" name="return_ce_id" value="{{ $ceId }}"><input type="hidden" name="return_view" value="{{ $isClientView ? 'client' : 'internal' }}">
+    <input type="hidden" name="equipment_id" id="ceEquipId">
+    <div class="doc-body" style="display:flex;flex-direction:column;gap:10px">
+      <div style="position:relative">
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Equipment *</label>
+        <input type="text" id="ceEquipSearch" autocomplete="off" oninput="ceFilterEquip(this.value)" placeholder="Search by name, category, brand…"
+               style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px">
+        <div id="ceEquipList" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1.5px solid #e2e8f0;border-radius:6px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(15,23,42,.12)"></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Qty</label><input type="number" name="quantity" value="1" min="1" required style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Days</label><input type="number" name="days" value="1" min="1" required style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Rate/Day</label><input type="number" name="daily_rate" id="ceEquipRate" step="0.01" min="0" required style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+      </div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Notes</label><input type="text" name="notes" placeholder="Optional" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+    </div>
+    <div class="doc-foot"><button type="button" class="tbtn" style="background:#f1f5f9;color:#334155" onclick="closeDocMo('moAddEquip')">Cancel</button><button type="submit" class="doc-accept-btn">Add Line</button></div>
+  </form>
+</div></div>
+
+<!-- ADD CREW -->
+<div class="doc-mo" id="moAddCrew"><div class="doc-box" style="width:520px">
+  <div class="doc-head"><h3>Add Crew Member</h3><button class="doc-close" onclick="closeDocMo('moAddCrew')">&times;</button></div>
+  <form method="POST" action="{{ $actionUrl }}">
+    @csrf
+    <input type="hidden" name="action" value="batch_add_crew">
+    <input type="hidden" name="return_to" value="ce_preview"><input type="hidden" name="return_ce_id" value="{{ $ceId }}"><input type="hidden" name="return_view" value="{{ $isClientView ? 'client' : 'internal' }}">
+    <input type="hidden" name="bc_crew_id[]" id="ceCrewId">
+    <input type="hidden" name="bc_notes[]" value="">
+    <div class="doc-body" style="display:flex;flex-direction:column;gap:10px">
+      <div style="position:relative">
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Crew Member *</label>
+        <input type="text" id="ceCrewSearch" autocomplete="off" oninput="ceFilterCrew(this.value)" placeholder="Search by name…"
+               style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px">
+        <div id="ceCrewList" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1.5px solid #e2e8f0;border-radius:6px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(15,23,42,.12)"></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Position</label>
+          <select name="bc_pos_id[]" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px">
+            <option value="0">— General —</option>
+            @foreach ($positions as $pos)<option value="{{ $pos->position_id }}">{{ $pos->position_name }}</option>@endforeach
+          </select>
+        </div>
+        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Rate/12hr</label><input type="number" name="bc_rate[]" id="ceCrewRate" step="0.01" min="0" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+      </div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Link to Equipment</label>
+        <select name="bc_eq_link[]" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px">
+          <option value="0">— Not equipment-specific —</option>
+          @foreach ($equipGroups as $catLines)@foreach ($catLines as $eq)<option value="{{ $eq->equipment_id ?? 0 }}">{{ $eq->equipment_name }}</option>@endforeach @endforeach
+        </select>
+      </div>
+    </div>
+    <div class="doc-foot"><button type="button" class="tbtn" style="background:#f1f5f9;color:#334155" onclick="closeDocMo('moAddCrew')">Cancel</button><button type="submit" class="doc-accept-btn">Add Crew</button></div>
+  </form>
+</div></div>
+
+<!-- ADD ACCESSORY -->
+<div class="doc-mo" id="moAddAcc"><div class="doc-box" style="width:480px">
+  <div class="doc-head"><h3>Add Accessories</h3><button class="doc-close" onclick="closeDocMo('moAddAcc')">&times;</button></div>
+  <form method="POST" action="{{ $actionUrl }}">
+    @csrf
+    <input type="hidden" name="action" value="add_booking_accessory">
+    <input type="hidden" name="return_to" value="ce_preview"><input type="hidden" name="return_ce_id" value="{{ $ceId }}"><input type="hidden" name="return_view" value="{{ $isClientView ? 'client' : 'internal' }}">
+    <div class="doc-body" style="display:flex;flex-direction:column;gap:10px">
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Accessory *</label>
+        <select name="accessory_id" required style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px">
+          <option value="">— Select accessory —</option>
+          @foreach ($allAccessoriesList as $acc)
+          @php $avail = max(0, (int) $acc->quantity - (int) $acc->qty_in_use); @endphp
+          <option value="{{ $acc->accessory_id }}" {{ $avail < 1 ? 'disabled' : '' }}>
+            {{ $acc->accessory_name }} {{ $acc->is_included ? '(Included)' : '(₱'.number_format($acc->daily_rate,2).'/day)' }} {{ $avail < 1 ? '— Out of stock' : "— $avail avail." }}
+          </option>
+          @endforeach
+        </select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Qty</label><input type="number" name="quantity" value="1" min="1" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Days</label><input type="number" name="days" value="{{ $accDays }}" min="1" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+      </div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Notes</label><input type="text" name="notes" placeholder="Optional" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+    </div>
+    <div class="doc-foot"><button type="button" class="tbtn" style="background:#f1f5f9;color:#334155" onclick="closeDocMo('moAddAcc')">Cancel</button><button type="submit" class="doc-accept-btn">Add</button></div>
+  </form>
+</div></div>
+
+<!-- ASSIGN/EDIT TRANSPORT -->
+<div class="doc-mo" id="moTransport"><div class="doc-box" style="width:480px">
+  <div class="doc-head"><h3>{{ $transCost > 0 ? 'Edit' : 'Assign' }} Transport</h3><button class="doc-close" onclick="closeDocMo('moTransport')">&times;</button></div>
+  <form method="POST" action="{{ $actionUrl }}">
+    @csrf
+    <input type="hidden" name="action" value="assign_transport">
+    <input type="hidden" name="return_to" value="ce_preview"><input type="hidden" name="return_ce_id" value="{{ $ceId }}"><input type="hidden" name="return_view" value="{{ $isClientView ? 'client' : 'internal' }}">
+    <div class="doc-body" style="display:flex;flex-direction:column;gap:10px">
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Zone</label>
+        <select name="location_zone" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px">
+          <option value="">— Not set —</option>
+          @foreach ($zoneLabels as $zk => $zl)<option value="{{ $zk }}" {{ $transZone === $zk ? 'selected' : '' }}>{{ $zl }}</option>@endforeach
+        </select>
+      </div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Vehicle</label>
+        <select name="vehicle_rate_id" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px">
+          <option value="">— None —</option>
+          @foreach ($vehicleRates as $vr)<option value="{{ $vr->vehicle_id }}">{{ $vr->label }} (₱{{ number_format($vr->base_rate, 2) }})</option>@endforeach
+        </select>
+      </div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Transport Cost (₱) *</label>
+        <input type="number" name="transport_cost" value="{{ $transCost }}" step="0.01" min="0" required style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Driver</label>
+        <select name="driver_crew_id" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px">
+          <option value="0">— No driver —</option>
+          @foreach ($availCrew as $cr)<option value="{{ $cr->crew_id }}">{{ $cr->name }}</option>@endforeach
+        </select>
+      </div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Driver Rate (₱/12hr)</label>
+        <input type="number" name="driver_rate" step="0.01" min="0" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+    </div>
+    <div class="doc-foot"><button type="button" class="tbtn" style="background:#f1f5f9;color:#334155" onclick="closeDocMo('moTransport')">Cancel</button><button type="submit" class="doc-accept-btn">Save</button></div>
+  </form>
+</div></div>
+
+<!-- SET DISCOUNT -->
+<div class="doc-mo" id="moDiscount"><div class="doc-box" style="width:460px">
+  <div class="doc-head"><h3>Set Discount</h3><button class="doc-close" onclick="closeDocMo('moDiscount')">&times;</button></div>
+  <form method="POST" action="{{ $actionUrl }}">
+    @csrf
+    <input type="hidden" name="action" value="set_discount">
+    <input type="hidden" name="return_to" value="ce_preview"><input type="hidden" name="return_ce_id" value="{{ $ceId }}"><input type="hidden" name="return_view" value="{{ $isClientView ? 'client' : 'internal' }}">
+    <div class="doc-body" style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:12px;color:var(--sub)">Applies immediately, no separate approval step, recorded under your name.</div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Discount Type</label>
+        <select name="discount_type" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px">
+          <option value="flat">Flat amount (₱)</option>
+          <option value="percent">Percentage (%)</option>
+          <option value="package">Package price (₱)</option>
+        </select>
+      </div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Amount</label>
+        <input type="number" name="discount_value" step="0.01" min="0.01" required style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Reason</label>
+        <textarea name="reason" rows="2" placeholder="e.g. Client called, agreed to a loyalty discount" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></textarea></div>
+    </div>
+    <div class="doc-foot"><button type="button" class="tbtn" style="background:#f1f5f9;color:#334155" onclick="closeDocMo('moDiscount')">Cancel</button><button type="submit" class="doc-accept-btn">Set &amp; Apply</button></div>
+  </form>
+</div></div>
+@endif
+@endif
 
 </div>
 
@@ -985,6 +1512,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
 const TILE_PROXY_URL = "{{ route('tile-proxy') }}";
 
+function ceToggleExportMenu() {
+    document.getElementById('ceExportMenu')?.classList.toggle('open');
+}
+document.addEventListener('click', (e) => {
+    if (e.target.closest('.ce-export-wrap')) return;
+    document.getElementById('ceExportMenu')?.classList.remove('open');
+});
+
 function showSheet(id, el) {
     document.querySelectorAll('.sheet-content').forEach(s => s.classList.remove('on'));
     document.querySelectorAll('.stab').forEach(t => t.classList.remove('on'));
@@ -1015,14 +1550,103 @@ function updateSubmitBtn() {
     btn.style.cursor   = ok ? 'pointer' : 'not-allowed';
 }
 document.addEventListener('click', function(e) {
-    ['tcMo','ppMo'].forEach(id => {
-        const mo = document.getElementById(id);
-        if (mo && e.target === mo) closeDocMo(id);
+    document.querySelectorAll('.doc-mo').forEach(mo => {
+        if (e.target === mo) closeDocMo(mo.id);
     });
 });
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') ['tcMo','ppMo'].forEach(closeDocMo);
+    if (e.key === 'Escape') document.querySelectorAll('.doc-mo').forEach(mo => closeDocMo(mo.id));
 });
+
+@if ($mode === 'booking' && $canManage)
+// ── In-place editing: equipment/crew search-select (Add Equipment / Add Crew modals) ──────
+const ceEquipData = {!! $availEquip->values()->toJson() !!};
+const ceCrewData  = {!! $availCrew->values()->toJson() !!};
+
+function ceRenderEquipList(items) {
+    const box = document.getElementById('ceEquipList');
+    box.innerHTML = '';
+    if (! items.length) { box.style.display = 'none'; return; }
+    items.slice(0, 30).forEach(i => {
+        const row = document.createElement('div');
+        row.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:12.5px;border-bottom:1px solid #f1f5f9';
+        row.addEventListener('mousedown', () => ceSelectEquip(i));
+        row.addEventListener('mouseover', () => row.style.background = '#f0f7ff');
+        row.addEventListener('mouseout', () => row.style.background = '');
+        row.textContent = i.equipment_name + (i.brand ? ' (' + i.brand + ')' : '') + ' — ₱' + Number(i.daily_rate).toLocaleString('en-PH', {minimumFractionDigits:2}) + '/day';
+        box.appendChild(row);
+    });
+    box.style.display = 'block';
+}
+function ceFilterEquip(q) {
+    const lq = q.toLowerCase();
+    ceRenderEquipList(ceEquipData.filter(i =>
+        i.equipment_name.toLowerCase().includes(lq) ||
+        (i.category_name||'').toLowerCase().includes(lq) ||
+        (i.brand||'').toLowerCase().includes(lq)
+    ));
+}
+function ceSelectEquip(i) {
+    document.getElementById('ceEquipId').value = i.equipment_id;
+    document.getElementById('ceEquipRate').value = i.daily_rate;
+    document.getElementById('ceEquipSearch').value = i.equipment_name + (i.brand ? ' (' + i.brand + ')' : '');
+    document.getElementById('ceEquipList').style.display = 'none';
+}
+// When this page is embedded (the Booking Detail "Cost Estimate" tab), Add Equipment /
+// Add Crew / Assign Transport delegate back to Booking Detail's own modals via postMessage
+// instead of opening a second, separately-styled copy of the same form — one real
+// implementation of each workflow. Viewed standalone ("Open Full Page"), there's no parent to
+// delegate to, so the page's own modals below still work as a fallback.
+function ceInIframe() {
+    try { return window.self !== window.top; } catch (e) { return true; }
+}
+
+function ceOpenAddEquip() {
+    if (ceInIframe()) { window.parent.postMessage({source: 'ce-editor', action: 'openAddEquip'}, '*'); return; }
+    document.getElementById('ceEquipSearch').value = '';
+    document.getElementById('ceEquipId').value = '';
+    document.getElementById('ceEquipRate').value = '';
+    openDocMo('moAddEquip');
+}
+
+function ceRenderCrewList(items) {
+    const box = document.getElementById('ceCrewList');
+    box.innerHTML = '';
+    if (! items.length) { box.style.display = 'none'; return; }
+    items.slice(0, 30).forEach(i => {
+        const row = document.createElement('div');
+        row.style.cssText = 'padding:8px 12px;cursor:pointer;font-size:12.5px;border-bottom:1px solid #f1f5f9' + (i.busy_on_booking ? ';color:#dc2626' : '');
+        row.addEventListener('mousedown', () => ceSelectCrew(i));
+        row.addEventListener('mouseover', () => row.style.background = '#f0f7ff');
+        row.addEventListener('mouseout', () => row.style.background = '');
+        row.textContent = i.name + (i.position_name ? ' — ' + i.position_name : '') + (i.busy_on_booking ? ' (busy on ' + i.busy_on_booking + ')' : '');
+        box.appendChild(row);
+    });
+    box.style.display = 'block';
+}
+function ceFilterCrew(q) {
+    const lq = q.toLowerCase();
+    ceRenderCrewList(ceCrewData.filter(i => i.name.toLowerCase().includes(lq)));
+}
+function ceSelectCrew(i) {
+    document.getElementById('ceCrewId').value = i.crew_id;
+    document.getElementById('ceCrewRate').value = i.base_rate_12hr || '';
+    document.getElementById('ceCrewSearch').value = i.name;
+    document.getElementById('ceCrewList').style.display = 'none';
+}
+function ceOpenAddCrew() {
+    if (ceInIframe()) { window.parent.postMessage({source: 'ce-editor', action: 'openAddCrew'}, '*'); return; }
+    document.getElementById('ceCrewSearch').value = '';
+    document.getElementById('ceCrewId').value = '';
+    document.getElementById('ceCrewRate').value = '';
+    openDocMo('moAddCrew');
+}
+
+function ceOpenTransport() {
+    if (ceInIframe()) { window.parent.postMessage({source: 'ce-editor', action: 'openAssignTransport'}, '*'); return; }
+    openDocMo('moTransport');
+}
+@endif
 
 @if ($mode === 'cart')
 // ── Base costs for live preview ───────────────────────────────────────────────

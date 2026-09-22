@@ -57,6 +57,15 @@
   </div>
 </div>
 
+<!-- Tabs -->
+<div class="tabs" style="margin-bottom:18px">
+  <a href="{{ $crewBase }}?tab=members" class="tab-btn {{ $tab === 'members' ? 'active' : '' }}"><i data-feather="users" style="width:13px;height:13px;margin-right:5px;vertical-align:middle"></i>Crew Members</a>
+  <a href="{{ $crewBase }}?tab=positions" class="tab-btn {{ $tab === 'positions' ? 'active' : '' }}"><i data-feather="briefcase" style="width:13px;height:13px;margin-right:5px;vertical-align:middle"></i>Positions <span class="badge badge-gray" style="margin-left:4px">{{ $positionsWithCounts->count() }}</span></a>
+  <a href="{{ $crewBase }}?tab=schedule" class="tab-btn {{ $tab === 'schedule' ? 'active' : '' }}"><i data-feather="calendar" style="width:13px;height:13px;margin-right:5px;vertical-align:middle"></i>Schedule</a>
+  <a href="{{ $crewBase }}?tab=attendance" class="tab-btn {{ $tab === 'attendance' ? 'active' : '' }}"><i data-feather="clock" style="width:13px;height:13px;margin-right:5px;vertical-align:middle"></i>Attendance</a>
+</div>
+
+@if ($tab === 'members')
 <div class="card">
   <div class="card-header">
     <h2 class="card-title">
@@ -264,6 +273,71 @@
     @endif
   </div>
 </div>
+@endif
+
+@if ($tab === 'positions')
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">Positions <span class="badge badge-blue" style="margin-left:8px">{{ $positionsWithCounts->count() }}</span></h2>
+    @if ($canManage)
+    <button onclick="openModal('modalAddPos')" class="btn btn-primary btn-sm"><i data-feather="plus"></i> Add Position</button>
+    @endif
+  </div>
+  <div class="table-wrap">
+    @if ($positionsWithCounts->isEmpty())
+    <div class="empty-state"><i data-feather="briefcase"></i><h3>No positions defined yet</h3></div>
+    @else
+    <table>
+      <thead><tr><th>Position</th><th>Department</th><th>Active Crew</th></tr></thead>
+      <tbody>
+      @foreach ($positionsWithCounts as $p)
+      <tr>
+        <td style="font-weight:600">{{ $p->position_name }}</td>
+        <td><span class="badge badge-gray">{{ $p->department ?: '—' }}</span></td>
+        <td>{{ $p->crew_count }}</td>
+      </tr>
+      @endforeach
+      </tbody>
+    </table>
+    @endif
+  </div>
+</div>
+@endif
+
+@if ($tab === 'schedule')
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title"><i data-feather="calendar" style="width:15px;height:15px;margin-right:6px;vertical-align:middle"></i>Crew Schedule</h2>
+    <span style="font-size:11px;color:var(--muted)">Confirmed / ongoing bookings only</span>
+  </div>
+  <div class="card-body">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <button class="btn btn-outline btn-sm" onclick="crewSchedPrev()"><i data-feather="chevron-left" style="width:14px;height:14px"></i></button>
+      <div id="crewSchedTitle" style="font-family:var(--font-display,inherit);font-size:18px;min-width:160px;text-align:center"></div>
+      <button class="btn btn-outline btn-sm" onclick="crewSchedNext()"><i data-feather="chevron-right" style="width:14px;height:14px"></i></button>
+      <button class="btn btn-outline btn-sm" onclick="crewSchedToday()">Today</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:6px;overflow:hidden">
+      @foreach (['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as $wd)
+      <div style="background:var(--s2);padding:6px;text-align:center;font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase">{{ $wd }}</div>
+      @endforeach
+    </div>
+    <div id="crewSchedGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-top:none"></div>
+  </div>
+</div>
+@endif
+
+@if ($tab === 'attendance')
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title"><i data-feather="clock" style="width:15px;height:15px;margin-right:6px;vertical-align:middle"></i>Attendance</h2>
+    <a href="{{ route('attendance') }}" class="btn btn-outline btn-sm" target="_blank">Open Full Page <i data-feather="external-link" style="width:12px;height:12px"></i></a>
+  </div>
+  <div class="card-body" style="padding:0">
+    <iframe src="{{ route('attendance') }}" style="width:100%;height:900px;border:none;display:block"></iframe>
+  </div>
+</div>
+@endif
 
 @if ($canManage)
 
@@ -528,8 +602,15 @@
         </div>
         <div class="form-group">
           <label>Department</label>
-          <input type="text" name="department" class="form-control"
-                 placeholder="e.g. Camera, Lighting, Grip, Audio">
+          <select name="department" class="form-control">
+            <option value="Camera">Camera</option>
+            <option value="Lighting">Lighting</option>
+            <option value="Grip">Grip</option>
+            <option value="Audio">Audio</option>
+            <option value="Production">Production</option>
+            <option value="Logistics / Transport">Logistics / Transport</option>
+            <option value="Other">Other</option>
+          </select>
         </div>
       </div>
       <div class="modal-footer">
@@ -570,8 +651,22 @@
             </div>
           </div>
           <div class="form-group" style="margin-bottom:10px">
-            <label style="font-size:.75rem">Reason <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+            <label style="font-size:.75rem">Reason Category <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+            <select name="reason_category" class="form-control">
+              <option value="">— Not specified —</option>
+              <option value="Personal">Personal</option>
+              <option value="Existing Commitment">Existing Commitment</option>
+              <option value="Leave">Leave</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:10px">
+            <label style="font-size:.75rem">Reason <span style="font-weight:400;color:var(--muted)">(optional, shown to scheduling staff)</span></label>
             <input type="text" name="reason" class="form-control" placeholder="e.g. Vacation, Medical leave…">
+          </div>
+          <div class="form-group" style="margin-bottom:10px">
+            <label style="font-size:.75rem">Internal Note <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+            <input type="text" name="internal_note" class="form-control" placeholder="Not shown to the crew member">
           </div>
           <div class="modal-footer" style="padding:0;border:0;margin-top:4px">
             <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modalAvailability')">Cancel</button>
@@ -635,6 +730,88 @@
 @push('scripts')
 <script>
 const CREW_ASSET_BASE = "{{ asset('storage') }}";
+
+@if ($tab === 'schedule')
+// ── Crew Schedule calendar — same day-map/grid approach as the Dashboard calendar ──────────
+const CREW_SCHED_ASSIGNMENTS = {!! $scheduleAssignments->map(fn ($a) => [
+  'crew_name' => $a->crew_name,
+  'ref' => $a->booking_reference,
+  'title' => $a->project_title ?: $a->booking_reference,
+  'start' => $a->shoot_date_start,
+  'end' => $a->shoot_date_end,
+  'status' => $a->booking_status,
+])->values()->toJson() !!};
+
+const CREW_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+let crewSchedYear  = {{ (int) \Carbon\Carbon::parse($scheduleMonth . '-01')->format('Y') }};
+let crewSchedMonth = {{ (int) \Carbon\Carbon::parse($scheduleMonth . '-01')->format('n') }};
+
+function crewBuildDayMap() {
+  const map = {};
+  CREW_SCHED_ASSIGNMENTS.forEach(a => {
+    const start = new Date(a.start + 'T00:00:00');
+    const end   = new Date(a.end   + 'T00:00:00');
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate()+1)) {
+      const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+      if (!map[key]) map[key] = [];
+      map[key].push(a);
+    }
+  });
+  return map;
+}
+
+function crewRenderSchedule() {
+  const today = new Date();
+  const todayStr = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  const firstOfMonth = new Date(crewSchedYear, crewSchedMonth-1, 1);
+  const daysInMonth  = new Date(crewSchedYear, crewSchedMonth, 0).getDate();
+  const startDow     = firstOfMonth.getDay();
+  const totalCells   = Math.ceil((startDow + daysInMonth) / 7) * 7;
+  const dayMap       = crewBuildDayMap();
+
+  document.getElementById('crewSchedTitle').textContent = CREW_MONTHS[crewSchedMonth-1] + ' ' + crewSchedYear;
+
+  const grid = document.getElementById('crewSchedGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < totalCells; i++) {
+    const dayOffset = i - startDow + 1;
+    const isCurrentMonth = dayOffset >= 1 && dayOffset <= daysInMonth;
+    const cellDate = new Date(crewSchedYear, crewSchedMonth-1, dayOffset);
+    const dateStr = cellDate.getFullYear()+'-'+String(cellDate.getMonth()+1).padStart(2,'0')+'-'+String(cellDate.getDate()).padStart(2,'0');
+    const isToday = dateStr === todayStr;
+    const events = dayMap[dateStr] || [];
+
+    const cell = document.createElement('div');
+    cell.style.cssText = 'background:#fff;min-height:80px;padding:6px;' + (!isCurrentMonth ? 'background:var(--s2);opacity:.5;' : '') + (isToday ? 'box-shadow:inset 0 0 0 2px var(--accent);' : '');
+
+    const dayNum = document.createElement('div');
+    dayNum.style.cssText = 'font-size:11px;font-weight:600;margin-bottom:3px';
+    dayNum.textContent = cellDate.getDate();
+    cell.appendChild(dayNum);
+
+    const uniqueCrew = [...new Set(events.map(e => e.crew_name))];
+    uniqueCrew.slice(0, 3).forEach(name => {
+      const pill = document.createElement('div');
+      pill.style.cssText = 'font-size:9px;font-weight:600;border-radius:3px;padding:2px 5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#e0f2fe;color:#0369a1';
+      pill.textContent = name;
+      cell.appendChild(pill);
+    });
+    if (uniqueCrew.length > 3) {
+      const more = document.createElement('div');
+      more.style.cssText = 'font-size:9px;color:var(--muted)';
+      more.textContent = '+' + (uniqueCrew.length - 3) + ' more';
+      cell.appendChild(more);
+    }
+    grid.appendChild(cell);
+  }
+}
+
+function crewSchedPrev()  { if (crewSchedMonth===1){crewSchedMonth=12;crewSchedYear--;}else{crewSchedMonth--;} crewRenderSchedule(); }
+function crewSchedNext()  { if (crewSchedMonth===12){crewSchedMonth=1;crewSchedYear++;}else{crewSchedMonth++;} crewRenderSchedule(); }
+function crewSchedToday() { const t=new Date(); crewSchedYear=t.getFullYear(); crewSchedMonth=t.getMonth()+1; crewRenderSchedule(); }
+
+document.addEventListener('DOMContentLoaded', crewRenderSchedule);
+@endif
 
 function toggleRates(val, prefix) {
   var showStaff = val === 'staff';
@@ -707,7 +884,9 @@ function renderAvailBlocks(crewId) {
   list.innerHTML = blocks.map(b =>
     '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px">'
     + '<div style="flex:1">'
-    + '<div style="font-weight:600;font-size:.83rem">' + _escAvail(b.date_from) + ' – ' + _escAvail(b.date_to) + '</div>'
+    + '<div style="font-weight:600;font-size:.83rem">' + _escAvail(b.date_from) + ' – ' + _escAvail(b.date_to)
+    + (b.reason_category ? ' <span style="font-size:.65rem;font-weight:700;color:var(--accent);background:var(--s2);border-radius:8px;padding:1px 7px;margin-left:4px">' + _escAvail(b.reason_category) + '</span>' : '')
+    + '</div>'
     + (b.reason ? '<div style="font-size:.72rem;color:var(--muted);margin-top:2px">' + _escAvail(b.reason) + '</div>' : '')
     + '</div>'
     + '<form method="POST" action="{{ $crewBase }}" style="display:inline" onsubmit="return confirm(\'Remove this block?\')">'

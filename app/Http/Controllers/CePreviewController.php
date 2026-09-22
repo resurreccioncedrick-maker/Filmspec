@@ -3,6 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Support\BookingCosting;
+use App\Support\DataExporter;
+use App\Support\Money;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +17,10 @@ class CePreviewController extends Controller
     {
         if (! Auth::check()) {
             return redirect()->route('login');
+        }
+
+        if ($request->filled('booking_id') && $request->filled('export')) {
+            return $this->exportDocument($request);
         }
 
         if ($request->filled('booking_id')) {
@@ -104,12 +112,108 @@ class CePreviewController extends Controller
         ));
     }
 
+    /**
+     * The CE document's Export ▾ (CSV/Excel/PDF) — same shared dropdown every other
+     * staff page uses (partials/export-dropdown.blade.php), replacing what used to be a
+     * "Save as PDF" button that was just window.print() in disguise. PDF renders the same
+     * official-document markup the client sees on screen (dompdf, one page per sheet); CSV/XLSX
+     * go through DataExporter::respondSections() like every other multi-section export.
+     */
+    private function exportDocument(Request $request)
+    {
+        $data = $this->bookingMode($request, true);
+        if ($data instanceof RedirectResponse) {
+            return $data;
+        }
+
+        // Always the client-facing document, regardless of which toggle the staff viewer
+        // currently has selected on screen.
+        $data['isClientView'] = true;
+        $format = (string) $request->query('export');
+        $filenameBase = 'CE-' . preg_replace('/[^A-Za-z0-9_-]/', '', (string) $data['ceNumber']);
+
+        if ($format === 'pdf') {
+            $html = view('exports.ce-document-pdf', $data)->render();
+
+            return Pdf::loadHTML($html)->setPaper('a4', 'portrait')->download("$filenameBase.pdf");
+        }
+
+        return DataExporter::respondSections($format, 'Cost Estimate ' . $data['ceNumber'], $this->exportSections($data), $filenameBase);
+    }
+
+    /** Equipment / Crew TF / Summary as DataExporter::respondSections() sections — same 3 "sheets" the PDF and on-screen document use. */
+    private function exportSections(array $d): array
+    {
+        $vatRate = (float) config('filmspec.vat_rate');
+        $eqNet = $d['ceBd'] ? $d['ceBd']['equip_net'] : $d['equipTotal'] - round($d['equipTotal'] * $vatRate / (1 + $vatRate), 2);
+        $eqVat = $d['ceBd'] ? $d['ceBd']['equip_vat'] : round($d['equipTotal'] * $vatRate / (1 + $vatRate), 2);
+        $eqGrand = $d['ceBd'] ? $d['ceBd']['equip_grand'] : $d['equipTotal'];
+        $crewNet = $d['ceBd'] ? $d['ceBd']['crew_net'] : $d['crewTotal'] - round($d['crewTotal'] * $vatRate / (1 + $vatRate), 2);
+        $crewVat = $d['ceBd'] ? $d['ceBd']['crew_vat'] : round($d['crewTotal'] * $vatRate / (1 + $vatRate), 2);
+        $crewGrand = $d['ceBd'] ? $d['ceBd']['crew_grand'] : $d['crewTotal'];
+        $money = fn ($v) => '₱' . number_format((float) $v, 2);
+
+        $infoLines = [];
+        foreach ($d['infoRows'] as $l => $v) {
+            $infoLines[] = [$l, $v];
+        }
+
+        $equipRows = [];
+        foreach ($d['equipGroups'] as $catName => $catLines) {
+            $equipRows[] = [strtoupper($catName) . ' (FS):', '', '', '', ''];
+            foreach ($catLines as $eq) {
+                $rate = (float) ($eq->daily_rate ?? 0);
+                $qty = (int) ($eq->quantity ?? 1);
+                $equipRows[] = [(string) $qty, $eq->equipment_name . ($eq->brand ? ' (' . $eq->brand . ')' : ''), '1', $money($rate), $money($qty * $rate)];
+            }
+        }
+        $equipRows[] = ['', '', '', 'Total (Equipment Only):', $money($d['equipTotal'])];
+
+        $crewRows = [];
+        foreach ($d['crewLines'] as $cl) {
+            $clRate = (float) ($cl->rate_used ?? 0);
+            $clDays = (int) ($cl->hours_worked ?? 1);
+            $crewRows[] = ['1', trim(($cl->position_name ?? 'Crew') . ($cl->crew_name ? ' - ' . $cl->crew_name : '')), (string) $clDays, $money($clRate), $money($clRate * $clDays)];
+        }
+        $crewRows[] = ['', '', '', 'TOTAL (CREW TF):', $money($d['crewTotal'])];
+
+        return [
+            ['title' => 'CE# ' . $d['ceNumber'] . ' (E) — Equipment', 'rows' => $infoLines],
+            ['title' => null, 'headers' => ['QTY', 'EQUIPMENT (S)', 'DAY(S)', 'RATE / DAY', 'AMOUNT'], 'rows' => $equipRows],
+            ['title' => null, 'rows' => [
+                ['Net Amount (ex-VAT):', $money($eqNet)],
+                ['VAT:', $money($eqVat)],
+                ['EQUIPMENT CE GRAND TOTAL:', $money($eqGrand)],
+                ['Amount in Words:', Money::amtWords($eqGrand) . ' PESOS ONLY'],
+            ]],
+            ['title' => 'CE# ' . $d['ceNumber'] . ' (M) — Crew TF', 'rows' => $infoLines],
+            ['title' => null, 'headers' => ['QTY', 'POSITION / NAME', 'DAY(S)', 'RATE / 12H', 'AMOUNT'], 'rows' => $crewRows],
+            ['title' => null, 'rows' => [
+                ['Net Amount (ex-VAT):', $money($crewNet)],
+                ['VAT:', $money($crewVat)],
+                ['CREW CE GRAND TOTAL:', $money($crewGrand)],
+                ['Amount in Words:', Money::amtWords($crewGrand) . ' PESOS ONLY'],
+            ]],
+            ['title' => 'CE# ' . $d['ceNumber'] . ' (S) — Summary', 'rows' => $infoLines],
+            ['title' => null, 'rows' => [
+                ['Grip Equipment (FS)', $money($d['equipTotal'])],
+                ['Personnel / Crew TF', $money($d['crewTotal'])],
+                ['Accessories / Add-ons', $money($d['accTotal'])],
+                ['Transportation', $money($d['ceBd'] ? $d['ceBd']['transportation'] : $d['transCost'])],
+                ['Net Amount (ex-VAT)', $money($d['subtotal'])],
+                ['VAT — Included', $money($d['vat'])],
+                ['GRAND TOTAL (VAT Incl.)', $money($d['grand'])],
+                ['Amount in Words:', Money::amtWords($d['grand']) . ' PESOS ONLY'],
+            ]],
+        ];
+    }
+
     // Booking-mode CE — an existing booking's confirmed/draft cost estimate, viewed by staff
     // (internal or "for client" toggle) or by the client themselves (always forced to the
     // client view). Reuses BookingCosting::breakdown()/lines(), the same helpers the Package &
     // Totals panel and CE export already use, so this document, the panel, and the CSV never
     // drift out of sync with each other.
-    private function bookingMode(Request $request)
+    private function bookingMode(Request $request, bool $asData = false)
     {
         $bid = (int) $request->query('booking_id');
         $uid = Auth::id();
@@ -247,7 +351,85 @@ class CePreviewController extends Controller
 
         $mode = 'booking';
 
-        return view('ce-preview', [
+        // Version/supersede context (same logic as CostEstimatesController's list-row flag) —
+        // shown as a "Version N" + Draft/Confirmed/Superseded badge on the CE header, and used
+        // to decide whether in-place editing is even offered (never on a superseded revision).
+        $ceVersion = 1;
+        $isSuperseded = false;
+        if ($ce) {
+            $ceVersion = 1 + (int) DB::table('cost_estimates')
+                ->where('booking_id', $bid)->where('ce_id', '<', $ce->ce_id)->count();
+            $isSuperseded = $ce->status === 'confirmed' && DB::table('cost_estimates')
+                ->where('booking_id', $bid)->where('status', 'confirmed')->where('ce_id', '>', $ce->ce_id)->exists();
+        }
+
+        // In-place editing (Add Equipment/Crew/Accessories/Assign Transport/Set Discount, plus
+        // the Client & Project Info "Edit" action) reuses BookingDetailController::act()'s
+        // existing, already-validated actions — same permission gate it uses
+        // ($isAdmin + a live, non-superseded booking) — rather than duplicating that logic here.
+        $isAdmin = in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true);
+        $canManage = $isAdmin && ! $isClientView && ! $isSuperseded
+            && in_array($booking->booking_status, ['pending', 'confirmed', 'ongoing'], true);
+        // set_discount is the one in-place-editing action BookingDetailController::act() does
+        // NOT extend to 'traffic' (unlike add_equipment/batch_add_crew/assign_transport/etc,
+        // all of which do) — the Add Discount button/modal needs its own, stricter check so a
+        // traffic-role viewer isn't shown a control that silently does nothing when submitted.
+        $canDiscount = $canManage && in_array($role, ['super_admin', 'admin', 'operations_manager'], true);
+
+        $availEquip = collect();
+        $availCrew = collect();
+        $positions = collect();
+        $vehicleRates = collect();
+        $allAccessoriesList = collect();
+        $accDays = 1;
+        if ($canManage) {
+            $ds = $booking->shoot_date_start;
+            $de = $booking->shoot_date_end;
+
+            $availEquip = DB::table('equipment as e')
+                ->join('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
+                ->where('e.availability_status', 'available')
+                ->whereNotIn('e.equipment_id', function ($q) use ($bid, $ds, $de) {
+                    $q->select('be.equipment_id')->from('booking_equipment as be')
+                        ->join('bookings as b', 'be.booking_id', '=', 'b.booking_id')
+                        ->where('be.booking_id', '!=', $bid)
+                        ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
+                        ->where('b.shoot_date_start', '<=', $de)->where('b.shoot_date_end', '>=', $ds);
+                })
+                ->select('e.equipment_id', 'e.equipment_name', 'e.brand', 'e.daily_rate', 'ec.category_name')
+                ->orderBy('e.equipment_name')
+                ->get();
+
+            $availCrew = DB::table('crew_members as cm')
+                ->leftJoin('crew_positions as cp', 'cm.primary_position_id', '=', 'cp.position_id')
+                ->where('cm.status', 'active')
+                ->select('cm.crew_id', DB::raw("CONCAT(cm.first_name,' ',cm.last_name) AS name"), 'cm.base_rate_12hr', 'cm.employment_type', 'cm.primary_position_id', 'cp.position_name')
+                ->selectRaw('(SELECT b2.booking_reference FROM booking_crew bc2 JOIN bookings b2 ON bc2.booking_id = b2.booking_id
+                    WHERE bc2.crew_id = cm.crew_id AND bc2.booking_id != ? AND b2.booking_status NOT IN (\'cancelled\',\'completed\')
+                    AND b2.shoot_date_start <= ? AND b2.shoot_date_end >= ? LIMIT 1) AS busy_on_booking', [$bid, $de, $ds])
+                ->orderBy('name')
+                ->get();
+
+            $positions = DB::table('crew_positions')->orderBy('position_name')->get();
+            $vehicleRates = DB::table('vehicle_rates')->where('is_active', 1)->orderBy('base_rate')->get();
+
+            $allAccessoriesList = DB::table('accessories as a')
+                ->whereNotIn('a.accessory_id', function ($q) use ($bid) {
+                    $q->select('accessory_id')->from('booking_accessories')->where('booking_id', $bid);
+                })
+                ->orderBy('a.accessory_name')
+                ->select('a.accessory_id', 'a.accessory_name', 'a.daily_rate', 'a.is_included', 'a.quantity')
+                ->selectRaw('COALESCE((SELECT SUM(ba2.quantity) FROM booking_accessories ba2
+                    JOIN bookings b2 ON ba2.booking_id=b2.booking_id
+                    WHERE ba2.accessory_id=a.accessory_id
+                    AND b2.booking_status NOT IN (\'cancelled\',\'completed\')
+                    AND ba2.booking_id != ?),0) AS qty_in_use', [$bid])
+                ->get();
+
+            $accDays = max(1, (int) ((strtotime($de) - strtotime($ds)) / 86400) + 1);
+        }
+
+        $viewData = [
             'mode' => $mode, 'bid' => $bid, 'ceId' => $ce->ce_id ?? 0, 'role' => $role, 'isClientView' => $isClientView,
             'equipGroups' => $equipGroups, 'crewLines' => $crewLines, 'accLines' => $accLines, 'accTotal' => $accTotal,
             'equipBaseTotal' => $equipBaseTotal, 'equipTotal' => $equipTotal, 'crewTotal' => $crewTotal,
@@ -255,8 +437,15 @@ class CePreviewController extends Controller
             'cePricingMode' => $cePricingMode, 'cePricingInput' => $cePricingInput, 'ceVatExempt' => $ceVatExempt,
             'ceBd' => $ceBd, 'ceBdDiscounted' => $ceBdDiscounted, 'grand' => $grand, 'vat' => $vat, 'subtotal' => $subtotal,
             'clientName' => $clientName, 'ceNumber' => $ceNumber, 'infoRows' => $infoRows,
+            'ceVersion' => $ceVersion, 'isSuperseded' => $isSuperseded, 'ceStatus' => $ce->status ?? 'draft',
+            'booking' => $booking, 'canManage' => $canManage, 'canDiscount' => $canDiscount,
+            'availEquip' => $availEquip, 'availCrew' => $availCrew, 'positions' => $positions,
+            'vehicleRates' => $vehicleRates, 'allAccessoriesList' => $allAccessoriesList, 'accDays' => $accDays,
+            'actionUrl' => route('booking-detail.act', $bid),
             // Cart-mode-only values the shared view still references — safe empty defaults.
             'equipLines' => [], 'estimatedCrewLines' => [], 'baseTransRate' => 0,
-        ]);
+        ];
+
+        return $asData ? $viewData : view('ce-preview', $viewData);
     }
 }

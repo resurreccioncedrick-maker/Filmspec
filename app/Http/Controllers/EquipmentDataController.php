@@ -120,6 +120,7 @@ class EquipmentDataController extends Controller
             'kpis' => [
                 'shoots' => $bookingIds->count(),
                 'fs_earned' => (float) $usage->sum('earnings'),
+                'quoted_days' => (int) $usage->sum('total_days'),
                 'chart_months' => $chartMonths,
             ],
         ]);

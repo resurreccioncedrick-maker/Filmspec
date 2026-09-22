@@ -36,7 +36,7 @@
           <h2 style="font-family:var(--font-display);font-size:1.5rem;font-weight:800;color:var(--blue-900);letter-spacing:-.02em">
             {{ $booking->booking_reference }}
           </h2>
-          @php $statusLabel2 = ['pending' => 'Pending', 'confirmed' => 'Confirmed', 'ongoing' => 'In Field', 'pending_inspection' => 'Inspection', 'returned' => 'Returned', 'completed' => 'Completed', 'cancelled' => 'Cancelled']; @endphp
+          @php $statusLabel2 = ['pending' => 'Awaiting Review', 'confirmed' => 'Confirmed', 'ongoing' => 'In Field', 'pending_inspection' => 'Inspection', 'returned' => 'Returned', 'completed' => 'Completed', 'cancelled' => 'Cancelled']; @endphp
           <span class="badge {{ $statusBadge[$booking->booking_status] ?? 'badge-gray' }}" style="font-size:.8rem">
             {{ $statusLabel2[$booking->booking_status] ?? ucfirst($booking->booking_status) }}
           </span>
@@ -234,9 +234,8 @@
         @endif
 
       @elseif ($st === 'confirmed' && $isAdmin)
-        <button onclick="openModal('modalAssignTransport')" class="btn btn-sm" style="background:{{ $hasTransport ? '#f0f9ff' : '#f8fafc' }};border:1px solid {{ $hasTransport ? '#bae6fd' : '#e2e8f0' }};color:{{ $hasTransport ? '#0369a1' : '#64748b' }};font-weight:600">
-          <i data-feather="truck" style="width:13px;height:13px"></i> {{ $hasTransport ? 'Transport ✓' : 'Assign Transport' }}
-        </button>
+        {{-- Assign Transport now lives only on the Cost Estimate tab (delegates back to this
+             page's modalAssignTransport via postMessage). --}}
         @if ($ce)
         @if ($ce->status === 'confirmed')
         <span class="badge badge-green" style="align-self:center"><i data-feather="check" style="width:11px;height:11px"></i> Confirmed</span>
@@ -253,8 +252,9 @@
         <div class="action-menu-wrap">
           <button type="button" class="btn-icon" onclick="toggleActionMenu(this)" title="More actions"><i data-feather="more-vertical"></i></button>
           <div class="action-menu">
-            <button type="button" onclick="closeActionMenus(); openAddEquipModal()"><i data-feather="camera"></i> Add Equipment</button>
-            <button type="button" onclick="closeActionMenus(); openAddCrewModal()"><i data-feather="user-plus"></i> Assign Crew</button>
+            {{-- Add Equipment / Assign Crew now live only on the Cost Estimate tab (which
+                 delegates back to this page's own modals via postMessage — see the
+                 window.addEventListener('message', ...) listener below). --}}
             @if ($hasCrew && $costApproval !== 'client_approved')
             @if ($ce && $ce->status === 'confirmed')
             <form method="POST" action="{{ $actionUrl }}"
@@ -294,9 +294,6 @@
         <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'out']) }}" class="btn btn-outline btn-sm"><i data-feather="log-out"></i> Checklist OUT</a>
         <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'in']) }}" class="btn btn-outline btn-sm"><i data-feather="log-in"></i> Checklist IN</a>
         <button onclick="openFieldAddModal()" class="btn btn-outline btn-sm" style="border-color:#d97706;color:#d97706"><i data-feather="plus-circle"></i> Field Add</button>
-        <button onclick="openModal('modalAssignTransport')" class="btn btn-sm" style="background:{{ $hasTransport ? '#f0f9ff' : '#f8fafc' }};border:1px solid {{ $hasTransport ? '#bae6fd' : '#e2e8f0' }};color:{{ $hasTransport ? '#0369a1' : '#64748b' }};font-weight:600">
-          <i data-feather="truck" style="width:13px;height:13px"></i> {{ $hasTransport ? 'Transport ✓' : 'Assign Transport' }}
-        </button>
         <a href="{{ route('attendance', ['booking_id' => $id]) }}" class="btn btn-outline btn-sm"><i data-feather="users"></i> Attendance</a>
         <button onclick="openModal('modalExtendRental')" class="btn btn-outline btn-sm"><i data-feather="calendar"></i> Extend Rental</button>
         <button onclick="openModal('modalRecordPayment')" class="btn btn-outline btn-sm" style="border-color:var(--success);color:var(--success)"><i data-feather="credit-card"></i> Record Payment</button>
@@ -431,10 +428,16 @@
 
 <!-- Tabs -->
 <div class="tabs">
+  @if ($ce)
+  <button class="tab-btn active" data-tab="tab-cost-estimate">
+    Cost Estimate
+    @if ($ce->status === 'confirmed')<span class="badge badge-green" style="margin-left:4px">Confirmed</span>@else<span class="badge badge-gray" style="margin-left:4px">Draft</span>@endif
+  </button>
+  @else
+  {{-- No CE generated yet — the CE page's "Edit Client & Project Info" isn't reachable until
+       a CE exists, so this small pre-CE form is the only place to set these fields early. --}}
   <button class="tab-btn active" data-tab="tab-project-details">Project Details</button>
-  <button class="tab-btn" data-tab="tab-equipment">Equipment <span class="badge badge-blue" style="margin-left:4px">{{ $equipmentLines->count() }}</span></button>
-  <button class="tab-btn" data-tab="tab-accessories">Accessories <span class="badge {{ $bookingAccessoriesCount > 0 ? 'badge-blue' : 'badge-gray' }}" style="margin-left:4px">{{ $bookingAccessoriesCount }}</span></button>
-  <button class="tab-btn" data-tab="tab-crew">Crew <span class="badge badge-blue" style="margin-left:4px">{{ $crewLines->count() }}</span></button>
+  @endif
   <button class="tab-btn" data-tab="tab-payments">Payments <span class="badge badge-blue" style="margin-left:4px">{{ $payments->count() }}</span></button>
   <div class="tab-divider"></div>
   <button class="tab-btn" data-tab="tab-incidents">Incidents <span class="badge {{ $incidents->count() > 0 ? 'badge-red' : 'badge-gray' }}" style="margin-left:4px">{{ $incidents->count() }}</span></button>
@@ -455,7 +458,9 @@
 
 <div data-tab-panes>
 
-<!-- PROJECT DETAILS TAB -->
+@if (! $ce)
+<!-- PROJECT DETAILS TAB — only shown pre-CE; once a CE exists, its "Edit Client & Project Info"
+     modal on the Cost Estimate tab covers the same fields. -->
 <div id="tab-project-details" class="tab-pane active">
   <div class="card" id="card-project-details">
     <div class="card-header">
@@ -520,184 +525,23 @@
     </div>
   </div>
 </div>
+@endif
 
-<!-- EQUIPMENT TAB -->
-<div id="tab-equipment" class="tab-pane">
-  @php $canAct = $isAdmin && in_array($booking->booking_status, ['confirmed', 'ongoing']); @endphp
-  <div class="card">
-    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-      <h2 class="card-title">Equipment Lines</h2>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      @if ($equipmentLines->count() > 0)
-      <div class="search-input-wrap" style="min-width:170px">
-        <i data-feather="search" style="width:13px;height:13px"></i>
-        <input type="text" id="eqSearchTbl" placeholder="Search equipment…" oninput="listFilter({rowSelector:'#tab-equipment tbody tr', searchId:'eqSearchTbl'})">
-      </div>
-      @endif
-      @if (in_array($role, config('filmspec.manage_roles'), true) && $equipmentLines->count() > 0 && $booking->booking_status !== 'cancelled')
-      <form method="POST" action="{{ $actionUrl }}"
-            onsubmit="return confirm('Remove all {{ $equipmentLines->count() }} FilmSpec equipment line(s)? Crew is left untouched.')">
-        @csrf
-        <input type="hidden" name="action" value="clear_fs_equipment">
-        <button type="submit" class="btn btn-outline btn-sm" style="border-color:var(--red);color:var(--red)"
-                title="Removes the FilmSpec lines only — crew untouched">
-          <i data-feather="x"></i> Clear Data
-        </button>
-      </form>
-      @endif
-      @if ($canAct && ! in_array($costApproval, ['pending_client', 'client_rejected']))
-      @php
-        $hasPending = $equipmentLines->filter(fn ($l) => ! $l->checked_out && ! $l->checked_in)->count() > 0;
-        $hasInField = $equipmentLines->filter(fn ($l) => $l->checked_out && ! $l->checked_in)->count() > 0;
-      @endphp
-      <div style="display:flex;gap:8px">
-        @if ($hasPending)
-        <form method="POST" action="{{ $actionUrl }}" onsubmit="return confirm('Release all pending equipment to field?')">
-          @csrf
-          <input type="hidden" name="action" value="bulk_checkout">
-          <button type="submit" class="btn btn-outline btn-sm"><i data-feather="log-out"></i> Release All</button>
-        </form>
-        @endif
-        @if ($hasInField)
-        <form method="POST" action="{{ $actionUrl }}" onsubmit="return confirm('Mark all in-field equipment as returned? Condition will default to Good.')">
-          @csrf
-          <input type="hidden" name="action" value="bulk_checkin">
-          <button type="submit" class="btn btn-warning btn-sm"><i data-feather="log-in"></i> Return All</button>
-        </form>
-        @endif
-      </div>
-      @endif
-      </div>
-    </div>
-    <div class="table-wrap">
-      @if ($equipmentLines->count() === 0)
-      <div class="empty-state"><i data-feather="camera"></i><h3>No equipment added yet</h3></div>
-      @else
-      <table>
-        <thead>
-          <tr><th>Equipment</th><th>Category</th><th>Qty</th><th>Days</th><th>Rate/Day</th><th>Subtotal</th><th>Status</th><th>Assigned Crew</th><th>Action</th></tr>
-        </thead>
-        <tbody>
-          @foreach ($equipmentLines as $line)
-          @php
-            $isOut = (int) $line->checked_out > 0;
-            $isIn = (int) $line->checked_in > 0;
-            $condLabel = ['excellent' => 'Excellent', 'good' => 'Good', 'fair' => 'Fair', 'damaged' => 'Damaged', 'missing' => 'Missing'];
-            $condColor = ['excellent' => 'badge-green', 'good' => 'badge-green', 'fair' => 'badge-yellow', 'damaged' => 'badge-red', 'missing' => 'badge-red'];
-          @endphp
-          <tr>
-            <td>
-              <div style="font-weight:600">{{ $line->equipment_name }}</div>
-              <div style="font-size:.75rem;color:var(--text-muted)">{{ trim($line->brand . ' ' . $line->model) }}</div>
-            </td>
-            <td><span class="badge badge-blue">{{ $line->category_name }}</span></td>
-            <td>{{ $line->quantity }}</td>
-            <td>{{ $line->days }}</td>
-            <td>₱{{ number_format($line->daily_rate, 2) }}</td>
-            <td style="font-weight:700;color:var(--blue-700)">₱{{ number_format($line->subtotal, 2) }}</td>
-            <td>
-              @if ($isIn)
-                <span class="badge {{ $condColor[$line->return_condition] ?? 'badge-gray' }}" style="font-size:.7rem">{{ $condLabel[$line->return_condition] ?? 'Returned' }}</span>
-                @if ($line->checkin_time)<div style="font-size:.7rem;color:var(--muted);margin-top:3px">{{ \Carbon\Carbon::parse($line->checkin_time)->format('M j g:ia') }}</div>@endif
-              @elseif ($isOut)
-                <span class="badge badge-blue" style="font-size:.7rem">In Field</span>
-                @if ($line->checkout_time)<div style="font-size:.7rem;color:var(--muted);margin-top:3px">Out: {{ \Carbon\Carbon::parse($line->checkout_time)->format('M j g:ia') }}</div>@endif
-              @else
-                <span class="badge badge-gray" style="font-size:.7rem">Pending</span>
-              @endif
-            </td>
-            <td style="min-width:130px">
-              @php $assigned = $equipAssignedCrew[$line->equipment_id] ?? []; @endphp
-              @if ($assigned)
-                @foreach ($assigned as $a)
-                <div style="font-size:.78rem;line-height:1.4">
-                  <span style="font-weight:600;color:var(--text)">{{ $a['name'] }}</span>
-                  @if ($a['position'])<div style="font-size:.7rem;color:var(--muted)">{{ $a['position'] }}</div>@endif
-                </div>
-                @endforeach
-              @else
-                <span style="color:var(--muted);font-size:.78rem">—</span>
-              @endif
-            </td>
-            <td>
-              @php $releaseBlocked = in_array($costApproval, ['pending_client', 'client_rejected']); @endphp
-              @if ($canAct && ! $isOut && ! $isIn)
-              <button class="btn btn-outline btn-sm"
-                      {{ $releaseBlocked ? 'disabled title="' . ($costApproval === 'pending_client' ? 'Awaiting client cost approval' : 'Client rejected cost estimate') . '"' : '' }}
-                      onclick="openRelease({{ $line->equipment_id }}, '{{ addslashes($line->equipment_name) }}')">
-                <i data-feather="log-out"></i> Release
-              </button>
-              @elseif ($canAct && $isOut && ! $isIn)
-              <button class="btn btn-warning btn-sm"
-                      onclick="openReturn({{ $line->equipment_id }}, '{{ addslashes($line->equipment_name) }}', '{{ $booking->shoot_date_end }}', {{ $line->daily_rate }}, {{ $line->quantity }})">
-                <i data-feather="log-in"></i> Return
-              </button>
-              @else—@endif
-            </td>
-          </tr>
-          @endforeach
-        </tbody>
-        <tfoot>
-          <tr style="background:var(--blue-50)">
-            <td colspan="5" style="text-align:right;font-weight:700;padding:12px 16px;color:var(--blue-900)">Equipment Subtotal</td>
-            <td style="font-weight:800;color:var(--blue-700);padding:12px 16px">₱{{ number_format($equipmentLines->sum('subtotal'), 2) }}</td>
-            <td colspan="3"></td>
-          </tr>
-        </tfoot>
-      </table>
-      @endif
-    </div>
-  </div>
-
-  {{-- Equipment catalog quick-add (Part 9) — filter the catalog and add without opening the
-       modal. Posts the same add_equipment action, so all its availability and date-conflict
-       checks still apply. --}}
-  @php
-    // Defined locally: the crew tab's $equipCanManage is declared further down the file, so it
-    // isn't in scope here yet.
-    $catalogCanAdd = $isAdmin && in_array($booking->booking_status, ['pending', 'confirmed', 'ongoing']);
-    $bookingDays = max(1, (int) \Carbon\Carbon::parse($booking->shoot_date_start)
-        ->diffInDays(\Carbon\Carbon::parse($booking->shoot_date_end)) + 1);
-  @endphp
-  @if ($catalogCanAdd)
-  <div class="card" id="catalogPanel" style="margin-top:14px">
+@if ($ce)
+<!-- COST ESTIMATE TAB — embeds the full CE editor (equipment/crew/accessories/transport/discount
+     all live here now) so it's the one place to build and manage the quote for this booking. -->
+<div id="tab-cost-estimate" class="tab-pane active">
+  <div class="card" style="margin-bottom:0">
     <div class="card-header">
-      <h2 class="card-title">Equipment Catalog</h2>
-      <span style="font-size:.75rem;color:var(--text-muted)">{{ $catalogEquipment->count() }} item(s)</span>
+      <h2 class="card-title"><i data-feather="file-text" style="width:15px;height:15px;margin-right:6px;vertical-align:middle"></i>Cost Estimate</h2>
+      <a href="{{ route('ce-preview', ['booking_id' => $id]) }}" class="btn btn-outline btn-sm" target="_blank">Open Full Page <i data-feather="external-link" style="width:12px;height:12px"></i></a>
     </div>
-    <div class="card-body" style="padding-bottom:8px">
-      <input type="text" id="cat_filter" class="form-control" placeholder="Filter the catalog…" oninput="filterCatalogPanel()">
-    </div>
-    <div style="max-height:280px;overflow-y:auto;padding:0 16px 14px">
-      @forelse ($catalogEquipment as $eq)
-      @php $already = $equipmentLines->contains('equipment_id', $eq->equipment_id); @endphp
-      <div data-cat-row="{{ strtolower($eq->equipment_name . ' ' . $eq->brand) }}"
-           style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
-        <div style="min-width:0">
-          <div style="font-size:.85rem;font-weight:600">{{ $eq->equipment_name }}</div>
-          <div style="font-size:.72rem;color:var(--text-muted)">{{ $eq->brand ?: '—' }} · ₱{{ number_format($eq->daily_rate, 2) }}/day</div>
-        </div>
-        @if ($already)
-        <span class="badge badge-gray" style="flex-shrink:0">Added</span>
-        @else
-        <form method="POST" action="{{ $actionUrl }}" style="flex-shrink:0">
-          @csrf
-          <input type="hidden" name="action" value="add_equipment">
-          <input type="hidden" name="equipment_id" value="{{ $eq->equipment_id }}">
-          <input type="hidden" name="quantity" value="1">
-          <input type="hidden" name="days" value="{{ $bookingDays ?? 1 }}">
-          <input type="hidden" name="daily_rate" value="{{ $eq->daily_rate }}">
-          <button type="submit" class="btn btn-outline btn-sm"><i data-feather="plus"></i> Add</button>
-        </form>
-        @endif
-      </div>
-      @empty
-      <div style="font-size:.83rem;color:var(--text-muted);padding:8px 0">No equipment in the catalog yet.</div>
-      @endforelse
+    <div class="card-body" style="padding:0">
+      <iframe src="{{ route('ce-preview', ['booking_id' => $id]) }}" style="width:100%;height:1400px;border:none;display:block"></iframe>
     </div>
   </div>
-  @endif
 </div>
+@endif
 
 <!-- PAYMENTS TAB -->
 <div id="tab-payments" class="tab-pane">
@@ -755,58 +599,14 @@
   </div>
 
 
-  <!-- Preview list — what the client sees, grouped the way the CE document prints -->
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-header">
-      <h2 class="card-title">Preview List</h2>
-      <a href="{{ route('ce-preview') }}?booking_id={{ $booking->booking_id }}" target="_blank"
-         class="btn btn-outline btn-sm"><i data-feather="file-text"></i> Open CE</a>
-    </div>
-    <div class="card-body">
-      @php
-        // Grouped by category with OTHERS last — mirrors the CE document's sectioning.
-        $pvGroups = [];
-        foreach ($equipmentLines as $ln) {
-            $cat = trim((string) ($ln->category_name ?? '')) ?: 'Others';
-            $pvGroups[$cat][] = $ln;
-        }
-        uksort($pvGroups, function ($a, $b) {
-            $aO = strcasecmp($a, 'Others') === 0 || strcasecmp($a, 'Other') === 0;
-            $bO = strcasecmp($b, 'Others') === 0 || strcasecmp($b, 'Other') === 0;
-            if ($aO !== $bO) return $aO ? 1 : -1;
-            return strcasecmp($a, $b);
-        });
-      @endphp
-      @if (empty($pvGroups))
-      <div style="font-size:13px;color:var(--text-muted)">No FilmSpec equipment on this booking yet.</div>
-      @else
-      @foreach ($pvGroups as $cat => $lines)
-      <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--blue-700);margin:10px 0 4px">
-        {{ strtoupper($cat) }} (FS)
-        <span style="float:right;font-weight:400;color:var(--text-muted)">{{ count($lines) }} item{{ count($lines) === 1 ? '' : 's' }}</span>
-      </div>
-      @foreach ($lines as $ln)
-      <div style="display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:3px 0;border-bottom:1px solid var(--border)">
-        <span><span style="font-family:monospace;color:var(--text-muted)">{{ $ln->quantity }}×</span> {{ $ln->equipment_name }}</span>
-        <span style="font-family:monospace;white-space:nowrap">{{ $ln->days }}d · ₱{{ number_format($ln->daily_rate, 2) }}</span>
-      </div>
-      @endforeach
-      @endforeach
-      @endif
-
-      <div style="margin-top:12px;padding-top:8px;border-top:2px solid var(--border);font-size:11.5px;color:var(--text-muted)">
-        {{ $equipmentLines->count() }} FILMSPEC · {{ $crewLines->count() }} crew
-        @if ($bookingAccessoriesCount > 0) · {{ $bookingAccessoriesCount }} accessories @endif
-      </div>
-    </div>
-  </div>
-
+  {{-- Preview List and the itemized cost breakdown that used to live here are now the Cost
+       Estimate tab's job (it embeds the CE editor, which shows the same equipment listing and
+       totals). What's left below is what has no home there: field additions, the client's
+       response to the quote, and the pricing-mode/VAT-exempt controls. --}}
   <div class="card" id="card-package-totals" style="margin-bottom:16px">
     <div class="card-header">
-      <h2 class="card-title">Package &amp; Totals</h2>
+      <h2 class="card-title">Pricing &amp; Client Response</h2>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <a href="{{ route('ce-preview') }}?booking_id={{ $booking->booking_id }}&view=client" target="_blank"
-           class="btn btn-outline btn-sm"><i data-feather="eye"></i> Client View</a>
         <a href="{{ route('booking-detail.ce-export', $booking->booking_id) }}"
            class="btn btn-outline btn-sm"><i data-feather="download"></i> Export CSV</a>
         @if (in_array($role, config('filmspec.all_staff'), true))
@@ -828,69 +628,7 @@
       @php
         $pricingModeLabels = ['no_discount' => 'Full itemized total', 'package_price' => 'Package Price', 'discount_percent' => 'Discount %', 'discount_flat' => 'Discount ₱'];
         $curMode = $ce->pricing_mode ?? 'no_discount';
-        $bd = $ceBreakdown;
-        $isDiscounted = $bd['pricing_mode'] !== 'no_discount';
-        $vatLabel = $bd['vat_exempt'] && $isDiscounted ? 'VAT (exempt)' : '12% VAT';
-        $pkRow = fn ($label, $value, $style = '') => '<div style="display:flex;justify-content:space-between;gap:16px;padding:5px 0;' . $style . '"><span>' . $label . '</span><span style="font-family:monospace;white-space:nowrap">₱' . number_format($value, 2) . '</span></div>';
-        // Equipment cost split by category (Camera, Lighting, Audio, ...) for display —
-        // the underlying discount/VAT math below still runs on the aggregate totals, this
-        // just itemizes what fs_equipment is made of.
-        $pkCatGroups = [];
-        foreach ($equipmentLines as $ln) {
-            $cat = trim((string) ($ln->category_name ?? '')) ?: 'Others';
-            $lineCost = (float) $ln->subtotal > 0 ? (float) $ln->subtotal : ((float) $ln->quantity * (float) $ln->days * (float) $ln->daily_rate);
-            $pkCatGroups[$cat] = ($pkCatGroups[$cat] ?? 0) + $lineCost;
-        }
-        ksort($pkCatGroups);
-        $pkAccessoriesTotal = (float) $bookingAccessories->sum('subtotal');
       @endphp
-
-      <div style="font-size:13px;margin-bottom:14px">
-        @if (empty($pkCatGroups) && $pkAccessoriesTotal <= 0)
-          {!! $pkRow('FS equipment', $bd['fs_equipment'], 'color:var(--text-muted)') !!}
-        @else
-          @foreach ($pkCatGroups as $pkCat => $pkCatCost)
-            {!! $pkRow($pkCat, $pkCatCost, 'color:var(--text-muted)') !!}
-          @endforeach
-          @if ($pkAccessoriesTotal > 0)
-            {!! $pkRow('Accessories', $pkAccessoriesTotal, 'color:var(--text-muted)') !!}
-          @endif
-        @endif
-        {!! $pkRow('Net items (ex. transport)', $bd['net_items'], 'color:var(--text-muted)') !!}
-        {!! $pkRow('Transportation', $bd['transportation'], 'color:var(--text-muted)') !!}
-        {!! $pkRow('Sub total (equipment CE)', $bd['equip_subtotal'], 'font-weight:700;border-top:1px solid var(--border);padding-top:7px') !!}
-        {!! $pkRow('Crew TF', $bd['crew_tf'], 'color:var(--text-muted)') !!}
-
-        @if ($bd['package_under_crew'])
-        <div class="alert alert-danger" style="margin:10px 0;font-size:12px">
-          <i data-feather="alert-circle"></i>
-          The package price is below the crew fees (₱{{ number_format($bd['crew_tf'], 2) }}), so there's nothing left for equipment.
-        </div>
-        @endif
-
-        <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:6px">
-          @if ($isDiscounted)
-            {!! $pkRow('Discount on packaged cost', $bd['discount_on_packaged_cost'], 'color:var(--text-muted)') !!}
-            @if (($bd['not_discounted'] ?? 0) > 0)
-              {!! $pkRow('Not discounted (billed on top)', $bd['not_discounted'], 'color:var(--orange-700, #b45309)') !!}
-            @endif
-            {!! $pkRow('Total discounted packaged cost', $bd['equip_net'], 'font-weight:700') !!}
-            {!! $pkRow($vatLabel, $bd['equip_vat'], 'color:var(--text-muted)') !!}
-          @else
-            @if (($bd['discount_amount'] ?? 0) > 0)
-              {!! $pkRow('Approved discount (off the itemized total)', -$bd['discount_amount'], 'color:var(--green-700, #15803d)') !!}
-            @endif
-            {!! $pkRow('Equipment net (ex-VAT)', $bd['equip_net'], 'color:var(--text-muted)') !!}
-            {!! $pkRow('12% VAT (included)', $bd['equip_vat'], 'color:var(--text-muted)') !!}
-          @endif
-          {!! $pkRow('Equipment CE grand total', $bd['equip_grand'], 'font-weight:700;color:var(--blue-700)') !!}
-          {!! $pkRow('Crew CE grand total', $bd['crew_grand'], 'font-weight:700') !!}
-          @if ($isDiscounted)
-            {!! $pkRow('Packaged cost (summary)', $bd['packaged_cost'], 'color:var(--text-muted)') !!}
-          @endif
-          {!! $pkRow('Summary grand total (incl. VAT)', $bd['summary_grand'], 'font-weight:800;font-size:15px;color:var(--blue-700);border-top:2px solid var(--blue-700);margin-top:6px;padding-top:8px') !!}
-        </div>
-      </div>
 
       @if ($fieldAdditions->isNotEmpty())
       {{-- Equipment/accessories requested and delivered to the field mid-shoot, on top of the
@@ -1332,416 +1070,6 @@
 <!-- DOCUMENTS TAB -->
 <div id="tab-documents" class="tab-pane">
   @include('partials.documents-card')
-</div>
-
-<!-- CREW TAB -->
-<div id="tab-crew" class="tab-pane">
-
-  @php
-    $equipCanManage = $isAdmin && in_array($booking->booking_status, ['pending', 'confirmed', 'ongoing']);
-    $equipNeedingOps = $equipOpRequirements->filter(fn ($r) => $r->req_count > 0);
-    $asBadge = ['tentative' => 'badge-yellow', 'confirmed' => 'badge-green', 'declined' => 'badge-red', 'no_show' => 'badge-red', 'replaced' => 'badge-orange'];
-  @endphp
-
-  @if ($equipNeedingOps->count())
-  @php
-    $coveredCount = $equipNeedingOps->filter(fn ($r) => ! empty($equipCoverage[(int) $r->equipment_id]))->count();
-    $totalSlots = $equipNeedingOps->count();
-  @endphp
-  <div class="card" style="margin-bottom:14px">
-    <div class="card-header" style="background:var(--s2)">
-      <h2 class="card-title" style="font-size:.88rem">
-        <i data-feather="camera" style="width:13px;height:13px;margin-right:6px;vertical-align:middle;color:var(--accent)"></i>
-        Equipment Slots
-      </h2>
-      <span class="badge {{ $coveredCount === $totalSlots ? 'badge-green' : ($coveredCount > 0 ? 'badge-orange' : 'badge-red') }}" style="font-size:.7rem;font-weight:700">
-        {{ $coveredCount }}/{{ $totalSlots }} covered
-      </span>
-    </div>
-    <div style="padding:8px 12px;display:flex;flex-direction:column;gap:6px">
-    @foreach ($equipNeedingOps as $req)
-    @php
-      $eqId = (int) $req->equipment_id;
-      $isCovered = ! empty($equipCoverage[$eqId]);
-      $posIds = array_values(array_filter(array_map('intval', explode(',', $req->required_position_ids ?? ''))));
-      $firstPosId = $posIds[0] ?? 0;
-    @endphp
-    @if ($isCovered)
-      <div style="display:flex;align-items:center;gap:10px;padding:9px 13px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px">
-        <i data-feather="check-circle" style="width:13px;height:13px;color:#16a34a;flex-shrink:0"></i>
-        <div style="flex:1;min-width:0">
-          <span style="font-weight:600;font-size:.83rem;color:var(--text)">{{ $req->equipment_name }}</span>
-          @if ($req->required_positions)<span class="badge badge-green" style="font-size:.63rem;margin-left:7px;opacity:.85">{{ $req->required_positions }}</span>@endif
-        </div>
-        <span style="font-size:.78rem;color:#15803d;font-weight:500;white-space:nowrap">{{ implode(', ', $equipCoverage[$eqId]) }}</span>
-      </div>
-    @elseif ($equipCanManage)
-      <form method="POST" action="{{ $actionUrl }}" id="slotF_{{ $eqId }}" style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:9px;overflow:visible">
-        @csrf
-        <input type="hidden" name="action" value="batch_add_crew">
-        <input type="hidden" name="bc_pos_id[]" value="{{ $firstPosId }}">
-        <input type="hidden" name="bc_eq_link[]" value="{{ $eqId }}">
-        <input type="hidden" name="bc_notes[]" value="">
-        <input type="hidden" name="bc_crew_id[]" id="slotCid_{{ $eqId }}">
-        <input type="hidden" name="bc_rate[]" id="slotRid_{{ $eqId }}">
-        <div style="display:flex;align-items:center;gap:10px;padding:9px 13px;flex-wrap:wrap">
-          <i data-feather="alert-circle" style="width:13px;height:13px;color:#d97706;flex-shrink:0"></i>
-          <div style="flex:1;min-width:110px">
-            <span style="font-weight:600;font-size:.83rem;color:var(--text)">{{ $req->equipment_name }}</span>
-            @if ($req->required_positions)<span class="badge badge-orange" style="font-size:.63rem;margin-left:7px">{{ $req->required_positions }}</span>@endif
-          </div>
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:nowrap">
-            <div style="position:relative;width:195px" id="slotW_{{ $eqId }}">
-              <input type="text" class="form-control slot-txt" data-eid="{{ $eqId }}" data-posid="{{ $firstPosId }}"
-                     placeholder="Search crew…" autocomplete="off"
-                     style="font-size:.8rem;height:32px;padding:4px 10px"
-                     oninput="openSlot(this,{{ $eqId }})" onfocus="openSlot(this,{{ $eqId }})" onblur="closeSlot({{ $eqId }},250)">
-              <div class="crew-slot-drop" id="slotD_{{ $eqId }}"></div>
-            </div>
-            <input type="number" id="slotRv_{{ $eqId }}" placeholder="₱/12hr"
-                   class="form-control" step="0.01" min="0"
-                   style="width:88px;font-size:.8rem;height:32px;padding:4px 8px"
-                   oninput="document.getElementById('slotRid_{{ $eqId }}').value=this.value">
-            <button type="submit" class="btn btn-primary btn-sm" style="height:32px;padding:0 12px;white-space:nowrap" onclick="return prepSlot({{ $eqId }})">
-              <i data-feather="user-check" style="width:11px;height:11px"></i> Assign
-            </button>
-          </div>
-        </div>
-      </form>
-    @else
-      <div style="display:flex;align-items:center;gap:10px;padding:9px 13px;background:#fff8f8;border:1px solid #fecaca;border-radius:9px">
-        <i data-feather="alert-circle" style="width:13px;height:13px;color:#dc2626;flex-shrink:0"></i>
-        <span style="font-weight:600;font-size:.83rem;color:var(--text)">{{ $req->equipment_name }}</span>
-        @if ($req->required_positions)<span class="badge badge-red" style="font-size:.63rem">{{ $req->required_positions }}</span>@endif
-      </div>
-    @endif
-    @endforeach
-    </div>
-  </div>
-  @endif
-
-  @if ($driverNeeded)
-  @php $assignedDrivers = $crewLines->filter(fn ($c) => stripos($c->position_name ?? '', 'driver') !== false); @endphp
-  <div class="card" style="margin-bottom:14px;border:1px solid {{ $driverCount ? '#bbf7d0' : '#fed7aa' }}">
-    <div class="card-header" style="background:{{ $driverCount ? '#f0fdf4' : '#fff7ed' }};display:flex;align-items:center;justify-content:space-between;gap:10px">
-      <h2 class="card-title" style="font-size:.88rem;color:{{ $driverCount ? '#15803d' : '#c2410c' }}">
-        <i data-feather="truck" style="width:13px;height:13px;margin-right:5px;vertical-align:middle"></i>
-        {{ $driverCount ? 'Driver Assigned' : 'Driver Required' }}
-        @if (! empty($booking->vehicle_label))&nbsp;<span class="badge badge-blue" style="font-size:.7rem;font-weight:500">{{ $booking->vehicle_label }}</span>@endif
-      </h2>
-      @if ($equipCanManage)
-      <button onclick="openModal('modalAssignTransport')" class="btn btn-sm" style="background:{{ $driverCount ? '#f0fdf4' : '#fff7ed' }};border:1px solid {{ $driverCount ? '#bbf7d0' : '#fed7aa' }};color:{{ $driverCount ? '#15803d' : '#c2410c' }};font-weight:600;padding:4px 12px;font-size:.78rem">
-        <i data-feather="truck" style="width:11px;height:11px"></i> {{ $driverCount ? 'Change / Add Driver' : 'Assign Driver' }}
-      </button>
-      @endif
-    </div>
-    @if ($assignedDrivers->count())
-    <div style="padding:8px 16px;display:flex;flex-wrap:wrap;gap:8px">
-      @foreach ($assignedDrivers as $drv)
-      <div style="display:inline-flex;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:7px;padding:6px 10px">
-        <i data-feather="check-circle" style="width:12px;height:12px;color:#16a34a;flex-shrink:0"></i>
-        <span style="font-weight:600;font-size:.83rem">{{ $drv->crew_name }}</span>
-        <span style="font-size:.75rem;color:var(--muted)">₱{{ number_format($drv->rate_used, 2) }}/12hr</span>
-      </div>
-      @endforeach
-    </div>
-    @elseif ($equipCanManage)
-    <div style="padding:10px 16px;font-size:.82rem;color:#9a3412">
-      <i data-feather="alert-triangle" style="width:13px;height:13px;vertical-align:middle;margin-right:4px"></i>
-      No driver assigned — use the <strong>Assign Transport</strong> button to add one.
-    </div>
-    @endif
-  </div>
-  @endif
-
-  @if ($equipCanManage)
-  <div class="card" style="margin-bottom:14px">
-    <div class="card-header" style="background:var(--s2)">
-      <h2 class="card-title" style="font-size:.88rem">
-        <i data-feather="user-plus" style="width:13px;height:13px;margin-right:6px;vertical-align:middle"></i>
-        Add Crew Member
-      </h2>
-      <span style="font-size:.75rem;color:var(--muted)">General or equipment-linked</span>
-    </div>
-    <form method="POST" action="{{ $actionUrl }}">
-      @csrf
-      <input type="hidden" name="action" value="batch_add_crew">
-      <input type="hidden" name="bc_crew_id[]" id="genCid">
-      <input type="hidden" name="bc_rate[]" id="genRid">
-      <input type="hidden" name="bc_notes[]" value="">
-      <div style="padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-        <div style="flex:1;min-width:190px">
-          <label style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;display:block;margin-bottom:4px">Search by name…</label>
-          <div style="position:relative" id="genCrewW">
-            <input type="text" id="genCrewTxt" class="form-control" placeholder="Type to search crew…" autocomplete="off"
-                   style="font-size:.83rem;height:34px" oninput="openGen(this.value)" onfocus="openGen(this.value)" onblur="closeGen(250)">
-            <div class="crew-slot-drop" id="genDrop"></div>
-          </div>
-        </div>
-        <div style="flex:0 0 155px">
-          <label style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;display:block;margin-bottom:4px">All positions</label>
-          <select name="bc_pos_id[]" id="genPos" class="form-control" style="height:34px;font-size:.83rem" onchange="openGen(document.getElementById('genCrewTxt').value)">
-            <option value="0">— General assignment —</option>
-            @foreach ($positions as $pos)<option value="{{ $pos->position_id }}">{{ $pos->position_name }}</option>@endforeach
-          </select>
-        </div>
-        <div style="flex:0 0 100px">
-          <label style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;display:block;margin-bottom:4px">Rate/12hr</label>
-          <input type="number" id="genRateVis" placeholder="₱ auto" class="form-control" step="0.01" min="0" style="height:34px;font-size:.83rem" oninput="document.getElementById('genRid').value=this.value">
-        </div>
-        <div style="flex:0 0 180px">
-          <label style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;display:block;margin-bottom:4px">Link to Equipment</label>
-          <select name="bc_eq_link[]" class="form-control" style="height:34px;font-size:.83rem">
-            <option value="0">— Not equipment-specific —</option>
-            @foreach ($equipmentLines as $el)<option value="{{ (int) $el->equipment_id }}">{{ $el->equipment_name }}</option>@endforeach
-          </select>
-        </div>
-        <button type="submit" class="btn btn-primary btn-sm" style="flex-shrink:0;height:34px;padding:0 14px" onclick="return prepGen()">
-          <i data-feather="plus" style="width:12px;height:12px"></i> Add
-        </button>
-      </div>
-    </form>
-  </div>
-  @endif
-
-  <div class="card">
-    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-      <h2 class="card-title">Assigned Crew</h2>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      @if ($crewLines->count() > 0)
-      <div class="search-input-wrap" style="min-width:160px">
-        <i data-feather="search" style="width:13px;height:13px"></i>
-        <input type="text" id="crewSearchTbl" placeholder="Search crew…" oninput="listFilter({rowSelector:'#tab-crew .table-wrap tbody tr', searchId:'crewSearchTbl', filterId:'crewStatusFilter'})">
-      </div>
-      <select id="crewStatusFilter" class="form-control" style="width:auto;font-size:12px;padding:7px 10px" onchange="listFilter({rowSelector:'#tab-crew .table-wrap tbody tr', searchId:'crewSearchTbl', filterId:'crewStatusFilter'})">
-        <option value="">All statuses</option>
-        <option value="tentative">Tentative</option>
-        <option value="confirmed">Confirmed</option>
-        <option value="declined">Declined</option>
-        <option value="no_show">No Show</option>
-        <option value="replaced">Replaced</option>
-      </select>
-      @endif
-      @if (in_array($role, config('filmspec.manage_roles'), true) && $crewLines->count() > 0 && $booking->booking_status !== 'cancelled')
-      <form method="POST" action="{{ $actionUrl }}"
-            onsubmit="return confirm('Remove all {{ $crewLines->count() }} crew assignment(s)? Equipment and project details are left untouched.')">
-        @csrf
-        <input type="hidden" name="action" value="clear_crew">
-        <button type="submit" class="btn btn-outline btn-sm" style="border-color:var(--red);color:var(--red)"
-                title="Removes the crew only — equipment and project details untouched">
-          <i data-feather="x"></i> Clear Data
-        </button>
-      </form>
-      @endif
-      </div>
-    </div>
-    <div class="table-wrap">
-      @if ($crewLines->count() === 0)
-      <div class="empty-state"><i data-feather="users"></i><h3>No crew assigned yet</h3>
-        <p>Use the forms above to assign crew members to this booking.</p>
-      </div>
-      @else
-      @php $crewRowsManage = $isAdmin && in_array($booking->booking_status, ['pending', 'confirmed', 'ongoing']); @endphp
-      <table>
-        <thead>
-          <tr><th>Crew Member</th><th>Position</th><th>Covers Equipment</th><th>Rate</th><th>Subtotal</th><th>Status</th>
-            @if ($crewRowsManage)<th></th>@endif
-          </tr>
-        </thead>
-        <tbody>
-          @foreach ($crewLines as $cl)
-          @php $isDriver = stripos($cl->position_name ?? '', 'driver') !== false; @endphp
-          <tr data-filter="{{ $cl->assignment_status }}">
-            <td>
-              <div style="font-weight:600">{{ $cl->crew_name }}</div>
-              <div style="font-size:.75rem;color:var(--text-muted)">{{ $cl->crew_phone ?? '' }}</div>
-            </td>
-            <td>
-              @if ($isDriver)<span class="badge badge-blue" style="font-size:.7rem">Driver</span>@else{{ $cl->position_name ?? '—' }}@endif
-            </td>
-            <td style="font-size:.8rem;color:var(--text-muted)">
-              @if ($cl->linked_equipment_name)<span class="badge badge-gray" style="font-size:.7rem">{{ $cl->linked_equipment_name }}</span>@else<span style="color:var(--muted)">General</span>@endif
-            </td>
-            <td>₱{{ number_format($cl->rate_used, 2) }}/12hr</td>
-            <td style="font-weight:700;color:var(--blue-700)">₱{{ number_format($cl->subtotal, 2) }}</td>
-            <td>
-              @if ($isAdmin)
-              <form method="POST" action="{{ $actionUrl }}" style="display:inline">
-                @csrf
-                <input type="hidden" name="action" value="update_crew_status">
-                <input type="hidden" name="bk_crew_id" value="{{ $cl->bk_crew_id }}">
-                <select name="assignment_status" class="form-control" style="width:auto;padding:3px 8px;font-size:.78rem" onchange="this.form.submit()">
-                  @foreach (['tentative', 'confirmed', 'declined', 'no_show', 'replaced'] as $s)
-                  <option value="{{ $s }}" {{ $cl->assignment_status === $s ? 'selected' : '' }}>{{ ucfirst(str_replace('_', ' ', $s)) }}</option>
-                  @endforeach
-                </select>
-              </form>
-              @else
-              <span class="badge {{ $asBadge[$cl->assignment_status] ?? 'badge-gray' }}">{{ ucfirst(str_replace('_', ' ', $cl->assignment_status)) }}</span>
-              @endif
-            </td>
-            @if ($crewRowsManage)
-            <td style="text-align:right">
-              <form method="POST" action="{{ $actionUrl }}" style="display:inline" onsubmit="return confirm('Remove {{ addslashes($cl->crew_name) }} from this booking?')">
-                @csrf
-                <input type="hidden" name="action" value="remove_crew">
-                <input type="hidden" name="bk_crew_id" value="{{ $cl->bk_crew_id }}">
-                <button type="submit" class="btn btn-sm" style="background:none;border:1px solid var(--red);color:var(--red);padding:3px 8px;font-size:.72rem;border-radius:5px;cursor:pointer">
-                  <i data-feather="x" style="width:11px;height:11px"></i> Remove
-                </button>
-              </form>
-            </td>
-            @endif
-          </tr>
-          @endforeach
-        </tbody>
-        <tfoot>
-          <tr style="background:var(--blue-50)">
-            <td colspan="4" style="text-align:right;font-weight:700;padding:10px 16px;color:var(--blue-900)">Crew Total</td>
-            <td style="font-weight:800;color:var(--blue-700);padding:10px 16px">₱{{ number_format($crewLines->sum('subtotal'), 2) }}</td>
-            <td></td>
-            @if ($crewRowsManage)<td></td>@endif
-          </tr>
-        </tfoot>
-      </table>
-      @endif
-    </div>
-  </div>
-</div>
-
-<!-- ACCESSORIES TAB -->
-<div id="tab-accessories" class="tab-pane">
-@php
-  $accCanManage = $isAdmin && in_array($booking->booking_status, ['pending', 'confirmed', 'ongoing']);
-  $accDays = max(1, (int) (strtotime($booking->shoot_date_end) - strtotime($booking->shoot_date_start)) / 86400 + 1);
-@endphp
-
-@if ($accCanManage)
-<div id="accSuggestWrap" style="display:none;margin-bottom:14px">
-  <div class="card" style="border:1.5px solid #bfdbfe">
-    <div class="card-header" style="background:rgba(59,130,246,.06)">
-      <h2 class="card-title" style="font-size:.85rem;color:var(--blue-700)">
-        <i data-feather="zap" style="width:13px;height:13px;margin-right:5px;vertical-align:middle"></i>
-        Suggested Accessories
-        <span style="font-size:.72rem;font-weight:400;color:var(--text-muted);margin-left:6px">— linked to equipment on this booking</span>
-      </h2>
-    </div>
-    <div class="card-body" style="padding:10px 14px">
-      <div id="accSuggestList" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-    </div>
-  </div>
-</div>
-
-<div class="card" style="margin-bottom:14px">
-  <div class="card-header" style="background:var(--s2)">
-    <h2 class="card-title" style="font-size:.88rem">
-      <i data-feather="plus-circle" style="width:13px;height:13px;margin-right:6px;vertical-align:middle"></i>
-      Add Accessory
-    </h2>
-  </div>
-  <form method="POST" action="{{ $actionUrl }}">
-    @csrf
-    <input type="hidden" name="action" value="add_booking_accessory">
-    <div style="padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-      <div class="form-group" style="margin-bottom:0;flex:2;min-width:180px">
-        <label style="font-size:.75rem">Accessory <span style="color:var(--red)">*</span></label>
-        <select name="accessory_id" class="form-control" required id="accSelectAdd" style="font-size:.83rem">
-          <option value="">— Select accessory —</option>
-          @foreach ($allAccessoriesList as $acc)
-          @php $avail = max(0, (int) $acc->quantity - (int) $acc->qty_in_use); @endphp
-          <option value="{{ $acc->accessory_id }}" data-rate="{{ $acc->daily_rate }}" data-incl="{{ $acc->is_included }}"
-                  {{ $avail < 1 ? 'disabled style="color:var(--muted)"' : '' }} data-avail="{{ $avail }}">
-            {{ $acc->accessory_name }}
-            {{ $acc->is_included ? '(Included)' : '(₱' . number_format($acc->daily_rate, 2) . '/day)' }}
-            {{ $avail < 1 ? '— Out of stock' : "— $avail avail." }}
-          </option>
-          @endforeach
-        </select>
-      </div>
-      <div class="form-group" style="margin-bottom:0;width:80px">
-        <label style="font-size:.75rem">Qty</label>
-        <input type="number" name="quantity" class="form-control" min="1" value="1" style="font-size:.83rem" id="accQtyAdd">
-      </div>
-      <div class="form-group" style="margin-bottom:0;width:80px">
-        <label style="font-size:.75rem">Days</label>
-        <input type="number" name="days" class="form-control" min="1" value="{{ $accDays }}" style="font-size:.83rem">
-      </div>
-      <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
-        <label style="font-size:.75rem">Notes</label>
-        <input type="text" name="notes" class="form-control" placeholder="Optional" style="font-size:.83rem">
-      </div>
-      <button type="submit" class="btn btn-primary btn-sm"><i data-feather="plus" style="width:13px;height:13px"></i> Add</button>
-    </div>
-  </form>
-</div>
-@endif
-
-<div class="card">
-  <div class="card-header">
-    <h2 class="card-title"><i data-feather="package" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"></i>Accessories on Booking</h2>
-    @if ($bookingAccessories->count())
-    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
-      <div class="search-input-wrap" style="min-width:170px">
-        <i data-feather="search" style="width:13px;height:13px"></i>
-        <input type="text" id="accSearchTbl" placeholder="Search accessories…" oninput="listFilter({rowSelector:'#tab-accessories .table-wrap tbody tr', searchId:'accSearchTbl'})">
-      </div>
-      <span style="font-size:.8rem;color:var(--text-muted);white-space:nowrap">Subtotal: <strong>₱{{ number_format($bookingAccessories->sum('subtotal'), 2) }}</strong></span>
-    </div>
-    @endif
-  </div>
-  @if ($bookingAccessories->count() === 0)
-  <div class="empty-state" style="padding:32px">
-    <i data-feather="package"></i>
-    <h3>No accessories added</h3>
-    <p>Add accessories using the form above, or they will be suggested based on the equipment on this booking.</p>
-  </div>
-  @else
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Accessory</th><th>Type</th><th style="text-align:center">Qty</th><th style="text-align:center">Days</th>
-          <th style="text-align:right">Rate/Day</th><th style="text-align:right">Subtotal</th><th>Notes</th>
-          @if ($accCanManage)<th></th>@endif
-        </tr>
-      </thead>
-      <tbody>
-      @foreach ($bookingAccessories as $ba)
-      <tr>
-        <td style="font-weight:600;font-size:.85rem">{{ $ba->accessory_name }}</td>
-        <td>
-          @if ($ba->is_included)<span class="badge badge-green" style="font-size:.68rem">Included</span>
-          @else<span class="badge badge-blue" style="font-size:.68rem">Add-on</span>@endif
-        </td>
-        <td style="text-align:center">{{ (int) $ba->quantity }}</td>
-        <td style="text-align:center">{{ (int) $ba->days }}</td>
-        <td style="text-align:right;font-family:var(--font-mono);font-size:.83rem">{{ $ba->daily_rate > 0 ? '₱' . number_format($ba->daily_rate, 2) : '—' }}</td>
-        <td style="text-align:right;font-weight:700;color:var(--blue-700);font-family:var(--font-mono)">{{ $ba->daily_rate > 0 ? '₱' . number_format($ba->subtotal, 2) : 'Included' }}</td>
-        <td style="font-size:.78rem;color:var(--text-muted)">{{ $ba->notes ?: '—' }}</td>
-        @if ($accCanManage)
-        <td>
-          <form method="POST" action="{{ $actionUrl }}" onsubmit="return confirm('Remove this accessory from the booking?')">
-            @csrf
-            <input type="hidden" name="action" value="remove_booking_accessory">
-            <input type="hidden" name="ba_id" value="{{ $ba->ba_id }}">
-            <button type="submit" class="btn btn-sm" style="background:none;border:1px solid var(--red);color:var(--red);padding:3px 8px;font-size:.72rem;border-radius:5px"><i data-feather="x" style="width:11px;height:11px"></i></button>
-          </form>
-        </td>
-        @endif
-      </tr>
-      @endforeach
-      </tbody>
-      <tfoot>
-        <tr style="background:var(--blue-50)">
-          <td colspan="5" style="text-align:right;font-weight:700;padding:10px 16px;color:var(--blue-900)">Accessories Subtotal</td>
-          <td style="text-align:right;font-weight:800;color:var(--blue-700);padding:10px 16px;font-family:var(--font-mono)">₱{{ number_format($bookingAccessories->sum('subtotal'), 2) }}</td>
-          <td colspan="{{ $accCanManage ? 2 : 1 }}"></td>
-        </tr>
-      </tfoot>
-    </table>
-  </div>
-  @endif
-</div>
 </div>
 
 <!-- CANCELLATIONS TAB -->
@@ -2828,10 +2156,10 @@
       <input type="hidden" name="action" value="duplicate_booking">
       <div class="modal-body">
         <div style="background:#052e16;border:1px solid #16a34a;color:#86efac;padding:10px 12px;border-radius:6px;font-size:12px;margin-bottom:14px">
-          Creates a new booking for <strong>{{ $booking->company_name ?: $booking->contact_person }}</strong>, copying
+          Creates a new <strong>Awaiting Review</strong> draft booking for {{ $booking->company_name ?: $booking->contact_person }}, copying
           project details, {{ $equipmentLines->count() }} equipment item(s), and {{ $crewLines->count() }} crew
           member(s) from this booking. Items no longer available or with conflicting dates will be skipped — you'll
-          see which ones on the new booking.
+          see which ones on the new booking. Nothing here is confirmed until the new booking is reviewed and approved.
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -3498,6 +2826,17 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.getElementById(tab)?.classList.add('active');
         if (window.feather) feather.replace();
     });
+});
+
+// The Cost Estimate tab embeds the CE editor in an iframe. Its Add Equipment / Assign Crew /
+// Assign Transport buttons no longer carry their own modals — they postMessage up to this page
+// and reuse these same modals (openAddEquipModal/openAddCrewModal/modalAssignTransport), so
+// there's exactly one implementation of each workflow instead of two that could drift apart.
+window.addEventListener('message', (e) => {
+    if (! e.data || e.data.source !== 'ce-editor') return;
+    if (e.data.action === 'openAddEquip') openAddEquipModal();
+    else if (e.data.action === 'openAddCrew') openAddCrewModal();
+    else if (e.data.action === 'openAssignTransport') openModal('modalAssignTransport');
 });
 
 function toggleCustomReason(val) {

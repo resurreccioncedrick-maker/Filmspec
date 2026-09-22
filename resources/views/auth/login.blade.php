@@ -159,7 +159,7 @@ body{
 
     <div class="tabs">
       <button type="button" class="tbtn {{ $activeTab === 'login' ? 'on' : '' }}" onclick="switchTab('login')">Sign In</button>
-      <button type="button" class="tbtn {{ $activeTab === 'signup' ? 'on' : '' }}" onclick="switchTab('signup')">Create Account</button>
+      <button type="button" class="tbtn {{ $activeTab === 'signup' ? 'on' : '' }}" onclick="switchTab('signup')">Client Registration</button>
     </div>
 
     <!-- LOGIN -->
@@ -192,13 +192,13 @@ body{
         </div>
         <button type="submit" class="sbtn">Sign In &rarr;</button>
       </form>
-      <div class="note">Staff accounts require email verification on every sign-in.</div>
+      <div class="note">All accounts require a one-time email verification code on every sign-in.</div>
     </div>
 
     <!-- SIGNUP -->
     <div class="fs {{ $activeTab === 'signup' ? 'on' : '' }}" id="fsSignup">
-      <div class="form-title">Create account</div>
-      <div class="form-sub">Fill in your details to get started</div>
+      <div class="form-title">Client registration</div>
+      <div class="form-sub">Fill in your details to get started — staff accounts are created internally</div>
       @if ($errors->has('register'))
       <div class="err">{{ $errors->first('register') }}</div>
       @endif

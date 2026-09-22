@@ -14,6 +14,20 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AccessoriesController extends Controller
 {
+    private array $typeLabel = [
+        'package_inclusion' => 'Package Inclusion', 'optional_addon' => 'Optional Add-On',
+        'internal_operational' => 'Internal / Operational',
+    ];
+
+    private array $unitCondLabel = [
+        'excellent' => 'Excellent', 'good' => 'Good', 'serviceable' => 'Serviceable', 'damaged' => 'Damaged',
+    ];
+
+    private array $unitStatusLabel = [
+        'available' => 'Available', 'allocated' => 'Allocated', 'in_field' => 'In Field',
+        'inspection_pending' => 'Inspection Pending', 'under_maintenance' => 'Under Maintenance', 'retired' => 'Retired',
+    ];
+
     public function index(Request $request): View|JsonResponse|StreamedResponse|Response
     {
         $user = $request->user();
@@ -37,6 +51,21 @@ class AccessoriesController extends Controller
             $ids = DB::table('equipment_accessory_links')->where('accessory_id', $aid)->pluck('equipment_id');
 
             return response()->json($ids);
+        }
+
+        if ($request->has('get_links_detail')) {
+            $aid = (int) $request->query('get_links_detail');
+            $rows = DB::table('equipment_accessory_links')->where('accessory_id', $aid)
+                ->select('equipment_id', 'included_qty')->get();
+
+            return response()->json($rows);
+        }
+
+        if ($request->has('get_units')) {
+            $aid = (int) $request->query('get_units');
+            $rows = DB::table('accessory_units')->where('accessory_id', $aid)->orderBy('asset_tag')->get();
+
+            return response()->json($rows);
         }
 
         if ($request->isMethod('post') && $canManage && $request->filled('ajax_action')) {
@@ -69,6 +98,7 @@ class AccessoriesController extends Controller
                 ->sum('ba.quantity');
             $acc->in_use = $inUse;
             $acc->available = max(0, (int) ($acc->quantity ?? 1) - $inUse);
+            $acc->unit_count = (int) DB::table('accessory_units')->where('accessory_id', $acc->accessory_id)->where('status', '!=', 'retired')->count();
         }
 
         $allEquipment = DB::table('equipment as e')
@@ -88,6 +118,7 @@ class AccessoriesController extends Controller
             'msg' => null, 'canManage' => $canManage,
             'accessories' => $accessories, 'allEquipment' => $allEquipment, 'stats' => $stats,
             'search' => $search, 'inclFilter' => $inclFilter,
+            'typeLabel' => $this->typeLabel, 'unitCondLabel' => $this->unitCondLabel, 'unitStatusLabel' => $this->unitStatusLabel,
         ]);
     }
 
@@ -156,8 +187,12 @@ class AccessoriesController extends Controller
         if ($action === 'add_accessory') {
             $name = trim($request->input('accessory_name', ''));
             $desc = trim($request->input('description', ''));
-            $rate = (float) $request->input('daily_rate', 0);
-            $incl = (int) $request->input('is_included', 1);
+            $type = in_array($request->input('accessory_type'), array_keys($this->typeLabel), true) ? $request->input('accessory_type') : 'optional_addon';
+            $tracking = $request->input('tracking_method') === 'individual' ? 'individual' : 'quantity';
+            // Package Inclusion never carries its own charge; is_included stays in sync with
+            // accessory_type so every existing is_included read elsewhere keeps working.
+            $incl = $type === 'package_inclusion' ? 1 : 0;
+            $rate = $incl ? 0.0 : (float) $request->input('daily_rate', 0);
             $qty = max(1, (int) $request->input('quantity', 1));
 
             if (! $name) {
@@ -172,16 +207,24 @@ class AccessoriesController extends Controller
 
             $newId = DB::table('accessories')->insertGetId([
                 'accessory_name' => $name, 'description' => $desc, 'daily_rate' => $rate,
-                'is_included' => $incl, 'quantity' => $qty, 'image_path' => $imgPath,
+                'is_included' => $incl, 'accessory_type' => $type, 'tracking_method' => $tracking,
+                // Individually-tracked accessories don't ask for a stock number up front — units
+                // are added afterward via accessory_units, so quantity stays a nominal 1 here
+                // rather than double-counting against the real per-unit count.
+                'quantity' => $tracking === 'individual' ? 1 : $qty, 'image_path' => $imgPath,
             ]);
             foreach ((array) $request->input('equipment_ids', []) as $eid) {
                 $eid = (int) $eid;
-                if ($eid) DB::table('equipment_accessory_links')->insertOrIgnore(['equipment_id' => $eid, 'accessory_id' => $newId]);
+                if ($eid) {
+                    $incQty = (int) $request->input("included_qty.$eid", 0) ?: null;
+                    DB::table('equipment_accessory_links')->insertOrIgnore(['equipment_id' => $eid, 'accessory_id' => $newId, 'included_qty' => $incQty]);
+                }
             }
 
             return response()->json([
                 'success' => true, 'accessory_id' => $newId, 'accessory_name' => $name, 'description' => $desc,
-                'daily_rate' => $rate, 'is_included' => $incl, 'quantity' => $qty, 'image_path' => $imgPath,
+                'daily_rate' => $rate, 'is_included' => $incl, 'accessory_type' => $type, 'tracking_method' => $tracking,
+                'quantity' => $qty, 'image_path' => $imgPath,
             ]);
         }
 
@@ -189,8 +232,10 @@ class AccessoriesController extends Controller
             $aid = (int) $request->input('accessory_id');
             $name = trim($request->input('accessory_name', ''));
             $desc = trim($request->input('description', ''));
-            $rate = (float) $request->input('daily_rate', 0);
-            $incl = (int) $request->input('is_included', 1);
+            $type = in_array($request->input('accessory_type'), array_keys($this->typeLabel), true) ? $request->input('accessory_type') : 'optional_addon';
+            $tracking = $request->input('tracking_method') === 'individual' ? 'individual' : 'quantity';
+            $incl = $type === 'package_inclusion' ? 1 : 0;
+            $rate = $incl ? 0.0 : (float) $request->input('daily_rate', 0);
             $qty = max(1, (int) $request->input('quantity', 1));
 
             if (! $aid || ! $name) {
@@ -209,17 +254,22 @@ class AccessoriesController extends Controller
 
             DB::table('accessories')->where('accessory_id', $aid)->update([
                 'accessory_name' => $name, 'description' => $desc, 'daily_rate' => $rate,
-                'is_included' => $incl, 'quantity' => $qty, 'image_path' => $imgPath,
+                'is_included' => $incl, 'accessory_type' => $type, 'tracking_method' => $tracking,
+                'quantity' => $tracking === 'individual' ? $row->quantity : $qty, 'image_path' => $imgPath,
             ]);
             DB::table('equipment_accessory_links')->where('accessory_id', $aid)->delete();
             foreach ((array) $request->input('equipment_ids', []) as $eid) {
                 $eid = (int) $eid;
-                if ($eid) DB::table('equipment_accessory_links')->insertOrIgnore(['equipment_id' => $eid, 'accessory_id' => $aid]);
+                if ($eid) {
+                    $incQty = (int) $request->input("included_qty.$eid", 0) ?: null;
+                    DB::table('equipment_accessory_links')->insertOrIgnore(['equipment_id' => $eid, 'accessory_id' => $aid, 'included_qty' => $incQty]);
+                }
             }
 
             return response()->json([
                 'success' => true, 'image_path' => $imgPath, 'accessory_name' => $name,
                 'description' => $desc, 'daily_rate' => $rate, 'is_included' => $incl,
+                'accessory_type' => $type, 'tracking_method' => $tracking,
             ]);
         }
 
@@ -244,6 +294,59 @@ class AccessoriesController extends Controller
             }
 
             return response()->json(['success' => true, 'count' => count($eids)]);
+        }
+
+        if ($action === 'add_unit') {
+            $aid = (int) $request->input('accessory_id');
+            $tag = trim($request->input('asset_tag', ''));
+            if (! $aid || ! $tag) {
+                return response()->json(['success' => false, 'error' => 'Asset tag is required.']);
+            }
+            if (DB::table('accessory_units')->where('asset_tag', $tag)->exists()) {
+                return response()->json(['success' => false, 'error' => 'This asset tag is already in use.']);
+            }
+
+            $unitId = DB::table('accessory_units')->insertGetId([
+                'accessory_id' => $aid, 'asset_tag' => $tag,
+                'serial_no' => trim($request->input('serial_no', '')) ?: null,
+                'condition' => in_array($request->input('condition'), array_keys($this->unitCondLabel), true) ? $request->input('condition') : 'good',
+                'status' => in_array($request->input('status'), array_keys($this->unitStatusLabel), true) ? $request->input('status') : 'available',
+                'location' => trim($request->input('location', '')) ?: null,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            ActivityLog::record($request->user()->user_id, 'create', 'accessory', "Added physical unit $tag", $aid);
+
+            return response()->json(['success' => true, 'unit_id' => $unitId]);
+        }
+
+        if ($action === 'update_unit') {
+            $unitId = (int) $request->input('unit_id');
+            $unit = DB::table('accessory_units')->where('unit_id', $unitId)->first();
+            if (! $unit) {
+                return response()->json(['success' => false, 'error' => 'Unit not found.']);
+            }
+
+            DB::table('accessory_units')->where('unit_id', $unitId)->update([
+                'condition' => in_array($request->input('condition'), array_keys($this->unitCondLabel), true) ? $request->input('condition') : $unit->condition,
+                'status' => in_array($request->input('status'), array_keys($this->unitStatusLabel), true) ? $request->input('status') : $unit->status,
+                'location' => trim($request->input('location', '')) ?: null,
+                'updated_at' => now(),
+            ]);
+            ActivityLog::record($request->user()->user_id, 'update', 'accessory', "Updated physical unit {$unit->asset_tag}", $unit->accessory_id);
+
+            return response()->json(['success' => true]);
+        }
+
+        if ($action === 'retire_unit') {
+            $unitId = (int) $request->input('unit_id');
+            $unit = DB::table('accessory_units')->where('unit_id', $unitId)->first();
+            if (! $unit) {
+                return response()->json(['success' => false, 'error' => 'Unit not found.']);
+            }
+            DB::table('accessory_units')->where('unit_id', $unitId)->update(['status' => 'retired', 'updated_at' => now()]);
+            ActivityLog::record($request->user()->user_id, 'update', 'accessory', "Retired physical unit {$unit->asset_tag}", $unit->accessory_id);
+
+            return response()->json(['success' => true]);
         }
 
         return response()->json(['success' => false, 'error' => 'Unknown action']);

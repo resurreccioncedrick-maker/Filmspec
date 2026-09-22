@@ -165,7 +165,10 @@ class HomeController extends Controller
         }
 
         $stats = [
-            'equip' => (int) DB::table('equipment')->where('availability_status', 'available')->count(),
+            // Total catalog size, not a live per-date availability count — labeled "Equipment
+            // Items" (not "Available") since retired units are the only ones excluded, and
+            // real availability depends on the shoot dates the client hasn't picked yet.
+            'equip' => (int) DB::table('equipment')->where('availability_status', '!=', 'retired')->count(),
             'crew' => (int) DB::table('crew_members')->where('status', 'active')->count(),
             'done' => (int) DB::table('bookings')->where('booking_status', 'completed')->count(),
         ];

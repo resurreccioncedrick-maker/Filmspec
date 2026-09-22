@@ -214,7 +214,7 @@ class AttendanceController extends Controller
                 DB::raw("CONCAT(logger.first_name,' ',logger.last_name) as logged_by_name"))
             ->get();
 
-        $totalCrew = (int) DB::table('booking_crew')->where('booking_id', $bid)->where('assignment_status', '!=', 'declined')->count();
+        $totalCrew = (int) DB::table('booking_crew')->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->count();
         $presentCount = $records->whereIn('status', ['present', 'late'])->count();
         $absentCount = $records->whereIn('status', ['absent', 'no_show'])->count();
 
@@ -241,17 +241,37 @@ class AttendanceController extends Controller
                 return ['type' => 'danger', 'text' => 'Attendance date must fall within this booking\'s shoot dates (' . $shootRange->shoot_date_start . ' to ' . $shootRange->shoot_date_end . ').'];
             }
 
-            foreach ((array) $request->input('crew_status', []) as $cid => $status) {
-                $cid = (int) $cid;
-                $reason = $request->input("crew_reason.$cid", '');
-                $repId = (int) $request->input("crew_replacement.$cid", 0);
+            // The whole batch commits together — a call sheet is one logical submission, and a
+            // failure partway through must not leave some crew logged/synced and others not.
+            DB::transaction(function () use ($request, $bid, $date, $uid, &$logged) {
+                foreach ((array) $request->input('crew_status', []) as $cid => $status) {
+                    $cid = (int) $cid;
+                    $reason = $request->input("crew_reason.$cid", '');
+                    $reasonCategory = $request->input("crew_reason_category.$cid", '');
+                    $repId = (int) $request->input("crew_replacement.$cid", 0);
 
-                DB::table('crew_attendance')->updateOrInsert(
-                    ['booking_id' => $bid, 'crew_id' => $cid, 'attendance_date' => $date],
-                    ['status' => $status, 'reason' => $reason, 'replacement_crew_id' => $repId ?: null, 'logged_by' => $uid]
-                );
-                $logged++;
-            }
+                    DB::table('crew_attendance')->updateOrInsert(
+                        ['booking_id' => $bid, 'crew_id' => $cid, 'attendance_date' => $date],
+                        ['status' => $status, 'reason' => $reason, 'reason_category' => $reasonCategory ?: null, 'replacement_crew_id' => $repId ?: null, 'logged_by' => $uid]
+                    );
+                    $logged++;
+
+                    // A back-out before/during the shoot is a change to the crew member's actual
+                    // assignment on this booking, not just a log entry — keep booking_crew in
+                    // sync so schedule/roster views (which read assignment_status) reflect it
+                    // too. Correcting a mistaken back-out (re-logging that same crew member as
+                    // present/late/absent/no_show instead) reverts the assignment back to
+                    // confirmed rather than leaving them stuck as back_out permanently.
+                    $currentAssignment = DB::table('booking_crew')->where('booking_id', $bid)->where('crew_id', $cid)->value('assignment_status');
+                    if ($status === 'back_out' && $currentAssignment !== 'back_out') {
+                        DB::table('booking_crew')->where('booking_id', $bid)->where('crew_id', $cid)
+                            ->update(['assignment_status' => 'back_out']);
+                    } elseif ($status !== 'back_out' && $currentAssignment === 'back_out') {
+                        DB::table('booking_crew')->where('booking_id', $bid)->where('crew_id', $cid)
+                            ->update(['assignment_status' => 'confirmed']);
+                    }
+                }
+            });
             ActivityLog::record($uid, 'log_attendance', 'crew', "Logged $logged attendance records for booking #$bid");
 
             return ['type' => 'success', 'text' => "Attendance logged for <strong>$logged</strong> crew members."];

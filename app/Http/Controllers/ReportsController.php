@@ -56,8 +56,17 @@ class ReportsController extends Controller
             ->limit(10)
             ->get();
 
+        // 'Sales' and 'Payments Collected' are deliberately two different figures from two
+        // different tables — sales is billed booking value (what was contracted), collected is
+        // actual cash received (from the payments table). Before this fix, "Period Sales" was
+        // silently SUM(payments.amount) — the exact same query as "Payment Collection" below,
+        // just grouped differently — so the two labels always showed the same number with no
+        // real "sales" concept behind either of them.
         $kpis = [
-            'period_revenue' => (float) DB::table('payments')->whereBetween('payment_date', [$dbFrom, $dbTo])->sum('amount'),
+            'period_sales' => (float) DB::table('bookings')
+                ->where('booking_status', '!=', 'cancelled')
+                ->whereBetween('created_at', [$dbFrom, $dbTo])->sum('final_amount'),
+            'payments_collected' => (float) DB::table('payments')->whereBetween('payment_date', [$dbFrom, $dbTo])->sum('amount'),
             'total_revenue' => (float) DB::table('payments')->sum('amount'),
             'total_bookings' => (int) DB::table('bookings')->whereBetween('created_at', [$dbFrom, $dbTo])->count(),
             'completed' => (int) DB::table('bookings')->where('booking_status', 'completed')->whereBetween('created_at', [$dbFrom, $dbTo])->count(),
@@ -212,7 +221,7 @@ class ReportsController extends Controller
             'incidents' => ['Incidents Report', ['Date', 'Equipment', 'Booking', 'Type', 'Charge (PHP)', 'Status'],
                 $data['damagedReport']->map(fn ($dr) => [date('Y-m-d', strtotime($dr->incident_date)), $dr->equipment_name, $dr->booking_reference, $dr->incident_type, $dr->charge_amount, $dr->status])->all()],
             // 'ce_financials' moved to CostEstimatesController::exportFinancials() in Part 11.
-            default => ['Monthly Sales', ['Month', 'Transactions', 'Revenue (PHP)'],
+            default => ['Daily Payments Trend', ['Date', 'Transactions', 'Payments Collected (PHP)'],
                 $data['revenueData']->map(fn ($r) => [$r->label, $r->transactions, $r->total])->all()],
         };
 

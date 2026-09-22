@@ -29,23 +29,23 @@
 <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
   <div class="stat-card green">
     <div class="stat-icon"><i data-feather="dollar-sign"></i></div>
-    <div class="stat-value">₱{{ number_format($totalCollected / 1000, 1) }}k</div>
-    <div class="stat-label">Total Collected</div>
+    <div class="stat-value">₱{{ number_format($totalCollected, 2) }}</div>
+    <div class="stat-label">Total Payments Collected <span style="font-weight:400;color:var(--muted)">· All time</span></div>
   </div>
   <div class="stat-card">
     <div class="stat-icon"><i data-feather="trending-up"></i></div>
-    <div class="stat-value">₱{{ number_format($monthCollected / 1000, 1) }}k</div>
-    <div class="stat-label">This Month</div>
+    <div class="stat-value">₱{{ number_format($monthCollected, 2) }}</div>
+    <div class="stat-label">Payments Received This Month</div>
   </div>
   <div class="stat-card orange">
     <div class="stat-icon"><i data-feather="clock"></i></div>
-    <div class="stat-value">₱{{ number_format($outstanding / 1000, 1) }}k</div>
-    <div class="stat-label">Outstanding</div>
+    <div class="stat-value">₱{{ number_format($outstanding, 2) }}</div>
+    <div class="stat-label">Outstanding Receivables</div>
   </div>
   <div class="stat-card {{ $overdueCount > 0 ? 'red' : '' }}">
     <div class="stat-icon"><i data-feather="alert-triangle"></i></div>
     <div class="stat-value">{{ $overdueCount }}</div>
-    <div class="stat-label">Overdue Billings</div>
+    <div class="stat-label">Overdue Accounts <span style="font-weight:400;color:var(--muted)">· As of today</span></div>
   </div>
 </div>
 
@@ -153,9 +153,10 @@
         </thead>
         <tbody>
           @foreach ($payments as $pay)
-          <tr>
-            <td style="font-family:monospace;font-size:.83rem;font-weight:600">
-              {{ $pay->receipt_number ?: '—' }}
+          @php $isReversal = (float) $pay->amount < 0; @endphp
+          <tr style="{{ $pay->is_voided ? 'opacity:.6' : '' }}">
+            <td style="font-family:monospace;font-size:.83rem;font-weight:600;{{ $pay->is_voided ? 'text-decoration:line-through' : '' }}">
+              {{ $pay->receipt_number ?: ($isReversal ? 'REVERSAL' : '—') }}
             </td>
             <td>
               <a href="{{ $bookingUrl($pay->booking_id) }}" style="color:var(--accent);font-weight:600">
@@ -165,15 +166,29 @@
             <td>{{ $pay->company_name ?: $pay->contact_person }}</td>
             <td><span class="badge {{ $ptBadge[$pay->payment_type] ?? 'badge-gray' }}">{{ ucfirst($pay->payment_type) }}</span></td>
             <td><span class="badge {{ $pmBadge[$pay->payment_method] ?? 'badge-gray' }}">{{ ucwords(str_replace('_', ' ', $pay->payment_method)) }}</span></td>
-            <td style="font-weight:700;color:var(--accent)">₱{{ number_format($pay->amount, 2) }}</td>
+            <td style="font-weight:700;color:{{ $isReversal ? 'var(--red)' : 'var(--accent)' }}">₱{{ number_format($pay->amount, 2) }}</td>
             <td>{{ \Illuminate\Support\Carbon::parse($pay->payment_date)->format('M j, Y') }}</td>
-            <td><span class="badge {{ $rcBadge[$pay->receipt_type] ?? 'badge-gray' }}" style="font-size:.65rem">
-              {{ $pay->receipt_type === 'official_receipt' ? 'OR (VAT)' : 'AR (Non-VAT)' }}
-            </span></td>
+            <td>
+              @if ($pay->is_voided)
+              <span class="badge badge-red" style="font-size:.65rem" title="{{ $pay->void_reason }}">Voided</span>
+              @elseif ($isReversal)
+              <span class="badge badge-gray" style="font-size:.65rem">Reversal</span>
+              @else
+              <span class="badge {{ $rcBadge[$pay->receipt_type] ?? 'badge-gray' }}" style="font-size:.65rem">
+                {{ $pay->receipt_type === 'official_receipt' ? 'OR (VAT)' : 'AR (Non-VAT)' }}
+              </span>
+              @endif
+            </td>
             <td style="white-space:nowrap">
               <a href="{{ route('billing-print', ['print_receipt' => $pay->payment_id]) }}" class="btn btn-outline btn-sm" title="Print / Save as PDF">
                 <i data-feather="printer"></i>
               </a>
+              @if ($canRecord && ! $pay->is_voided && ! $isReversal)
+              <button type="button" class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" title="Void Payment"
+                      onclick="openVoidPayment({{ $pay->payment_id }}, {{ json_encode($pay->receipt_number ?: ('#'.$pay->payment_id)) }})">
+                <i data-feather="rotate-ccw"></i>
+              </button>
+              @endif
             </td>
           </tr>
           @endforeach
@@ -323,8 +338,11 @@
             </td>
             <td><span class="badge {{ $soaBadge[$soa->status] ?? 'badge-gray' }}">{{ ucfirst($soa->status) }}</span></td>
             <td style="white-space:nowrap">
-              <a href="{{ route('billing-print', ['print_soa' => $soa->soa_id]) }}" class="btn btn-outline btn-sm" title="Print / Save as PDF">
+              <a href="{{ route('billing-print', ['print_soa' => $soa->soa_id]) }}" class="btn btn-outline btn-sm" title="Print Statement of Account">
                 <i data-feather="printer"></i>
+              </a>
+              <a href="{{ route('billing-print', ['print_invoice' => $soa->soa_id]) }}" class="btn btn-outline btn-sm" title="View Invoice">
+                <i data-feather="file-text"></i>
               </a>
             </td>
           </tr>
@@ -700,6 +718,36 @@
   </div>
 </div>
 
+<!-- VOID PAYMENT MODAL -->
+<div class="modal-overlay" id="modalVoidPayment">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <h3 class="modal-title"><i data-feather="rotate-ccw" style="width:16px;height:16px;margin-right:6px;vertical-align:middle;color:var(--red)"></i>Void Payment</h3>
+      <button class="modal-close" data-modal-close><i data-feather="x"></i></button>
+    </div>
+    <form method="POST" action="{{ $billingBase }}">
+      @csrf
+      <input type="hidden" name="action" value="void_payment">
+      <input type="hidden" name="payment_id" id="voidPaymentId">
+      <div class="modal-body">
+        <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:13px">
+          Voiding <strong id="voidPaymentLabel"></strong> does not delete it — it's flagged as voided and a matching reversing entry is recorded, so the booking's balance updates correctly and the full history stays visible for audit.
+        </div>
+        <div class="form-group">
+          <label>Reason *</label>
+          <textarea name="void_reason" class="form-control" rows="2" placeholder="e.g. Duplicate entry, wrong amount, client dispute…" required></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-danger">
+          <i data-feather="rotate-ccw" style="width:13px;height:13px;margin-right:4px;vertical-align:middle"></i>Void Payment
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- APPROVE DISCOUNT MODAL -->
 <div class="modal-overlay" id="modalApproveDiscount">
   <div class="modal" style="max-width:440px">
@@ -762,6 +810,11 @@
 
 @push('scripts')
 <script>
+function openVoidPayment(paymentId, label) {
+  document.getElementById('voidPaymentId').value = paymentId;
+  document.getElementById('voidPaymentLabel').textContent = label;
+  openModal('modalVoidPayment');
+}
 function openApproveDiscountModal(discountId, bookingId, label) {
   document.getElementById('approveDiscountId').value = discountId;
   document.getElementById('approveDiscountBookingId').value = bookingId;

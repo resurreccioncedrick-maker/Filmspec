@@ -505,7 +505,88 @@ class BillingController extends Controller
             return $this->rejectDiscount($request, $uid);
         }
 
+        if ($action === 'void_payment') {
+            return $this->voidPayment($request, $uid);
+        }
+
         return null;
+    }
+
+    /**
+     * Void/Reversal — genuinely new; no payment-deletion capability existed before this.
+     * Append-only: the original row is only flagged (is_voided/voided_by/voided_at/void_reason),
+     * never mutated or deleted. The actual balance correction is a separate negative-amount
+     * reversing row (reversal_of_id points back at the original) so every existing
+     * SUM(payments.amount) call site across the app (booking detail, billing, dashboard,
+     * reports, client detail) nets out correctly with no changes needed there.
+     */
+    private function voidPayment(Request $request, int $uid): array
+    {
+        $pid = (int) $request->input('payment_id');
+        $reason = trim((string) $request->input('void_reason', ''));
+        if ($reason === '') {
+            return ['type' => 'danger', 'text' => 'A reason is required to void a payment.'];
+        }
+
+        // Payment is re-read and locked inside the transaction (not just checked beforehand) so
+        // two near-simultaneous void requests for the same payment can't both read is_voided=0
+        // and both insert a reversing entry — same race class record_payment already guards
+        // against for overpayment, via the same lockForUpdate()-inside-transaction pattern.
+        $result = DB::transaction(function () use ($pid, $reason, $uid) {
+            $payment = DB::table('payments')->where('payment_id', $pid)->lockForUpdate()->first();
+            if (! $payment) {
+                return ['type' => 'danger', 'text' => 'Payment not found.'];
+            }
+            if ($payment->is_voided) {
+                return ['type' => 'danger', 'text' => 'This payment has already been voided.'];
+            }
+            if ((float) $payment->amount < 0) {
+                return ['type' => 'danger', 'text' => 'This is itself a reversing entry and cannot be voided.'];
+            }
+
+            DB::table('payments')->where('payment_id', $pid)->update([
+                'is_voided' => 1, 'voided_by' => $uid, 'voided_at' => now(), 'void_reason' => $reason,
+            ]);
+
+            DB::table('payments')->insert([
+                'booking_id' => $payment->booking_id, 'payment_type' => $payment->payment_type,
+                'payment_method' => $payment->payment_method, 'amount' => -1 * (float) $payment->amount,
+                'reference_number' => $payment->receipt_number, 'payment_date' => now()->toDateString(),
+                'received_by' => $uid, 'is_vat' => $payment->is_vat, 'receipt_number' => null,
+                'receipt_type' => $payment->receipt_type, 'notes' => 'Reversal: ' . $reason,
+                'reversal_of_id' => $pid,
+            ]);
+
+            $bid = $payment->booking_id;
+            $paid = (float) DB::table('payments')->where('booking_id', $bid)->sum('amount');
+            $total = (float) DB::table('bookings')->where('booking_id', $bid)->value('final_amount');
+            $currentStatus = (string) DB::table('bookings')->where('booking_id', $bid)->value('payment_status');
+            if (! in_array($currentStatus, ['refunded', 'cancelled'], true)) {
+                $payStatus = $paid <= 0 ? 'unpaid' : ($total > 0 && $paid >= $total ? 'paid' : 'partial');
+                DB::table('bookings')->where('booking_id', $bid)->update(['payment_status' => $payStatus, 'updated_at' => now()]);
+            }
+
+            $soaExists = DB::table('statement_of_accounts')->where('booking_id', $bid)->value('soa_id');
+            if ($soaExists) {
+                $balance = max(0, $total - $paid);
+                $soaStatus = $balance <= 0 ? 'paid' : ($paid > 0 ? 'issued' : 'draft');
+                DB::table('statement_of_accounts')->where('booking_id', $bid)->update([
+                    'total_payments' => $paid, 'balance' => $balance, 'status' => $soaStatus,
+                ]);
+            }
+
+            return ['receipt_number' => $payment->receipt_number];
+        });
+
+        // An error array returned from inside the transaction (payment missing/already
+        // voided/negative) has a 'type' key; the success path's return doesn't.
+        if (isset($result['type'])) {
+            return $result;
+        }
+
+        ActivityLog::record($uid, 'void', 'billing', 'Payment ' . ($result['receipt_number'] ?? "#$pid") . " voided: $reason", $pid);
+
+        return ['type' => 'success', 'text' => 'Payment voided and a reversing entry recorded.'];
     }
 
     // Propose happens on the Bookings page (and, for clients, their booking page); this is

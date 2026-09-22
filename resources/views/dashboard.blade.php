@@ -20,23 +20,54 @@
 }
 .dash-title { font-family:var(--font-display);font-size:24px;letter-spacing:.5px;color:var(--text);line-height:1; }
 .dash-date  { font-size:12px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:5px; }
-.dash-status-pills { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
-.dash-pill {
-  display:inline-flex;align-items:center;gap:6px;
-  padding:6px 13px;border-radius:20px;font-size:12px;font-weight:600;
-  border:1.5px solid var(--border);background:var(--surface);color:var(--sub);
-  white-space:nowrap;
-}
-.dash-pill i { width:13px;height:13px; }
-.dash-pill.blue   { background:var(--acclight);border-color:rgba(0,96,199,.2);color:var(--accent); }
-.dash-pill.green  { background:var(--greenl);border-color:rgba(22,163,74,.2);color:var(--green); }
-.dash-pill.red    { background:var(--redl);border-color:rgba(220,38,38,.2);color:var(--red); }
-.dash-pill.orange { background:var(--orangel);border-color:rgba(234,88,12,.2);color:var(--orange); }
+
+/* Needs Attention */
+.attn-wrap { background:#fef2f2;border:1px solid #fecaca;border-radius:var(--radius-md);padding:18px 20px;margin-bottom:20px; }
+.attn-head { display:flex;align-items:center;gap:8px;margin-bottom:14px;font-weight:700;font-size:14px;color:#991b1b; }
+.attn-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:14px; }
+.attn-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px; }
+.attn-card .num { font-family:var(--font-display);font-size:26px;color:var(--text);line-height:1;display:flex;align-items:center;gap:8px; }
+.attn-card .lbl { font-size:12px;color:var(--sub);font-weight:600;margin-top:4px; }
+.attn-card a { font-size:11.5px;color:var(--accent);text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:3px;margin-top:8px; }
+.attn-card a:hover { text-decoration:underline; }
+.attn-card.clear { opacity:.55; }
+
+/* Today's Operations */
+.today-ops-grid { display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px; }
+.today-ops-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow-sm); }
+.today-ops-card .icon { width:30px;height:30px;border-radius:8px;background:var(--acclight);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:8px; }
+.today-ops-card .num { font-family:var(--font-display);font-size:24px;color:var(--text);line-height:1; }
+.today-ops-card .lbl { font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-top:4px; }
+
 .dash-grid-main { display:grid;grid-template-columns:1fr 320px;gap:18px;margin-bottom:20px; }
 .dash-grid-bottom { display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px; }
 
+/* Equipment Status — Command Strip: one proportional bar (fleet health at a glance) above a
+   4-column number strip, rather than four disconnected numbers with no shared scale. */
+.eqbar-track { height:6px;background:var(--s3);overflow:hidden;display:flex;margin:0; }
+.eqbar-seg { height:100%; }
+.eqstat-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--border); }
+.eqstat-cell { padding:12px 10px;border-right:1px solid var(--border); }
+.eqstat-cell:last-child { border-right:none; }
+.eqstat-cell .num { font-family:var(--font-display);font-size:22px;color:var(--text);line-height:1; }
+.eqstat-cell .lbl { font-size:9.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-top:4px; }
+
+/* Financial Snapshot */
+.fin-snap { padding:16px 18px 6px; }
+.fin-snap .val { font-family:var(--font-display);font-size:32px;color:var(--text);line-height:1; }
+.fin-snap .lbl { font-size:11px;color:var(--muted);margin-top:4px; }
+.fin-bars { display:flex;align-items:flex-end;gap:4px;height:36px;margin-top:12px; }
+.fin-bar { width:10px;border-radius:2px 2px 0 0;background:var(--acclight); }
+.fin-bar.last { background:var(--accent); }
+
+/* Command Strip's compact agenda — next few shoot days, no need to open the calendar */
+.fin-agenda { padding:12px 18px 16px;border-top:1px solid var(--border);margin-top:14px;display:flex;flex-direction:column;gap:8px; }
+.fin-agenda-row { display:flex;gap:10px;align-items:baseline;font-size:12px; }
+.fin-agenda-date { font-family:var(--font-mono);font-weight:700;color:var(--accent);width:52px;flex-shrink:0; }
+.fin-agenda-txt { color:var(--sub); }
+
 /* Calendar */
-.cal-wrap { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;box-shadow:var(--shadow-sm);margin-bottom:20px; }
+.cal-wrap { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;box-shadow:var(--shadow-sm);margin-bottom:0;height:100%; }
 .cal-head { display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border); }
 .cal-nav-btn { width:32px;height:32px;border:1px solid var(--border);border-radius:8px;background:var(--s2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;color:var(--sub); }
 .cal-nav-btn:hover { background:var(--accent);border-color:var(--accent);color:#fff; }
@@ -45,7 +76,7 @@
 .cal-dow-cell { padding:8px 4px;text-align:center;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted); }
 .cal-dow-cell:first-child,.cal-dow-cell:last-child { color:var(--red); }
 .cal-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);padding:1px; }
-.cal-cell { background:var(--surface);min-height:90px;padding:6px;position:relative;cursor:pointer;transition:background .1s; }
+.cal-cell { background:var(--surface);min-height:74px;padding:6px;position:relative;cursor:pointer;transition:background .1s; }
 .cal-cell:hover { background:var(--acclight); }
 .cal-cell.other-month { background:var(--s2); }
 .cal-cell.other-month .cal-day-num { color:var(--border2); }
@@ -68,10 +99,11 @@
 .activity-action { font-size:12px;color:var(--sub);margin-top:1px; }
 .activity-time { font-size:10px;color:var(--muted);white-space:nowrap;margin-top:2px; }
 
-/* Today sidebar */
-.today-shoot { display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-bottom:1px solid var(--border); }
-.today-shoot:last-child { border-bottom:none; }
-.today-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px; }
+@media (max-width:1100px) {
+  .today-ops-grid { grid-template-columns:repeat(2,1fr); }
+  .attn-grid { grid-template-columns:1fr; }
+  .dash-grid-main { grid-template-columns:1fr; }
+}
 </style>
 
 <!-- ══ PAGE HEADER ══ -->
@@ -79,279 +111,279 @@
   <div class="dash-header-left">
     <div class="dash-icon-wrap"><i data-feather="grid" style="width:20px;height:20px"></i></div>
     <div>
-      <div class="dash-title">Dashboard</div>
+      <div class="dash-title">Operations Dashboard</div>
       <div class="dash-date">
         <i data-feather="calendar" style="width:11px;height:11px"></i>
         {{ now()->format('l, F j, Y') }}
       </div>
     </div>
   </div>
-  <div class="dash-status-pills">
-    <div class="dash-pill {{ $activeBookings ? 'blue' : '' }}">
-      <i data-feather="layers"></i>
-      {{ $activeBookings }} active booking{{ $activeBookings != 1 ? 's' : '' }}
+</div>
+
+<!-- ══ NEEDS ATTENTION ══ -->
+@php $needsAttentionTotal = $pendingApprovalCount + $overdueReturns + $openIncidents; @endphp
+<div class="attn-wrap" style="{{ $needsAttentionTotal === 0 ? 'background:var(--greenl);border-color:rgba(22,163,74,.25)' : '' }}">
+  <div class="attn-head" style="{{ $needsAttentionTotal === 0 ? 'color:var(--green)' : '' }}">
+    <i data-feather="{{ $needsAttentionTotal === 0 ? 'check-circle' : 'alert-triangle' }}" style="width:16px;height:16px"></i>
+    Needs Attention
+    <span style="font-weight:400;font-size:11.5px;opacity:.8">— items that require your action</span>
+  </div>
+  <div class="attn-grid">
+    <div class="attn-card {{ $pendingApprovalCount === 0 ? 'clear' : '' }}">
+      <div class="num"><i data-feather="file-text" style="width:18px;height:18px;color:var(--orange)"></i>{{ $pendingApprovalCount }}</div>
+      <div class="lbl">Requests Awaiting Review</div>
+      <a href="{{ route('bookings') }}?approval=pending_approval">View Requests <i data-feather="arrow-right" style="width:11px;height:11px"></i></a>
     </div>
-    @if (count($todayShoots))
-    <div class="dash-pill green">
-      <i data-feather="video"></i>
-      {{ count($todayShoots) }} shoot{{ count($todayShoots) != 1 ? 's' : '' }} today
+    <div class="attn-card {{ $overdueReturns === 0 ? 'clear' : '' }}">
+      <div class="num"><i data-feather="rotate-ccw" style="width:18px;height:18px;color:var(--red)"></i>{{ $overdueReturns }}</div>
+      <div class="lbl">Overdue Returns</div>
+      <a href="{{ route('bookings') }}?status=ongoing">View Overdue <i data-feather="arrow-right" style="width:11px;height:11px"></i></a>
     </div>
-    @endif
-    @if ($pendingApprovalCount)
-    <div class="dash-pill orange">
-      <i data-feather="clock"></i>
-      {{ $pendingApprovalCount }} pending approval
+    <div class="attn-card {{ $openIncidents === 0 ? 'clear' : '' }}">
+      <div class="num"><i data-feather="alert-triangle" style="width:18px;height:18px;color:var(--red)"></i>{{ $openIncidents }}</div>
+      <div class="lbl">Open Incidents</div>
+      <a href="{{ route('incidents') }}">View Incidents <i data-feather="arrow-right" style="width:11px;height:11px"></i></a>
     </div>
-    @endif
-    @if ($openIncidents)
-    <div class="dash-pill red">
-      <i data-feather="alert-triangle"></i>
-      {{ $openIncidents }} open incident{{ $openIncidents != 1 ? 's' : '' }}
-    </div>
-    @endif
   </div>
 </div>
 
-<!-- ══ KPI CARDS ══ -->
-<div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
-  <div class="stat-card">
-    <div class="stat-icon"><i data-feather="layers"></i></div>
-    <div class="stat-value">{{ $totalBookings }}</div>
-    <div class="stat-label">Total Bookings</div>
-    <span class="stat-delta up"><i data-feather="activity"></i> {{ $activeBookings }} active now</span>
+<!-- ══ TODAY'S OPERATIONS ══ -->
+<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">
+  Today's Operations — what's happening today
+</div>
+<div class="today-ops-grid">
+  <div class="today-ops-card">
+    <div class="icon"><i data-feather="video" style="width:15px;height:15px"></i></div>
+    <div class="num">{{ count($todayShoots) }}</div>
+    <div class="lbl">Shoots Today</div>
   </div>
-  <div class="stat-card {{ $pendingApprovalCount > 0 ? 'orange' : '' }}">
-    <div class="stat-icon" style="{{ $pendingApprovalCount > 0 ? 'background:var(--orangel);color:var(--orange)' : '' }}"><i data-feather="clock"></i></div>
-    <div class="stat-value">{{ $pendingApprovalCount }}</div>
-    <div class="stat-label">Pending Approval</div>
-    <span class="stat-delta {{ $pendingApprovalCount > 0 ? 'down' : 'up' }}">
-      <i data-feather="{{ $pendingApprovalCount > 0 ? 'alert-triangle' : 'check' }}"></i>
-      {{ $pendingApprovalCount > 0 ? 'Needs review' : 'All clear' }}
-    </span>
+  <div class="today-ops-card">
+    <div class="icon" style="background:var(--greenl);color:var(--green)"><i data-feather="upload" style="width:15px;height:15px"></i></div>
+    <div class="num">{{ $unitsDueOutToday }}</div>
+    <div class="lbl">Units Due Out</div>
   </div>
-  @if ($canSeeFinancials)
-  <div class="stat-card green">
-    <div class="stat-icon" style="background:var(--greenl);color:var(--green)"><i data-feather="dollar-sign"></i></div>
-    <div class="stat-value">₱{{ number_format($totalRevenue / 1000, 1) }}k</div>
-    <div class="stat-label">Sales This Month</div>
-    <span class="stat-delta up"><i data-feather="trending-up"></i> Payments received</span>
+  <div class="today-ops-card">
+    <div class="icon" style="background:var(--orangel);color:var(--orange)"><i data-feather="download" style="width:15px;height:15px"></i></div>
+    <div class="num">{{ $dueBackToday }}</div>
+    <div class="lbl">Due Back Today</div>
   </div>
-  @else
-  <div class="stat-card">
-    <div class="stat-icon"><i data-feather="users"></i></div>
-    <div class="stat-value">{{ $activeCrewCount }}</div>
-    <div class="stat-label">Active Crew</div>
-    <span class="stat-delta up"><i data-feather="check"></i> On roster</span>
+  <div class="today-ops-card">
+    <div class="icon" style="background:#f3e8ff;color:#7c3aed"><i data-feather="box" style="width:15px;height:15px"></i></div>
+    <div class="num">{{ $rentedEquipment }}</div>
+    <div class="lbl">Units in Field</div>
   </div>
-  @endif
-  <div class="stat-card">
-    <div class="stat-icon"><i data-feather="camera"></i></div>
-    <div class="stat-value">{{ $availableEquipment }}<span style="font-size:16px;color:var(--muted)"> / {{ $totalEquipment }}</span></div>
-    <div class="stat-label">Equipment Available</div>
-    <span class="stat-delta {{ $rentedEquipment > 0 ? 'down' : 'up' }}">
-      <i data-feather="box"></i> {{ $rentedEquipment }} in field
-    </span>
+  <div class="today-ops-card">
+    <div class="icon" style="background:#e0f2fe;color:#0891b2"><i data-feather="users" style="width:15px;height:15px"></i></div>
+    <div class="num">{{ $crewOnScheduleToday }}</div>
+    <div class="lbl">Crew on Schedule</div>
   </div>
 </div>
 
-<!-- ══ MAIN CONTENT ROW ══ -->
+<!-- ══ CALENDAR + EQUIPMENT STATUS ══ -->
 <div class="dash-grid-main">
 
-  <!-- Recent Bookings -->
-  <div class="card" style="margin-bottom:0">
-    <div class="card-header">
-      <h2 class="card-title"><i data-feather="layers" style="width:14px;height:14px"></i> Recent Bookings</h2>
-      <a href="{{ route('bookings') }}" class="btn btn-outline btn-sm">View All <i data-feather="arrow-right" style="width:12px;height:12px"></i></a>
-    </div>
-    @if (empty($recentBookings) || count($recentBookings) === 0)
-    <div class="empty-state"><i data-feather="calendar"></i><h3>No bookings yet</h3></div>
-    @else
-    <div class="table-wrap card-scroll">
-      <table>
-        <thead>
-          <tr><th>Ref</th><th>Client</th><th>Project</th><th>Date</th><th>Amount</th><th>Status</th></tr>
-        </thead>
-        <tbody>
-          @foreach ($recentBookings as $rb)
-          <tr style="cursor:pointer" onclick="window.location='{{ route('booking-detail', $rb->booking_id) }}'">
-            <td style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--accent)">{{ $rb->booking_reference }}</td>
-            <td style="font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $rb->company_name ?: $rb->contact_person }}</td>
-            <td style="color:var(--sub);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $rb->project_title ?: '—' }}</td>
-            <td style="font-size:11.5px;color:var(--muted);white-space:nowrap">{{ \Carbon\Carbon::parse($rb->shoot_date_start)->format('M j, Y') }}</td>
-            <td style="font-weight:700;color:var(--accent);font-size:12px">{{ $canSeeFinancials && $rb->final_amount > 0 ? '₱' . number_format($rb->final_amount, 0) : '—' }}</td>
-            <td>
-              <span class="badge {{ $statusBadge[$rb->booking_status] ?? '' }}" style="font-size:10px">
-                {{ ucfirst(str_replace('_', ' ', $rb->booking_status)) }}
-              </span>
-              @if (($rb->approval_status ?? '') === 'pending_approval')
-              <span class="badge badge-orange" style="font-size:9px;margin-left:3px">Pending OM</span>
-              @endif
-            </td>
-          </tr>
-          @endforeach
-        </tbody>
-      </table>
-    </div>
-    @endif
-  </div>
-
-  <!-- Sidebar -->
-  <div style="display:flex;flex-direction:column;gap:16px">
-
-    <!-- Today's Shoots -->
-    <div class="card" style="margin-bottom:0">
-      <div class="card-header">
-        <h2 class="card-title"><i data-feather="video" style="width:14px;height:14px"></i> Today's Shoots</h2>
-        <span class="badge {{ count($todayShoots) ? 'badge-blue' : 'badge-gray' }}">{{ count($todayShoots) }}</span>
-      </div>
-      @if (empty($todayShoots) || count($todayShoots) === 0)
-      <div class="card-body" style="padding:20px;text-align:center">
-        <div style="color:var(--green);margin-bottom:6px"><i data-feather="check-circle" style="width:28px;height:28px"></i></div>
-        <p style="font-size:12.5px;color:var(--muted)">No shoots scheduled today.</p>
-      </div>
-      @else
-      <div class="card-scroll-sm">
-        @foreach ($todayShoots as $ts)
-        <div class="today-shoot">
-          <div class="today-dot" style="background:{{ $ts->booking_status === 'ongoing' ? 'var(--green)' : 'var(--accent)' }}"></div>
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:600;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $ts->project_title ?: $ts->booking_reference }}</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:2px">{{ $ts->company_name ?: $ts->contact_person }}</div>
-            <span class="badge {{ $statusBadge[$ts->booking_status] ?? '' }}" style="font-size:9px;margin-top:4px">{{ ucfirst($ts->booking_status) }}</span>
-          </div>
-          <a href="{{ route('booking-detail', $ts->booking_id) }}" class="btn btn-outline btn-sm" style="padding:3px 8px;font-size:10px">View</a>
+  <!-- Upcoming Calendar -->
+  <div class="cal-wrap">
+    <div class="cal-head">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="cal-nav-btn" onclick="calPrev()"><i data-feather="chevron-left" style="width:14px;height:14px"></i></button>
+        <div>
+          <div class="cal-month-title" id="calTitle"></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:1px" id="calSub"></div>
         </div>
-        @endforeach
+        <button class="cal-nav-btn" onclick="calNext()"><i data-feather="chevron-right" style="width:14px;height:14px"></i></button>
       </div>
-      @endif
-    </div>
-
-    <!-- Quick Stats -->
-    <div class="card" style="margin-bottom:0">
-      <div class="card-header"><h2 class="card-title"><i data-feather="bar-chart-2" style="width:14px;height:14px"></i> Quick Stats</h2></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
-        @php
-          $qs = [
-            ['Active Crew', $activeCrewCount, 'badge-green', 'users'],
-            ['Rented Units', $rentedEquipment, 'badge-orange', 'box'],
-            ['Open Incidents', $openIncidents, $openIncidents > 0 ? 'badge-red' : 'badge-gray', 'alert-triangle'],
-            ['This Week', $upcomingCount, 'badge-blue', 'calendar'],
-          ];
-        @endphp
-        @foreach ($qs as $i => [$lbl, $val, $badge, $icon])
-        <div style="padding:14px 16px;{{ $i % 2 === 0 ? 'border-right:1px solid var(--border)' : '' }};border-bottom:1px solid var(--border)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-            <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600">{{ $lbl }}</span>
-            <i data-feather="{{ $icon }}" style="width:12px;height:12px;color:var(--muted)"></i>
-          </div>
-          <div style="font-family:var(--font-display);font-size:26px;color:var(--text);line-height:1">{{ $val }}</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--sub)">
+          <span style="width:10px;height:10px;background:var(--acclight);border-left:2px solid var(--accent);border-radius:1px;display:inline-block"></span> Confirmed &nbsp;
+          <span style="width:10px;height:10px;background:var(--greenl);border-left:2px solid var(--green);border-radius:1px;display:inline-block"></span> Ongoing &nbsp;
+          <span style="width:10px;height:10px;background:var(--yellowl);border-left:2px solid var(--yellow);border-radius:1px;display:inline-block"></span> Pending
         </div>
-        @endforeach
+        <button class="btn btn-outline btn-sm" onclick="calGoToday()" style="font-size:11px">Today</button>
       </div>
     </div>
-
-  </div>
-</div>
-
-<!-- ══ CALENDAR ══ -->
-<div class="cal-wrap">
-  <div class="cal-head">
-    <div style="display:flex;align-items:center;gap:12px">
-      <button class="cal-nav-btn" onclick="calPrev()"><i data-feather="chevron-left" style="width:14px;height:14px"></i></button>
-      <div>
-        <div class="cal-month-title" id="calTitle"></div>
-        <div style="font-size:11px;color:var(--muted);margin-top:1px" id="calSub"></div>
-      </div>
-      <button class="cal-nav-btn" onclick="calNext()"><i data-feather="chevron-right" style="width:14px;height:14px"></i></button>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px">
-      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--sub)">
-        <span style="width:10px;height:10px;background:var(--acclight);border-left:2px solid var(--accent);border-radius:1px;display:inline-block"></span> Confirmed &nbsp;
-        <span style="width:10px;height:10px;background:var(--greenl);border-left:2px solid var(--green);border-radius:1px;display:inline-block"></span> Ongoing &nbsp;
-        <span style="width:10px;height:10px;background:var(--yellowl);border-left:2px solid var(--yellow);border-radius:1px;display:inline-block"></span> Pending
-      </div>
-      <button class="btn btn-outline btn-sm" onclick="calGoToday()" style="font-size:11px">Today</button>
-    </div>
-  </div>
-  <div class="cal-dow">
-    @foreach (['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $d)
-    <div class="cal-dow-cell">{{ $d }}</div>
-    @endforeach
-  </div>
-  <div class="cal-grid" id="calGrid"></div>
-</div>
-
-<!-- ══ BOTTOM ROW ══ -->
-<div class="dash-grid-bottom">
-
-  <!-- Equipment in Field -->
-  <div class="card" style="margin-bottom:0">
-    <div class="card-header">
-      <h2 class="card-title"><i data-feather="box" style="width:14px;height:14px"></i> Equipment in Field</h2>
-      <span class="badge {{ $rentedEquipment > 0 ? 'badge-orange' : 'badge-green' }}">{{ $rentedEquipment }} rented</span>
-    </div>
-    @if (empty($rentedAll) || count($rentedAll) === 0)
-    <div class="empty-state" style="padding:28px 0">
-      <i data-feather="check-circle"></i>
-      <h3>All equipment available</h3>
-    </div>
-    @else
-    <div class="table-wrap card-scroll">
-      <table>
-        <thead><tr><th>Equipment</th><th>Brand</th><th>Category</th><th>Status</th></tr></thead>
-        <tbody>
-          @foreach ($rentedAll as $r)
-          <tr>
-            <td style="font-weight:600">{{ $r->equipment_name }}</td>
-            <td style="color:var(--muted);font-size:12px">{{ $r->brand ?? '—' }}</td>
-            <td style="color:var(--muted);font-size:12px">{{ $r->category_name }}</td>
-            <td><span class="badge badge-orange">In Field</span></td>
-          </tr>
-          @endforeach
-        </tbody>
-      </table>
-    </div>
-    @endif
-  </div>
-
-  <!-- Activity Feed -->
-  <div class="card" style="margin-bottom:0">
-    <div class="card-header">
-      <h2 class="card-title"><i data-feather="activity" style="width:14px;height:14px"></i> Recent Activity</h2>
-      @if (in_array($userRole, ['super_admin', 'operations_manager'], true))
-      <a href="{{ route('activity') }}" class="btn btn-outline btn-sm" style="font-size:11px">Full Log</a>
-      @endif
-    </div>
-    @if (empty($recentActivity) || count($recentActivity) === 0)
-    <div class="empty-state" style="padding:28px 0"><i data-feather="activity"></i><h3>No activity yet</h3></div>
-    @else
-    <div class="card-scroll-sm">
-      @foreach ($recentActivity as $al)
-      @php
-        $initials = strtoupper(substr($al->first_name ?? 'S', 0, 1));
-        $avatarColor = $roleColors[$al->role_name ?? ''] ?? '#94a3b8';
-        $actionLabel = str_replace(['_'], [' '], $al->action);
-        $moduleLabel = ucfirst($al->module ?? '');
-      @endphp
-      <div class="activity-item">
-        <div class="activity-avatar" style="background:{{ $avatarColor }}">{{ $initials }}</div>
-        <div class="activity-body">
-          <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">
-            <span class="activity-user">{{ $al->user_name ?? 'System' }}</span>
-            <span class="badge badge-blue" style="font-size:9px">{{ $actionLabel }}</span>
-            @if ($moduleLabel)<span style="font-size:10px;color:var(--muted)">{{ $moduleLabel }}</span>@endif
-          </div>
-          @if ($al->description)
-          <div class="activity-action">{{ $al->description }}</div>
-          @endif
-          <div class="activity-time">{{ \App\Support\Dates::relTime($al->created_at) }}</div>
-        </div>
-      </div>
+    <div class="cal-dow">
+      @foreach (['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $d)
+      <div class="cal-dow-cell">{{ $d }}</div>
       @endforeach
     </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+
+  <!-- Equipment Status + Financial Snapshot — "Command Strip" -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+    @php
+      // Bar segments are the three mutually-exclusive equipment statuses that make up fleet
+      // utilization (available/rented/under_repair) — "Overdue Returns" is a booking-level flag,
+      // not an equipment status, so it's called out as a number rather than a bar segment.
+      // Any remainder (e.g. 'booked' units) is left as unfilled track, not force-summed to 100%.
+      $eqPct = fn ($n) => $totalEquipment > 0 ? round($n / $totalEquipment * 100, 1) : 0;
+    @endphp
+    <div class="card" style="margin-bottom:0">
+      <div class="card-header"><h2 class="card-title"><i data-feather="package" style="width:14px;height:14px"></i> Equipment Status</h2></div>
+      <div class="eqbar-track">
+        <div class="eqbar-seg" style="width:{{ $eqPct($availableEquipment) }}%;background:var(--green)"></div>
+        <div class="eqbar-seg" style="width:{{ $eqPct($rentedEquipment) }}%;background:#7c3aed"></div>
+        <div class="eqbar-seg" style="width:{{ $eqPct($underMaintenance) }}%;background:var(--orange)"></div>
+      </div>
+      <div class="eqstat-grid">
+        <div class="eqstat-cell">
+          <div class="num" style="color:var(--green)">{{ $availableEquipment }}</div>
+          <div class="lbl">Available</div>
+        </div>
+        <div class="eqstat-cell">
+          <div class="num" style="color:#7c3aed">{{ $rentedEquipment }}</div>
+          <div class="lbl">In Field</div>
+        </div>
+        <div class="eqstat-cell">
+          <div class="num" style="color:var(--orange)">{{ $underMaintenance }}</div>
+          <div class="lbl">Maint.</div>
+        </div>
+        <div class="eqstat-cell">
+          <div class="num" style="color:{{ $overdueReturns > 0 ? 'var(--red)' : 'var(--muted)' }}">{{ $overdueReturns }}</div>
+          <div class="lbl">Overdue</div>
+        </div>
+      </div>
+      <div style="padding:10px 16px;font-size:11px;color:var(--muted);border-top:1px solid var(--border)">
+        {{ $availableEquipment }} of {{ $totalEquipment }} total units
+      </div>
+    </div>
+
+    @if ($canSeeFinancials)
+    <!-- Financial Snapshot -->
+    <div class="card" style="margin-bottom:0">
+      <div class="card-header">
+        <h2 class="card-title"><i data-feather="bar-chart-2" style="width:14px;height:14px"></i> Financial Snapshot</h2>
+        <a href="{{ route('reports') }}" class="btn btn-outline btn-sm" style="font-size:11px">View Reports</a>
+      </div>
+      <div class="fin-snap">
+        <div class="val">₱{{ number_format($totalRevenue, 0) }}</div>
+        <div class="lbl">Payments Received This Month</div>
+        @if ($revenueDeltaPct !== null)
+        <span class="stat-delta {{ $revenueDeltaPct >= 0 ? 'up' : 'down' }}" style="margin-top:6px">
+          <i data-feather="{{ $revenueDeltaPct >= 0 ? 'trending-up' : 'trending-down' }}"></i> {{ $revenueDeltaPct >= 0 ? '+' : '' }}{{ $revenueDeltaPct }}% vs last month
+        </span>
+        @endif
+        @if ($financialTrend->isNotEmpty())
+        @php $maxTrend = max(1, $financialTrend->max('total')); @endphp
+        <div class="fin-bars">
+          @foreach ($financialTrend as $i => $t)
+          <div class="fin-bar {{ $loop->last ? 'last' : '' }}" style="height:{{ max(4, round($t->total / $maxTrend * 32)) }}px" title="{{ $t->label }}: ₱{{ number_format($t->total, 2) }}"></div>
+          @endforeach
+        </div>
+        @endif
+      </div>
+
+      @if ($upcomingAgenda->isNotEmpty())
+      <div class="fin-agenda">
+        @foreach ($upcomingAgenda as $day)
+        <div class="fin-agenda-row">
+          <span class="fin-agenda-date">{{ \Illuminate\Support\Carbon::parse($day['date'])->format('M j') }}</span>
+          <span class="fin-agenda-txt">{{ $day['count'] }} shoot{{ $day['count'] === 1 ? '' : 's' }}</span>
+        </div>
+        @endforeach
+      </div>
+      @endif
+    </div>
+    @endif
+  </div>
+</div>
+
+<!-- ══ REQUESTS AWAITING REVIEW + UPCOMING CONFIRMED BOOKINGS ══ -->
+<div class="dash-grid-bottom">
+
+  <div class="card" style="margin-bottom:0">
+    <div class="card-header">
+      <h2 class="card-title"><i data-feather="file-text" style="width:14px;height:14px"></i> Requests Awaiting Review</h2>
+      <a href="{{ route('bookings') }}" class="btn btn-outline btn-sm">View All</a>
+    </div>
+    @if ($requestsAwaitingReview->isEmpty())
+    <div class="empty-state" style="padding:28px 0"><i data-feather="check-circle"></i><h3>Nothing awaiting review</h3></div>
+    @else
+    <div class="table-wrap card-scroll">
+      <table>
+        <thead><tr><th>Ref</th><th>Client</th><th>Project</th><th>Submitted</th><th>Days</th></tr></thead>
+        <tbody>
+          @foreach ($requestsAwaitingReview as $r)
+          <tr style="cursor:pointer" onclick="window.location='{{ route('booking-detail', $r->booking_id) }}'">
+            <td style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--accent)">{{ $r->booking_reference }}</td>
+            <td style="font-weight:600;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $r->client_name }}</td>
+            <td style="color:var(--sub);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $r->project_title ?: '—' }}</td>
+            <td style="font-size:11.5px;color:var(--muted);white-space:nowrap">{{ \Carbon\Carbon::parse($r->created_at)->format('M j, Y') }}</td>
+            <td><span class="badge {{ $r->days_waiting >= 2 ? 'badge-red' : 'badge-orange' }}" style="font-size:10px">{{ $r->days_waiting }}</span></td>
+          </tr>
+          @endforeach
+        </tbody>
+      </table>
+    </div>
     @endif
   </div>
 
+  <div class="card" style="margin-bottom:0">
+    <div class="card-header">
+      <h2 class="card-title"><i data-feather="calendar" style="width:14px;height:14px"></i> Upcoming Confirmed Bookings</h2>
+      <span style="font-size:11px;color:var(--muted)">Next 7 days</span>
+    </div>
+    @if ($upcomingConfirmed->isEmpty())
+    <div class="empty-state" style="padding:28px 0"><i data-feather="calendar"></i><h3>Nothing confirmed in the next 7 days</h3></div>
+    @else
+    <div class="table-wrap card-scroll">
+      <table>
+        <thead><tr><th>Ref</th><th>Client</th><th>Project</th><th>Shoot Date</th><th>Status</th></tr></thead>
+        <tbody>
+          @foreach ($upcomingConfirmed as $b)
+          <tr style="cursor:pointer" onclick="window.location='{{ route('booking-detail', $b->booking_id) }}'">
+            <td style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--accent)">{{ $b->booking_reference }}</td>
+            <td style="font-weight:600;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $b->client_name }}</td>
+            <td style="color:var(--sub);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $b->project_title ?: '—' }}</td>
+            <td style="font-size:11.5px;color:var(--muted);white-space:nowrap">{{ \Carbon\Carbon::parse($b->shoot_date_start)->format('M j, Y') }}</td>
+            <td><span class="badge {{ $statusBadge[$b->booking_status] ?? '' }}" style="font-size:10px">{{ ucfirst($b->booking_status) }}</span></td>
+          </tr>
+          @endforeach
+        </tbody>
+      </table>
+    </div>
+    @endif
+  </div>
+
+</div>
+
+<!-- ══ RECENT ACTIVITY ══ -->
+<div class="card" style="margin-bottom:0">
+  <div class="card-header">
+    <h2 class="card-title"><i data-feather="activity" style="width:14px;height:14px"></i> Recent Activity</h2>
+    @if (in_array($userRole, ['super_admin', 'operations_manager'], true))
+    <a href="{{ route('activity') }}" class="btn btn-outline btn-sm" style="font-size:11px">Full Log</a>
+    @endif
+  </div>
+  @if (empty($recentActivity) || count($recentActivity) === 0)
+  <div class="empty-state" style="padding:28px 0"><i data-feather="activity"></i><h3>No activity yet</h3></div>
+  @else
+  <div class="card-scroll-sm">
+    @foreach ($recentActivity as $al)
+    @php
+      $initials = strtoupper(substr($al->first_name ?? 'S', 0, 1));
+      $avatarColor = $roleColors[$al->role_name ?? ''] ?? '#94a3b8';
+      $actionLabel = str_replace(['_'], [' '], $al->action);
+      $moduleLabel = ucfirst($al->module ?? '');
+    @endphp
+    <div class="activity-item">
+      <div class="activity-avatar" style="background:{{ $avatarColor }}">{{ $initials }}</div>
+      <div class="activity-body">
+        <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">
+          <span class="activity-user">{{ $al->user_name ?? 'System' }}</span>
+          <span class="badge badge-blue" style="font-size:9px">{{ $actionLabel }}</span>
+          @if ($moduleLabel)<span style="font-size:10px;color:var(--muted)">{{ $moduleLabel }}</span>@endif
+        </div>
+        @if ($al->description)
+        <div class="activity-action">{{ $al->description }}</div>
+        @endif
+        <div class="activity-time">{{ \App\Support\Dates::relTime($al->created_at) }}</div>
+      </div>
+    </div>
+    @endforeach
+  </div>
+  @endif
 </div>
 
 <div style="height:8px"></div>

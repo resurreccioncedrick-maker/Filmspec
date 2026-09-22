@@ -459,6 +459,19 @@ class BookingDetailController extends Controller
             $request->session()->flash('bd_flash', $msg);
         }
 
+        // Lets a form embedded on the CE page (ce-preview, mode=booking) reuse this exact same
+        // action set (add_equipment, batch_add_crew, add_booking_accessory, assign_transport,
+        // set_discount, update_project_details, ...) instead of duplicating the business logic
+        // there, and land back on the CE page instead of Booking Detail afterward. Deliberately
+        // a closed enum, not an arbitrary URL, to rule out an open redirect.
+        if ($request->input('return_to') === 'ce_preview') {
+            return redirect()->route('ce-preview', array_filter([
+                'booking_id' => $id,
+                'ce_id' => $request->input('return_ce_id'),
+                'view' => $request->input('return_view', 'internal'),
+            ]));
+        }
+
         return redirect()->route('booking-detail', $id);
     }
 

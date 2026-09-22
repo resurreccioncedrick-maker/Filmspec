@@ -32,9 +32,11 @@ class CostEstimatesController extends Controller
 
         // There is no 'cancelled' CE status — a CE is cancelled in practice when its booking
         // is, so that tab keys off booking_status while the others exclude cancelled bookings.
+        // 'confirmed' is deduplicated to the latest confirmed row per booking (CeAnalytics::
+        // onlyLatestConfirmed) so a revised-then-reconfirmed booking isn't counted twice.
         $applyTab = function ($q, string $tab) {
             if ($tab === 'confirmed') {
-                return $q->where('ce.status', 'confirmed')->where('b.booking_status', '!=', 'cancelled');
+                return CeAnalytics::onlyLatestConfirmed($q)->where('b.booking_status', '!=', 'cancelled');
             }
             if ($tab === 'draft') {
                 return $q->where('ce.status', '!=', 'confirmed')->where('b.booking_status', '!=', 'cancelled');
@@ -72,7 +74,11 @@ class CostEstimatesController extends Controller
                 'b.booking_id', 'b.booking_reference', 'b.project_title', 'b.booking_status',
                 'b.shoot_date_start', 'b.shoot_date_end', 'b.ce_director_dop',
                 'c.company_name', 'c.contact_person',
-                DB::raw("CONCAT(u.first_name,' ',u.last_name) AS confirmed_by_name")
+                DB::raw("CONCAT(u.first_name,' ',u.last_name) AS confirmed_by_name"),
+                // A confirmed row this old is "superseded" if a newer confirmed row exists for
+                // the same booking — surfaces the stale-but-still-status='confirmed' rows that
+                // caused the tab-count double-counting bug, instead of hiding them silently.
+                DB::raw('EXISTS (SELECT 1 FROM cost_estimates ce3 WHERE ce3.booking_id = ce.booking_id AND ce3.status = "confirmed" AND ce3.ce_id > ce.ce_id) AS is_superseded')
             )
             ->orderByDesc('ce.generated_at')->orderByDesc('ce.ce_id')
             ->forPage($page, $perPage)
@@ -82,6 +88,7 @@ class CostEstimatesController extends Controller
         $rows->each(function ($r) {
             $r->client_name = $r->company_name ?: $r->contact_person;
             $r->is_revision = (bool) preg_match('/-R\d+$/', (string) $r->ce_reference);
+            $r->is_superseded = (bool) $r->is_superseded;
         });
 
         $tabCounts = [];
@@ -93,10 +100,10 @@ class CostEstimatesController extends Controller
         $kpis = [
             'this_month' => (int) $base()->where('ce.generated_at', '>=', $monthStart)->count('ce.ce_id'),
             'drafts' => $tabCounts['draft'],
-            'confirmed_month' => (int) $base()->where('ce.status', 'confirmed')
+            'confirmed_month' => (int) CeAnalytics::onlyLatestConfirmed($base())
                 ->where('b.booking_status', '!=', 'cancelled')
                 ->where('ce.confirmed_at', '>=', $monthStart)->count('ce.ce_id'),
-            'confirmed_value' => (float) $base()->where('ce.status', 'confirmed')
+            'confirmed_value' => (float) CeAnalytics::onlyLatestConfirmed($base())
                 ->where('b.booking_status', '!=', 'cancelled')
                 ->where('ce.confirmed_at', '>=', $monthStart)->sum('ce.grand_total'),
         ];

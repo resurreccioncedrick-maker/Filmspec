@@ -52,7 +52,7 @@
   <div class="stat-card red">
     <div class="stat-icon" style="background:rgba(248,113,113,.12);color:var(--red)"><i data-feather="tool"></i></div>
     <div class="stat-value">{{ $stats['repair'] }}</div>
-    <div class="stat-label">Under Repair</div>
+    <div class="stat-label">Under Maintenance</div>
   </div>
 </div>
 
@@ -102,9 +102,9 @@
         <select name="status" class="form-control" style="width:auto">
           <option value="">All Status</option>
           <option value="available" {{ $statusFilter === 'available' ? 'selected' : '' }}>Available</option>
-          <option value="booked" {{ $statusFilter === 'booked' ? 'selected' : '' }}>Booked</option>
-          <option value="rented" {{ $statusFilter === 'rented' ? 'selected' : '' }}>In Use</option>
-          <option value="under_repair" {{ $statusFilter === 'under_repair' ? 'selected' : '' }}>Under Repair</option>
+          <option value="booked" {{ $statusFilter === 'booked' ? 'selected' : '' }}>Allocated</option>
+          <option value="rented" {{ $statusFilter === 'rented' ? 'selected' : '' }}>In Field</option>
+          <option value="under_repair" {{ $statusFilter === 'under_repair' ? 'selected' : '' }}>Under Maintenance</option>
         </select>
         <button type="submit" class="btn btn-outline btn-sm"><i data-feather="filter"></i> Filter</button>
       </div>
@@ -153,6 +153,9 @@
               <button class="btn btn-outline btn-sm" onclick='editEquip(@json($eq))'>
                 <i data-feather="edit-2"></i> Edit
               </button>
+              <button class="btn btn-outline btn-sm" onclick="openUnits({{ $eq->equipment_id }}, {{ json_encode($eq->equipment_name) }})" title="Physical Units">
+                <i data-feather="hash"></i> Units <span class="badge badge-gray" style="margin-left:2px">{{ $eq->unit_count }}</span>
+              </button>
               @if ($eq->availability_status === 'booked')
               <button class="btn btn-success btn-sm" onclick="checkoutEquip({{ $eq->equipment_id }}, '{{ addslashes($eq->equipment_name) }}')">
                 <i data-feather="log-out"></i> Out
@@ -163,11 +166,11 @@
                 <i data-feather="log-in"></i> In
               </button>
               @endif
-              <form method="POST" action="{{ $equipBase }}" style="display:inline" onsubmit="return confirm('Retire this item?')">
+              <form method="POST" action="{{ $equipBase }}" style="display:inline" onsubmit="return confirm('Deactivate / retire this equipment model? It will no longer appear as available for new bookings.')">
                 @csrf
                 <input type="hidden" name="action" value="delete">
                 <input type="hidden" name="equipment_id" value="{{ $eq->equipment_id }}">
-                <button type="submit" class="btn btn-danger btn-sm"><i data-feather="archive"></i></button>
+                <button type="submit" class="btn btn-danger btn-sm" title="Deactivate / Retire Equipment"><i data-feather="archive"></i></button>
               </form>
             </div>
           </div>
@@ -217,7 +220,7 @@
           <td style="font-family:var(--font-mono);font-size:.75rem;color:var(--muted)">{{ $eq->serial_number ?? '—' }}</td>
           <td style="font-family:var(--font-mono);font-size:.85rem;color:var(--accent);font-weight:600">₱{{ number_format($eq->daily_rate, 2) }}</td>
           <td style="font-family:var(--font-mono);font-size:.83rem;text-align:center">{{ (int) ($eq->stock_quantity ?? 1) }}</td>
-          <td><span class="badge {{ $condBadge[$eq->condition_status] ?? 'badge-gray' }}">{{ ucfirst(str_replace('_', ' ', $eq->condition_status)) }}</span></td>
+          <td><span class="badge {{ $condBadge[$eq->condition_status] ?? 'badge-gray' }}">{{ $condLabel[$eq->condition_status] ?? ucfirst(str_replace('_', ' ', $eq->condition_status)) }}</span></td>
           <td>
             @if (! empty($eq->allocated_to) && $eq->availability_status === 'available')
             <span class="status-dot dot-yellow"></span>
@@ -237,6 +240,10 @@
                       onclick="openAccessories({{ $eq->equipment_id }}, '{{ addslashes($eq->equipment_name) }}')">
                 <i data-feather="package"></i>
               </button>
+              <button class="btn btn-outline btn-sm" title="Physical Units ({{ $eq->unit_count }})"
+                      onclick="openUnits({{ $eq->equipment_id }}, {{ json_encode($eq->equipment_name) }})">
+                <i data-feather="hash"></i>
+              </button>
               @if ($eq->availability_status === 'booked')
               <button class="btn btn-success btn-sm" onclick="checkoutEquip({{ $eq->equipment_id }}, '{{ addslashes($eq->equipment_name) }}')">
                 <i data-feather="log-out"></i> Out
@@ -247,11 +254,11 @@
                 <i data-feather="log-in"></i> In
               </button>
               @endif
-              <form method="POST" action="{{ $equipBase }}" style="display:inline" onsubmit="return confirm('Retire this item?')">
+              <form method="POST" action="{{ $equipBase }}" style="display:inline" onsubmit="return confirm('Deactivate / retire this equipment model? It will no longer appear as available for new bookings.')">
                 @csrf
                 <input type="hidden" name="action" value="delete">
                 <input type="hidden" name="equipment_id" value="{{ $eq->equipment_id }}">
-                <button type="submit" class="btn btn-danger btn-sm"><i data-feather="archive"></i></button>
+                <button type="submit" class="btn btn-danger btn-sm" title="Deactivate / Retire Equipment"><i data-feather="archive"></i></button>
               </form>
             </div>
           </td>
@@ -333,7 +340,7 @@
             <select name="condition_status" class="form-control">
               <option value="excellent">Excellent</option>
               <option value="good" selected>Good</option>
-              <option value="fair">Fair</option>
+              <option value="fair">Serviceable</option>
             </select>
           </div>
           <div class="form-group" style="display:flex;align-items:flex-end">
@@ -424,8 +431,8 @@
             <select name="condition_status" id="edit_econd" class="form-control">
               <option value="excellent">Excellent</option>
               <option value="good">Good</option>
-              <option value="fair">Fair</option>
-              <option value="under_repair">Under Repair</option>
+              <option value="fair">Serviceable</option>
+              <option value="under_repair">Damaged</option>
             </select>
           </div>
         </div>
@@ -434,8 +441,10 @@
             <label>Availability</label>
             <select name="availability_status" id="edit_eavail" class="form-control">
               <option value="available">Available</option>
-              <option value="rented">In Use</option>
-              <option value="under_repair">Under Repair</option>
+              <option value="booked">Allocated</option>
+              <option value="rented">In Field</option>
+              <option value="under_repair">Under Maintenance</option>
+              <option value="retired">Retired</option>
             </select>
           </div>
           <div class="form-group" style="display:flex;align-items:flex-end">
@@ -447,6 +456,7 @@
         </div>
         <div class="form-group"><label>Description</label><textarea name="description" id="edit_edesc" class="form-control" rows="2"></textarea></div>
         <div class="form-group"><label>Internal Notes</label><textarea name="notes" id="edit_enotes" class="form-control" rows="2"></textarea></div>
+        <div class="form-group"><label>Operator Note</label><input type="text" name="operator_note" id="edit_eopnote" class="form-control" placeholder="e.g. Requires licensed camera operator"></div>
         <input type="hidden" name="requires_operator" value="1">
         <div class="form-group" id="edit_op_positions">
           <label>Allowed Operator Positions <span style="color:var(--muted);font-weight:400">(who can operate this) *</span></label>
@@ -535,6 +545,63 @@
     </div>
   </div>
 </div>
+
+<!-- PHYSICAL UNITS MODAL -->
+<div class="modal-overlay" id="modalUnits">
+  <div class="modal" style="max-width:780px">
+    <div class="modal-header">
+      <div class="modal-title"><i data-feather="hash"></i> Physical Units — <span id="unitsEquipName" style="color:var(--accent)"></span></div>
+      <button class="modal-close" data-modal-close>&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="table-wrap" style="margin-bottom:14px">
+        <table>
+          <thead><tr><th>Asset Tag</th><th>Serial No.</th><th>Condition</th><th>Status</th><th>Location</th><th>Actions</th></tr></thead>
+          <tbody id="unitsTbody"></tbody>
+        </table>
+      </div>
+      <div id="unitsEmpty" style="display:none;text-align:center;color:var(--muted);padding:16px;font-size:.85rem">No physical units recorded yet.</div>
+
+      <div style="border-top:1px solid var(--border);padding-top:14px">
+        <div style="font-size:.78rem;font-weight:700;color:var(--text);margin-bottom:8px">Add Unit</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
+            <label style="font-size:.72rem">Asset Tag *</label>
+            <input type="text" id="unitAssetTag" class="form-control" placeholder="e.g. CAM-003">
+          </div>
+          <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
+            <label style="font-size:.72rem">Serial No.</label>
+            <input type="text" id="unitSerialNo" class="form-control">
+          </div>
+          <div class="form-group" style="margin-bottom:0;min-width:130px">
+            <label style="font-size:.72rem">Condition</label>
+            <select id="unitCondition" class="form-control">
+              @foreach ($unitCondLabel as $ck => $cl)
+              <option value="{{ $ck }}" {{ $ck === 'good' ? 'selected' : '' }}>{{ $cl }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;min-width:150px">
+            <label style="font-size:.72rem">Status</label>
+            <select id="unitStatus" class="form-control">
+              @foreach ($unitStatusLabel as $sk => $sl)
+              <option value="{{ $sk }}" {{ $sk === 'available' ? 'selected' : '' }}>{{ $sl }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
+            <label style="font-size:.72rem">Location</label>
+            <input type="text" id="unitLocation" class="form-control" placeholder="e.g. Camera Room A">
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" onclick="addUnit()"><i data-feather="plus" style="width:13px;height:13px"></i> Add Unit</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" data-modal-close>Close</button>
+    </div>
+  </div>
+</div>
 @endif
 
 @push('scripts')
@@ -555,6 +622,7 @@ function editEquip(eq) {
   document.getElementById('edit_eavail').value  = eq.availability_status;
   document.getElementById('edit_edesc').value   = eq.description || '';
   document.getElementById('edit_enotes').value  = eq.notes || '';
+  document.getElementById('edit_eopnote').value = eq.operator_note || '';
 
   fetch(EQUIP_BASE_URL + '?get_operators=' + eq.equipment_id)
     .then(r => r.json())
@@ -672,6 +740,108 @@ function deleteAccessory(aid) {
   fetch(EQUIP_BASE_URL, { method: 'POST', body: fd })
     .then(r => r.json())
     .then(data => { if (data.success) loadAccessories(); });
+}
+
+const UNIT_COND_LABEL = @json($unitCondLabel);
+const UNIT_STATUS_LABEL = @json($unitStatusLabel);
+let currentUnitsEquipId = null;
+
+function openUnits(eid, ename) {
+  currentUnitsEquipId = eid;
+  document.getElementById('unitsEquipName').textContent = ename;
+  document.getElementById('unitAssetTag').value = '';
+  document.getElementById('unitSerialNo').value = '';
+  document.getElementById('unitLocation').value = '';
+  loadUnits();
+  openModal('modalUnits');
+}
+
+function loadUnits() {
+  const tbody = document.getElementById('unitsTbody');
+  const empty = document.getElementById('unitsEmpty');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:12px">Loading…</td></tr>';
+  fetch(EQUIP_BASE_URL + '?get_units=' + currentUnitsEquipId)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.length) {
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      tbody.innerHTML = data.map(u => {
+        const condOpts = Object.keys(UNIT_COND_LABEL).map(k =>
+          `<option value="${k}" ${k === u.condition ? 'selected' : ''}>${escHtml(UNIT_COND_LABEL[k])}</option>`).join('');
+        const statusOpts = Object.keys(UNIT_STATUS_LABEL).map(k =>
+          `<option value="${k}" ${k === u.status ? 'selected' : ''}>${escHtml(UNIT_STATUS_LABEL[k])}</option>`).join('');
+        return `<tr data-unit-id="${u.unit_id}">
+          <td style="font-family:monospace;font-weight:700">${escHtml(u.asset_tag)}</td>
+          <td style="font-family:monospace;font-size:.8rem">${escHtml(u.serial_no || '—')}</td>
+          <td><select class="form-control unit-cond-sel" style="font-size:.78rem;padding:4px 6px">${condOpts}</select></td>
+          <td><select class="form-control unit-status-sel" style="font-size:.78rem;padding:4px 6px">${statusOpts}</select></td>
+          <td><input type="text" class="form-control unit-loc-input" value="${escHtml(u.location || '')}" style="font-size:.78rem;padding:4px 6px" placeholder="Location"></td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-outline btn-sm" onclick="saveUnit(${u.unit_id}, this)" title="Save"><i data-feather="save" style="width:12px;height:12px"></i></button>
+            <button class="btn btn-danger btn-sm" onclick="retireUnit(${u.unit_id})" title="Retire Unit"><i data-feather="archive" style="width:12px;height:12px"></i></button>
+          </td>
+        </tr>`;
+      }).join('');
+      if (window.feather) feather.replace();
+    });
+}
+
+function addUnit() {
+  const tag = document.getElementById('unitAssetTag').value.trim();
+  if (!tag) { alert('Asset tag is required.'); return; }
+  const fd = new FormData();
+  fd.append('ajax_action', 'add_unit');
+  fd.append('equipment_id', currentUnitsEquipId);
+  fd.append('asset_tag', tag);
+  fd.append('serial_no', document.getElementById('unitSerialNo').value.trim());
+  fd.append('condition', document.getElementById('unitCondition').value);
+  fd.append('status', document.getElementById('unitStatus').value);
+  fd.append('location', document.getElementById('unitLocation').value.trim());
+  fd.append('_token', document.querySelector('meta[name="csrf-token"]').content);
+
+  fetch(EQUIP_BASE_URL, { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        document.getElementById('unitAssetTag').value = '';
+        document.getElementById('unitSerialNo').value = '';
+        document.getElementById('unitLocation').value = '';
+        loadUnits();
+      } else {
+        alert(data.error || 'Could not add unit.');
+      }
+    });
+}
+
+function saveUnit(unitId, btn) {
+  const row = btn.closest('tr');
+  const fd = new FormData();
+  fd.append('ajax_action', 'update_unit');
+  fd.append('unit_id', unitId);
+  fd.append('condition', row.querySelector('.unit-cond-sel').value);
+  fd.append('status', row.querySelector('.unit-status-sel').value);
+  fd.append('location', row.querySelector('.unit-loc-input').value.trim());
+  fd.append('_token', document.querySelector('meta[name="csrf-token"]').content);
+
+  fetch(EQUIP_BASE_URL, { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => { if (!data.success) alert(data.error || 'Could not save unit.'); });
+}
+
+function retireUnit(unitId) {
+  if (!confirm('Retire this physical unit? It will be marked Retired and hidden from the active unit count.')) return;
+  const fd = new FormData();
+  fd.append('ajax_action', 'retire_unit');
+  fd.append('unit_id', unitId);
+  fd.append('_token', document.querySelector('meta[name="csrf-token"]').content);
+
+  fetch(EQUIP_BASE_URL, { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => { if (data.success) loadUnits(); });
 }
 @endif
 

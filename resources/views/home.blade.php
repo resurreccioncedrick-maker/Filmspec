@@ -1233,6 +1233,24 @@ textarea.fi{resize:vertical;min-height:60px}
   color:#2e4a6a;
   letter-spacing:.3px;
 }
+.footer-links{
+  display:flex;
+  align-items:center;
+  gap:22px;
+  flex-wrap:wrap;
+}
+.footer-link{
+  font-size:12px;
+  color:#5a82ad;
+  letter-spacing:.2px;
+  background:none;
+  border:none;
+  cursor:pointer;
+  padding:0;
+  font-family:inherit;
+  transition:color .15s;
+}
+.footer-link:hover{color:#60b0ff}
 
 @media(max-width:900px){
   .hero-inner{grid-template-columns:1fr;padding:72px 36px 60px}
@@ -1534,11 +1552,11 @@ textarea.fi{resize:vertical;min-height:60px}
         <div class="hero-stats-strip" style="justify-content:flex-start;margin-top:40px">
           <div class="hstat-mini">
             <div class="hstat-mini-n">{{ $stats['equip'] }}</div>
-            <div class="hstat-mini-l">Available Items</div>
+            <div class="hstat-mini-l">Equipment Items</div>
           </div>
           <div class="hstat-mini">
             <div class="hstat-mini-n">{{ $stats['crew'] }}</div>
-            <div class="hstat-mini-l">Active Crew</div>
+            <div class="hstat-mini-l">Crew on Roster</div>
           </div>
           <div class="hstat-mini">
             <div class="hstat-mini-n">{{ $stats['done'] }}</div>
@@ -1610,7 +1628,7 @@ textarea.fi{resize:vertical;min-height:60px}
         $av = $eq->availability_status === 'available';
         $isBooked = $eq->availability_status === 'booked';
         $availClass = $av ? 'av' : ($isBooked ? 'busy' : 'inuse');
-        $availText  = $av ? 'Available' : ($isBooked ? 'Booked' : 'In Use');
+        $availText  = $av ? 'Available Now' : ($isBooked ? 'Currently Booked' : 'Currently In Use');
       @endphp
       <div class="eq-card">
         <div class="eq-img" onclick="openEqDetail({{ $eq->equipment_id }})" style="cursor:pointer" title="View details">
@@ -1923,6 +1941,18 @@ textarea.fi{resize:vertical;min-height:60px}
       <div class="empty-icon">&#10067;</div>
       <h3>No matching questions</h3>
       <p>Try a different search term or topic, or reach out through the support chat.</p>
+    </div>
+
+    <div style="margin-top:28px;padding:20px 22px;border-radius:14px;background:var(--surface-hover,#f4f7fb);border:1px solid var(--border,#e2e8f0);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:700;font-size:14.5px;margin-bottom:3px">Still need help?</div>
+        <div style="font-size:12.5px;color:var(--text-muted,#64748b)">Message our team directly and we'll get back to you.</div>
+      </div>
+      @if ($isLoggedIn)
+      <button class="hbtn blue" style="font-size:13px;padding:10px 18px" onclick="showPage('account',null)">Contact FilmSpec &rarr;</button>
+      @else
+      <button class="hbtn blue" style="font-size:13px;padding:10px 18px" onclick="requireAuth()">Sign In to Contact FilmSpec</button>
+      @endif
     </div>
   </div>
 </div>
@@ -2618,7 +2648,7 @@ function renderGrid() {
     const isBooked=eq.avail==='booked';
     const inList=eqIds.includes(eq.id);
     const isFav=favIds.includes(eq.id);
-    const statusText = av ? 'Available' : (isBooked ? 'Booked' : 'In Use');
+    const statusText = av ? 'Available Now' : (isBooked ? 'Currently Booked' : 'Currently In Use');
     const availClass = av ? 'av' : (isBooked ? 'busy' : 'inuse');
     const catAb=escHtml((eq.cat||'').substring(0,2).toUpperCase());
     const imgHtml=eq.img?`<img src="${ASSET_BASE}/${escAttr(eq.img)}" alt="">`:(`<span class="eq-cat-icon">${catAb}</span>`);
@@ -2684,7 +2714,7 @@ function openEqDetail(eid) {
   const ap = document.getElementById('edAvailPill');
   const av = eq.avail === 'available';
   const isBooked = eq.avail === 'booked';
-  ap.textContent      = av ? 'Available' : (isBooked ? 'Booked' : 'In Use');
+  ap.textContent      = av ? 'Available Now' : (isBooked ? 'Currently Booked' : 'Currently In Use');
   ap.style.background = av ? 'rgba(21,128,61,.28)' : 'rgba(185,28,28,.28)';
   ap.style.color      = av ? '#bbf7d0' : '#fca5a5';
 
@@ -3036,6 +3066,11 @@ document.addEventListener('visibilitychange', function () { if (!document.hidden
     <div class="footer-brand">
       <span class="footer-logo">FilmSpec</span>
       <span class="footer-tagline">Integrated Film Operations Platform</span>
+    </div>
+    <div class="footer-links">
+      <button class="footer-link" onclick="showPage('equipment',null)">Equipment Catalog</button>
+      <button class="footer-link" onclick="showPage('help',null)">Help Center</button>
+      <button class="footer-link" onclick="{{ $isLoggedIn ? "showPage('account',null)" : 'requireAuth()' }}">Contact Us</button>
     </div>
     <div class="footer-copy">&copy; {{ date('Y') }} FilmSpec. All rights reserved.</div>
   </div>

@@ -21,6 +21,30 @@
 </div>
 @endif
 
+<!-- KPIs -->
+<div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
+  <div class="stat-card blue">
+    <div class="stat-icon"><i data-feather="clipboard"></i></div>
+    <div class="stat-value">{{ $kpis['open_tasks'] }}</div>
+    <div class="stat-label">Open Tasks</div>
+  </div>
+  <div class="stat-card red">
+    <div class="stat-icon" style="background:#fef2f2;color:#dc2626"><i data-feather="alert-circle"></i></div>
+    <div class="stat-value">{{ $kpis['overdue'] }}</div>
+    <div class="stat-label">Overdue</div>
+  </div>
+  <div class="stat-card orange">
+    <div class="stat-icon"><i data-feather="calendar"></i></div>
+    <div class="stat-value">{{ $kpis['upcoming_meetings'] }}</div>
+    <div class="stat-label">Upcoming Meetings</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon" style="background:#f0fdf4;color:#16a34a"><i data-feather="check-circle"></i></div>
+    <div class="stat-value">{{ $kpis['completed_this_month'] }}</div>
+    <div class="stat-label">Completed (This Month)</div>
+  </div>
+</div>
+
 <!-- Partners Meeting -->
 <div class="card" style="margin-bottom:20px">
   <div class="card-header">
@@ -95,6 +119,7 @@
       <thead>
         <tr>
           <th>Title</th>
+          <th>Priority</th>
           <th>Due</th>
           <th>Target Date</th>
           <th>Person In Charge</th>
@@ -106,7 +131,14 @@
       @foreach ($todos as $t)
       <tr>
         <td style="font-weight:600">{{ $t->title }}@if ($t->visible_to_crew) <span class="badge badge-blue" style="font-size:.62rem;vertical-align:middle" title="Visible to crew in the Crew Portal">Crew</span>@endif</td>
-        <td style="white-space:nowrap;font-size:.83rem">{{ date('M j, Y', strtotime($t->reminder_date)) }}</td>
+        <td>
+          @if ($t->priority === 'high')
+          <span class="badge badge-red">High</span>
+          @else
+          <span class="badge badge-gray">Normal</span>
+          @endif
+        </td>
+        <td style="white-space:nowrap;font-size:.83rem{{ $t->reminder_date < now()->toDateString() ? ';color:var(--red);font-weight:600' : '' }}">{{ date('M j, Y', strtotime($t->reminder_date)) }}</td>
         <td style="white-space:nowrap;font-size:.83rem">{{ $t->target_date ? date('M j, Y', strtotime($t->target_date)) : '—' }}</td>
         <td style="font-size:.83rem">{{ $t->person_in_charge ?: '—' }}</td>
         <td style="font-size:.83rem;color:var(--muted)">{{ $t->note ?: '—' }}</td>
@@ -231,6 +263,13 @@
             <label>Meeting Time</label>
             <input type="time" name="meeting_time" id="reminderTime" class="form-control">
           </div>
+          <div class="form-group">
+            <label>Priority</label>
+            <select name="priority" id="reminderPriority" class="form-control">
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+            </select>
+          </div>
         </div>
         <div class="form-group" id="meetingLocationWrap" style="display:none">
           <label>Location</label>
@@ -279,6 +318,7 @@ function openModal_add() {
   document.getElementById('reminderType').value = 'todo';
   ['reminderTitle', 'reminderDate', 'reminderTime', 'reminderLocation', 'reminderTargetDate', 'reminderPic', 'reminderNote']
     .forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('reminderPriority').value = 'normal';
   document.getElementById('reminderVisibleToCrew').checked = false;
   document.getElementById('reminderSubmit').innerHTML =
     '<i data-feather="plus"></i> Add Reminder';
@@ -300,6 +340,7 @@ function openEditReminder(r) {
   document.getElementById('reminderTargetDate').value = r.target_date || '';
   document.getElementById('reminderPic').value = r.person_in_charge || '';
   document.getElementById('reminderNote').value = r.note || '';
+  document.getElementById('reminderPriority').value = r.priority || 'normal';
   document.getElementById('reminderVisibleToCrew').checked = !!(r.visible_to_crew && r.visible_to_crew != 0);
   document.getElementById('reminderSubmit').innerHTML = '<i data-feather="check"></i> Save Changes';
   toggleReminderType();

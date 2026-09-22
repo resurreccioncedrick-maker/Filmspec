@@ -32,7 +32,15 @@ class CalendarDataController extends Controller
         [$dayMap, $bookings] = $this->buildDayMap($from, $to);
 
         $totalDays = (int) $from->diffInDays($to) + 1;
+        // Utilization/Busiest-Day/Longest-Gap are all "primary" scheduling facts and must not
+        // be inflated by bookings that were never confirmed — $day['count'] here is deliberately
+        // the CONFIRMED count only (see buildDayMap()), so every KPI derived from it below is
+        // confirmed-only by construction, not a per-KPI filter that's easy to forget on one of
+        // them.
         $shootDays = collect($dayMap)->filter(fn ($d) => $d['count'] > 0)->count();
+        // Tentative (pending-only) shoot days are tracked separately and never folded into the
+        // utilization/busiest/gap figures above.
+        $tentativeDays = collect($dayMap)->filter(fn ($d) => $d['pending_count'] > 0)->count();
 
         $byWeekday = array_fill(0, 7, 0);
         $cursor = $from->copy();
@@ -57,6 +65,7 @@ class CalendarDataController extends Controller
             'busiest_day_date' => $busiestDayCount > 0 ? ($busiestDay['date'] ?? null) : null,
             'busiest_day_count' => $busiestDayCount,
             'longest_gap' => $longestGap,
+            'tentative_days' => $tentativeDays,
         ];
 
         $grid = $period['mode'] === 'month' ? $this->monthGrid($from, $dayMap) : null;
@@ -137,18 +146,30 @@ class CalendarDataController extends Controller
         $dayMap = [];
         $cursor = $from->copy();
         while ($cursor->lte($to)) {
-            $dayMap[$cursor->toDateString()] = ['date' => $cursor->toDateString(), 'count' => 0, 'items' => collect()];
+            // 'count' is deliberately the CONFIRMED count (booking_status != pending/cancelled)
+            // — every KPI in index() reads 'count' directly, so defining it as confirmed-only
+            // here means utilization/busiest-day/longest-gap can't accidentally include pending
+            // bookings just by forgetting a filter downstream. Pending is tracked in parallel
+            // via 'pending_count', never merged into 'count'.
+            $dayMap[$cursor->toDateString()] = [
+                'date' => $cursor->toDateString(), 'count' => 0, 'pending_count' => 0, 'items' => collect(),
+            ];
             $cursor->addDay();
         }
 
         foreach ($bookings as $b) {
+            $isPending = $b->booking_status === 'pending';
             $start = Carbon::parse($b->shoot_date_start)->max($from);
             $end = Carbon::parse($b->shoot_date_end)->min($to);
             $d = $start->copy();
             while ($d->lte($end)) {
                 $key = $d->toDateString();
                 if (isset($dayMap[$key])) {
-                    $dayMap[$key]['count']++;
+                    if ($isPending) {
+                        $dayMap[$key]['pending_count']++;
+                    } else {
+                        $dayMap[$key]['count']++;
+                    }
                     $dayMap[$key]['items']->push($b);
                 }
                 $d->addDay();
@@ -196,6 +217,7 @@ class CalendarDataController extends Controller
                 'in_month' => $cursor->month === $firstOfMonth->month,
                 'is_today' => $cursor->isToday(),
                 'count' => $dayMap[$key]['count'] ?? 0,
+                'pending_count' => $dayMap[$key]['pending_count'] ?? 0,
                 'items' => $dayMap[$key]['items'] ?? collect(),
             ];
             if (count($week) === 7) {
@@ -213,7 +235,7 @@ class CalendarDataController extends Controller
         $months = [];
         $cursor = $from->copy()->startOfMonth();
         while ($cursor->lte($to)) {
-            $months[$cursor->format('Y-m')] = ['shoot_days' => 0, 'booking_days' => 0, 'busiest_count' => 0, 'busiest_date' => null];
+            $months[$cursor->format('Y-m')] = ['shoot_days' => 0, 'booking_days' => 0, 'busiest_count' => 0, 'busiest_date' => null, 'tentative_days' => 0];
             $cursor->addMonthNoOverflow();
         }
 
@@ -229,6 +251,9 @@ class CalendarDataController extends Controller
                     $months[$mKey]['busiest_count'] = $d['count'];
                     $months[$mKey]['busiest_date'] = $date;
                 }
+            }
+            if ($d['pending_count'] > 0) {
+                $months[$mKey]['tentative_days']++;
             }
         }
 

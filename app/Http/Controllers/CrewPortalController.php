@@ -90,7 +90,7 @@ class CrewPortalController extends Controller
                 ->join('clients as c', 'b.client_id', '=', 'c.client_id')
                 ->leftJoin('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
                 ->where('bc.crew_id', $cmId)
-                ->where('bc.assignment_status', '!=', 'declined')
+                ->whereNotIn('bc.assignment_status', ['declined', 'back_out'])
                 ->whereIn('b.booking_status', ['confirmed', 'ongoing', 'pending_inspection', 'returned'])
                 ->orderByDesc('b.shoot_date_start')
                 ->select('b.booking_id', 'b.booking_reference', 'b.project_title', 'b.shoot_date_start',
@@ -112,7 +112,7 @@ class CrewPortalController extends Controller
             $myActiveBookings = DB::table('booking_crew as bc')
                 ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
                 ->where('bc.crew_id', $cmId)
-                ->where('bc.assignment_status', '!=', 'declined')
+                ->whereNotIn('bc.assignment_status', ['declined', 'back_out'])
                 ->whereIn('b.booking_status', ['confirmed', 'ongoing', 'pending_inspection', 'returned'])
                 ->orderByDesc('b.shoot_date_start')
                 ->distinct()
@@ -202,7 +202,7 @@ class CrewPortalController extends Controller
                     ->join('crew_members as cm', 'bc.crew_id', '=', 'cm.crew_id')
                     ->leftJoin('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
                     ->whereIn('bc.booking_id', $teamBookingIds)
-                    ->where('bc.assignment_status', '!=', 'declined')
+                    ->whereNotIn('bc.assignment_status', ['declined', 'back_out'])
                     ->orderBy('cp.position_name')->orderBy('cm.last_name')
                     ->select('bc.booking_id', 'bc.crew_id', DB::raw("CONCAT(cm.first_name,' ',cm.last_name) AS crew_name"), 'cm.phone', 'cp.position_name')
                     ->get();
@@ -310,7 +310,7 @@ class CrewPortalController extends Controller
         }
 
         $ownsBooking = DB::table('booking_crew')->where('crew_id', $crewMember->crew_id)
-            ->where('booking_id', $bid)->where('assignment_status', '!=', 'declined')->exists();
+            ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
         if (! $ownsBooking) {
             return redirect()->route('crew-portal');
         }
@@ -384,7 +384,7 @@ class CrewPortalController extends Controller
         }
 
         $ownsBooking = DB::table('booking_crew')->where('crew_id', $crewMember->crew_id)
-            ->where('booking_id', $bid)->where('assignment_status', '!=', 'declined')->exists();
+            ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
         if (! $ownsBooking) {
             return redirect()->route('crew-portal');
         }
@@ -410,7 +410,7 @@ class CrewPortalController extends Controller
                 DB::raw("CONCAT(logger.first_name,' ',logger.last_name) as logged_by_name"))
             ->get();
 
-        $totalCrew = (int) DB::table('booking_crew')->where('booking_id', $bid)->where('assignment_status', '!=', 'declined')->count();
+        $totalCrew = (int) DB::table('booking_crew')->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->count();
         $presentCount = $records->whereIn('status', ['present', 'late'])->count();
         $absentCount = $records->whereIn('status', ['absent', 'no_show'])->count();
 
@@ -448,7 +448,7 @@ class CrewPortalController extends Controller
             // POSTed by the client. The booking/equipment <select>s only ever offer these in the
             // real UI, but the server re-validates rather than trusting that alone.
             $ownsBooking = DB::table('booking_crew')->where('crew_id', $crewMember->crew_id)
-                ->where('booking_id', $bid)->where('assignment_status', '!=', 'declined')->exists();
+                ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
             if (! $ownsBooking) {
                 return ['type' => 'danger', 'text' => 'That booking is not assigned to you.'];
             }
@@ -491,7 +491,7 @@ class CrewPortalController extends Controller
             $checkedIds = array_map('intval', (array) $request->input('items', []));
 
             $ownsBooking = DB::table('booking_crew')->where('crew_id', $crewMember->crew_id)
-                ->where('booking_id', $bid)->where('assignment_status', '!=', 'declined')->exists();
+                ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
             if (! $ownsBooking) {
                 return ['type' => 'danger', 'text' => 'That booking is not assigned to you.'];
             }
@@ -580,7 +580,7 @@ class CrewPortalController extends Controller
             $date = $request->input('attendance_date') ?: now()->toDateString();
 
             $ownsBooking = DB::table('booking_crew')->where('crew_id', $crewMember->crew_id)
-                ->where('booking_id', $bid)->where('assignment_status', '!=', 'declined')->exists();
+                ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
             if (! $ownsBooking) {
                 return ['type' => 'danger', 'text' => 'That booking is not assigned to you.'];
             }
@@ -594,26 +594,41 @@ class CrewPortalController extends Controller
             }
 
             $logged = 0;
-            foreach ((array) $request->input('crew_status', []) as $cid => $status) {
-                $cid = (int) $cid;
-                // Only allow marking teammates actually assigned (non-declined) to this same
-                // booking — the form only ever offers these, but the server re-checks rather
-                // than trusting the POSTed crew_id list.
-                $memberOnBooking = DB::table('booking_crew')->where('booking_id', $bid)->where('crew_id', $cid)
-                    ->where('assignment_status', '!=', 'declined')->exists();
-                if (! $memberOnBooking) {
-                    continue;
+            DB::transaction(function () use ($request, $bid, $date, $uid, &$logged) {
+                foreach ((array) $request->input('crew_status', []) as $cid => $status) {
+                    $cid = (int) $cid;
+                    // Only allow marking teammates actually assigned (non-declined) to this same
+                    // booking — the form only ever offers these, but the server re-checks rather
+                    // than trusting the POSTed crew_id list.
+                    $memberOnBooking = DB::table('booking_crew')->where('booking_id', $bid)->where('crew_id', $cid)
+                        ->where('assignment_status', '!=', 'declined')->exists();
+                    if (! $memberOnBooking) {
+                        continue;
+                    }
+
+                    $reason = $request->input("crew_reason.$cid", '');
+                    $repId = (int) $request->input("crew_replacement.$cid", 0);
+
+                    DB::table('crew_attendance')->updateOrInsert(
+                        ['booking_id' => $bid, 'crew_id' => $cid, 'attendance_date' => $date],
+                        ['status' => $status, 'reason' => $reason, 'replacement_crew_id' => $repId ?: null, 'logged_by' => $uid]
+                    );
+                    $logged++;
+
+                    // Same booking_crew sync as the staff-side Log Attendance flow (see
+                    // AttendanceController::handleAction) — without this, a crew lead marking a
+                    // teammate back_out here never actually changed that teammate's real
+                    // assignment status, so Schedule/roster views kept showing them as active.
+                    $currentAssignment = DB::table('booking_crew')->where('booking_id', $bid)->where('crew_id', $cid)->value('assignment_status');
+                    if ($status === 'back_out' && $currentAssignment !== 'back_out') {
+                        DB::table('booking_crew')->where('booking_id', $bid)->where('crew_id', $cid)
+                            ->update(['assignment_status' => 'back_out']);
+                    } elseif ($status !== 'back_out' && $currentAssignment === 'back_out') {
+                        DB::table('booking_crew')->where('booking_id', $bid)->where('crew_id', $cid)
+                            ->update(['assignment_status' => 'confirmed']);
+                    }
                 }
-
-                $reason = $request->input("crew_reason.$cid", '');
-                $repId = (int) $request->input("crew_replacement.$cid", 0);
-
-                DB::table('crew_attendance')->updateOrInsert(
-                    ['booking_id' => $bid, 'crew_id' => $cid, 'attendance_date' => $date],
-                    ['status' => $status, 'reason' => $reason, 'replacement_crew_id' => $repId ?: null, 'logged_by' => $uid]
-                );
-                $logged++;
-            }
+            });
             ActivityLog::record($uid, 'log_attendance', 'crew', "Crew lead logged $logged attendance record(s) for booking #$bid");
 
             return ['type' => 'success', 'text' => "Attendance logged for <strong>$logged</strong> crew member(s)."];
@@ -628,7 +643,7 @@ class CrewPortalController extends Controller
 
             $booking = DB::table('bookings')->where('booking_id', $bid)->first();
             $ownsBooking = DB::table('booking_crew')->where('crew_id', $crewMember->crew_id)
-                ->where('booking_id', $bid)->where('assignment_status', '!=', 'declined')->exists();
+                ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
             if (! $booking || ! $ownsBooking || ! in_array($booking->booking_status, ['confirmed', 'ongoing'], true)) {
                 return ['type' => 'danger', 'text' => 'That booking is not assigned to you or is not currently active.'];
             }

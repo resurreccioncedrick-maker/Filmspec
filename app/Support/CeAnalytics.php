@@ -14,17 +14,33 @@ use Illuminate\Support\Facades\DB;
 class CeAnalytics
 {
     /**
+     * Restricts a `cost_estimates as ce` query builder to only the latest CONFIRMED row per
+     * booking, so a booking that was confirmed, revised and re-confirmed never counts twice.
+     * confirmCe() (BookingCosting) sets status='confirmed' on the new row without demoting
+     * the row it superseded, so without this filter any raw `status='confirmed'` query can
+     * see 2+ "confirmed" rows for the same booking — this is the shared fix for that.
+     */
+    public static function onlyLatestConfirmed($query)
+    {
+        return $query->where('ce.status', 'confirmed')
+            ->whereRaw('ce.ce_id = (SELECT MAX(ce2.ce_id) FROM cost_estimates ce2 WHERE ce2.booking_id = ce.booking_id AND ce2.status = "confirmed")');
+    }
+
+    /**
      * Only the latest CONFIRMED CE per booking counts, so a booking that was confirmed,
      * changed and re-confirmed (Part 2a's revision lifecycle) is never double-counted from
-     * stale revision history.
+     * stale revision history. A confirmed CE whose booking was later cancelled is also
+     * excluded — a cancelled booking shouldn't inflate confirmed financial totals even
+     * though its old CE row still literally says status='confirmed'.
      */
     public static function confirmedCes(string $from, string $to): Collection
     {
-        $rows = DB::table('cost_estimates as ce')
-            ->join('bookings as b', 'ce.booking_id', '=', 'b.booking_id')
-            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
-            ->where('ce.status', 'confirmed')
-            ->whereRaw('ce.ce_id = (SELECT MAX(ce2.ce_id) FROM cost_estimates ce2 WHERE ce2.booking_id = ce.booking_id AND ce2.status = "confirmed")')
+        $rows = self::onlyLatestConfirmed(
+            DB::table('cost_estimates as ce')
+                ->join('bookings as b', 'ce.booking_id', '=', 'b.booking_id')
+                ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+        )
+            ->where('b.booking_status', '!=', 'cancelled')
             ->whereBetween('ce.confirmed_at', [$from, $to])
             ->orderByDesc('ce.confirmed_at')
             ->select('ce.ce_id', 'ce.ce_reference', 'ce.grand_total', 'ce.subtotal', 'ce.crew_total',

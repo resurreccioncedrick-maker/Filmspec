@@ -55,9 +55,18 @@ class FieldRequestsController extends Controller
             )
             ->get();
 
+        // Awaiting Dispatch/Out for Delivery apply only to physical resources (equipment/
+        // accessories) — crew items are already committed at approval time and just need a
+        // driver/ETA, tracked separately below as "Ready for Dispatch".
         $stats = [
-            'approved' => (int) DB::table('booking_equipment_requests')->where('status', 'approved')->count(),
+            'pending' => (int) DB::table('booking_equipment_requests')->where('status', 'pending')->count(),
+            'approved' => (int) DB::table('booking_equipment_requests')->where('status', 'approved')
+                ->whereIn('item_type', ['equipment', 'accessory'])->count(),
+            'ready_crew' => (int) DB::table('booking_equipment_requests')->where('status', 'approved')
+                ->where('item_type', 'crew')->count(),
             'dispatched' => (int) DB::table('booking_equipment_requests')->where('status', 'dispatched')->count(),
+            'overdue' => (int) DB::table('booking_equipment_requests')->where('status', 'dispatched')
+                ->where('eta', '<', now())->count(),
         ];
 
         $vehicleRates = DB::table('vehicle_rates')->where('is_active', 1)->orderBy('base_rate')->get();

@@ -120,7 +120,7 @@ class IncidentsController extends Controller
                 ->join('crew_members as cm', 'bc.crew_id', '=', 'cm.crew_id')
                 ->leftJoin('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
                 ->whereIn('bc.booking_id', $bookingIds)
-                ->where('bc.assignment_status', '!=', 'declined')
+                ->whereNotIn('bc.assignment_status', ['declined', 'back_out'])
                 ->orderBy('cp.position_name')->orderBy('cm.last_name')
                 ->select('bc.booking_id', 'cm.first_name', 'cm.last_name', DB::raw("COALESCE(cp.position_name,'Crew') AS position_name"))
                 ->get();

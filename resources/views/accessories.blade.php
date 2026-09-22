@@ -132,9 +132,15 @@
       <div class="acc-pg-name" title="{{ $acc->accessory_name }}">{{ $acc->accessory_name }}</div>
       <div class="acc-pg-desc">{{ $acc->description ?: '—' }}</div>
       <div class="acc-pg-rate">{{ $rateStr }}</div>
+      @if (($acc->tracking_method ?? 'quantity') === 'individual')
+      <div style="font-size:.68rem;color:var(--accent);font-weight:700;margin-bottom:4px">
+        {{ $acc->unit_count }} unit{{ $acc->unit_count === 1 ? '' : 's' }} tracked
+      </div>
+      @else
       <div style="font-size:.68rem;color:{{ $qtyColor }};font-weight:700;margin-bottom:4px">
         {{ $acc->available }}/{{ (int) ($acc->quantity ?? 1) }} available{{ $acc->in_use > 0 ? ' · ' . $acc->in_use . ' out' : '' }}
       </div>
+      @endif
       <div>
         @if ($eqCount > 0)
         <span class="acc-link-chip" title="{{ $acc->linked_equipment ?? '' }}"
@@ -158,6 +164,10 @@
       <button class="btn btn-outline btn-sm" style="font-size:.72rem"
               onclick='openEditAcc(@json($acc))' title="Edit">
         <i data-feather="edit-2" style="width:11px;height:11px"></i>
+      </button>
+      <button class="btn btn-outline btn-sm" style="font-size:.72rem"
+              onclick="openAccUnits({{ $acc->accessory_id }}, {{ json_encode($acc->accessory_name) }})" title="Physical Units ({{ $acc->unit_count }})">
+        <i data-feather="hash" style="width:11px;height:11px"></i>
       </button>
       <button class="btn btn-danger btn-sm" style="font-size:.72rem"
               onclick="deleteAcc({{ $acc->accessory_id }}, '{{ addslashes($acc->accessory_name) }}')" title="Delete">
@@ -195,23 +205,42 @@
           <input type="text" id="addAccName" class="form-control" placeholder="e.g. 50mm Lens, Tripod">
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <label>Daily Rate (₱) <span style="color:var(--muted);font-weight:400">— 0 = included</span></label>
-          <input type="number" id="addAccRate" class="form-control" step="0.01" min="0" value="0">
-        </div>
-        <div class="form-group" style="margin-bottom:0">
           <label>Description</label>
           <input type="text" id="addAccDesc" class="form-control" placeholder="Optional notes">
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <label>Type</label>
-          <select id="addAccIncl" class="form-control">
-            <option value="1">Included in package</option>
-            <option value="0">Optional add-on</option>
+          <label>Accessory Type</label>
+          <select id="addAccType" class="form-control" onchange="onAddAccTypeChange()">
+            @foreach ($typeLabel as $tk => $tl)
+            <option value="{{ $tk }}" {{ $tk === 'optional_addon' ? 'selected' : '' }}>{{ $tl }}</option>
+            @endforeach
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0">
+          <label>Tracking Method</label>
+          <select id="addAccTracking" class="form-control" onchange="onAddAccTrackingChange()">
+            <option value="quantity" selected>Quantity Tracked</option>
+            <option value="individual">Individually Tracked</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0" id="addAccRateWrap">
+          <label>Daily Rate (₱)</label>
+          <input type="number" id="addAccRate" class="form-control" step="0.01" min="0" value="0">
+        </div>
+        <div class="form-group" style="margin-bottom:0;display:none" id="addAccInclNote">
+          <label>Pricing</label>
+          <div style="font-size:.8rem;color:var(--muted);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+            No separate charge. Included with linked equipment/package.
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0" id="addAccQtyWrap">
           <label>Stock Qty <span style="color:var(--muted);font-weight:400">— units available</span></label>
           <input type="number" id="addAccQty" class="form-control" min="1" value="1" placeholder="1">
+        </div>
+        <div class="form-group" style="margin-bottom:0;display:none" id="addAccIndivNote">
+          <div style="font-size:.8rem;color:var(--muted);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+            Individual units are added after saving, from the accessory's <strong>Units</strong> button.
+          </div>
         </div>
         <div style="grid-column:1/-1">
           <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:8px">
@@ -225,8 +254,9 @@
           <div class="acc-equip-list" id="addEquipList">
             @foreach ($allEquipment as $eq)
             <div class="acc-equip-item" data-search="{{ strtolower($eq->equipment_name) }}">
-              <input type="checkbox" id="addEq{{ $eq->equipment_id }}" class="add-equip-chk" value="{{ $eq->equipment_id }}">
+              <input type="checkbox" id="addEq{{ $eq->equipment_id }}" class="add-equip-chk" value="{{ $eq->equipment_id }}" onchange="document.getElementById('addEqQty{{ $eq->equipment_id }}').style.display = this.checked ? 'inline-block' : 'none'">
               <label for="addEq{{ $eq->equipment_id }}">{{ $eq->equipment_name }}</label>
+              <input type="number" id="addEqQty{{ $eq->equipment_id }}" class="add-equip-incqty form-control" data-eid="{{ $eq->equipment_id }}" min="1" placeholder="Qty" title="Included quantity for this equipment" style="display:none;width:56px;padding:3px 5px;font-size:.72rem;margin-left:6px">
               <span class="acc-equip-cat">{{ $eq->category_name }}</span>
             </div>
             @endforeach
@@ -266,23 +296,42 @@
           <input type="text" id="editAccName" class="form-control">
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <label>Daily Rate (₱)</label>
-          <input type="number" id="editAccRate" class="form-control" step="0.01" min="0">
-        </div>
-        <div class="form-group" style="margin-bottom:0">
           <label>Description</label>
           <input type="text" id="editAccDesc" class="form-control">
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <label>Type</label>
-          <select id="editAccIncl" class="form-control">
-            <option value="1">Included in package</option>
-            <option value="0">Optional add-on</option>
+          <label>Accessory Type</label>
+          <select id="editAccType" class="form-control" onchange="onEditAccTypeChange()">
+            @foreach ($typeLabel as $tk => $tl)
+            <option value="{{ $tk }}">{{ $tl }}</option>
+            @endforeach
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0">
+          <label>Tracking Method</label>
+          <select id="editAccTracking" class="form-control" onchange="onEditAccTrackingChange()">
+            <option value="quantity">Quantity Tracked</option>
+            <option value="individual">Individually Tracked</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0" id="editAccRateWrap">
+          <label>Daily Rate (₱)</label>
+          <input type="number" id="editAccRate" class="form-control" step="0.01" min="0">
+        </div>
+        <div class="form-group" style="margin-bottom:0;display:none" id="editAccInclNote">
+          <label>Pricing</label>
+          <div style="font-size:.8rem;color:var(--muted);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+            No separate charge. Included with linked equipment/package.
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0" id="editAccQtyWrap">
           <label>Stock Qty</label>
           <input type="number" id="editAccQty" class="form-control" min="1" value="1">
+        </div>
+        <div class="form-group" style="margin-bottom:0;display:none" id="editAccIndivNote">
+          <div style="font-size:.8rem;color:var(--muted);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+            Manage individual units from the accessory's <strong>Units</strong> button.
+          </div>
         </div>
         <div style="grid-column:1/-1">
           <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:8px">Compatible Equipment</label>
@@ -293,8 +342,9 @@
           <div class="acc-equip-list" id="editEquipList">
             @foreach ($allEquipment as $eq)
             <div class="acc-equip-item" data-search="{{ strtolower($eq->equipment_name) }}">
-              <input type="checkbox" id="editEq{{ $eq->equipment_id }}" class="edit-equip-chk" value="{{ $eq->equipment_id }}">
+              <input type="checkbox" id="editEq{{ $eq->equipment_id }}" class="edit-equip-chk" value="{{ $eq->equipment_id }}" onchange="document.getElementById('editEqQty{{ $eq->equipment_id }}').style.display = this.checked ? 'inline-block' : 'none'">
               <label for="editEq{{ $eq->equipment_id }}">{{ $eq->equipment_name }}</label>
+              <input type="number" id="editEqQty{{ $eq->equipment_id }}" class="edit-equip-incqty form-control" data-eid="{{ $eq->equipment_id }}" min="1" placeholder="Qty" title="Included quantity for this equipment" style="display:none;width:56px;padding:3px 5px;font-size:.72rem;margin-left:6px">
               <span class="acc-equip-cat">{{ $eq->category_name }}</span>
             </div>
             @endforeach
@@ -305,6 +355,63 @@
     <div class="modal-footer">
       <button type="button" class="btn btn-outline" data-modal-close>Cancel</button>
       <button type="button" class="btn btn-primary" onclick="submitEditAcc()"><i data-feather="save"></i> Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- PHYSICAL UNITS MODAL (ACCESSORY) -->
+<div class="modal-overlay" id="modalAccUnits">
+  <div class="modal" style="max-width:780px">
+    <div class="modal-header">
+      <div class="modal-title"><i data-feather="hash"></i> Physical Units — <span id="accUnitsName" style="color:var(--accent)"></span></div>
+      <button class="modal-close" data-modal-close>&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="table-wrap" style="margin-bottom:14px">
+        <table>
+          <thead><tr><th>Asset Tag</th><th>Serial No.</th><th>Condition</th><th>Status</th><th>Location</th><th>Actions</th></tr></thead>
+          <tbody id="accUnitsTbody"></tbody>
+        </table>
+      </div>
+      <div id="accUnitsEmpty" style="display:none;text-align:center;color:var(--muted);padding:16px;font-size:.85rem">No physical units recorded yet.</div>
+
+      <div style="border-top:1px solid var(--border);padding-top:14px">
+        <div style="font-size:.78rem;font-weight:700;color:var(--text);margin-bottom:8px">Add Unit</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
+            <label style="font-size:.72rem">Asset Tag *</label>
+            <input type="text" id="accUnitAssetTag" class="form-control" placeholder="e.g. ACC-001">
+          </div>
+          <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
+            <label style="font-size:.72rem">Serial No.</label>
+            <input type="text" id="accUnitSerialNo" class="form-control">
+          </div>
+          <div class="form-group" style="margin-bottom:0;min-width:130px">
+            <label style="font-size:.72rem">Condition</label>
+            <select id="accUnitCondition" class="form-control">
+              @foreach ($unitCondLabel as $ck => $cl)
+              <option value="{{ $ck }}" {{ $ck === 'good' ? 'selected' : '' }}>{{ $cl }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;min-width:150px">
+            <label style="font-size:.72rem">Status</label>
+            <select id="accUnitStatus" class="form-control">
+              @foreach ($unitStatusLabel as $sk => $sl)
+              <option value="{{ $sk }}" {{ $sk === 'available' ? 'selected' : '' }}>{{ $sl }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;flex:1;min-width:120px">
+            <label style="font-size:.72rem">Location</label>
+            <input type="text" id="accUnitLocation" class="form-control">
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" onclick="addAccUnit()"><i data-feather="plus" style="width:13px;height:13px"></i> Add Unit</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" data-modal-close>Close</button>
     </div>
   </div>
 </div>
@@ -410,6 +517,27 @@ function previewAccImg(prefix, input) {
 }
 
 @if ($canManage)
+function onAddAccTypeChange() {
+  const isIncl = document.getElementById('addAccType').value === 'package_inclusion';
+  document.getElementById('addAccRateWrap').style.display = isIncl ? 'none' : '';
+  document.getElementById('addAccInclNote').style.display = isIncl ? '' : 'none';
+}
+function onAddAccTrackingChange() {
+  const isIndiv = document.getElementById('addAccTracking').value === 'individual';
+  document.getElementById('addAccQtyWrap').style.display = isIndiv ? 'none' : '';
+  document.getElementById('addAccIndivNote').style.display = isIndiv ? '' : 'none';
+}
+function onEditAccTypeChange() {
+  const isIncl = document.getElementById('editAccType').value === 'package_inclusion';
+  document.getElementById('editAccRateWrap').style.display = isIncl ? 'none' : '';
+  document.getElementById('editAccInclNote').style.display = isIncl ? '' : 'none';
+}
+function onEditAccTrackingChange() {
+  const isIndiv = document.getElementById('editAccTracking').value === 'individual';
+  document.getElementById('editAccQtyWrap').style.display = isIndiv ? 'none' : '';
+  document.getElementById('editAccIndivNote').style.display = isIndiv ? '' : 'none';
+}
+
 function submitAddAcc() {
   const name = document.getElementById('addAccName').value.trim();
   if (!name) { alert('Accessory name is required.'); return; }
@@ -420,11 +548,16 @@ function submitAddAcc() {
   fd.append('accessory_name', name);
   fd.append('daily_rate',     document.getElementById('addAccRate').value || '0');
   fd.append('description',    document.getElementById('addAccDesc').value.trim());
-  fd.append('is_included',    document.getElementById('addAccIncl').value);
+  fd.append('accessory_type', document.getElementById('addAccType').value);
+  fd.append('tracking_method', document.getElementById('addAccTracking').value);
   fd.append('quantity',       document.getElementById('addAccQty').value || '1');
   const imgFile = document.getElementById('addAccImg').files[0];
   if (imgFile) fd.append('accessory_image', imgFile);
-  document.querySelectorAll('.add-equip-chk:checked').forEach(cb => fd.append('equipment_ids[]', cb.value));
+  document.querySelectorAll('.add-equip-chk:checked').forEach(cb => {
+    fd.append('equipment_ids[]', cb.value);
+    const qtyInput = document.getElementById('addEqQty' + cb.value);
+    if (qtyInput && qtyInput.value) fd.append('included_qty[' + cb.value + ']', qtyInput.value);
+  });
 
   fetch(ACC_BASE_URL, { method: 'POST', body: fd })
     .then(r => r.json())
@@ -442,8 +575,11 @@ function openEditAcc(acc) {
   document.getElementById('editAccName').value = acc.accessory_name;
   document.getElementById('editAccRate').value = acc.daily_rate;
   document.getElementById('editAccDesc').value = acc.description || '';
-  document.getElementById('editAccIncl').value = acc.is_included;
+  document.getElementById('editAccType').value = acc.accessory_type || (acc.is_included ? 'package_inclusion' : 'optional_addon');
+  document.getElementById('editAccTracking').value = acc.tracking_method || 'quantity';
   document.getElementById('editAccQty').value  = acc.quantity || 1;
+  onEditAccTypeChange();
+  onEditAccTrackingChange();
   const prev = document.getElementById('editAccImgPrev');
   const ph   = document.getElementById('editAccImgPh');
   document.getElementById('editAccImg').value = '';
@@ -455,11 +591,20 @@ function openEditAcc(acc) {
     prev.style.display = 'none';
     ph.style.display   = '';
   }
-  fetch(ACC_BASE_URL + '?get_linked_ids=' + acc.accessory_id)
+  fetch(ACC_BASE_URL + '?get_links_detail=' + acc.accessory_id)
     .then(r => r.json())
-    .then(ids => {
+    .then(links => {
+      const byEid = {};
+      links.forEach(l => { byEid[l.equipment_id] = l.included_qty; });
       document.querySelectorAll('.edit-equip-chk').forEach(cb => {
-        cb.checked = ids.map(Number).includes(parseInt(cb.value));
+        const eid = parseInt(cb.value);
+        const linked = Object.prototype.hasOwnProperty.call(byEid, eid);
+        cb.checked = linked;
+        const qtyInput = document.getElementById('editEqQty' + eid);
+        if (qtyInput) {
+          qtyInput.style.display = linked ? 'inline-block' : 'none';
+          qtyInput.value = linked && byEid[eid] ? byEid[eid] : '';
+        }
       });
     });
   openModal('modalEditAcc');
@@ -477,11 +622,16 @@ function submitEditAcc() {
   fd.append('accessory_name', name);
   fd.append('daily_rate',     document.getElementById('editAccRate').value || '0');
   fd.append('description',    document.getElementById('editAccDesc').value.trim());
-  fd.append('is_included',    document.getElementById('editAccIncl').value);
+  fd.append('accessory_type', document.getElementById('editAccType').value);
+  fd.append('tracking_method', document.getElementById('editAccTracking').value);
   fd.append('quantity',       document.getElementById('editAccQty').value || '1');
   const imgFile = document.getElementById('editAccImg').files[0];
   if (imgFile) fd.append('accessory_image', imgFile);
-  document.querySelectorAll('.edit-equip-chk:checked').forEach(cb => fd.append('equipment_ids[]', cb.value));
+  document.querySelectorAll('.edit-equip-chk:checked').forEach(cb => {
+    fd.append('equipment_ids[]', cb.value);
+    const qtyInput = document.getElementById('editEqQty' + cb.value);
+    if (qtyInput && qtyInput.value) fd.append('included_qty[' + cb.value + ']', qtyInput.value);
+  });
 
   fetch(ACC_BASE_URL, { method: 'POST', body: fd })
     .then(r => r.json())
@@ -492,6 +642,108 @@ function submitEditAcc() {
         alert(data.error || 'Update failed.');
       }
     });
+}
+
+const ACC_UNIT_COND_LABEL = @json($unitCondLabel);
+const ACC_UNIT_STATUS_LABEL = @json($unitStatusLabel);
+let currentAccUnitsId = null;
+
+function openAccUnits(aid, aname) {
+  currentAccUnitsId = aid;
+  document.getElementById('accUnitsName').textContent = aname;
+  document.getElementById('accUnitAssetTag').value = '';
+  document.getElementById('accUnitSerialNo').value = '';
+  document.getElementById('accUnitLocation').value = '';
+  loadAccUnits();
+  openModal('modalAccUnits');
+}
+
+function loadAccUnits() {
+  const tbody = document.getElementById('accUnitsTbody');
+  const empty = document.getElementById('accUnitsEmpty');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:12px">Loading…</td></tr>';
+  fetch(ACC_BASE_URL + '?get_units=' + currentAccUnitsId)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.length) {
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      tbody.innerHTML = data.map(u => {
+        const condOpts = Object.keys(ACC_UNIT_COND_LABEL).map(k =>
+          `<option value="${k}" ${k === u.condition ? 'selected' : ''}>${escHtml(ACC_UNIT_COND_LABEL[k])}</option>`).join('');
+        const statusOpts = Object.keys(ACC_UNIT_STATUS_LABEL).map(k =>
+          `<option value="${k}" ${k === u.status ? 'selected' : ''}>${escHtml(ACC_UNIT_STATUS_LABEL[k])}</option>`).join('');
+        return `<tr>
+          <td style="font-family:monospace;font-weight:700">${escHtml(u.asset_tag)}</td>
+          <td style="font-family:monospace;font-size:.8rem">${escHtml(u.serial_no || '—')}</td>
+          <td><select class="form-control acc-unit-cond-sel" style="font-size:.78rem;padding:4px 6px">${condOpts}</select></td>
+          <td><select class="form-control acc-unit-status-sel" style="font-size:.78rem;padding:4px 6px">${statusOpts}</select></td>
+          <td><input type="text" class="form-control acc-unit-loc-input" value="${escHtml(u.location || '')}" style="font-size:.78rem;padding:4px 6px" placeholder="Location"></td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-outline btn-sm" onclick="saveAccUnit(${u.unit_id}, this)" title="Save"><i data-feather="save" style="width:12px;height:12px"></i></button>
+            <button class="btn btn-danger btn-sm" onclick="retireAccUnit(${u.unit_id})" title="Retire Unit"><i data-feather="archive" style="width:12px;height:12px"></i></button>
+          </td>
+        </tr>`;
+      }).join('');
+      if (window.feather) feather.replace();
+    });
+}
+
+function addAccUnit() {
+  const tag = document.getElementById('accUnitAssetTag').value.trim();
+  if (!tag) { alert('Asset tag is required.'); return; }
+  const fd = new FormData();
+  fd.append('ajax_action', 'add_unit');
+  fd.append('accessory_id', currentAccUnitsId);
+  fd.append('asset_tag', tag);
+  fd.append('serial_no', document.getElementById('accUnitSerialNo').value.trim());
+  fd.append('condition', document.getElementById('accUnitCondition').value);
+  fd.append('status', document.getElementById('accUnitStatus').value);
+  fd.append('location', document.getElementById('accUnitLocation').value.trim());
+  fd.append('_token', ACC_CSRF);
+
+  fetch(ACC_BASE_URL, { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        document.getElementById('accUnitAssetTag').value = '';
+        document.getElementById('accUnitSerialNo').value = '';
+        document.getElementById('accUnitLocation').value = '';
+        loadAccUnits();
+      } else {
+        alert(data.error || 'Could not add unit.');
+      }
+    });
+}
+
+function saveAccUnit(unitId, btn) {
+  const row = btn.closest('tr');
+  const fd = new FormData();
+  fd.append('ajax_action', 'update_unit');
+  fd.append('unit_id', unitId);
+  fd.append('condition', row.querySelector('.acc-unit-cond-sel').value);
+  fd.append('status', row.querySelector('.acc-unit-status-sel').value);
+  fd.append('location', row.querySelector('.acc-unit-loc-input').value.trim());
+  fd.append('_token', ACC_CSRF);
+
+  fetch(ACC_BASE_URL, { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => { if (!data.success) alert(data.error || 'Could not save unit.'); });
+}
+
+function retireAccUnit(unitId) {
+  if (!confirm('Retire this physical unit?')) return;
+  const fd = new FormData();
+  fd.append('ajax_action', 'retire_unit');
+  fd.append('unit_id', unitId);
+  fd.append('_token', ACC_CSRF);
+
+  fetch(ACC_BASE_URL, { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => { if (data.success) loadAccUnits(); });
 }
 
 function deleteAcc(aid, name) {
