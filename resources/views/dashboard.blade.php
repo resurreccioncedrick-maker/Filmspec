@@ -42,23 +42,29 @@
 .dash-grid-main { display:grid;grid-template-columns:1fr 320px;gap:18px;margin-bottom:20px; }
 .dash-grid-bottom { display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px; }
 
-/* Equipment Status — Command Strip: one proportional bar (fleet health at a glance) above a
-   4-column number strip, rather than four disconnected numbers with no shared scale. */
-.eqbar-track { height:6px;background:var(--s3);overflow:hidden;display:flex;margin:0; }
-.eqbar-seg { height:100%; }
-.eqstat-grid { display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--border); }
-.eqstat-cell { padding:12px 10px;border-right:1px solid var(--border); }
-.eqstat-cell:last-child { border-right:none; }
-.eqstat-cell .num { font-family:var(--font-display);font-size:22px;color:var(--text);line-height:1; }
-.eqstat-cell .lbl { font-size:9.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-top:4px; }
+/* Equipment Status — Signal Board: a real ring chart with a center total instead of a bar +
+   number strip. Overdue is a booking-level flag, not a fleet-utilization slice, so it's called
+   out as its own chip rather than a ring segment. */
+.eq-ring-wrap { display:flex;align-items:center;gap:18px;padding:14px 16px; flex-wrap:wrap; }
+.eq-ring-svg { flex-shrink:0; }
+.eq-ring-center-num { font-family:var(--font-display); }
+.eq-ring-center-lbl { font-family:var(--font-body); }
+.eq-legend { display:flex;flex-direction:column;gap:9px;font-size:12px;flex:1;min-width:120px; }
+.eq-legend span { display:flex;align-items:center;gap:7px;color:var(--sub); }
+.eq-legend b { margin-left:auto;padding-left:14px;font-family:var(--font-mono);color:var(--text); }
+.eq-legend .dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
+.eq-overdue-chip { margin:0 16px 16px;display:flex;align-items:center;gap:8px;border-radius:8px;padding:9px 12px;font-size:12.5px;font-weight:700; }
+.eq-overdue-chip.alert { background:var(--redl);color:#991b1b; }
+.eq-overdue-chip.clear { background:var(--greenl);color:var(--green); }
 
-/* Financial Snapshot */
-.fin-snap { padding:16px 18px 6px; }
+/* Financial Snapshot — a real area sparkline with a labeled current-month point, not seven
+   skinny disconnected bars. */
+.fin-snap { padding:16px 18px 4px; }
 .fin-snap .val { font-family:var(--font-display);font-size:32px;color:var(--text);line-height:1; }
 .fin-snap .lbl { font-size:11px;color:var(--muted);margin-top:4px; }
-.fin-bars { display:flex;align-items:flex-end;gap:4px;height:36px;margin-top:12px; }
-.fin-bar { width:10px;border-radius:2px 2px 0 0;background:var(--acclight); }
-.fin-bar.last { background:var(--accent); }
+.fin-chart-wrap { padding:6px 16px 2px;position:relative; }
+.fin-callout { position:absolute;right:4px;font-family:var(--font-mono);font-size:9.5px;font-weight:700;background:var(--accent);color:#fff;border-radius:5px;padding:2px 6px;white-space:nowrap;transform:translate(0,-130%);pointer-events:none; }
+.fin-axis { display:flex;justify-content:space-between;font-size:9px;font-family:var(--font-mono);color:var(--muted);padding:2px 2px 0; }
 
 /* Command Strip's compact agenda — next few shoot days, no need to open the calendar */
 .fin-agenda { padding:12px 18px 16px;border-top:1px solid var(--border);margin-top:14px;display:flex;flex-direction:column;gap:8px; }
@@ -72,11 +78,11 @@
 .cal-nav-btn { width:32px;height:32px;border:1px solid var(--border);border-radius:8px;background:var(--s2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;color:var(--sub); }
 .cal-nav-btn:hover { background:var(--accent);border-color:var(--accent);color:#fff; }
 .cal-month-title { font-family:var(--font-display);font-size:22px;letter-spacing:1px;color:var(--text); }
-.cal-dow { display:grid;grid-template-columns:repeat(7,1fr);background:var(--s2);border-bottom:1px solid var(--border); }
+.cal-dow { display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--s2);border-bottom:1px solid var(--border); }
 .cal-dow-cell { padding:8px 4px;text-align:center;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted); }
 .cal-dow-cell:first-child,.cal-dow-cell:last-child { color:var(--red); }
-.cal-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);padding:1px; }
-.cal-cell { background:var(--surface);min-height:74px;padding:6px;position:relative;cursor:pointer;transition:background .1s; }
+.cal-grid { display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;background:var(--border);padding:1px; }
+.cal-cell { background:var(--surface);min-height:74px;min-width:0;overflow:hidden;padding:6px;position:relative;cursor:pointer;transition:background .1s; }
 .cal-cell:hover { background:var(--acclight); }
 .cal-cell.other-month { background:var(--s2); }
 .cal-cell.other-month .cal-day-num { color:var(--border2); }
@@ -103,6 +109,13 @@
   .today-ops-grid { grid-template-columns:repeat(2,1fr); }
   .attn-grid { grid-template-columns:1fr; }
   .dash-grid-main { grid-template-columns:1fr; }
+}
+@media (max-width:560px) {
+  .eq-ring-wrap { gap:14px; }
+  .eq-ring-svg { width:76px;height:76px; }
+  .fin-snap .val { font-size:26px; }
+  .fin-axis span { font-size:8px; }
+  .dash-grid-bottom { grid-template-columns:1fr; }
 }
 </style>
 
@@ -210,46 +223,77 @@
     <div class="cal-grid" id="calGrid"></div>
   </div>
 
-  <!-- Equipment Status + Financial Snapshot — "Command Strip" -->
+  <!-- Equipment Status + Financial Snapshot — "Signal Board" -->
   <div style="display:flex;flex-direction:column;gap:16px">
     @php
-      // Bar segments are the three mutually-exclusive equipment statuses that make up fleet
+      // Ring segments are the three mutually-exclusive equipment statuses that make up fleet
       // utilization (available/rented/under_repair) — "Overdue Returns" is a booking-level flag,
-      // not an equipment status, so it's called out as a number rather than a bar segment.
+      // not an equipment status, so it's called out as its own chip rather than a ring segment.
       // Any remainder (e.g. 'booked' units) is left as unfilled track, not force-summed to 100%.
-      $eqPct = fn ($n) => $totalEquipment > 0 ? round($n / $totalEquipment * 100, 1) : 0;
+      $eqR = 37; $eqC = 2 * M_PI * $eqR;
+      $eqSegments = [
+        ['value' => $availableEquipment, 'color' => 'var(--green)'],
+        ['value' => $rentedEquipment,    'color' => 'var(--purple)'],
+        ['value' => $underMaintenance,   'color' => 'var(--orange)'],
+      ];
+      $eqCum = 0;
+      foreach ($eqSegments as $i => $seg) {
+        $frac = $totalEquipment > 0 ? $seg['value'] / $totalEquipment : 0;
+        $eqSegments[$i]['len'] = round($frac * $eqC, 2);
+        $eqSegments[$i]['offset'] = round(-$eqCum, 2);
+        $eqCum += $frac * $eqC;
+      }
     @endphp
     <div class="card" style="margin-bottom:0">
       <div class="card-header"><h2 class="card-title"><i data-feather="package" style="width:14px;height:14px"></i> Equipment Status</h2></div>
-      <div class="eqbar-track">
-        <div class="eqbar-seg" style="width:{{ $eqPct($availableEquipment) }}%;background:var(--green)"></div>
-        <div class="eqbar-seg" style="width:{{ $eqPct($rentedEquipment) }}%;background:#7c3aed"></div>
-        <div class="eqbar-seg" style="width:{{ $eqPct($underMaintenance) }}%;background:var(--orange)"></div>
-      </div>
-      <div class="eqstat-grid">
-        <div class="eqstat-cell">
-          <div class="num" style="color:var(--green)">{{ $availableEquipment }}</div>
-          <div class="lbl">Available</div>
-        </div>
-        <div class="eqstat-cell">
-          <div class="num" style="color:#7c3aed">{{ $rentedEquipment }}</div>
-          <div class="lbl">In Field</div>
-        </div>
-        <div class="eqstat-cell">
-          <div class="num" style="color:var(--orange)">{{ $underMaintenance }}</div>
-          <div class="lbl">Maint.</div>
-        </div>
-        <div class="eqstat-cell">
-          <div class="num" style="color:{{ $overdueReturns > 0 ? 'var(--red)' : 'var(--muted)' }}">{{ $overdueReturns }}</div>
-          <div class="lbl">Overdue</div>
+      <div class="eq-ring-wrap">
+        <svg class="eq-ring-svg" width="92" height="92" viewBox="0 0 92 92" role="img" aria-label="{{ $availableEquipment }} of {{ $totalEquipment }} units available">
+          <circle cx="46" cy="46" r="{{ $eqR }}" fill="none" stroke="var(--s3)" stroke-width="11"/>
+          @foreach ($eqSegments as $seg)
+          @if ($seg['value'] > 0)
+          <circle cx="46" cy="46" r="{{ $eqR }}" fill="none" stroke="{{ $seg['color'] }}" stroke-width="11"
+            stroke-dasharray="{{ $seg['len'] }} {{ round($eqC, 2) }}"
+            stroke-dashoffset="{{ $seg['offset'] }}"
+            transform="rotate(-90 46 46)"/>
+          @endif
+          @endforeach
+          <text x="46" y="43" text-anchor="middle" class="eq-ring-center-num" font-size="24" fill="var(--text)">{{ $totalEquipment }}</text>
+          <text x="46" y="57" text-anchor="middle" class="eq-ring-center-lbl" font-size="8" fill="var(--muted)">TOTAL UNITS</text>
+        </svg>
+        <div class="eq-legend">
+          <span><span class="dot" style="background:var(--green)"></span>Available<b>{{ $availableEquipment }}</b></span>
+          <span><span class="dot" style="background:var(--purple)"></span>In Field<b>{{ $rentedEquipment }}</b></span>
+          <span><span class="dot" style="background:var(--orange)"></span>Maintenance<b>{{ $underMaintenance }}</b></span>
         </div>
       </div>
-      <div style="padding:10px 16px;font-size:11px;color:var(--muted);border-top:1px solid var(--border)">
-        {{ $availableEquipment }} of {{ $totalEquipment }} total units
+      <div class="eq-overdue-chip {{ $overdueReturns > 0 ? 'alert' : 'clear' }}">
+        <i data-feather="{{ $overdueReturns > 0 ? 'alert-triangle' : 'check-circle' }}" style="width:14px;height:14px"></i>
+        {{ $overdueReturns > 0 ? $overdueReturns . ' unit' . ($overdueReturns === 1 ? '' : 's') . ' overdue for return' : 'No overdue returns' }}
       </div>
     </div>
 
     @if ($canSeeFinancials)
+    @php
+      $finPoints = [];
+      if ($financialTrend->isNotEmpty()) {
+        $finMax = max(1, $financialTrend->max('total'));
+        $finVals = $financialTrend->values();
+        $finCount = $finVals->count();
+        $finW = 280; $finTop = 4; $finBase = 60;
+        foreach ($finVals as $i => $t) {
+          $x = $finCount > 1 ? round(($i / ($finCount - 1)) * $finW, 1) : $finW / 2;
+          $y = round($finBase - (($t->total / $finMax) * ($finBase - $finTop)), 1);
+          $finPoints[] = ['x' => $x, 'y' => $y, 'label' => $t->label, 'total' => $t->total];
+        }
+      }
+      $finLinePath = ''; $finAreaPath = ''; $finLast = null;
+      if (count($finPoints) >= 2) {
+        $finLinePath = 'M' . $finPoints[0]['x'] . ',' . $finPoints[0]['y'];
+        foreach (array_slice($finPoints, 1) as $p) { $finLinePath .= ' L' . $p['x'] . ',' . $p['y']; }
+        $finLast = end($finPoints);
+        $finAreaPath = $finLinePath . ' L' . $finLast['x'] . ',64 L' . $finPoints[0]['x'] . ',64 Z';
+      }
+    @endphp
     <!-- Financial Snapshot -->
     <div class="card" style="margin-bottom:0">
       <div class="card-header">
@@ -264,15 +308,25 @@
           <i data-feather="{{ $revenueDeltaPct >= 0 ? 'trending-up' : 'trending-down' }}"></i> {{ $revenueDeltaPct >= 0 ? '+' : '' }}{{ $revenueDeltaPct }}% vs last month
         </span>
         @endif
-        @if ($financialTrend->isNotEmpty())
-        @php $maxTrend = max(1, $financialTrend->max('total')); @endphp
-        <div class="fin-bars">
-          @foreach ($financialTrend as $i => $t)
-          <div class="fin-bar {{ $loop->last ? 'last' : '' }}" style="height:{{ max(4, round($t->total / $maxTrend * 32)) }}px" title="{{ $t->label }}: ₱{{ number_format($t->total, 2) }}"></div>
+      </div>
+      @if ($finLast)
+      <div class="fin-chart-wrap">
+        <svg width="100%" height="72" viewBox="0 0 280 72" preserveAspectRatio="none" style="display:block;overflow:visible">
+          <line x1="0" y1="60" x2="280" y2="60" stroke="var(--border)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+          <path d="{{ $finLinePath }}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+          <path d="{{ $finAreaPath }}" fill="var(--acclight)" opacity="0.6"/>
+          <circle cx="{{ $finLast['x'] }}" cy="{{ $finLast['y'] }}" r="4" fill="var(--accent)" stroke="var(--surface)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+        </svg>
+        <div class="fin-callout" style="top:{{ $finLast['y'] }}px" title="{{ $finLast['label'] }}: ₱{{ number_format($finLast['total'], 2) }}">
+          ₱{{ $finLast['total'] >= 1000 ? number_format($finLast['total'] / 1000, 1) . 'K' : number_format($finLast['total'], 0) }}
+        </div>
+        <div class="fin-axis">
+          @foreach ($finPoints as $p)
+          <span>{{ strtoupper(substr($p['label'], 0, 3)) }}</span>
           @endforeach
         </div>
-        @endif
       </div>
+      @endif
 
       @if ($upcomingAgenda->isNotEmpty())
       <div class="fin-agenda">
