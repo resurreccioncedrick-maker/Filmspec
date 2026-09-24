@@ -149,12 +149,9 @@
           </div>
           @if ($canManage)
           <div class="equip-card-acts" style="margin-top:10px">
-            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+            <div style="display:flex;gap:6px;align-items:center">
               <button class="btn btn-outline btn-sm" onclick='editEquip(@json($eq))'>
                 <i data-feather="edit-2"></i> Edit
-              </button>
-              <button class="btn btn-outline btn-sm" onclick="openUnits({{ $eq->equipment_id }}, {{ json_encode($eq->equipment_name) }})" title="Physical Units">
-                <i data-feather="hash"></i> Units <span class="badge badge-gray" style="margin-left:2px">{{ $eq->unit_count }}</span>
               </button>
               @if ($eq->availability_status === 'booked')
               <button class="btn btn-success btn-sm" onclick="checkoutEquip({{ $eq->equipment_id }}, '{{ addslashes($eq->equipment_name) }}')">
@@ -166,12 +163,26 @@
                 <i data-feather="log-in"></i> In
               </button>
               @endif
-              <form method="POST" action="{{ $equipBase }}" style="display:inline" onsubmit="return confirm('Deactivate / retire this equipment model? It will no longer appear as available for new bookings.')">
-                @csrf
-                <input type="hidden" name="action" value="delete">
-                <input type="hidden" name="equipment_id" value="{{ $eq->equipment_id }}">
-                <button type="submit" class="btn btn-danger btn-sm" title="Deactivate / Retire Equipment"><i data-feather="archive"></i></button>
-              </form>
+              <div class="action-menu-wrap">
+                <button type="button" class="btn-icon" onclick="toggleActionMenu(this)" title="More actions">
+                  <i data-feather="more-vertical"></i>
+                </button>
+                <div class="action-menu align-right">
+                  <button type="button" onclick="closeActionMenus(); openAccessories({{ $eq->equipment_id }}, '{{ addslashes($eq->equipment_name) }}')">
+                    <i data-feather="package"></i> Accessories
+                  </button>
+                  <button type="button" onclick="closeActionMenus(); openUnits({{ $eq->equipment_id }}, {{ json_encode($eq->equipment_name) }})">
+                    <i data-feather="hash"></i> Physical Units <span class="badge badge-gray" style="margin-left:2px">{{ $eq->unit_count }}</span>
+                  </button>
+                  <div class="action-menu-divider"></div>
+                  <form method="POST" action="{{ $equipBase }}" onsubmit="return confirm('Deactivate / retire this equipment model? It will no longer appear as available for new bookings.')">
+                    @csrf
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="equipment_id" value="{{ $eq->equipment_id }}">
+                    <button type="submit" class="text-danger"><i data-feather="archive"></i> Deactivate / Retire</button>
+                  </form>
+                </div>
+              </div>
             </div>
           </div>
           @endif
@@ -232,17 +243,9 @@
           </td>
           @if ($canManage)
           <td style="text-align:right">
-            <div style="display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap;">
+            <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center">
               <button class="btn btn-outline btn-sm" onclick='editEquip(@json($eq))'>
-                <i data-feather="edit-2"></i>
-              </button>
-              <button class="btn btn-outline btn-sm" title="Accessories"
-                      onclick="openAccessories({{ $eq->equipment_id }}, '{{ addslashes($eq->equipment_name) }}')">
-                <i data-feather="package"></i>
-              </button>
-              <button class="btn btn-outline btn-sm" title="Physical Units ({{ $eq->unit_count }})"
-                      onclick="openUnits({{ $eq->equipment_id }}, {{ json_encode($eq->equipment_name) }})">
-                <i data-feather="hash"></i>
+                <i data-feather="edit-2"></i> Edit
               </button>
               @if ($eq->availability_status === 'booked')
               <button class="btn btn-success btn-sm" onclick="checkoutEquip({{ $eq->equipment_id }}, '{{ addslashes($eq->equipment_name) }}')">
@@ -254,12 +257,26 @@
                 <i data-feather="log-in"></i> In
               </button>
               @endif
-              <form method="POST" action="{{ $equipBase }}" style="display:inline" onsubmit="return confirm('Deactivate / retire this equipment model? It will no longer appear as available for new bookings.')">
-                @csrf
-                <input type="hidden" name="action" value="delete">
-                <input type="hidden" name="equipment_id" value="{{ $eq->equipment_id }}">
-                <button type="submit" class="btn btn-danger btn-sm" title="Deactivate / Retire Equipment"><i data-feather="archive"></i></button>
-              </form>
+              <div class="action-menu-wrap">
+                <button type="button" class="btn-icon" onclick="toggleActionMenu(this)" title="More actions">
+                  <i data-feather="more-vertical"></i>
+                </button>
+                <div class="action-menu align-right">
+                  <button type="button" onclick="closeActionMenus(); openAccessories({{ $eq->equipment_id }}, '{{ addslashes($eq->equipment_name) }}')">
+                    <i data-feather="package"></i> Accessories
+                  </button>
+                  <button type="button" onclick="closeActionMenus(); openUnits({{ $eq->equipment_id }}, {{ json_encode($eq->equipment_name) }})">
+                    <i data-feather="hash"></i> Physical Units <span class="badge badge-gray" style="margin-left:2px">{{ $eq->unit_count }}</span>
+                  </button>
+                  <div class="action-menu-divider"></div>
+                  <form method="POST" action="{{ $equipBase }}" onsubmit="return confirm('Deactivate / retire this equipment model? It will no longer appear as available for new bookings.')">
+                    @csrf
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="equipment_id" value="{{ $eq->equipment_id }}">
+                    <button type="submit" class="text-danger"><i data-feather="archive"></i> Deactivate / Retire</button>
+                  </form>
+                </div>
+              </div>
             </div>
           </td>
           @endif
@@ -323,50 +340,36 @@
           <div class="form-group"><label>Brand</label><input type="text" name="brand" class="form-control" placeholder="Sony, ARRI, Aputure…"></div>
           <div class="form-group"><label>Model</label><input type="text" name="model" class="form-control" placeholder="FX9, ALEXA Mini…"></div>
         </div>
-        <div class="form-row">
-          <div class="form-group"><label>Serial Number</label><input type="text" name="serial_number" class="form-control"></div>
-          <div class="form-group"><label>Daily Rate (₱) *</label><input type="number" name="daily_rate" class="form-control" step="0.01" min="0" placeholder="0.00" required></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Stock Quantity *</label>
-            <input type="number" name="stock_quantity" class="form-control" min="1" value="1" required placeholder="How many units owned">
-          </div>
-          <div class="form-group"><label>Date Acquired</label><input type="date" name="date_acquired" class="form-control"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Condition</label>
-            <select name="condition_status" class="form-control">
-              <option value="excellent">Excellent</option>
-              <option value="good" selected>Good</option>
-              <option value="fair">Serviceable</option>
-            </select>
-          </div>
-          <div class="form-group" style="display:flex;align-items:flex-end">
-            <div style="font-size:.75rem;color:var(--muted);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.5;width:100%">
-              <i data-feather="info" style="width:12px;height:12px;margin-right:4px;vertical-align:middle"></i>
-              Accessories can be added after saving the equipment.
-            </div>
-          </div>
+        <div class="form-group"><label>Daily Rate (₱) *</label><input type="number" name="daily_rate" class="form-control" step="0.01" min="0" placeholder="0.00" required></div>
+        <div class="form-group" style="font-size:.75rem;color:var(--muted);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.5">
+          <i data-feather="info" style="width:12px;height:12px;margin-right:4px;vertical-align:middle"></i>
+          Serial Number, Condition, Stock Quantity, and Date Acquired are tracked per <strong>Physical Unit</strong> — add units (and accessories) from the equipment's Physical Units panel after saving.
         </div>
         <div class="form-group"><label>Description / Specs</label><textarea name="description" class="form-control" rows="2" placeholder="Specs, included items…"></textarea></div>
         <div class="form-group"><label>Internal Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="Storage location, reminders…"></textarea></div>
-        <input type="hidden" name="requires_operator" value="1">
-        <div class="form-group" id="add_op_positions">
-          <label>Allowed Operator Positions <span style="color:var(--muted);font-weight:400">(who can operate this) *</span></label>
-          <div style="background:var(--s2);border:1px solid var(--border2);border-radius:7px;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
-            @foreach ($positions as $pos)
-            <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);cursor:pointer;text-transform:none;letter-spacing:0">
-              <input type="checkbox" name="operator_positions[]" value="{{ $pos->position_id }}" style="width:auto">
-              {{ $pos->position_name }}
-            </label>
-            @endforeach
-          </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="hidden" name="requires_operator" value="0">
+            <input type="checkbox" name="requires_operator" value="1" id="add_requires_op" checked onchange="toggleOperatorSection('add')" style="width:auto">
+            Requires a qualified operator
+          </label>
         </div>
-        <div class="form-group" id="add_op_note_wrap">
-          <label>Operator Note *</label>
-          <input type="text" name="operator_note" class="form-control" placeholder="e.g. Requires licensed camera operator" required>
+        <div id="add_operator_fields">
+          <div class="form-group" id="add_op_positions">
+            <label>Allowed Operator Positions <span style="color:var(--muted);font-weight:400">(who can operate this) *</span></label>
+            <div style="background:var(--s2);border:1px solid var(--border2);border-radius:7px;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              @foreach ($positions as $pos)
+              <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);cursor:pointer;text-transform:none;letter-spacing:0">
+                <input type="checkbox" name="operator_positions[]" value="{{ $pos->position_id }}" style="width:auto">
+                {{ $pos->position_name }}
+              </label>
+              @endforeach
+            </div>
+          </div>
+          <div class="form-group" id="add_op_note_wrap">
+            <label>Operator Note *</label>
+            <input type="text" name="operator_note" class="form-control" placeholder="e.g. Requires licensed camera operator" required>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -417,14 +420,15 @@
           <div class="form-group"><label>Brand</label><input type="text" name="brand" id="edit_ebrand" class="form-control"></div>
           <div class="form-group"><label>Model</label><input type="text" name="model" id="edit_emodel" class="form-control"></div>
         </div>
-        <div class="form-row">
-          <div class="form-group"><label>Serial Number</label><input type="text" name="serial_number" id="edit_eserial" class="form-control"></div>
-          <div class="form-group"><label>Daily Rate (₱) *</label><input type="number" name="daily_rate" id="edit_erate" class="form-control" step="0.01" min="0" required></div>
+        <div class="form-group"><label>Daily Rate (₱) *</label><input type="number" name="daily_rate" id="edit_erate" class="form-control" step="0.01" min="0" required></div>
+        <div id="edit_derived_note" style="display:none;font-size:.75rem;color:var(--muted);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;line-height:1.5;margin-bottom:14px">
+          <i data-feather="hash" style="width:12px;height:12px;margin-right:4px;vertical-align:middle"></i>
+          <span id="edit_derived_text"></span> — Stock Quantity and Condition are derived from its Physical Units. Manage them from the <strong>Physical Units</strong> button in the table.
         </div>
-        <div class="form-row">
+        <div class="form-row" id="edit_manual_stock_cond">
           <div class="form-group">
             <label>Stock Quantity *</label>
-            <input type="number" name="stock_quantity" id="edit_estock" class="form-control" min="1" required>
+            <input type="number" name="stock_quantity" id="edit_estock" class="form-control" min="1">
           </div>
           <div class="form-group">
             <label>Condition</label>
@@ -436,7 +440,7 @@
             </select>
           </div>
         </div>
-        <div class="form-row">
+        <div class="form-row" id="edit_manual_avail">
           <div class="form-group">
             <label>Availability</label>
             <select name="availability_status" id="edit_eavail" class="form-control">
@@ -456,17 +460,25 @@
         </div>
         <div class="form-group"><label>Description</label><textarea name="description" id="edit_edesc" class="form-control" rows="2"></textarea></div>
         <div class="form-group"><label>Internal Notes</label><textarea name="notes" id="edit_enotes" class="form-control" rows="2"></textarea></div>
-        <div class="form-group"><label>Operator Note</label><input type="text" name="operator_note" id="edit_eopnote" class="form-control" placeholder="e.g. Requires licensed camera operator"></div>
-        <input type="hidden" name="requires_operator" value="1">
-        <div class="form-group" id="edit_op_positions">
-          <label>Allowed Operator Positions <span style="color:var(--muted);font-weight:400">(who can operate this) *</span></label>
-          <div style="background:var(--s2);border:1px solid var(--border2);border-radius:7px;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px" id="edit_op_chk">
-            @foreach ($positions as $pos)
-            <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);cursor:pointer;text-transform:none;letter-spacing:0">
-              <input type="checkbox" name="operator_positions[]" value="{{ $pos->position_id }}" class="op-pos-chk" style="width:auto">
-              {{ $pos->position_name }}
-            </label>
-            @endforeach
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="hidden" name="requires_operator" value="0">
+            <input type="checkbox" name="requires_operator" value="1" id="edit_requires_op" onchange="toggleOperatorSection('edit')" style="width:auto">
+            Requires a qualified operator
+          </label>
+        </div>
+        <div id="edit_operator_fields">
+          <div class="form-group"><label>Operator Note *</label><input type="text" name="operator_note" id="edit_eopnote" class="form-control" placeholder="e.g. Requires licensed camera operator"></div>
+          <div class="form-group" id="edit_op_positions">
+            <label>Allowed Operator Positions <span style="color:var(--muted);font-weight:400">(who can operate this) *</span></label>
+            <div style="background:var(--s2);border:1px solid var(--border2);border-radius:7px;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px" id="edit_op_chk">
+              @foreach ($positions as $pos)
+              <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);cursor:pointer;text-transform:none;letter-spacing:0">
+                <input type="checkbox" name="operator_positions[]" value="{{ $pos->position_id }}" class="op-pos-chk" style="width:auto">
+                {{ $pos->position_name }}
+              </label>
+              @endforeach
+            </div>
           </div>
         </div>
       </div>
@@ -556,7 +568,7 @@
     <div class="modal-body">
       <div class="table-wrap" style="margin-bottom:14px">
         <table>
-          <thead><tr><th>Asset Tag</th><th>Serial No.</th><th>Condition</th><th>Status</th><th>Location</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Asset Tag</th><th>Serial No.</th><th>Condition</th><th>Status</th><th>Location</th><th>Acquired</th><th>Actions</th></tr></thead>
           <tbody id="unitsTbody"></tbody>
         </table>
       </div>
@@ -593,6 +605,10 @@
             <label style="font-size:.72rem">Location</label>
             <input type="text" id="unitLocation" class="form-control" placeholder="e.g. Camera Room A">
           </div>
+          <div class="form-group" style="margin-bottom:0;min-width:140px">
+            <label style="font-size:.72rem">Date Acquired</label>
+            <input type="date" id="unitDateAcquired" class="form-control">
+          </div>
           <button type="button" class="btn btn-primary btn-sm" onclick="addUnit()"><i data-feather="plus" style="width:13px;height:13px"></i> Add Unit</button>
         </div>
       </div>
@@ -609,13 +625,33 @@
 const EQUIP_ASSET_BASE = "{{ asset('storage') }}";
 const EQUIP_BASE_URL = "{{ $equipBase }}";
 
+function closeActionMenus() {
+  document.querySelectorAll('.action-menu.show').forEach(function (m) {
+    m.classList.remove('show', 'drop-up');
+  });
+}
+function toggleActionMenu(trigger) {
+  var menu = trigger.nextElementSibling;
+  var wasOpen = menu.classList.contains('show');
+  closeActionMenus();
+  if (wasOpen) return;
+  menu.classList.add('show');
+  var rect = menu.getBoundingClientRect();
+  if (rect.bottom > window.innerHeight) menu.classList.add('drop-up');
+}
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('.action-menu-wrap')) closeActionMenus();
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') closeActionMenus();
+});
+
 function editEquip(eq) {
   document.getElementById('edit_eid').value     = eq.equipment_id;
   document.getElementById('edit_cat').value     = eq.category_id;
   document.getElementById('edit_ename').value   = eq.equipment_name;
   document.getElementById('edit_ebrand').value  = eq.brand  || '';
   document.getElementById('edit_emodel').value  = eq.model  || '';
-  document.getElementById('edit_eserial').value = eq.serial_number || '';
   document.getElementById('edit_erate').value   = eq.daily_rate;
   document.getElementById('edit_estock').value  = eq.stock_quantity || 1;
   document.getElementById('edit_econd').value   = eq.condition_status;
@@ -623,6 +659,19 @@ function editEquip(eq) {
   document.getElementById('edit_edesc').value   = eq.description || '';
   document.getElementById('edit_enotes').value  = eq.notes || '';
   document.getElementById('edit_eopnote').value = eq.operator_note || '';
+  document.getElementById('edit_requires_op').checked = !!parseInt(eq.requires_operator);
+  toggleOperatorSection('edit');
+
+  // Once this model has real Physical Units, Stock Quantity/Condition/Availability are
+  // derived — hide the manual fields and point staff at the Physical Units panel instead.
+  var hasUnits = parseInt(eq.unit_count || 0) > 0;
+  document.getElementById('edit_manual_stock_cond').style.display = hasUnits ? 'none' : '';
+  document.getElementById('edit_manual_avail').style.display = hasUnits ? 'none' : '';
+  document.getElementById('edit_derived_note').style.display = hasUnits ? '' : 'none';
+  if (hasUnits) {
+    document.getElementById('edit_derived_text').textContent =
+      eq.unit_count + ' active physical unit' + (eq.unit_count == 1 ? '' : 's');
+  }
 
   fetch(EQUIP_BASE_URL + '?get_operators=' + eq.equipment_id)
     .then(r => r.json())
@@ -644,6 +693,17 @@ function editEquip(eq) {
     if (ph) ph.style.display = 'block';
   }
   openModal('modalEditEquip');
+}
+
+function toggleOperatorSection(prefix) {
+  var checked = document.getElementById(prefix + '_requires_op').checked;
+  var fields = document.getElementById(prefix + '_operator_fields');
+  fields.style.display = checked ? '' : 'none';
+  var noteInput = document.getElementById(prefix + '_eopnote') || fields.querySelector('input[name="operator_note"]');
+  if (noteInput) {
+    if (checked) noteInput.setAttribute('required', 'required');
+    else { noteInput.removeAttribute('required'); noteInput.value = ''; }
+  }
 }
 
 function checkoutEquip(eid, equipName) {
@@ -752,6 +812,7 @@ function openUnits(eid, ename) {
   document.getElementById('unitAssetTag').value = '';
   document.getElementById('unitSerialNo').value = '';
   document.getElementById('unitLocation').value = '';
+  document.getElementById('unitDateAcquired').value = '';
   loadUnits();
   openModal('modalUnits');
 }
@@ -759,7 +820,7 @@ function openUnits(eid, ename) {
 function loadUnits() {
   const tbody = document.getElementById('unitsTbody');
   const empty = document.getElementById('unitsEmpty');
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:12px">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:12px">Loading…</td></tr>';
   fetch(EQUIP_BASE_URL + '?get_units=' + currentUnitsEquipId)
     .then(r => r.json())
     .then(data => {
@@ -780,6 +841,7 @@ function loadUnits() {
           <td><select class="form-control unit-cond-sel" style="font-size:.78rem;padding:4px 6px">${condOpts}</select></td>
           <td><select class="form-control unit-status-sel" style="font-size:.78rem;padding:4px 6px">${statusOpts}</select></td>
           <td><input type="text" class="form-control unit-loc-input" value="${escHtml(u.location || '')}" style="font-size:.78rem;padding:4px 6px" placeholder="Location"></td>
+          <td style="font-size:.78rem;color:var(--muted);white-space:nowrap">${u.date_acquired ? escHtml(u.date_acquired) : '—'}</td>
           <td style="white-space:nowrap">
             <button class="btn btn-outline btn-sm" onclick="saveUnit(${u.unit_id}, this)" title="Save"><i data-feather="save" style="width:12px;height:12px"></i></button>
             <button class="btn btn-danger btn-sm" onclick="retireUnit(${u.unit_id})" title="Retire Unit"><i data-feather="archive" style="width:12px;height:12px"></i></button>
@@ -801,6 +863,7 @@ function addUnit() {
   fd.append('condition', document.getElementById('unitCondition').value);
   fd.append('status', document.getElementById('unitStatus').value);
   fd.append('location', document.getElementById('unitLocation').value.trim());
+  fd.append('date_acquired', document.getElementById('unitDateAcquired').value);
   fd.append('_token', document.querySelector('meta[name="csrf-token"]').content);
 
   fetch(EQUIP_BASE_URL, { method: 'POST', body: fd })
@@ -810,6 +873,7 @@ function addUnit() {
         document.getElementById('unitAssetTag').value = '';
         document.getElementById('unitSerialNo').value = '';
         document.getElementById('unitLocation').value = '';
+        document.getElementById('unitDateAcquired').value = '';
         loadUnits();
       } else {
         alert(data.error || 'Could not add unit.');
@@ -854,6 +918,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var form = document.querySelector('#' + modalId + ' form');
     if (!form) return;
     form.addEventListener('submit', function(e) {
+      var reqOp = form.querySelector('input[type="checkbox"][name="requires_operator"]');
+      if (reqOp && !reqOp.checked) return;
       var boxes = form.querySelectorAll('input[name="operator_positions[]"]');
       if (boxes.length && !Array.from(boxes).some(function(cb) { return cb.checked; })) {
         e.preventDefault();

@@ -27,6 +27,16 @@ class HomeController extends Controller
             $accs = DB::table('accessories as a')
                 ->join('equipment_accessory_links as eal', 'eal.accessory_id', '=', 'a.accessory_id')
                 ->where('eal.equipment_id', $eid)
+                ->where('a.is_active', 1)
+                // Package Inclusions are informational (what ships with the package) so they
+                // always show here; Optional Add-Ons are gated by the Public Visibility toggle;
+                // Internal/Operational accessories are staff-only and never shown to clients.
+                ->where(function ($w) {
+                    $w->where('a.accessory_type', 'package_inclusion')
+                        ->orWhere(function ($w2) {
+                            $w2->where('a.accessory_type', 'optional_addon')->where('a.is_public', 1);
+                        });
+                })
                 ->orderByDesc('a.is_included')
                 ->orderBy('a.accessory_name')
                 ->select('a.accessory_id', 'a.accessory_name', 'a.description', 'a.daily_rate', 'a.is_included', 'a.image_path')

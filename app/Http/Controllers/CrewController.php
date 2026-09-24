@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Support\BookingCosting;
 use App\Support\DataExporter;
 use App\Support\ImageUpload;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
@@ -21,11 +23,19 @@ class CrewController extends Controller
 
     private array $typeLabel = ['staff' => 'Staff', 'freelance' => 'Freelance', 'on_call' => 'On Call'];
 
-    public function index(Request $request): View|StreamedResponse|Response
+    public function index(Request $request): View|JsonResponse|StreamedResponse|Response
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
         $canManage = in_array($role, config('filmspec.manage_roles'), true);
+
+        if ($request->has('get_crew_detail')) {
+            return $this->crewDetail((int) $request->query('get_crew_detail'));
+        }
+
+        if ($request->isMethod('post') && $canManage && $request->filled('ajax_action')) {
+            return $this->handleAjaxAction($request);
+        }
 
         $msg = null;
         if ($request->isMethod('post') && $canManage) {
@@ -187,6 +197,177 @@ class CrewController extends Controller
             ->all();
 
         return DataExporter::respond($request->query('export'), 'Crew Registry', $headers, $rows, 'crew-export');
+    }
+
+    /**
+     * Feeds the Crew Management detail panel — one fetch returns everything all five sub-tabs
+     * need (Overview/Qualifications/Schedule/Attendance/History) so switching tabs is instant,
+     * client-side, with no extra round trips.
+     */
+    private function crewDetail(int $cid): JsonResponse
+    {
+        $cm = DB::table('crew_members as cm')
+            ->leftJoin('crew_positions as cp', 'cm.primary_position_id', '=', 'cp.position_id')
+            ->leftJoin('users as lu', 'cm.user_id', '=', 'lu.user_id')
+            ->where('cm.crew_id', $cid)
+            ->select('cm.*', 'cp.position_name', 'cp.department', 'lu.email as linked_email')
+            ->first();
+        if (! $cm) {
+            return response()->json(['error' => 'Crew member not found.'], 404);
+        }
+
+        $qualifications = DB::table('crew_qualifications')->where('crew_id', $cid)
+            ->orderByDesc('expiry_date')->orderBy('title')->get();
+
+        $schedule = DB::table('booking_crew as bc')
+            ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
+            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+            ->where('bc.crew_id', $cid)
+            ->whereNotIn('b.booking_status', ['cancelled'])
+            ->whereNotIn('bc.assignment_status', ['declined', 'replaced', 'back_out'])
+            ->orderByDesc('b.shoot_date_start')
+            ->select('bc.bk_crew_id', 'b.booking_id', 'b.booking_reference', 'b.project_title', 'b.shoot_date_start',
+                'b.shoot_date_end', 'b.booking_status', 'c.company_name', 'c.contact_person', 'bc.assignment_status')
+            ->limit(30)
+            ->get();
+
+        $attendance = DB::table('crew_attendance as ca')
+            ->join('bookings as b', 'ca.booking_id', '=', 'b.booking_id')
+            ->where('ca.crew_id', $cid)
+            ->orderByDesc('ca.attendance_date')
+            ->select('ca.*', 'b.booking_reference', 'b.project_title')
+            ->limit(30)
+            ->get();
+
+        $history = DB::table('activity_logs as al')
+            ->leftJoin('users as u', 'al.user_id', '=', 'u.user_id')
+            ->where('al.module', 'crew')->where('al.record_id', $cid)
+            ->orderByDesc('al.created_at')
+            ->select('al.action', 'al.description', 'al.created_at', DB::raw("CONCAT(u.first_name,' ',u.last_name) AS by_name"))
+            ->limit(50)
+            ->get();
+
+        // For the Schedule tab's "Mark Withdrawn" replacement picker — every other active crew
+        // member, so a withdrawal and its replacement can be chosen in one step.
+        $otherActiveCrew = DB::table('crew_members')
+            ->where('status', 'active')->where('crew_id', '!=', $cid)
+            ->orderBy('last_name')
+            ->selectRaw("crew_id, CONCAT(first_name,' ',last_name) AS name")
+            ->get();
+
+        return response()->json([
+            'crew' => $cm, 'qualifications' => $qualifications,
+            'schedule' => $schedule, 'attendance' => $attendance, 'history' => $history,
+            'otherActiveCrew' => $otherActiveCrew,
+            'statusBadge' => $this->statusBadge, 'typeBadge' => $this->typeBadge, 'typeLabel' => $this->typeLabel,
+        ]);
+    }
+
+    private function handleAjaxAction(Request $request): JsonResponse
+    {
+        $action = $request->input('ajax_action');
+        $uid = $request->user()->user_id;
+
+        if ($action === 'add_qualification') {
+            $cid = (int) $request->input('crew_id');
+            $title = trim($request->input('title', ''));
+            if (! $cid || ! $title) {
+                return response()->json(['success' => false, 'error' => 'Qualification title is required.']);
+            }
+
+            $qid = DB::table('crew_qualifications')->insertGetId([
+                'crew_id' => $cid, 'title' => $title,
+                'issuing_body' => trim($request->input('issuing_body', '')) ?: null,
+                'issue_date' => $request->input('issue_date') ?: null,
+                'expiry_date' => $request->input('expiry_date') ?: null,
+                'notes' => trim($request->input('notes', '')) ?: null,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $crewName = DB::table('crew_members')->where('crew_id', $cid)->selectRaw("CONCAT(first_name,' ',last_name) AS name")->value('name');
+            ActivityLog::record($uid, 'create', 'crew', "Added qualification \"$title\" for $crewName", $cid);
+
+            return response()->json(['success' => true, 'qualification_id' => $qid]);
+        }
+
+        if ($action === 'delete_qualification') {
+            $qid = (int) $request->input('qualification_id');
+            $row = DB::table('crew_qualifications')->where('qualification_id', $qid)->first();
+            if (! $row) {
+                return response()->json(['success' => false, 'error' => 'Qualification not found.']);
+            }
+            DB::table('crew_qualifications')->where('qualification_id', $qid)->delete();
+            $crewName = DB::table('crew_members')->where('crew_id', $row->crew_id)->selectRaw("CONCAT(first_name,' ',last_name) AS name")->value('name');
+            ActivityLog::record($uid, 'delete', 'crew', "Removed qualification \"{$row->title}\" from $crewName", $row->crew_id);
+
+            return response()->json(['success' => true]);
+        }
+
+        // Withdrawing before a shoot is a crew-ASSIGNMENT change, not an attendance log entry —
+        // moved out of the day-of Attendance form per the panelist notes. Requires a replacement
+        // in the same step, same conflict checks batchAddCrew()/FieldRequestsController::dispatch()
+        // already use for assigning anyone else to a booking.
+        if ($action === 'mark_withdrawn') {
+            $bkCrewId = (int) $request->input('bk_crew_id');
+            $replacementId = (int) $request->input('replacement_crew_id');
+            $original = DB::table('booking_crew')->where('bk_crew_id', $bkCrewId)->first();
+            if (! $original) {
+                return response()->json(['success' => false, 'error' => 'Crew assignment not found.']);
+            }
+            if (! $replacementId) {
+                return response()->json(['success' => false, 'error' => 'A replacement crew member is required.']);
+            }
+            if ($replacementId === $original->crew_id) {
+                return response()->json(['success' => false, 'error' => 'Replacement must be a different crew member.']);
+            }
+
+            $booking = DB::table('bookings')->where('booking_id', $original->booking_id)->first();
+            if (! $booking) {
+                return response()->json(['success' => false, 'error' => 'Booking not found.']);
+            }
+            $replacement = DB::table('crew_members')->where('crew_id', $replacementId)->first();
+            if (! $replacement || $replacement->status !== 'active') {
+                return response()->json(['success' => false, 'error' => 'Selected replacement is not an active crew member.']);
+            }
+            if (DB::table('booking_crew')->where('booking_id', $original->booking_id)->where('crew_id', $replacementId)->exists()) {
+                return response()->json(['success' => false, 'error' => 'That crew member is already on this booking.']);
+            }
+            $conflictRef = DB::table('booking_crew as bc')
+                ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
+                ->where('bc.crew_id', $replacementId)->where('bc.booking_id', '!=', $original->booking_id)
+                ->whereNotIn('bc.assignment_status', ['declined', 'replaced', 'back_out'])
+                ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
+                ->where('b.shoot_date_start', '<=', $booking->shoot_date_end)
+                ->where('b.shoot_date_end', '>=', $booking->shoot_date_start)
+                ->value('b.booking_reference');
+            if ($conflictRef) {
+                return response()->json(['success' => false, 'error' => 'This crew member is already booked on ' . $conflictRef . ' during this period.']);
+            }
+            $unavail = DB::table('crew_unavailability')->where('crew_id', $replacementId)
+                ->where('date_from', '<=', $booking->shoot_date_end)->where('date_to', '>=', $booking->shoot_date_start)
+                ->exists();
+            if ($unavail) {
+                return response()->json(['success' => false, 'error' => 'This crew member has marked themselves unavailable during this period.']);
+            }
+
+            $originalName = DB::table('crew_members')->where('crew_id', $original->crew_id)->selectRaw("CONCAT(first_name,' ',last_name) AS name")->value('name');
+            $replacementName = trim($replacement->first_name . ' ' . $replacement->last_name);
+
+            DB::transaction(function () use ($original, $replacementId, $replacement, $booking) {
+                DB::table('booking_crew')->where('bk_crew_id', $original->bk_crew_id)->update(['assignment_status' => 'back_out']);
+                DB::table('booking_crew')->insert([
+                    'booking_id' => $original->booking_id, 'crew_id' => $replacementId, 'position_id' => $original->position_id,
+                    'rate_used' => $replacement->base_rate_12hr, 'hours_worked' => $original->hours_worked,
+                    'assignment_status' => 'confirmed', 'notes' => 'Replacement — original crew member withdrew before the shoot.',
+                ]);
+            });
+            BookingCosting::generateCostEstimate($original->booking_id, $uid);
+            ActivityLog::record($uid, 'update', 'crew', "Withdrawn from {$booking->booking_reference}, replaced by $replacementName", $original->crew_id);
+            ActivityLog::record($uid, 'assign', 'crew', "Assigned to {$booking->booking_reference} as a replacement for $originalName", $replacementId);
+
+            return response()->json(['success' => true]);
+        }
+
+        return response()->json(['success' => false, 'error' => 'Unknown action']);
     }
 
     private function handleAction(Request $request): ?array
@@ -380,7 +561,11 @@ class CrewController extends Controller
             $pn = trim($request->input('position_name', ''));
             $dept = trim($request->input('department', ''));
             if ($pn) {
-                DB::table('crew_positions')->insertOrIgnore(['position_name' => $pn, 'department' => $dept]);
+                DB::table('crew_positions')->insertOrIgnore([
+                    'position_name' => $pn, 'department' => $dept,
+                    'description' => trim($request->input('description', '')) ?: null,
+                    'responsibilities' => trim($request->input('responsibilities', '')) ?: null,
+                ]);
 
                 return ['type' => 'success', 'text' => "Position <strong>" . e($pn) . "</strong> added."];
             }

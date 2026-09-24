@@ -217,41 +217,43 @@
           </td>
           @if ($canManage)
           <td style="text-align:right">
-            <div style="display:flex;gap:4px;justify-content:flex-end">
+            <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center">
               <button class="btn btn-outline btn-sm"
-                      onclick='editCrew(@json($cm))'>
-                <i data-feather="edit-2"></i> Edit
+                      onclick="openCrewDetail({{ $cm->crew_id }})">
+                <i data-feather="eye"></i> View
               </button>
-              <button class="btn btn-outline btn-sm" title="Manage Unavailability"
-                      onclick="openAvailModal({{ $cm->crew_id }}, '{{ addslashes($cm->first_name . ' ' . $cm->last_name) }}')">
-                <i data-feather="calendar-x" style="width:13px;height:13px"></i>
-                @php $nb = count($upcomingBlocks[$cm->crew_id] ?? []); @endphp
-                @if ($nb)<span class="badge badge-red" style="font-size:.65rem;padding:1px 5px;margin-left:2px">{{ $nb }}</span>@endif
-              </button>
-              <a href="{{ route('attendance') }}?crew_id={{ $cm->crew_id }}"
-                 class="btn btn-outline btn-sm" title="View Attendance">
-                <i data-feather="clock"></i>
-              </a>
-              @if ($cm->user_id)
-              <button class="btn btn-outline btn-sm" style="border-color:var(--green);color:var(--green)" title="Login linked — click to unlink"
-                      onclick="openUnlinkModal({{ $cm->crew_id }}, '{{ addslashes($cm->first_name . ' ' . $cm->last_name) }}', '{{ addslashes($cm->linked_email ?? '') }}')">
-                <i data-feather="user-check" style="width:13px;height:13px"></i>
-              </button>
-              @else
-              <button class="btn btn-outline btn-sm" title="No login linked — click to create one"
-                      onclick="openLinkModal({{ $cm->crew_id }}, '{{ addslashes($cm->first_name . ' ' . $cm->last_name) }}')">
-                <i data-feather="user-plus" style="width:13px;height:13px"></i>
-              </button>
-              @endif
-              <form method="POST" action="{{ $crewBase }}" style="display:inline"
-                    onsubmit="return confirm('Delete {{ addslashes($cm->first_name . ' ' . $cm->last_name) }}? This cannot be undone.')">
-                @csrf
-                <input type="hidden" name="action" value="delete_crew">
-                <input type="hidden" name="crew_id" value="{{ $cm->crew_id }}">
-                <button type="submit" class="btn btn-sm" style="border:1px solid var(--red);color:var(--red);background:none;padding:5px 8px;border-radius:6px;cursor:pointer" title="Delete crew member">
-                  <i data-feather="trash-2" style="width:13px;height:13px"></i>
+              <div class="action-menu-wrap">
+                <button type="button" class="btn-icon" onclick="toggleActionMenu(this)" title="More actions">
+                  <i data-feather="more-vertical"></i>
                 </button>
-              </form>
+                <div class="action-menu align-right">
+                  @php $nb = count($upcomingBlocks[$cm->crew_id] ?? []); @endphp
+                  <button type="button" onclick="closeActionMenus(); openAvailModal({{ $cm->crew_id }}, '{{ addslashes($cm->first_name . ' ' . $cm->last_name) }}')">
+                    <i data-feather="calendar-x"></i> Manage Unavailability
+                    @if ($nb)<span class="badge badge-red" style="margin-left:auto">{{ $nb }}</span>@endif
+                  </button>
+                  <a href="{{ route('attendance') }}?crew_id={{ $cm->crew_id }}">
+                    <i data-feather="clock"></i> View Attendance
+                  </a>
+                  @if ($cm->user_id)
+                  <button type="button" class="text-success" onclick="closeActionMenus(); openUnlinkModal({{ $cm->crew_id }}, '{{ addslashes($cm->first_name . ' ' . $cm->last_name) }}', '{{ addslashes($cm->linked_email ?? '') }}')">
+                    <i data-feather="user-check"></i> Unlink Login
+                  </button>
+                  @else
+                  <button type="button" onclick="closeActionMenus(); openLinkModal({{ $cm->crew_id }}, '{{ addslashes($cm->first_name . ' ' . $cm->last_name) }}')">
+                    <i data-feather="user-plus"></i> Create Login
+                  </button>
+                  @endif
+                  <div class="action-menu-divider"></div>
+                  <form method="POST" action="{{ $crewBase }}"
+                        onsubmit="return confirm('Delete {{ addslashes($cm->first_name . ' ' . $cm->last_name) }}? This cannot be undone.')">
+                    @csrf
+                    <input type="hidden" name="action" value="delete_crew">
+                    <input type="hidden" name="crew_id" value="{{ $cm->crew_id }}">
+                    <button type="submit" class="text-danger"><i data-feather="trash-2"></i> Delete Crew Member</button>
+                  </form>
+                </div>
+              </div>
             </div>
           </td>
           @endif
@@ -271,6 +273,78 @@
     </div>
     @endif
     @endif
+  </div>
+</div>
+
+<!-- CREW DETAIL MODAL -->
+<div class="modal-overlay" id="modalCrewDetail">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header" style="flex-direction:column;align-items:stretch;gap:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="crew-avatar" id="cd_avatar" style="width:48px;height:48px;font-size:1.05rem;flex-shrink:0"></div>
+          <div>
+            <div id="cd_name" class="modal-title" style="font-size:.95rem"></div>
+            <div id="cd_position" style="font-size:.75rem;color:var(--muted)"></div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          @if ($canManage)
+          <button type="button" class="btn btn-outline btn-sm" onclick="editCrewFromDetail()"><i data-feather="edit-2" style="width:12px;height:12px"></i> Edit</button>
+          @endif
+          <button type="button" class="modal-close" data-modal-close title="Close"><i data-feather="x"></i></button>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <span class="badge" id="cd_type_badge"></span>
+        <span class="badge" id="cd_status_badge"></span>
+      </div>
+    </div>
+    <div class="tabs" id="cd_tabs" style="padding:0 20px;flex-wrap:wrap">
+      <a class="tab-btn active" data-cdtab="overview" onclick="switchCdTab('overview')" style="font-size:.72rem;padding:8px 10px">Overview</a>
+      <a class="tab-btn" data-cdtab="qual" onclick="switchCdTab('qual')" style="font-size:.72rem;padding:8px 10px">Qualifications</a>
+      <a class="tab-btn" data-cdtab="sched" onclick="switchCdTab('sched')" style="font-size:.72rem;padding:8px 10px">Schedule</a>
+      <a class="tab-btn" data-cdtab="att" onclick="switchCdTab('att')" style="font-size:.72rem;padding:8px 10px">Attendance</a>
+      <a class="tab-btn" data-cdtab="hist" onclick="switchCdTab('hist')" style="font-size:.72rem;padding:8px 10px">History</a>
+    </div>
+    <div class="modal-body" style="max-height:60vh;overflow-y:auto;padding-top:12px">
+      <div class="cd-pane" data-cdpane="overview" id="cd_pane_overview"></div>
+
+      <div class="cd-pane" data-cdpane="qual" style="display:none">
+        <div id="cd_qual_list" style="margin-bottom:12px"></div>
+        @if ($canManage)
+        <form onsubmit="return submitAddQualification(event)" style="border-top:1px solid var(--border);padding-top:12px">
+          <div class="form-group" style="margin-bottom:8px">
+            <label style="font-size:.72rem">Title *</label>
+            <input type="text" id="cd_qual_title" class="form-control" style="font-size:.8rem;padding:6px 8px" placeholder="e.g. Drone Pilot License">
+          </div>
+          <div class="form-group" style="margin-bottom:8px">
+            <label style="font-size:.72rem">Issuing Body</label>
+            <input type="text" id="cd_qual_issuer" class="form-control" style="font-size:.8rem;padding:6px 8px" placeholder="e.g. CAAP">
+          </div>
+          <div class="form-row" style="margin-bottom:8px">
+            <div class="form-group" style="margin-bottom:0">
+              <label style="font-size:.72rem">Issue Date</label>
+              <input type="date" id="cd_qual_issued" class="form-control" style="font-size:.78rem;padding:6px 8px">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label style="font-size:.72rem">Expiry Date</label>
+              <input type="date" id="cd_qual_expiry" class="form-control" style="font-size:.78rem;padding:6px 8px">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:8px">
+            <label style="font-size:.72rem">Notes</label>
+            <input type="text" id="cd_qual_notes" class="form-control" style="font-size:.8rem;padding:6px 8px" placeholder="Optional">
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="width:100%"><i data-feather="plus" style="width:12px;height:12px"></i> Add Qualification</button>
+        </form>
+        @endif
+      </div>
+
+      <div class="cd-pane" data-cdpane="sched" style="display:none"><div id="cd_sched_list"></div></div>
+      <div class="cd-pane" data-cdpane="att" style="display:none"><div id="cd_att_list"></div></div>
+      <div class="cd-pane" data-cdpane="hist" style="display:none"><div id="cd_hist_list"></div></div>
+    </div>
   </div>
 </div>
 @endif
@@ -601,8 +675,8 @@
                  placeholder="e.g. Drone Operator, DIT" required>
         </div>
         <div class="form-group">
-          <label>Department</label>
-          <select name="department" class="form-control">
+          <label>Department *</label>
+          <select name="department" class="form-control" required>
             <option value="Camera">Camera</option>
             <option value="Lighting">Lighting</option>
             <option value="Grip">Grip</option>
@@ -611,6 +685,14 @@
             <option value="Logistics / Transport">Logistics / Transport</option>
             <option value="Other">Other</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea name="description" class="form-control" rows="2" placeholder="Operates camera equipment during shoots."></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Typical Responsibilities <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <textarea name="responsibilities" class="form-control" rows="3" placeholder="One per line, e.g.&#10;Operate camera systems&#10;Work with the Director of Photography&#10;Maintain camera equipment"></textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -633,6 +715,21 @@
       <button class="modal-close" onclick="closeModal('modalAvailability')">&times;</button>
     </div>
     <div class="modal-body">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <button type="button" class="btn-icon" onclick="availCalPrev()"><i data-feather="chevron-left" style="width:14px;height:14px"></i></button>
+        <div id="avail_cal_title" style="flex:1;text-align:center;font-weight:700;font-size:.85rem"></div>
+        <button type="button" class="btn-icon" onclick="availCalNext()"><i data-feather="chevron-right" style="width:14px;height:14px"></i></button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:6px 6px 0 0;overflow:hidden">
+        @foreach (['S','M','T','W','T','F','S'] as $wd)
+        <div style="background:var(--s2);padding:4px;text-align:center;font-size:.62rem;font-weight:700;color:var(--muted)">{{ $wd }}</div>
+        @endforeach
+      </div>
+      <div id="avail_cal_grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-top:none;border-radius:0 0 6px 6px;margin-bottom:6px"></div>
+      <div style="display:flex;gap:12px;font-size:.68rem;color:var(--muted);margin-bottom:16px">
+        <span><span style="display:inline-block;width:9px;height:9px;background:var(--red);border-radius:2px;vertical-align:middle;margin-right:4px"></span>Unavailable</span>
+        <span><span style="display:inline-block;width:9px;height:9px;background:var(--accent);border-radius:2px;vertical-align:middle;margin-right:4px"></span>Today</span>
+      </div>
       <div id="avail_blocks_list" style="margin-bottom:16px"></div>
       <div style="border-top:1px solid var(--border);padding-top:14px">
         <div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:10px">Add Blocked Dates</div>
@@ -730,6 +827,28 @@
 @push('scripts')
 <script>
 const CREW_ASSET_BASE = "{{ asset('storage') }}";
+const CREW_BASE_URL = "{{ $crewBase }}";
+
+function closeActionMenus() {
+  document.querySelectorAll('.action-menu.show').forEach(function (m) {
+    m.classList.remove('show', 'drop-up');
+  });
+}
+function toggleActionMenu(trigger) {
+  var menu = trigger.nextElementSibling;
+  var wasOpen = menu.classList.contains('show');
+  closeActionMenus();
+  if (wasOpen) return;
+  menu.classList.add('show');
+  var rect = menu.getBoundingClientRect();
+  if (rect.bottom > window.innerHeight) menu.classList.add('drop-up');
+}
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('.action-menu-wrap')) closeActionMenus();
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') closeActionMenus();
+});
 
 @if ($tab === 'schedule')
 // ── Crew Schedule calendar — same day-map/grid approach as the Dashboard calendar ──────────
@@ -866,10 +985,16 @@ function openUnlinkModal(crewId, crewName, email) {
 
 const _allBlocks = @json($allUpcomingBlocks);
 
+let _availCurCrewId = null;
+let _availCalDate = new Date();
+
 function openAvailModal(crewId, crewName) {
+  _availCurCrewId = crewId;
+  _availCalDate = new Date();
   document.getElementById('avail_crew_id').value = crewId;
   document.getElementById('avail_crew_name').textContent = crewName;
   renderAvailBlocks(crewId);
+  renderAvailCalendar();
   openModal('modalAvailability');
   if (typeof feather !== 'undefined') feather.replace();
 }
@@ -904,6 +1029,252 @@ function renderAvailBlocks(crewId) {
 
 function _escAvail(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// --- Availability calendar (month grid, days within any of this crew member's blocks
+// highlighted) — reuses the same _allBlocks array the list view already fetches once.
+function availCalPrev() { _availCalDate.setMonth(_availCalDate.getMonth() - 1); renderAvailCalendar(); }
+function availCalNext() { _availCalDate.setMonth(_availCalDate.getMonth() + 1); renderAvailCalendar(); }
+
+function _dateInBlocks(dateStr, blocks) {
+  return blocks.some(b => dateStr >= b.date_from.slice(0, 10) && dateStr <= b.date_to.slice(0, 10));
+}
+
+function renderAvailCalendar() {
+  const y = _availCalDate.getFullYear(), m = _availCalDate.getMonth();
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('avail_cal_title').textContent = monthNames[m] + ' ' + y;
+
+  const blocks = _allBlocks.filter(b => parseInt(b.crew_id) === parseInt(_availCurCrewId));
+  const firstDow = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  let html = '';
+  for (let i = 0; i < firstDow; i++) {
+    html += '<div style="background:var(--surface);min-height:32px"></div>';
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const unavail = _dateInBlocks(dateStr, blocks);
+    const isToday = dateStr === todayStr;
+    let bg = 'var(--surface)', color = 'var(--text)';
+    if (unavail) { bg = 'var(--redl)'; color = 'var(--red)'; }
+    const border = isToday ? 'box-shadow:inset 0 0 0 1.5px var(--accent);' : '';
+    html += '<div style="background:' + bg + ';color:' + color + ';min-height:32px;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:' + (unavail ? '700' : '400') + ';' + border + '">' + d + '</div>';
+  }
+  document.getElementById('avail_cal_grid').innerHTML = html;
+}
+
+// --- Crew Management detail panel ---
+let cdCurrentId = null;
+let cdCurrentCrewData = null;
+let cdOtherActiveCrew = [];
+
+// Lets other pages (e.g. Attendance's Assigned Crew list) deep-link straight to a crew
+// member's profile via ?tab=members#crew-<id>, instead of just landing on the plain list.
+document.addEventListener('DOMContentLoaded', function () {
+  var m = location.hash.match(/^#crew-(\d+)$/);
+  if (m) openCrewDetail(parseInt(m[1], 10));
+});
+
+function openCrewDetail(cid) {
+  cdCurrentId = cid;
+  cdCurrentCrewData = null;
+  switchCdTab('overview');
+  openModal('modalCrewDetail');
+  refreshCrewDetail();
+}
+
+function refreshCrewDetail() {
+  fetch(CREW_BASE_URL + '?get_crew_detail=' + cdCurrentId)
+    .then(r => r.json())
+    .then(data => { if (!data.error) renderCrewDetail(data); });
+}
+
+function editCrewFromDetail() {
+  if (!cdCurrentCrewData) return;
+  closeModal('modalCrewDetail');
+  editCrew(cdCurrentCrewData);
+}
+
+function renderCrewDetail(data) {
+  const cm = data.crew;
+  cdCurrentCrewData = cm;
+  const name = cm.first_name + ' ' + cm.last_name;
+  document.getElementById('cd_avatar').innerHTML = cm.photo_path
+    ? '<img src="' + CREW_ASSET_BASE + '/' + cm.photo_path + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'
+    : escHtmlCd(cm.first_name.charAt(0));
+  document.getElementById('cd_name').textContent = name;
+  document.getElementById('cd_position').textContent = (cm.position_name || 'No position') + (cm.department ? ' · ' + cm.department : '');
+  const typeBadgeCls = { staff: 'badge-blue', freelance: 'badge-purple', on_call: 'badge-yellow' }[cm.employment_type] || 'badge-gray';
+  const typeLbl = { staff: 'Staff', freelance: 'Freelance', on_call: 'On Call' }[cm.employment_type] || cm.employment_type;
+  const statusBadgeCls = { active: 'badge-green', inactive: 'badge-gray', blacklisted: 'badge-red' }[cm.status] || 'badge-gray';
+  document.getElementById('cd_type_badge').className = 'badge ' + typeBadgeCls;
+  document.getElementById('cd_type_badge').textContent = typeLbl;
+  document.getElementById('cd_status_badge').className = 'badge ' + statusBadgeCls;
+  document.getElementById('cd_status_badge').textContent = cm.status.charAt(0).toUpperCase() + cm.status.slice(1);
+
+  const rateHtml = cm.employment_type === 'staff'
+    ? '₱' + parseFloat(cm.monthly_salary).toLocaleString('en-PH', {minimumFractionDigits:2}) + ' / month'
+    : '₱' + parseFloat(cm.base_rate_12hr).toLocaleString('en-PH', {minimumFractionDigits:2}) + ' / 12hr shift';
+
+  document.getElementById('cd_pane_overview').innerHTML = `
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px">Personal Information</div>
+    <div style="font-size:.8rem;line-height:1.9;margin-bottom:14px">
+      <div>Email: <strong>${escHtmlCd(cm.email || '—')}</strong></div>
+      <div>Phone: <strong>${escHtmlCd(cm.phone || '—')}</strong></div>
+      <div>Address: <strong>${escHtmlCd(cm.address || '—')}</strong></div>
+      <div>Joined: <strong>${escHtmlCd(cm.date_joined || '—')}</strong></div>
+    </div>
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px">Employment &amp; Rate</div>
+    <div style="font-size:.8rem;line-height:1.9;margin-bottom:14px">
+      <div>Type: <strong>${typeLbl} (Day Rate)</strong></div>
+      <div>Rate: <strong>${rateHtml}</strong></div>
+      <div>Overtime Rate: <strong>₱${parseFloat(cm.overtime_rate || 0).toLocaleString('en-PH', {minimumFractionDigits:2})}</strong></div>
+    </div>
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px">Access Account</div>
+    <div style="font-size:.8rem">
+      ${cm.linked_email
+        ? '<span class="badge badge-green" style="margin-bottom:4px;display:inline-block"><i data-feather="check" style="width:10px;height:10px;vertical-align:middle"></i> Active</span><div>' + escHtmlCd(cm.linked_email) + '</div>'
+        : '<span class="badge badge-gray">No login linked</span>'}
+    </div>
+    ${cm.profile_notes ? '<div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:14px 0 6px">Notes</div><div style="font-size:.8rem;color:var(--sub)">' + escHtmlCd(cm.profile_notes) + '</div>' : ''}
+  `;
+
+  document.getElementById('cd_qual_list').innerHTML = data.qualifications.length
+    ? data.qualifications.map(q => {
+        const expired = q.expiry_date && q.expiry_date < new Date().toISOString().slice(0, 10);
+        return '<div style="border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px;' + (expired ? 'background:var(--redl)' : '') + '">'
+          + '<div style="display:flex;justify-content:space-between;align-items:start">'
+          + '<div style="font-weight:600;font-size:.8rem">' + escHtmlCd(q.title) + (expired ? ' <span class="badge badge-red" style="font-size:.6rem">Expired</span>' : '') + '</div>'
+          + (@json($canManage) ? '<button onclick="deleteQualification(' + q.qualification_id + ')" style="background:none;border:none;cursor:pointer;color:var(--muted)" title="Remove"><i data-feather="x" style="width:12px;height:12px"></i></button>' : '')
+          + '</div>'
+          + (q.issuing_body ? '<div style="font-size:.7rem;color:var(--muted)">' + escHtmlCd(q.issuing_body) + '</div>' : '')
+          + (q.expiry_date ? '<div style="font-size:.68rem;color:var(--muted);margin-top:2px">Expires: ' + escHtmlCd(q.expiry_date) + '</div>' : '')
+          + '</div>';
+      }).join('')
+    : '<div style="text-align:center;color:var(--muted);font-size:.78rem;padding:16px 0">No qualifications on file.</div>';
+  if (typeof feather !== 'undefined') feather.replace();
+
+  cdOtherActiveCrew = data.otherActiveCrew || [];
+  document.getElementById('cd_sched_list').innerHTML = data.schedule.length
+    ? data.schedule.map(s => {
+        const canWithdraw = @json($canManage) && ['tentative', 'confirmed'].includes(s.assignment_status);
+        const replOpts = cdOtherActiveCrew.map(c => '<option value="' + c.crew_id + '">' + escHtmlCd(c.name) + '</option>').join('');
+        return '<div style="border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px">'
+        + '<div style="display:flex;justify-content:space-between;align-items:start;gap:6px">'
+        + '<div><div style="font-weight:600;font-size:.8rem">' + escHtmlCd(s.booking_reference) + '</div>'
+        + '<div style="font-size:.72rem;color:var(--muted)">' + escHtmlCd(s.company_name || s.contact_person || '') + ' · ' + escHtmlCd(s.shoot_date_start) + ' – ' + escHtmlCd(s.shoot_date_end) + '</div>'
+        + '<div style="font-size:.68rem;color:var(--muted);margin-top:2px">' + escHtmlCd(s.booking_status) + ' · ' + escHtmlCd(s.assignment_status) + '</div></div>'
+        + (canWithdraw ? '<button type="button" onclick="toggleWithdrawForm(' + s.bk_crew_id + ')" style="background:none;border:1px solid var(--red);color:var(--red);border-radius:5px;padding:3px 8px;font-size:.68rem;cursor:pointer;white-space:nowrap">Mark Withdrawn</button>' : '')
+        + '</div>'
+        + (canWithdraw ? '<div id="withdraw_form_' + s.bk_crew_id + '" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">'
+            + '<label style="font-size:.68rem;color:var(--muted);display:block;margin-bottom:4px">Replacement Crew Assignment *</label>'
+            + '<select id="withdraw_replacement_' + s.bk_crew_id + '" class="form-control" style="font-size:.78rem;padding:5px 7px;margin-bottom:6px"><option value="">— Select replacement —</option>' + replOpts + '</select>'
+            + '<div style="display:flex;gap:6px">'
+            + '<button type="button" class="btn btn-danger btn-sm" style="font-size:.7rem" onclick="submitMarkWithdrawn(' + s.bk_crew_id + ')">Confirm Withdrawal</button>'
+            + '<button type="button" class="btn btn-outline btn-sm" style="font-size:.7rem" onclick="toggleWithdrawForm(' + s.bk_crew_id + ')">Cancel</button>'
+            + '</div></div>' : '')
+        + '</div>';
+      }).join('')
+    : '<div style="text-align:center;color:var(--muted);font-size:.78rem;padding:16px 0">No bookings on record.</div>';
+
+  document.getElementById('cd_att_list').innerHTML = data.attendance.length
+    ? data.attendance.map(a => '<div style="border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px">'
+        + '<div style="display:flex;justify-content:space-between"><strong style="font-size:.8rem">' + escHtmlCd(a.attendance_date) + '</strong>'
+        + '<span class="badge ' + ({present:'badge-green',late:'badge-yellow',absent:'badge-red',no_show:'badge-red',back_out:'badge-orange'}[a.status] || 'badge-gray') + '" style="font-size:.65rem">' + escHtmlCd(a.status.replace('_',' ')) + '</span></div>'
+        + '<div style="font-size:.72rem;color:var(--muted)">' + escHtmlCd(a.booking_reference) + '</div>'
+        + (a.reason ? '<div style="font-size:.7rem;color:var(--muted);margin-top:2px">' + escHtmlCd(a.reason) + '</div>' : '')
+        + '</div>').join('')
+    : '<div style="text-align:center;color:var(--muted);font-size:.78rem;padding:16px 0">No attendance records.</div>';
+
+  document.getElementById('cd_hist_list').innerHTML = data.history.length
+    ? data.history.map(h => '<div style="border-bottom:1px solid var(--border);padding:8px 0">'
+        + '<div style="font-size:.78rem">' + escHtmlCd(h.description) + '</div>'
+        + '<div style="font-size:.66rem;color:var(--muted);margin-top:2px">' + escHtmlCd(h.by_name || 'System') + ' · ' + escHtmlCd(h.created_at) + '</div>'
+        + '</div>').join('')
+    : '<div style="text-align:center;color:var(--muted);font-size:.78rem;padding:16px 0">No activity recorded yet.</div>';
+}
+
+function switchCdTab(tab) {
+  document.querySelectorAll('#cd_tabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.cdtab === tab));
+  document.querySelectorAll('.cd-pane').forEach(p => p.style.display = p.dataset.cdpane === tab ? '' : 'none');
+}
+
+function submitAddQualification(e) {
+  e.preventDefault();
+  const title = document.getElementById('cd_qual_title').value.trim();
+  if (!title) { alert('Qualification title is required.'); return false; }
+  const fd = new FormData();
+  fd.append('ajax_action', 'add_qualification');
+  fd.append('crew_id', cdCurrentId);
+  fd.append('title', title);
+  fd.append('issuing_body', document.getElementById('cd_qual_issuer').value.trim());
+  fd.append('issue_date', document.getElementById('cd_qual_issued').value);
+  fd.append('expiry_date', document.getElementById('cd_qual_expiry').value);
+  fd.append('notes', document.getElementById('cd_qual_notes').value.trim());
+  fd.append('_token', document.querySelector('meta[name="csrf-token"]').content);
+
+  fetch(CREW_BASE_URL, { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        document.getElementById('cd_qual_title').value = '';
+        document.getElementById('cd_qual_issuer').value = '';
+        document.getElementById('cd_qual_issued').value = '';
+        document.getElementById('cd_qual_expiry').value = '';
+        document.getElementById('cd_qual_notes').value = '';
+        refreshCrewDetail();
+      } else {
+        alert(data.error || 'Could not add qualification.');
+      }
+    });
+  return false;
+}
+
+function deleteQualification(qid) {
+  if (!confirm('Remove this qualification?')) return;
+  const fd = new FormData();
+  fd.append('ajax_action', 'delete_qualification');
+  fd.append('qualification_id', qid);
+  fd.append('_token', document.querySelector('meta[name="csrf-token"]').content);
+
+  fetch(CREW_BASE_URL, { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => { if (data.success) refreshCrewDetail(); });
+}
+
+function toggleWithdrawForm(bkCrewId) {
+  const el = document.getElementById('withdraw_form_' + bkCrewId);
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+function submitMarkWithdrawn(bkCrewId) {
+  const sel = document.getElementById('withdraw_replacement_' + bkCrewId);
+  const replacementId = sel.value;
+  if (!replacementId) { alert('Select a replacement crew member first.'); return; }
+  if (!confirm('Mark this crew member as withdrawn and assign the selected replacement? This cannot be undone from here.')) return;
+
+  const fd = new FormData();
+  fd.append('ajax_action', 'mark_withdrawn');
+  fd.append('bk_crew_id', bkCrewId);
+  fd.append('replacement_crew_id', replacementId);
+  fd.append('_token', document.querySelector('meta[name="csrf-token"]').content);
+
+  fetch(CREW_BASE_URL, { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        refreshCrewDetail();
+      } else {
+        alert(data.error || 'Could not process the withdrawal.');
+      }
+    });
+}
+
+function escHtmlCd(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
 @endpush

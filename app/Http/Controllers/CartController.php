@@ -382,6 +382,8 @@ class CartController extends Controller
                     'phone' => $u->phone ?? '',
                     'client_type' => 'first_time',
                 ]);
+            } elseif (! DB::table('clients')->where('client_id', $cid)->value('is_active')) {
+                return response()->json(['error' => 'Your account has been deactivated. Please contact FilmSpec for assistance.']);
             }
 
             $numDays = max(1, (int) (new \DateTime($dateStart))->diff(new \DateTime($dateEnd))->days + 1);

@@ -126,10 +126,18 @@
 
     <!-- Booking Status Pipeline -->
     @php
+      // Kept in ongoing -> pending_inspection -> returned order (not the Returned-before-
+      // Inspection order the panelist's notes suggested): confirmInspection() in
+      // BookingDetailController only flips status to 'returned' AFTER inspection is confirmed
+      // (see bulkCheckin()/confirmInspection() — 'returned' means "inspection passed, accepted
+      // back," not "physically received"). Reordering the display without changing that real
+      // state machine would make the pipeline show "Returned" as done before it actually is.
       $pipeline = ['pending' => 0, 'confirmed' => 1, 'ongoing' => 2, 'pending_inspection' => 3, 'returned' => 4, 'completed' => 5];
       $currentStep = $pipeline[$booking->booking_status] ?? ($booking->booking_status === 'cancelled' ? -1 : 0);
       $isCancelled = $booking->booking_status === 'cancelled';
-      $paidFull = $booking->payment_status === 'paid';
+      // Payment status has its own dedicated summary card further down the page (Total /
+      // Paid / Balance / Status) — it's deliberately not a step here, since "paid" isn't a
+      // production-pipeline stage and mixing it in understated the real payment state.
       $steps = [
         ['key' => 'pending', 'label' => 'Submitted', 'icon' => 'file-text'],
         ['key' => 'confirmed', 'label' => 'Confirmed', 'icon' => 'check-circle'],
@@ -137,7 +145,6 @@
         ['key' => 'pending_inspection', 'label' => 'Inspection', 'icon' => 'search'],
         ['key' => 'returned', 'label' => 'Returned', 'icon' => 'package'],
         ['key' => 'completed', 'label' => 'Completed', 'icon' => 'check-square'],
-        ['key' => 'paid', 'label' => 'Paid', 'icon' => 'dollar-sign'],
       ];
     @endphp
     <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
@@ -150,8 +157,8 @@
       <div style="display:flex;align-items:center;gap:0">
         @foreach ($steps as $i => $step)
         @php
-          $isDone = ($step['key'] === 'paid') ? $paidFull : ($pipeline[$step['key']] ?? 99) <= $currentStep;
-          $isCurrent = ($step['key'] === 'paid') ? (! $paidFull && $currentStep === 3) : ($pipeline[$step['key']] ?? 99) === $currentStep;
+          $isDone = ($pipeline[$step['key']] ?? 99) <= $currentStep;
+          $isCurrent = ($pipeline[$step['key']] ?? 99) === $currentStep;
           $dotBg = $isDone ? '#16a34a' : ($isCurrent ? '#1d4ed8' : '#e2e8f0');
           $dotColor = ($isDone || $isCurrent) ? '#fff' : '#94a3b8';
           $labelColor = $isDone ? '#16a34a' : ($isCurrent ? '#1d4ed8' : '#94a3b8');
@@ -367,7 +374,7 @@
 <div class="card" style="margin-bottom:18px;border:1.5px solid {{ $allOk ? '#bbf7d0' : '#fecaca' }};overflow:hidden">
   <div style="padding:10px 16px;display:flex;align-items:center;gap:10px;background:{{ $allOk ? '#f0fdf4' : '#fef2f2' }};border-bottom:1.5px solid {{ $allOk ? '#bbf7d0' : '#fecaca' }}">
     <i data-feather="{{ $allOk ? 'check-circle' : 'alert-triangle' }}" style="width:15px;height:15px;color:{{ $allOk ? '#16a34a' : '#d97706' }};flex-shrink:0"></i>
-    <span style="font-weight:700;font-size:.88rem;color:{{ $allOk ? '#15803d' : '#92400e' }};flex:1">{{ $allOk ? 'Ready to Release' : 'Pre-Release Checklist' }}</span>
+    <span style="font-weight:700;font-size:.88rem;color:{{ $allOk ? '#15803d' : '#92400e' }};flex:1">{{ $allOk ? 'Ready to Release' : 'Release Readiness' }}</span>
     @if (! $allOk)
     <span style="font-size:.72rem;font-weight:700;background:#fee2e2;color:#dc2626;border-radius:12px;padding:2px 10px;white-space:nowrap">{{ $metConds }}/{{ $totalConds }} conditions met</span>
     @else
@@ -445,7 +452,7 @@
     @if ($pendingCancellation)<span class="badge badge-yellow" style="margin-left:4px">1</span>
     @elseif ($cancellations->count())<span class="badge badge-gray" style="margin-left:4px">{{ $cancellations->count() }}</span>@endif
   </button>
-  <button class="tab-btn" data-tab="tab-requests">Requests
+  <button class="tab-btn" data-tab="tab-requests">Extension &amp; Resource Requests
     @php $totalPendingReq = $pendingExtensionCount + $pendingEquipRequestsCount; $totalAllReq = $extensionRequestsCount + $equipRequestsCount; @endphp
     @if ($totalPendingReq > 0)<span class="badge badge-yellow" style="margin-left:4px">{{ $totalPendingReq }}</span>
     @elseif ($totalAllReq > 0)<span class="badge badge-gray" style="margin-left:4px">{{ $totalAllReq }}</span>@endif
@@ -2827,6 +2834,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         if (window.feather) feather.replace();
     });
 });
+
+// Arriving from Field Resource Requests' "Review" link (#tab-requests) — jump straight to that
+// tab instead of landing on the default one, so staff don't have to hunt for it.
+if (location.hash) {
+    const target = document.querySelector('.tab-btn[data-tab="' + location.hash.slice(1) + '"]');
+    if (target) target.click();
+}
 
 // The Cost Estimate tab embeds the CE editor in an iframe. Its Add Equipment / Assign Crew /
 // Assign Transport buttons no longer carry their own modals — they postMessage up to this page

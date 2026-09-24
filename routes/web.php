@@ -240,6 +240,14 @@ Route::post('/clients/{id}/billing', [ClientDetailController::class, 'updateBill
     ->middleware(['auth', 'can_access:clients'])
     ->whereNumber('id')
     ->name('client-detail.billing');
+Route::post('/clients/{id}/profile', [ClientDetailController::class, 'updateProfile'])
+    ->middleware(['auth', 'can_access:clients'])
+    ->whereNumber('id')
+    ->name('client-detail.profile');
+Route::post('/clients/{id}/action', [ClientDetailController::class, 'action'])
+    ->middleware(['auth', 'can_access:clients'])
+    ->whereNumber('id')
+    ->name('client-detail.action');
 
 // A single client's documents (Part 18) — embedded via iframe as the Client Detail page's
 // Documents tab, and still reachable directly.

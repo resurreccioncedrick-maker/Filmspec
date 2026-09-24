@@ -89,9 +89,9 @@ class BillingController extends Controller
             ->where(function ($w) {
                 $w->whereNull('b.approval_status')->orWhere('b.approval_status', 'approved');
             })
-            ->groupBy('b.booking_id', 'b.booking_reference', 'b.project_title', 'b.final_amount', 'b.payment_status', 'c.contact_person', 'c.company_name')
+            ->groupBy('b.booking_id', 'b.booking_reference', 'b.project_title', 'b.final_amount', 'b.payment_status', 'c.contact_person', 'c.company_name', 'c.is_vat_registered', 'c.client_type')
             ->orderByDesc('b.shoot_date_start')
-            ->select('b.booking_id', 'b.booking_reference', 'b.project_title', 'b.final_amount', 'b.payment_status', 'c.contact_person', 'c.company_name')
+            ->select('b.booking_id', 'b.booking_reference', 'b.project_title', 'b.final_amount', 'b.payment_status', 'c.contact_person', 'c.company_name', 'c.is_vat_registered', 'c.client_type')
             ->selectRaw('COALESCE(SUM(p.amount),0) AS paid_so_far')
             ->get();
 
@@ -399,18 +399,29 @@ class BillingController extends Controller
             $amount = (float) $request->input('amount');
             $ref = $request->input('reference_number', '');
             $pdate = $request->input('payment_date');
-            $isVat = $request->boolean('is_vat') ? 1 : 0;
-            $rctype = $isVat ? 'official_receipt' : 'acknowledgement_receipt';
-            $rcPrefix = $isVat ? 'OR' : 'AR';
             $notes = $request->input('notes', '');
 
             if ($amount <= 0) {
                 return ['type' => 'danger', 'text' => 'Payment amount must be greater than zero.'];
             }
 
-            if (! DB::table('bookings')->where('booking_id', $bid)->exists()) {
+            if ($pdate && $pdate < now()->toDateString()) {
+                return ['type' => 'danger', 'text' => 'Payment date cannot be backdated — it must be today or later.'];
+            }
+
+            $bookingClient = DB::table('bookings as b')
+                ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+                ->where('b.booking_id', $bid)
+                ->select('c.is_vat_registered')
+                ->first();
+            if (! $bookingClient) {
                 return ['type' => 'danger', 'text' => 'Booking not found.'];
             }
+            // Document type is derived from the client's own VAT registration, not a checkbox
+            // the person recording the payment could pick either way for the same client.
+            $isVat = (int) $bookingClient->is_vat_registered ? 1 : 0;
+            $rctype = $isVat ? 'official_receipt' : 'acknowledgement_receipt';
+            $rcPrefix = $isVat ? 'OR' : 'AR';
 
             // The remaining-balance check and the insert both happen inside the same
             // booking-row-locked transaction — otherwise two near-simultaneous payment
@@ -472,7 +483,7 @@ class BillingController extends Controller
 
             ActivityLog::record($uid, 'payment', 'billing', 'Payment ₱' . number_format($amount, 2) . " recorded for booking #$bid", $bid);
 
-            return ['type' => 'success', 'text' => 'Payment recorded successfully.'];
+            return ['type' => 'success', 'text' => 'Payment recorded successfully. Amount Received: <strong>₱' . number_format($amount, 2) . '</strong>. Remaining Balance: <strong>₱' . number_format($balance, 2) . '</strong>.'];
         }
 
         if ($action === 'generate_soa') {

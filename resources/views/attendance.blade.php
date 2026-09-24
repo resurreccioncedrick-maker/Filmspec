@@ -84,11 +84,53 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Shoot Date *</label>
-            <input type="date" name="attendance_date" class="form-control"
-                   value="{{ request('date', now()->toDateString()) }}" required>
+            <label>Shoot Date</label>
+            <input type="text" class="form-control" style="background:var(--surface-hover);color:var(--text-muted)"
+                   value="{{ \Illuminate\Support\Carbon::parse($activeDate)->format('M j, Y') }}" readonly>
+            <input type="hidden" name="attendance_date" value="{{ $activeDate }}">
           </div>
         </div>
+
+        @if ($filterBooking && $scheduleDays->isNotEmpty())
+        @php
+          $firstDay = $scheduleDays->first();
+          $lastDay = $scheduleDays->last();
+          $currentBk = $activeBookings->firstWhere('booking_id', $filterBooking);
+        @endphp
+        <div style="border:1px solid var(--border);border-radius:var(--radius-md,8px);padding:14px 16px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="font-size:.8rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px">
+              <i data-feather="calendar" style="width:14px;height:14px"></i> Booking Schedule
+            </div>
+            <span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 9px;border-radius:10px;background:var(--blue-50,#eff6ff);color:var(--blue-700,#1d4ed8)">
+              {{ $currentBk ? ucfirst($currentBk->booking_status) : 'Ongoing' }}
+            </span>
+          </div>
+          <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:10px">
+            {{ \Illuminate\Support\Carbon::parse($firstDay['date'])->format('M j') }} – {{ \Illuminate\Support\Carbon::parse($lastDay['date'])->format('M j, Y') }}
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            @foreach ($scheduleDays as $d)
+            <a href="{{ $attBase }}?booking_id={{ $filterBooking }}&date={{ $d['date'] }}"
+               style="text-decoration:none;min-width:72px;text-align:center;padding:8px 10px;border-radius:8px;border:2px solid {{ $d['is_selected'] ? 'var(--blue-600,#2563eb)' : 'var(--border)' }};background:{{ $d['is_selected'] ? 'var(--blue-50,#eff6ff)' : 'var(--surface)' }}">
+              <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted)">{{ $d['dow'] }}</div>
+              <div style="font-size:.78rem;font-weight:700;color:var(--text);margin:2px 0 5px">{{ $d['label'] }}</div>
+              @if ($d['is_today'])
+              <span style="display:inline-flex;align-items:center;gap:3px;font-size:.62rem;font-weight:700;color:var(--blue-600,#2563eb)">
+                <span style="width:6px;height:6px;border-radius:50%;background:var(--blue-600,#2563eb);display:inline-block"></span> Today
+              </span>
+              @elseif ($d['is_completed'])
+              <span style="display:inline-flex;align-items:center;gap:3px;font-size:.62rem;font-weight:700;color:var(--green,#16a34a)">
+                <i data-feather="check-circle" style="width:11px;height:11px"></i> Completed
+              </span>
+              @else
+              <span style="font-size:.62rem;color:var(--text-muted)">—</span>
+              @endif
+            </a>
+            @endforeach
+          </div>
+        </div>
+        @endif
 
         @if ($filterBooking && $bookingCrew->isNotEmpty())
         <div id="crewAttendanceTable">
@@ -112,7 +154,7 @@
                 @php $existAtt = $bc->existing_attendance; @endphp
                 <tr style="border-bottom:1px solid var(--blue-100)">
                   <td style="padding:10px 8px">
-                    <div style="font-weight:600">{{ $bc->crew_name }}</div>
+                    <a href="{{ route('crew') }}?tab=members#crew-{{ $bc->crew_id }}" style="font-weight:600;color:var(--blue-600);text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">{{ $bc->crew_name }}</a>
                     <div style="font-size:.72rem;color:var(--text-muted)">{{ $bc->phone ?? '' }}</div>
                   </td>
                   <td style="padding:10px 8px;font-size:.83rem;color:var(--text-muted)">{{ $bc->position_name ?? '—' }}</td>
@@ -124,7 +166,6 @@
                       <option value="late" {{ ($existAtt->status ?? '') === 'late' ? 'selected' : '' }}>Late</option>
                       <option value="absent" {{ ($existAtt->status ?? '') === 'absent' ? 'selected' : '' }}>Absent</option>
                       <option value="no_show" {{ ($existAtt->status ?? '') === 'no_show' ? 'selected' : '' }}>No Show</option>
-                      <option value="back_out" {{ ($existAtt->status ?? '') === 'back_out' ? 'selected' : '' }}>Back Out</option>
                     </select>
                   </td>
                   <td style="padding:10px 8px">
@@ -147,7 +188,7 @@
                   <td style="padding:10px 8px">
                     <select name="crew_replacement[{{ $bc->crew_id }}]"
                             class="form-control replacement-field-{{ $bc->crew_id }}"
-                            style="font-size:.83rem{{ in_array($existAtt->status ?? 'present', ['present', 'late', 'absent']) ? ';display:none' : '' }}">
+                            style="font-size:.83rem{{ in_array($existAtt->status ?? 'present', ['present', 'late']) ? ';display:none' : '' }}">
                       <option value="">— No replacement —</option>
                       @foreach ($allActiveCrew as $ac)
                       @continue($ac->crew_id == $bc->crew_id)
@@ -414,7 +455,7 @@ function toggleReason(sel, crewId) {
     category.style.display = (val === 'present' || val === 'late') ? 'none' : 'block';
   }
   if (replace) {
-    replace.style.display = (val === 'no_show' || val === 'back_out') ? 'block' : 'none';
+    replace.style.display = (val === 'absent' || val === 'no_show') ? 'block' : 'none';
   }
 }
 function loadBookingCrew(bookingId) {

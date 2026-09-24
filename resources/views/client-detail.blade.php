@@ -13,6 +13,9 @@
   $et = $client->entity_type ?? 'individual';
   $activeTab = request('tab', 'overview');
   $tabs = ['overview' => 'Overview', 'bookings' => 'Bookings', 'billing' => 'Billing', 'documents' => 'Documents', 'activity' => 'Activity'];
+  $isActive = (bool) ($client->is_active ?? true);
+  $completedCount = (int) ($bookingStats->completed ?? 0);
+  $eligibleForRegular = $client->client_type === 'first_time' && $completedCount >= 4;
 @endphp
 
 <style>
@@ -26,13 +29,29 @@
 .cd-field { padding:10px 0;border-bottom:1px solid var(--border); }
 .cd-field .lbl { font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700; }
 .cd-field .val { font-size:13.5px;color:var(--text);margin-top:3px;font-weight:600; }
+.cd-more-wrap { position:relative;display:inline-flex; }
+.cd-more-menu { display:none;position:absolute;top:calc(100% + 4px);right:0;min-width:200px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);z-index:20;overflow:hidden; }
+.cd-more-menu.open { display:block; }
+.cd-more-menu button, .cd-more-menu a { display:flex;align-items:center;gap:8px;width:100%;padding:9px 14px;font-size:12.5px;font-weight:600;color:var(--text);background:none;border:none;text-align:left;cursor:pointer;text-decoration:none; }
+.cd-more-menu button:hover, .cd-more-menu a:hover { background:var(--s2); }
+.cd-more-menu .text-danger { color:var(--red); }
+.cd-more-menu .text-danger:hover { background:var(--redl); }
 </style>
+
+@if (! $isActive)
+<div style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:12px 16px;border-radius:8px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:13px">
+  <i data-feather="alert-triangle" style="width:16px;height:16px;flex-shrink:0"></i>
+  <div><strong>This client is deactivated</strong> — they cannot be booked for new requests until reactivated.
+  @if ($client->deactivation_reason) Reason: {{ $client->deactivation_reason }}@endif</div>
+</div>
+@endif
 
 <div class="cd-header">
   <div>
     <div class="cd-name">
       {{ $displayName }}
       <span class="badge {{ $typeBadge[$client->client_type] ?? 'badge-gray' }}">{{ $typeLabel[$client->client_type] ?? ucfirst($client->client_type) }}</span>
+      <span class="badge {{ $isActive ? 'badge-green' : 'badge-red' }}">{{ $isActive ? 'Active' : 'Inactive' }}</span>
       @if (($client->status ?? 'approved') === 'pending')<span class="badge badge-yellow">Pending Approval</span>@endif
       @if (($client->status ?? 'approved') === 'rejected')<span class="badge badge-red">Rejected</span>@endif
       @if ($client->is_vat_registered)<span class="badge badge-purple">VAT Registered</span>@endif
@@ -49,9 +68,34 @@
     </div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <a href="{{ route('bookings') }}?client={{ $id }}" class="btn btn-primary btn-sm"><i data-feather="plus" style="width:13px;height:13px"></i> New Booking</a>
+    @if ($isActive)
+    <a href="{{ route('bookings') }}?client={{ $id }}" class="btn btn-primary btn-sm"><i data-feather="plus" style="width:13px;height:13px"></i> New Client Request</a>
+    @endif
     @if ($canManage)
-    <a href="{{ route('clients') }}" class="btn btn-outline btn-sm" onclick="return false" style="cursor:default" title="Use Edit on the Clients list"><i data-feather="edit-2" style="width:13px;height:13px"></i> Edit Profile</a>
+    <button type="button" class="btn btn-outline btn-sm" onclick="openModal('modalEditProfile')"><i data-feather="edit-2" style="width:13px;height:13px"></i> Edit Profile</button>
+    @if ($eligibleForRegular)
+    {{-- Two actions available (Mark as Regular + Deactivate) — worth a dropdown. --}}
+    <div class="cd-more-wrap">
+      <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('cdMoreMenu').classList.toggle('open')"><i data-feather="more-horizontal" style="width:13px;height:13px"></i> More</button>
+      <div class="cd-more-menu" id="cdMoreMenu">
+        <form method="POST" action="{{ route('client-detail.action', $id) }}">
+          @csrf
+          <input type="hidden" name="action" value="mark_regular_client">
+          <button type="submit" onclick="return confirm('Mark this client as a Regular Client?')"><i data-feather="star" style="width:13px;height:13px"></i> Mark as Regular Client</button>
+        </form>
+        <button type="button" onclick="document.getElementById('cdMoreMenu').classList.remove('open');openModal('modalDeactivateClient')" class="text-danger"><i data-feather="user-x" style="width:13px;height:13px"></i> Deactivate Client</button>
+      </div>
+    </div>
+    @elseif ($isActive)
+    {{-- Only one action available — show it directly, no point wrapping a single item in a menu. --}}
+    <button type="button" class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="openModal('modalDeactivateClient')"><i data-feather="user-x" style="width:13px;height:13px"></i> Deactivate Client</button>
+    @else
+    <form method="POST" action="{{ route('client-detail.action', $id) }}">
+      @csrf
+      <input type="hidden" name="action" value="reactivate_client">
+      <button type="submit" class="btn btn-outline btn-sm" onclick="return confirm('Reactivate this client?')"><i data-feather="user-check" style="width:13px;height:13px"></i> Reactivate Client</button>
+    </form>
+    @endif
     @endif
   </div>
 </div>
@@ -167,15 +211,7 @@
 @endif
 
 @if ($activeTab === 'documents')
-<div class="card">
-  <div class="card-header">
-    <h2 class="card-title"><i data-feather="file-text" style="width:14px;height:14px"></i> Documents</h2>
-    <a href="{{ route('client-documents', $id) }}" class="btn btn-outline btn-sm" target="_blank">Open Full Page <i data-feather="external-link" style="width:12px;height:12px"></i></a>
-  </div>
-  <div class="card-body" style="padding:0">
-    <iframe src="{{ route('client-documents', $id) }}" style="width:100%;height:600px;border:none;display:block"></iframe>
-  </div>
-</div>
+@include('partials.documents-card')
 @endif
 
 @if ($activeTab === 'activity')
@@ -201,6 +237,104 @@
   </div>
   @endif
 </div>
+@endif
+
+@if ($canManage)
+<!-- Edit Profile Modal -->
+<div id="modalEditProfile" class="modal-overlay">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <h3><i data-feather="edit-2" style="width:16px;height:16px;margin-right:6px;vertical-align:middle"></i>Edit Profile</h3>
+      <button class="modal-close" onclick="closeModal('modalEditProfile')">&times;</button>
+    </div>
+    <form method="POST" action="{{ route('client-detail.profile', $id) }}">
+      @csrf
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Company Name</label>
+            <input type="text" name="company_name" class="form-control" value="{{ $client->company_name }}">
+          </div>
+          <div class="form-group">
+            <label>Contact Person <span class="req">*</span></label>
+            <input type="text" name="contact_person" class="form-control" value="{{ $client->contact_person }}" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" name="email" class="form-control" value="{{ $client->email }}">
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="text" name="phone" class="form-control" value="{{ $client->phone }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <input type="text" name="address" class="form-control" value="{{ $client->address }}">
+        </div>
+        <div class="form-group">
+          <label>Entity Type</label>
+          <select name="entity_type" class="form-control">
+            @foreach ($entityTypeLabel as $k => $l)
+            <option value="{{ $k }}" {{ $et === $k ? 'selected' : '' }}>{{ $l }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea name="notes" class="form-control" rows="2">{{ $client->notes }}</textarea>
+        </div>
+        <div style="font-size:.75rem;color:var(--text-muted);background:var(--s2);border-radius:6px;padding:8px 10px">
+          Regular Client status, Payment Terms, and Loyalty Discount aren't edited here — see the header's More menu and the Billing tab.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalEditProfile')">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i data-feather="save" style="width:14px;height:14px;margin-right:4px;vertical-align:middle"></i>Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Deactivate Client Modal -->
+<div id="modalDeactivateClient" class="modal-overlay">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <h3><i data-feather="user-x" style="width:16px;height:16px;margin-right:6px;vertical-align:middle;color:var(--red)"></i>Deactivate Client</h3>
+      <button class="modal-close" onclick="closeModal('modalDeactivateClient')">&times;</button>
+    </div>
+    <form method="POST" action="{{ route('client-detail.action', $id) }}">
+      @csrf
+      <input type="hidden" name="action" value="deactivate_client">
+      <div class="modal-body">
+        <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:12px">
+          <strong>{{ $displayName }}</strong> will no longer be able to make new bookings, but all historical data
+          (bookings, invoices, payments) will be preserved. This can be reversed at any time.
+        </p>
+        <div class="form-group">
+          <label>Reason for deactivation <span class="req">*</span></label>
+          <textarea name="reason" class="form-control" rows="3" required placeholder="e.g. No longer active, payment dispute, requested by client…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalDeactivateClient')">Cancel</button>
+        <button type="submit" class="btn btn-danger"><i data-feather="user-x" style="width:14px;height:14px;margin-right:4px;vertical-align:middle"></i>Deactivate Client</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+@push('scripts')
+<script>
+document.addEventListener('click', function (e) {
+  const wrap = document.querySelector('.cd-more-wrap');
+  const menu = document.getElementById('cdMoreMenu');
+  if (wrap && menu && !wrap.contains(e.target)) menu.classList.remove('open');
+});
+</script>
+@endpush
 @endif
 
 @endsection

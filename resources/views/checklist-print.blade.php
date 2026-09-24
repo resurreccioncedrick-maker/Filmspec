@@ -122,7 +122,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="eq-card">
         <div class="eq-top">
           <div>
-            <div class="eq-name">{{ $e->equipment_name }}</div>
+            <div class="eq-name">{{ $e->item_name }}</div>
             <div class="eq-cat">{{ $e->category_name }}{{ $e->brand ? ' · '.$e->brand : '' }}</div>
           </div>
           <div class="eq-qty">Qty Expected: <b style="color:var(--text)">{{ (int) $e->quantity }}</b></div>

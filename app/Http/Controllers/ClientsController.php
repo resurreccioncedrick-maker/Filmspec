@@ -184,13 +184,15 @@ class ClientsController extends Controller
                 return ['type' => 'danger', 'text' => 'A client with this email already exists.'];
             }
 
-            $type = in_array($request->input('client_type'), ['regular', 'first_time'], true) ? $request->input('client_type') : 'first_time';
+            // client_type is never taken from the form — every new client starts as
+            // "New Customer" (first_time) and is only promoted to "Regular" via the dedicated
+            // mark_regular_client action below, once they've actually earned it.
             $terms = in_array($request->input('payment_terms'), $validTerms, true) ? $request->input('payment_terms') : '50_downpayment';
             $entityType = in_array($request->input('entity_type'), array_keys($this->entityTypeLabel), true) ? $request->input('entity_type') : 'individual';
 
             $newId = DB::table('clients')->insertGetId([
                 'company_name' => $company ?: null, 'contact_person' => $contact, 'email' => $email, 'phone' => $phone,
-                'address' => trim($request->input('address', '')), 'client_type' => $type, 'payment_terms' => $terms,
+                'address' => trim($request->input('address', '')), 'client_type' => 'first_time', 'payment_terms' => $terms,
                 'is_vat_registered' => $entityType === 'company' ? 1 : 0, 'entity_type' => $entityType,
                 'notes' => trim($request->input('notes', '')),
                 'discount_pct' => min(100, max(0, (float) $request->input('discount_pct', 0))),
@@ -214,15 +216,15 @@ class ClientsController extends Controller
 
             $company = strtoupper(trim($request->input('company_name', '')));
             $contact = strtoupper(trim($request->input('contact_person', '')));
-            $type = in_array($request->input('client_type'), ['regular', 'first_time'], true) ? $request->input('client_type') : 'first_time';
             $entityType = in_array($request->input('entity_type'), array_keys($this->entityTypeLabel), true) ? $request->input('entity_type') : 'individual';
 
             // payment_terms/discount_pct are deliberately NOT touched here — they moved to the
-            // Billing tab's own restricted save (ClientDetailController::updateBilling()), so
-            // this basic edit form must never overwrite them back to a default.
+            // Billing tab's own restricted save (ClientDetailController::updateBilling()). And
+            // client_type is deliberately NOT touched here either — it only changes through the
+            // dedicated mark_regular_client action below, not this basic edit form.
             DB::table('clients')->where('client_id', $cid)->update([
                 'company_name' => $company ?: null, 'contact_person' => $contact, 'email' => $email, 'phone' => $phone,
-                'address' => trim($request->input('address', '')), 'client_type' => $type,
+                'address' => trim($request->input('address', '')),
                 'is_vat_registered' => $entityType === 'company' ? 1 : 0, 'entity_type' => $entityType,
                 'notes' => trim($request->input('notes', '')),
             ]);
@@ -271,6 +273,11 @@ class ClientsController extends Controller
 
             return ['type' => 'success', 'text' => 'Client <strong>' . e($name) . '</strong> rejected.'];
         }
+
+        // mark_regular_client / deactivate_client / reactivate_client live in
+        // ClientDetailController::action() instead — they're triggered from the Client Detail
+        // page and need to redirect back there, not to this list page (see updateBilling() for
+        // the same reasoning already established for the Billing tab's save).
 
         return null;
     }

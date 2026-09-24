@@ -50,10 +50,12 @@ class AttendanceController extends Controller
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
             ->whereIn('b.booking_status', ['confirmed', 'ongoing'])
             ->orderByDesc('b.shoot_date_start')
-            ->select('b.booking_id', 'b.booking_reference', 'b.project_title', 'b.shoot_date_start', 'c.company_name', 'c.contact_person')
+            ->select('b.booking_id', 'b.booking_reference', 'b.project_title', 'b.shoot_date_start', 'b.booking_status', 'c.company_name', 'c.contact_person')
             ->get();
 
         $bookingCrew = collect();
+        $scheduleDays = collect();
+        $activeDate = $filterDate ?: now()->toDateString();
         if ($filterBooking) {
             $bookingCrew = DB::table('booking_crew as bc')
                 ->join('crew_members as cm', 'bc.crew_id', '=', 'cm.crew_id')
@@ -64,12 +66,45 @@ class AttendanceController extends Controller
                 ->select('bc.*', DB::raw("CONCAT(cm.first_name,' ',cm.last_name) AS crew_name"), 'cm.phone', 'cp.position_name')
                 ->get();
 
-            $today = now()->toDateString();
+            // Booking Schedule strip — one card per day of the shoot, so staff pick a day by
+            // clicking it instead of typing/searching a date manually. When no explicit ?date=
+            // was given, default to today only if today actually falls within this booking's
+            // shoot range — otherwise "today" would silently point outside the booking entirely
+            // (e.g. opening a booking that already wrapped, or hasn't started yet).
+            $bookingRange = DB::table('bookings')->where('booking_id', $filterBooking)
+                ->select('shoot_date_start', 'shoot_date_end', 'booking_status')->first();
+            if ($bookingRange && ! $filterDate) {
+                $todayStr = now()->toDateString();
+                $activeDate = ($todayStr >= $bookingRange->shoot_date_start && $todayStr <= $bookingRange->shoot_date_end)
+                    ? $todayStr : $bookingRange->shoot_date_start;
+            }
+
+            // Pre-fills the form with whatever's already logged for the currently-selected day
+            // (not always "today" — the Booking Schedule strip lets staff pick any day in the
+            // shoot range, so this has to follow that selection).
             $existingAttByCrew = DB::table('crew_attendance')
-                ->where('booking_id', $filterBooking)->where('attendance_date', $today)
+                ->where('booking_id', $filterBooking)->where('attendance_date', $activeDate)
                 ->get()->keyBy('crew_id');
             foreach ($bookingCrew as $bc) {
                 $bc->existing_attendance = $existingAttByCrew->get($bc->crew_id);
+            }
+
+            if ($bookingRange) {
+                $loggedDates = DB::table('crew_attendance')->where('booking_id', $filterBooking)
+                    ->distinct()->pluck('attendance_date')->map(fn ($d) => (string) $d)->all();
+                $todayStr = now()->toDateString();
+                $cursor = Carbon::parse($bookingRange->shoot_date_start);
+                $end = Carbon::parse($bookingRange->shoot_date_end);
+                while ($cursor->lte($end)) {
+                    $ds = $cursor->toDateString();
+                    $scheduleDays->push([
+                        'date' => $ds, 'dow' => $cursor->format('D'), 'label' => $cursor->format('M j'),
+                        'is_today' => $ds === $todayStr,
+                        'is_completed' => in_array($ds, $loggedDates, true),
+                        'is_selected' => $ds === $activeDate,
+                    ]);
+                    $cursor->addDay();
+                }
             }
         }
 
@@ -128,7 +163,7 @@ class AttendanceController extends Controller
             'msg' => $msg, 'canManage' => $canManage,
             'activeBookings' => $activeBookings, 'bookingCrew' => $bookingCrew, 'allActiveCrew' => $allActiveCrew,
             'attendance' => $attendance, 'attTotal' => $attTotal, 'attPages' => $attPages, 'page' => $page,
-            'timesheets' => $timesheets,
+            'timesheets' => $timesheets, 'scheduleDays' => $scheduleDays, 'activeDate' => $activeDate,
             'filterBooking' => $filterBooking, 'filterCrew' => $filterCrew, 'filterDate' => $filterDate, 'filterStatus' => $filterStatus,
             'totalDeployed' => $totalDeployed, 'totalNoShows' => $totalNoShows, 'totalOT' => $totalOT,
             'statusBadge' => $this->statusBadge, 'statusLabel' => $this->statusLabel,
@@ -246,6 +281,12 @@ class AttendanceController extends Controller
             DB::transaction(function () use ($request, $bid, $date, $uid, &$logged) {
                 foreach ((array) $request->input('crew_status', []) as $cid => $status) {
                     $cid = (int) $cid;
+                    // Back Out is no longer logged here — withdrawing before a shoot is now a
+                    // crew-assignment change (Crew Management → Schedule → Mark Withdrawn),
+                    // which requires picking a replacement at the same time.
+                    if (! in_array($status, ['present', 'late', 'absent', 'no_show'], true)) {
+                        continue;
+                    }
                     $reason = $request->input("crew_reason.$cid", '');
                     $reasonCategory = $request->input("crew_reason_category.$cid", '');
                     $repId = (int) $request->input("crew_replacement.$cid", 0);
@@ -255,21 +296,6 @@ class AttendanceController extends Controller
                         ['status' => $status, 'reason' => $reason, 'reason_category' => $reasonCategory ?: null, 'replacement_crew_id' => $repId ?: null, 'logged_by' => $uid]
                     );
                     $logged++;
-
-                    // A back-out before/during the shoot is a change to the crew member's actual
-                    // assignment on this booking, not just a log entry — keep booking_crew in
-                    // sync so schedule/roster views (which read assignment_status) reflect it
-                    // too. Correcting a mistaken back-out (re-logging that same crew member as
-                    // present/late/absent/no_show instead) reverts the assignment back to
-                    // confirmed rather than leaving them stuck as back_out permanently.
-                    $currentAssignment = DB::table('booking_crew')->where('booking_id', $bid)->where('crew_id', $cid)->value('assignment_status');
-                    if ($status === 'back_out' && $currentAssignment !== 'back_out') {
-                        DB::table('booking_crew')->where('booking_id', $bid)->where('crew_id', $cid)
-                            ->update(['assignment_status' => 'back_out']);
-                    } elseif ($status !== 'back_out' && $currentAssignment === 'back_out') {
-                        DB::table('booking_crew')->where('booking_id', $bid)->where('crew_id', $cid)
-                            ->update(['assignment_status' => 'confirmed']);
-                    }
                 }
             });
             ActivityLog::record($uid, 'log_attendance', 'crew', "Logged $logged attendance records for booking #$bid");

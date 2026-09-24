@@ -70,10 +70,12 @@ class FieldRequestsController extends Controller
         ];
 
         $vehicleRates = DB::table('vehicle_rates')->where('is_active', 1)->orderBy('base_rate')->get();
+        // Shared by the Driver dropdown (any active crew can drive) and the crew-assignment
+        // picker for unassigned requests (JS re-sorts this same list by matching position_id).
         $activeDrivers = DB::table('crew_members as cm')
             ->leftJoin('crew_positions as cp', 'cm.primary_position_id', '=', 'cp.position_id')
             ->where('cm.status', 'active')
-            ->select('cm.crew_id', DB::raw("CONCAT(cm.first_name,' ',cm.last_name) AS name"), 'cp.position_name')
+            ->select('cm.crew_id', 'cm.primary_position_id as position_id', DB::raw("CONCAT(cm.first_name,' ',cm.last_name) AS name"), 'cp.position_name')
             ->orderByRaw("(LOWER(cp.position_name) LIKE '%driver%') DESC")
             ->orderBy('cm.last_name')
             ->get();
@@ -181,6 +183,52 @@ class FieldRequestsController extends Controller
 
         $booking = DB::table('bookings')->where('booking_id', $req->booking_id)->first();
 
+        // Crew requests are normally assigned at approval time (BookingDetailController::
+        // approveFieldRequest() requires picking a crew_id right there) — but stale/legacy rows
+        // can still reach here unassigned, and the dispatch UI needs a real way to fix that
+        // instead of just asserting "already assigned" when it plainly isn't. Same four checks
+        // batchAddCrew() uses: already-assigned / active status / date-overlap / unavailability.
+        if ($req->item_type === 'crew' && ! $req->crew_id) {
+            $assignCid = (int) $request->input('assign_crew_id', 0);
+            if (! $assignCid) {
+                return ['type' => 'danger', 'text' => 'Select a crew member to assign to this role before dispatching.'];
+            }
+            $assignee = DB::table('crew_members')->where('crew_id', $assignCid)->first();
+            if (! $assignee || $assignee->status !== 'active') {
+                return ['type' => 'danger', 'text' => 'Selected crew member is not active.'];
+            }
+            $conflictRef = DB::table('booking_crew as bc')
+                ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
+                ->where('bc.crew_id', $assignCid)->where('bc.booking_id', '!=', $req->booking_id)
+                ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
+                ->where('b.shoot_date_start', '<=', $booking->shoot_date_end)
+                ->where('b.shoot_date_end', '>=', $booking->shoot_date_start)
+                ->value('b.booking_reference');
+            if ($conflictRef) {
+                return ['type' => 'danger', 'text' => 'This crew member is already booked on ' . e($conflictRef) . ' during this period.'];
+            }
+            $unavail = DB::table('crew_unavailability')->where('crew_id', $assignCid)
+                ->where('date_from', '<=', $booking->shoot_date_end)->where('date_to', '>=', $booking->shoot_date_start)
+                ->exists();
+            if ($unavail) {
+                return ['type' => 'danger', 'text' => 'This crew member has marked themselves unavailable during this period.'];
+            }
+
+            $numDaysForCrew = max(1, (new \DateTime($booking->shoot_date_start))->diff(new \DateTime($booking->shoot_date_end))->days + 1);
+            $rate = (float) $assignee->base_rate_12hr;
+            if (! DB::table('booking_crew')->where('booking_id', $req->booking_id)->where('crew_id', $assignCid)->exists()) {
+                DB::table('booking_crew')->insert([
+                    'booking_id' => $req->booking_id, 'crew_id' => $assignCid, 'position_id' => $req->position_id,
+                    'rate_used' => $rate, 'hours_worked' => $numDaysForCrew, 'notes' => 'Field request: ' . ($req->reason ?? ''),
+                ]);
+            }
+            DB::table('booking_equipment_requests')->where('request_id', $reqId)->update(['crew_id' => $assignCid]);
+            $req->crew_id = $assignCid;
+            BookingCosting::generateCostEstimate($req->booking_id, $uid);
+            $assigneeName = trim($assignee->first_name . ' ' . $assignee->last_name);
+            ActivityLog::record($uid, 'assign', 'booking', "Field request #$reqId: assigned crew $assigneeName to booking {$req->booking_id}", $req->booking_id);
+        }
+
         // Same double-booking guard BookingDetailController::addEquipment()/fieldAddEquipment()
         // use — approveFieldRequest() never checked this, so without it here, dispatching a
         // field request was the one equipment-assignment path in the app that could hand the
@@ -259,6 +307,11 @@ class FieldRequestsController extends Controller
                     'notes' => 'Field request dispatch',
                 ]);
             }
+            DB::table('equipment_checklist')->insertOrIgnore([
+                'booking_id' => $req->booking_id, 'accessory_id' => $req->accessory_id, 'direction' => 'out',
+                'quantity_expected' => $req->quantity, 'quantity_actual' => $req->quantity, 'condition_out' => 'good',
+                'checked' => 1, 'checked_by' => $uid, 'checked_at' => now(),
+            ]);
             BookingCosting::generateCostEstimate($req->booking_id, $uid);
         }
         // crew: already booked at approval — dispatch here only carries the driver/ETA

@@ -28,21 +28,31 @@
 @endif
 
 <!-- Stats -->
-<div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+<div class="stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px">
   <div class="stat-card">
     <div class="stat-icon"><i data-feather="package"></i></div>
-    <div class="stat-value">{{ $stats['total'] }}</div>
-    <div class="stat-label">Total Accessories</div>
+    <div class="stat-value">{{ $stats['types'] }}</div>
+    <div class="stat-label">Accessory Types</div>
+  </div>
+  <div class="stat-card" style="--sb:var(--accent)">
+    <div class="stat-icon" style="background:rgba(0,96,199,.12);color:var(--accent)"><i data-feather="hash"></i></div>
+    <div class="stat-value">{{ $stats['total_units'] }}</div>
+    <div class="stat-label">Total Units</div>
   </div>
   <div class="stat-card green">
     <div class="stat-icon" style="background:rgba(74,222,128,.12);color:var(--green)"><i data-feather="check-circle"></i></div>
-    <div class="stat-value">{{ $stats['included'] }}</div>
-    <div class="stat-label">Package Included</div>
+    <div class="stat-value">{{ $stats['available_now'] }}</div>
+    <div class="stat-label">Available Now</div>
   </div>
-  <div class="stat-card" style="--sb:var(--accent)">
-    <div class="stat-icon" style="background:rgba(0,96,199,.12);color:var(--accent)"><i data-feather="plus-circle"></i></div>
-    <div class="stat-value">{{ $stats['addon'] }}</div>
-    <div class="stat-label">Optional Add-ons</div>
+  <div class="stat-card">
+    <div class="stat-icon" style="background:rgba(217,119,6,.12);color:#d97706"><i data-feather="send"></i></div>
+    <div class="stat-value">{{ $stats['allocated_field'] }}</div>
+    <div class="stat-label">Allocated / In Field</div>
+  </div>
+  <div class="stat-card red">
+    <div class="stat-icon" style="background:rgba(220,38,38,.12);color:var(--red)"><i data-feather="tool"></i></div>
+    <div class="stat-value">{{ $stats['under_maintenance'] }}</div>
+    <div class="stat-label">Under Maintenance</div>
   </div>
 </div>
 
@@ -59,6 +69,11 @@
         <option value="1" {{ $inclFilter === '1' ? 'selected' : '' }}>Package Included</option>
         <option value="0" {{ $inclFilter === '0' ? 'selected' : '' }}>Add-on Only</option>
       </select>
+      <select name="active" class="form-control" style="width:auto">
+        <option value="1" {{ $activeFilter === '1' ? 'selected' : '' }}>Active</option>
+        <option value="0" {{ $activeFilter === '0' ? 'selected' : '' }}>Deactivated</option>
+        <option value="all" {{ $activeFilter === 'all' ? 'selected' : '' }}>All</option>
+      </select>
       <button type="submit" class="btn btn-outline btn-sm"><i data-feather="filter"></i> Filter</button>
     </form>
   </div>
@@ -68,6 +83,8 @@
 .acc-pg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:14px}
 .acc-pg-card{background:var(--surface);border:1px solid var(--border);border-radius:11px;overflow:hidden;transition:box-shadow .15s,transform .1s;display:flex;flex-direction:column}
 .acc-pg-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.acc-pg-inactive{opacity:.6}
+.acc-pg-inactive:hover{opacity:.85}
 .acc-pg-thumb{width:100%;aspect-ratio:16/9;background:var(--s2);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;flex-shrink:0}
 .acc-pg-thumb img{width:100%;height:100%;object-fit:cover}
 .acc-pg-icon{font-family:var(--font-display);font-size:30px;color:var(--accent);opacity:.3;letter-spacing:1px}
@@ -118,8 +135,9 @@
     $inclLbl = $acc->is_included ? 'Package' : 'Add-on';
     $eqCount = (int) $acc->equipment_count;
     $qtyColor = $acc->available < 1 ? 'var(--red)' : ($acc->available <= 1 ? '#d97706' : 'var(--green)');
+    $trackLbl = ($acc->tracking_method ?? 'quantity') === 'individual' ? 'Individually Tracked' : 'Quantity Tracked';
   @endphp
-  <div class="acc-pg-card">
+  <div class="acc-pg-card{{ ! ($acc->is_active ?? 1) ? ' acc-pg-inactive' : '' }}">
     <div class="acc-pg-thumb">
       @if ($acc->image_path)
       <img src="{{ asset('storage/' . $acc->image_path) }}" alt="">
@@ -127,18 +145,22 @@
       <span class="acc-pg-icon">{{ strtoupper(substr($acc->accessory_name, 0, 2)) }}</span>
       @endif
       <span class="acc-pg-pill {{ $inclCls }}">{{ $inclLbl }}</span>
+      @if (! ($acc->is_active ?? 1))
+      <span class="acc-pg-pill" style="right:8px;left:auto;background:rgba(100,116,139,.85);color:#fff">Deactivated</span>
+      @endif
     </div>
     <div class="acc-pg-body">
       <div class="acc-pg-name" title="{{ $acc->accessory_name }}">{{ $acc->accessory_name }}</div>
       <div class="acc-pg-desc">{{ $acc->description ?: '—' }}</div>
       <div class="acc-pg-rate">{{ $rateStr }}</div>
-      @if (($acc->tracking_method ?? 'quantity') === 'individual')
-      <div style="font-size:.68rem;color:var(--accent);font-weight:700;margin-bottom:4px">
-        {{ $acc->unit_count }} unit{{ $acc->unit_count === 1 ? '' : 's' }} tracked
-      </div>
-      @else
+      <div style="font-size:.65rem;color:var(--muted);margin-bottom:2px">{{ $trackLbl }} · Total: {{ $acc->total_units }}</div>
       <div style="font-size:.68rem;color:{{ $qtyColor }};font-weight:700;margin-bottom:4px">
-        {{ $acc->available }}/{{ (int) ($acc->quantity ?? 1) }} available{{ $acc->in_use > 0 ? ' · ' . $acc->in_use . ' out' : '' }}
+        {{ $acc->available }} available{{ $acc->in_use > 0 ? ' · ' . $acc->in_use . ' out' : '' }}
+      </div>
+      @if ($acc->accessory_type === 'optional_addon')
+      <div style="font-size:.62rem;color:{{ $acc->is_public ? 'var(--green)' : 'var(--muted)' }};margin-bottom:2px">
+        <i data-feather="{{ $acc->is_public ? 'eye' : 'eye-off' }}" style="width:10px;height:10px;vertical-align:middle"></i>
+        {{ $acc->is_public ? 'Shown to clients' : 'Hidden from catalog' }}
       </div>
       @endif
       <div>
@@ -157,6 +179,7 @@
     </div>
     @if ($canManage)
     <div class="acc-pg-actions">
+      @if ($acc->is_active ?? 1)
       <button class="btn btn-outline btn-sm" style="flex:1;font-size:.72rem"
               onclick="openLinks({{ $acc->accessory_id }}, '{{ addslashes($acc->accessory_name) }}')">
         <i data-feather="link" style="width:11px;height:11px"></i> Manage
@@ -170,9 +193,15 @@
         <i data-feather="hash" style="width:11px;height:11px"></i>
       </button>
       <button class="btn btn-danger btn-sm" style="font-size:.72rem"
-              onclick="deleteAcc({{ $acc->accessory_id }}, '{{ addslashes($acc->accessory_name) }}')" title="Delete">
-        <i data-feather="trash-2" style="width:11px;height:11px"></i>
+              onclick="deactivateAcc({{ $acc->accessory_id }}, '{{ addslashes($acc->accessory_name) }}')" title="Deactivate / Retire">
+        <i data-feather="archive" style="width:11px;height:11px"></i>
       </button>
+      @else
+      <button class="btn btn-outline btn-sm" style="flex:1;font-size:.72rem;color:var(--green);border-color:var(--green)"
+              onclick="reactivateAcc({{ $acc->accessory_id }}, '{{ addslashes($acc->accessory_name) }}')">
+        <i data-feather="rotate-ccw" style="width:11px;height:11px"></i> Reactivate
+      </button>
+      @endif
     </div>
     @endif
   </div>
@@ -241,6 +270,12 @@
           <div style="font-size:.8rem;color:var(--muted);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
             Individual units are added after saving, from the accessory's <strong>Units</strong> button.
           </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0;display:none;grid-column:1/-1" id="addAccPublicWrap">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="addAccPublic" checked style="width:auto">
+            Show as selectable add-on in customer catalog
+          </label>
         </div>
         <div style="grid-column:1/-1">
           <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:8px">
@@ -332,6 +367,12 @@
           <div style="font-size:.8rem;color:var(--muted);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
             Manage individual units from the accessory's <strong>Units</strong> button.
           </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0;display:none;grid-column:1/-1" id="editAccPublicWrap">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="editAccPublic" style="width:auto">
+            Show as selectable add-on in customer catalog
+          </label>
         </div>
         <div style="grid-column:1/-1">
           <label style="font-size:.75rem;font-weight:700;display:block;margin-bottom:8px">Compatible Equipment</label>
@@ -521,6 +562,8 @@ function onAddAccTypeChange() {
   const isIncl = document.getElementById('addAccType').value === 'package_inclusion';
   document.getElementById('addAccRateWrap').style.display = isIncl ? 'none' : '';
   document.getElementById('addAccInclNote').style.display = isIncl ? '' : 'none';
+  const isAddon = document.getElementById('addAccType').value === 'optional_addon';
+  document.getElementById('addAccPublicWrap').style.display = isAddon ? '' : 'none';
 }
 function onAddAccTrackingChange() {
   const isIndiv = document.getElementById('addAccTracking').value === 'individual';
@@ -531,6 +574,8 @@ function onEditAccTypeChange() {
   const isIncl = document.getElementById('editAccType').value === 'package_inclusion';
   document.getElementById('editAccRateWrap').style.display = isIncl ? 'none' : '';
   document.getElementById('editAccInclNote').style.display = isIncl ? '' : 'none';
+  const isAddon = document.getElementById('editAccType').value === 'optional_addon';
+  document.getElementById('editAccPublicWrap').style.display = isAddon ? '' : 'none';
 }
 function onEditAccTrackingChange() {
   const isIndiv = document.getElementById('editAccTracking').value === 'individual';
@@ -551,6 +596,7 @@ function submitAddAcc() {
   fd.append('accessory_type', document.getElementById('addAccType').value);
   fd.append('tracking_method', document.getElementById('addAccTracking').value);
   fd.append('quantity',       document.getElementById('addAccQty').value || '1');
+  fd.append('is_public',      document.getElementById('addAccPublic').checked ? '1' : '0');
   const imgFile = document.getElementById('addAccImg').files[0];
   if (imgFile) fd.append('accessory_image', imgFile);
   document.querySelectorAll('.add-equip-chk:checked').forEach(cb => {
@@ -578,6 +624,7 @@ function openEditAcc(acc) {
   document.getElementById('editAccType').value = acc.accessory_type || (acc.is_included ? 'package_inclusion' : 'optional_addon');
   document.getElementById('editAccTracking').value = acc.tracking_method || 'quantity';
   document.getElementById('editAccQty').value  = acc.quantity || 1;
+  document.getElementById('editAccPublic').checked = !!parseInt(acc.is_public ?? 1);
   onEditAccTypeChange();
   onEditAccTrackingChange();
   const prev = document.getElementById('editAccImgPrev');
@@ -625,6 +672,7 @@ function submitEditAcc() {
   fd.append('accessory_type', document.getElementById('editAccType').value);
   fd.append('tracking_method', document.getElementById('editAccTracking').value);
   fd.append('quantity',       document.getElementById('editAccQty').value || '1');
+  fd.append('is_public',      document.getElementById('editAccPublic').checked ? '1' : '0');
   const imgFile = document.getElementById('editAccImg').files[0];
   if (imgFile) fd.append('accessory_image', imgFile);
   document.querySelectorAll('.edit-equip-chk:checked').forEach(cb => {
@@ -746,16 +794,31 @@ function retireAccUnit(unitId) {
     .then(data => { if (data.success) loadAccUnits(); });
 }
 
-function deleteAcc(aid, name) {
-  if (!confirm('Delete "' + name + '"?\n\nThis will permanently remove it from all equipment.')) return;
+function deactivateAcc(aid, name) {
+  if (!confirm('Deactivate / retire "' + name + '"?\n\nIt will no longer be offered on new bookings, but its history is kept. You can reactivate it later.')) return;
   const fd = new FormData();
   fd.append('_token',       ACC_CSRF);
-  fd.append('ajax_action',  'delete_accessory');
+  fd.append('ajax_action',  'deactivate_accessory');
   fd.append('accessory_id', aid);
   fetch(ACC_BASE_URL, { method: 'POST', body: fd })
     .then(r => r.json())
     .then(data => { if (data.success) location.reload(); });
 }
+
+function reactivateAcc(aid, name) {
+  const fd = new FormData();
+  fd.append('_token',       ACC_CSRF);
+  fd.append('ajax_action',  'reactivate_accessory');
+  fd.append('accessory_id', aid);
+  fetch(ACC_BASE_URL, { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => { if (data.success) location.reload(); });
+}
+
+// Sync the Add modal's conditional sections (Pricing/Public Visibility) with its default
+// selected Type/Tracking on first render — the onchange handlers only fire on a later change.
+onAddAccTypeChange();
+onAddAccTrackingChange();
 
 (function() {
   const params = new URLSearchParams(window.location.search);

@@ -8,7 +8,7 @@
 
 @section('topbarActions')
 @include('partials.export-dropdown', ['id' => 'Bookings'])
-<button onclick="openModal('modalAddBooking')" class="btn btn-primary btn-sm"> New Booking</button>
+<button onclick="openModal('modalAddBooking')" class="btn btn-primary btn-sm"> New Client Request</button>
 @endsection
 
 @section('content')
@@ -307,7 +307,7 @@
 <div class="modal-overlay" id="modalAddBooking">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
-      <h3 class="modal-title"><i data-feather="calendar" style="width:18px;height:18px;margin-right:8px;vertical-align:middle"></i>New Booking</h3>
+      <h3 class="modal-title"><i data-feather="calendar" style="width:18px;height:18px;margin-right:8px;vertical-align:middle"></i>New Client Request</h3>
       <button class="modal-close"><i data-feather="x"></i></button>
     </div>
     <form method="POST" action="{{ $bookingsBase }}">

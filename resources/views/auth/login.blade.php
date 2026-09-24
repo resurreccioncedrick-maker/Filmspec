@@ -262,8 +262,8 @@ body{
         <div class="dpa-row">
           <input type="checkbox" name="dpa_consent" id="dpaConsent" value="1" required onchange="updateSignupBtn()">
           <span>
-            I agree to FilmSpec's
-            <strong class="link" onclick="openDpaModal(event)">Data Privacy Policy</strong>
+            I have read and understood FilmSpec's
+            <strong class="link" onclick="openDpaModal(event)">Privacy Notice</strong>
             and consent to processing my personal information per <strong style="color:#94a3b8">R.A. 10173</strong>.
           </span>
         </div>

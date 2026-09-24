@@ -78,8 +78,15 @@ class AccessoriesController extends Controller
 
         $search = $request->query('q', '');
         $inclFilter = $request->query('incl', '');
+        $activeFilter = $request->query('active', '1');
 
         $accessories = $this->filteredQuery($request)->orderBy('a.accessory_name')->select('a.*')->get();
+
+        // Unit-status aggregates (Available Now / Allocated·In Field / Under Maintenance) are
+        // computed once here rather than per-accessory in the loop below — cheaper, and it's
+        // exactly the breakdown the KPI row and each card need.
+        $unitStatusTotals = DB::table('accessory_units')->where('status', '!=', 'retired')
+            ->select('status', DB::raw('COUNT(*) as cnt'))->groupBy('status')->pluck('cnt', 'status');
 
         foreach ($accessories as $acc) {
             $linked = DB::table('equipment_accessory_links as eal')
@@ -97,8 +104,14 @@ class AccessoriesController extends Controller
                 ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
                 ->sum('ba.quantity');
             $acc->in_use = $inUse;
-            $acc->available = max(0, (int) ($acc->quantity ?? 1) - $inUse);
             $acc->unit_count = (int) DB::table('accessory_units')->where('accessory_id', $acc->accessory_id)->where('status', '!=', 'retired')->count();
+            // "Total" and "Available" both come from the physical units once an accessory is
+            // individually tracked; a quantity-tracked accessory has no per-unit rows, so both
+            // fall back to the plain quantity/in-use arithmetic instead.
+            $acc->total_units = ($acc->tracking_method ?? 'quantity') === 'individual' ? $acc->unit_count : (int) ($acc->quantity ?? 1);
+            $acc->available = ($acc->tracking_method ?? 'quantity') === 'individual'
+                ? (int) DB::table('accessory_units')->where('accessory_id', $acc->accessory_id)->where('status', 'available')->count()
+                : max(0, (int) ($acc->quantity ?? 1) - $inUse);
         }
 
         $allEquipment = DB::table('equipment as e')
@@ -108,16 +121,28 @@ class AccessoriesController extends Controller
             ->select('e.equipment_id', 'e.equipment_name', 'ec.category_name')
             ->get();
 
+        $qtyAccessories = DB::table('accessories')->where('is_active', 1)->where('tracking_method', 'quantity')
+            ->select('quantity')->get();
+        $qtyInUse = (int) DB::table('booking_accessories as ba')
+            ->join('bookings as b', 'ba.booking_id', '=', 'b.booking_id')
+            ->join('accessories as a', 'ba.accessory_id', '=', 'a.accessory_id')
+            ->where('a.tracking_method', 'quantity')
+            ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
+            ->sum('ba.quantity');
+        $qtyTotal = (int) $qtyAccessories->sum('quantity');
+
         $stats = [
-            'total' => (int) DB::table('accessories')->count(),
-            'included' => (int) DB::table('accessories')->where('is_included', 1)->count(),
-            'addon' => (int) DB::table('accessories')->where('is_included', 0)->count(),
+            'types' => (int) DB::table('accessories')->where('is_active', 1)->count(),
+            'total_units' => (int) ($unitStatusTotals->sum() + $qtyTotal),
+            'available_now' => (int) (($unitStatusTotals['available'] ?? 0) + max(0, $qtyTotal - $qtyInUse)),
+            'allocated_field' => (int) (($unitStatusTotals['allocated'] ?? 0) + ($unitStatusTotals['in_field'] ?? 0) + ($unitStatusTotals['inspection_pending'] ?? 0) + min($qtyInUse, $qtyTotal)),
+            'under_maintenance' => (int) ($unitStatusTotals['under_maintenance'] ?? 0),
         ];
 
         return view('accessories', [
             'msg' => null, 'canManage' => $canManage,
             'accessories' => $accessories, 'allEquipment' => $allEquipment, 'stats' => $stats,
-            'search' => $search, 'inclFilter' => $inclFilter,
+            'search' => $search, 'inclFilter' => $inclFilter, 'activeFilter' => $activeFilter,
             'typeLabel' => $this->typeLabel, 'unitCondLabel' => $this->unitCondLabel, 'unitStatusLabel' => $this->unitStatusLabel,
         ]);
     }
@@ -127,6 +152,7 @@ class AccessoriesController extends Controller
     {
         $search = $request->query('q', '');
         $inclFilter = $request->query('incl', '');
+        $activeFilter = $request->query('active', '1');
 
         $query = DB::table('accessories as a');
         if ($search) {
@@ -137,6 +163,9 @@ class AccessoriesController extends Controller
         }
         if ($inclFilter !== '') {
             $query->where('a.is_included', (int) $inclFilter);
+        }
+        if ($activeFilter !== 'all') {
+            $query->where('a.is_active', (int) $activeFilter);
         }
 
         return $query;
@@ -204,6 +233,9 @@ class AccessoriesController extends Controller
                 $up = ImageUpload::handle($request->file('accessory_image'), 'accessories');
                 if ($up['success']) $imgPath = $up['path'];
             }
+            // Public Visibility only means something for a standalone Optional Add-On — Package
+            // Inclusions/Internal accessories aren't catalog products, so the toggle is forced off.
+            $isPublic = $type === 'optional_addon' ? (int) $request->boolean('is_public', true) : 0;
 
             $newId = DB::table('accessories')->insertGetId([
                 'accessory_name' => $name, 'description' => $desc, 'daily_rate' => $rate,
@@ -212,6 +244,7 @@ class AccessoriesController extends Controller
                 // are added afterward via accessory_units, so quantity stays a nominal 1 here
                 // rather than double-counting against the real per-unit count.
                 'quantity' => $tracking === 'individual' ? 1 : $qty, 'image_path' => $imgPath,
+                'is_active' => 1, 'is_public' => $isPublic,
             ]);
             foreach ((array) $request->input('equipment_ids', []) as $eid) {
                 $eid = (int) $eid;
@@ -224,7 +257,7 @@ class AccessoriesController extends Controller
             return response()->json([
                 'success' => true, 'accessory_id' => $newId, 'accessory_name' => $name, 'description' => $desc,
                 'daily_rate' => $rate, 'is_included' => $incl, 'accessory_type' => $type, 'tracking_method' => $tracking,
-                'quantity' => $qty, 'image_path' => $imgPath,
+                'quantity' => $qty, 'image_path' => $imgPath, 'is_public' => $isPublic,
             ]);
         }
 
@@ -251,11 +284,13 @@ class AccessoriesController extends Controller
                     $imgPath = $up['path'];
                 }
             }
+            $isPublic = $type === 'optional_addon' ? (int) $request->boolean('is_public', true) : 0;
 
             DB::table('accessories')->where('accessory_id', $aid)->update([
                 'accessory_name' => $name, 'description' => $desc, 'daily_rate' => $rate,
                 'is_included' => $incl, 'accessory_type' => $type, 'tracking_method' => $tracking,
                 'quantity' => $tracking === 'individual' ? $row->quantity : $qty, 'image_path' => $imgPath,
+                'is_public' => $isPublic,
             ]);
             DB::table('equipment_accessory_links')->where('accessory_id', $aid)->delete();
             foreach ((array) $request->input('equipment_ids', []) as $eid) {
@@ -269,18 +304,28 @@ class AccessoriesController extends Controller
             return response()->json([
                 'success' => true, 'image_path' => $imgPath, 'accessory_name' => $name,
                 'description' => $desc, 'daily_rate' => $rate, 'is_included' => $incl,
-                'accessory_type' => $type, 'tracking_method' => $tracking,
+                'accessory_type' => $type, 'tracking_method' => $tracking, 'is_public' => $isPublic,
             ]);
         }
 
-        if ($action === 'delete_accessory') {
+        // Replaces the old hard DELETE — accessory rows are referenced by booking_accessories
+        // and equipment_checklist history, so deleting one outright would either fail on the FK
+        // or silently orphan past bookings' records. Deactivating (like Equipment's Retire and
+        // Clients' Deactivate) keeps that history intact and hides it from new bookings.
+        if ($action === 'deactivate_accessory') {
             $aid = (int) $request->input('accessory_id');
             $row = DB::table('accessories')->where('accessory_id', $aid)->first();
-            if ($row && $row->image_path) {
-                ImageUpload::deleteOld($row->image_path);
-            }
-            DB::table('accessories')->where('accessory_id', $aid)->delete();
-            ActivityLog::record($request->user()->user_id, 'delete', 'accessory', 'Deleted accessory: ' . ($row->accessory_name ?? "ID $aid"), $aid);
+            DB::table('accessories')->where('accessory_id', $aid)->update(['is_active' => 0]);
+            ActivityLog::record($request->user()->user_id, 'update', 'accessory', 'Deactivated accessory: ' . ($row->accessory_name ?? "ID $aid"), $aid);
+
+            return response()->json(['success' => true]);
+        }
+
+        if ($action === 'reactivate_accessory') {
+            $aid = (int) $request->input('accessory_id');
+            $row = DB::table('accessories')->where('accessory_id', $aid)->first();
+            DB::table('accessories')->where('accessory_id', $aid)->update(['is_active' => 1]);
+            ActivityLog::record($request->user()->user_id, 'update', 'accessory', 'Reactivated accessory: ' . ($row->accessory_name ?? "ID $aid"), $aid);
 
             return response()->json(['success' => true]);
         }

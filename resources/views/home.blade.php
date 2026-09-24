@@ -1573,7 +1573,7 @@ textarea.fi{resize:vertical;min-height:60px}
           @if($isLoggedIn)
           <button class="hbtn ghost" onclick="showPage('mybookings',null)">My Bookings</button>
           @else
-          <a href="{{ route('login') }}"><button class="hbtn ghost">Sign In to Book</button></a>
+          <a href="{{ route('login') }}"><button class="hbtn ghost">Sign In</button></a>
           @endif
         </div>
         <div class="hero-eq-line" style="margin-top:24px">Film Gear &nbsp;&middot;&nbsp; Rental &nbsp;&middot;&nbsp; Made Easy</div>
@@ -1644,16 +1644,12 @@ textarea.fi{resize:vertical;min-height:60px}
           <div class="eq-name">{{ $eq->equipment_name }}</div>
           <div class="eq-brand">{{ $eq->brand ?? '' }}</div>
           <div class="eq-divider"></div>
-          @if ($eq->requires_operator ?? 0)<div class="eq-op">Operator req'd</div>@endif
+          @if ($eq->requires_operator ?? 0)<div class="eq-op" title="Requires a certified operator — may include an additional service fee">Operator req'd</div>@endif
           <div class="eq-foot">
             <div class="eq-rate">₱{{ number_format($eq->daily_rate, 0) }}</div>
             <div class="eq-rate-sub">/day &middot; VAT included</div>
           </div>
-          @if ($isLoggedIn)
           <button class="req-btn" id="rb_{{ $eq->equipment_id }}" data-eid="{{ $eq->equipment_id }}" onclick="toggleEquipment({{ $eq->equipment_id }})">+ Add to Request List</button>
-          @else
-          <button class="req-btn" onclick="requireAuth()">+ Add to Request List</button>
-          @endif
         </div>
       </div>
       @endforeach
@@ -1692,7 +1688,7 @@ textarea.fi{resize:vertical;min-height:60px}
         <div class="eq-page-title">Equipment<br>Catalog</div>
         <div class="eq-page-sub">Premium production gear · Daily rates · VAT inclusive</div>
       </div>
-      <span class="eq-page-count">{{ count($equipment) }} items available</span>
+      <span class="eq-page-count">{{ count($equipment) }} Equipment Items</span>
     </div>
   </div>
   <div class="eq-toolbar">
@@ -1913,7 +1909,7 @@ textarea.fi{resize:vertical;min-height:60px}
     @if($isLoggedIn)
     <button class="proc-btn" id="procBtn" disabled onclick="goToEstimate()">View Cost Estimate &amp; Submit &rarr;</button>
     @else
-    <button class="proc-btn" onclick="requireAuth()">Sign In to Book</button>
+    <button class="proc-btn" onclick="requireAuthForSubmit()">Sign In to Continue Request</button>
     @endif
   </div>
 </div>
@@ -2100,7 +2096,7 @@ textarea.fi{resize:vertical;min-height:60px}
   <div class="mdl" style="max-width:360px;text-align:center">
     <div class="mb" style="padding:36px 28px">
       <div style="font-family:var(--font-d);font-size:26px;letter-spacing:.5px;margin-bottom:10px">Sign In Required</div>
-      <div style="font-size:13px;color:var(--sub);margin-bottom:22px;line-height:1.7">Create a free client account or sign in to add items to your request list and submit bookings.</div>
+      <div style="font-size:13px;color:var(--sub);margin-bottom:22px;line-height:1.7">Create a free client account or sign in to add items to your request list and submit your equipment request.</div>
       <div style="display:flex;gap:10px;justify-content:center">
         <button class="btn-g" onclick="closeMo('authMo')">Cancel</button>
         <a href="{{ route('login') }}"><button class="btn-p">Sign In / Register</button></a>
@@ -2235,6 +2231,16 @@ const ALL_FAQS = {!! $faqs->flatten(1)->map(fn ($f) => [
 
 let reqList = [];
 let panelOpen = false;
+
+// ── Guest draft cart (localStorage) ─────────────────────────
+// Anonymous visitors can build a request list before signing in; it's synced to their
+// real (server-side) cart the moment they land back here logged in — see syncGuestCartOnLogin().
+function loadGuestCart() {
+  try { return JSON.parse(localStorage.getItem('fs_guest_cart') || '[]'); } catch (e) { return []; }
+}
+function saveGuestCart(items) {
+  try { localStorage.setItem('fs_guest_cart', JSON.stringify(items)); } catch (e) {}
+}
 let activeCat   = 0;
 let searchTerm  = '';
 let activeFaqCat = '';
@@ -2262,7 +2268,21 @@ function togglePanel() {
 }
 
 function loadList() {
-  if (!IS_LOGIN) return;
+  if (!IS_LOGIN) {
+    const cart = loadGuestCart();
+    reqList = cart.map(i => {
+      const eq = ALL_EQ.find(e => e.id === i.equipment_id) || {};
+      return {
+        item_type: 'equipment', equipment_id: i.equipment_id, quantity: i.quantity || 1, days: i.days || 1,
+        daily_rate: eq.rate || 0, equipment_name: eq.name || 'Equipment', category_name: eq.cat || '',
+        image_path: eq.img || '', requires_operator: eq.req_op ? 1 : 0, cart_id: 'guest_' + i.equipment_id,
+      };
+    });
+    renderPanel({});
+    updateCount();
+    updateBtns();
+    return;
+  }
   fetch('/cart?action=get')
     .then(r=>r.json())
     .then(d => {
@@ -2361,7 +2381,15 @@ function updateBtns() {
 }
 
 function toggleEquipment(eid, selectedAccessories) {
-  if (!IS_LOGIN) { requireAuth(); return; }
+  if (!IS_LOGIN) {
+    const cart = loadGuestCart();
+    const idx = cart.findIndex(i => i.equipment_id === eid);
+    if (idx > -1) { cart.splice(idx, 1); toast('Removed from request list', 'blue'); }
+    else { cart.push({ equipment_id: eid, quantity: 1, days: 1 }); toast('Added to request list', 'blue'); }
+    saveGuestCart(cart);
+    loadList();
+    return;
+  }
   const inList = reqList.some(i=>i.item_type==='equipment'&&parseInt(i.equipment_id)===eid);
   if (inList) { removeByEqId(eid); return; }
   const fd=new FormData();
@@ -2538,8 +2566,36 @@ function escapeHtml(s) {
 }
 
 function removeItem(cartId) {
+  if (typeof cartId === 'string' && cartId.indexOf('guest_') === 0) {
+    const eid = parseInt(cartId.slice(6));
+    saveGuestCart(loadGuestCart().filter(i => i.equipment_id !== eid));
+    loadList();
+    return;
+  }
   const fd=new FormData(); fd.append('_token', CSRF_TOKEN); fd.append('action','remove'); fd.append('cart_id',cartId);
   fetch('/cart',{method:'POST',body:fd}).then(()=>loadList());
+}
+function syncGuestCartOnLogin() {
+  const cart = loadGuestCart();
+  if (!cart.length) { loadList(); return; }
+  const adds = cart.map(i => {
+    const fd = new FormData();
+    fd.append('_token', CSRF_TOKEN);
+    fd.append('action', 'add_equipment');
+    fd.append('equipment_id', i.equipment_id);
+    fd.append('quantity', i.quantity || 1);
+    fd.append('days', i.days || 1);
+    return fetch('/cart', { method: 'POST', body: fd }).then(r => r.json()).catch(() => ({ ok: false }));
+  });
+  Promise.all(adds).then(results => {
+    const okCount = results.filter(r => r && r.ok).length;
+    saveGuestCart([]);
+    loadList();
+    if (okCount) toast(`${okCount} saved item${okCount === 1 ? '' : 's'} added to your request list.`, 'green');
+    let intent = null;
+    try { intent = sessionStorage.getItem('fs_post_login_intent'); sessionStorage.removeItem('fs_post_login_intent'); } catch (e) {}
+    if (intent === 'submit') setTimeout(goToEstimate, 500);
+  });
 }
 function removeByEqId(eid) {
   const it=reqList.find(i=>i.item_type==='equipment'&&parseInt(i.equipment_id)===eid);
@@ -2652,12 +2708,10 @@ function renderGrid() {
     const availClass = av ? 'av' : (isBooked ? 'busy' : 'inuse');
     const catAb=escHtml((eq.cat||'').substring(0,2).toUpperCase());
     const imgHtml=eq.img?`<img src="${ASSET_BASE}/${escAttr(eq.img)}" alt="">`:(`<span class="eq-cat-icon">${catAb}</span>`);
-    const opHtml=eq.req_op?`<div class="eq-op">Operator req'd</div>`:'';
-    const btnHtml=IS_LOGIN
-      ?`<button class="req-btn${inList?' selected':''}" data-eid="${eq.id}" onclick="${inList?`removeByEqId(${eq.id})`:`toggleEquipment(${eq.id})`}" ${!av&&!inList?'disabled':''}>
+    const opHtml=eq.req_op?`<div class="eq-op" title="Requires a certified operator — may include an additional service fee">Operator req'd</div>`:'';
+    const btnHtml=`<button class="req-btn${inList?' selected':''}" data-eid="${eq.id}" onclick="${inList?`removeByEqId(${eq.id})`:`toggleEquipment(${eq.id})`}" ${!av&&!inList?'disabled':''}>
           ${inList?'In List — Remove':(!av?'Unavailable':'+ Add to Request List')}
-        </button>`
-      :`<button class="req-btn" onclick="requireAuth()">+ Add to Request List</button>`;
+        </button>`;
     const favBtnHtml=`<button class="fav-star${isFav?' on':''}" onclick="event.stopPropagation();toggleFavorite(${eq.id})" title="${isFav?'Remove from favorites':'Add to favorites'}">
         <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
       </button>`;
@@ -2835,13 +2889,6 @@ function refreshEdActionBtn() {
     btn.style.outline    = '1.5px solid #fca5a5';
     btn.disabled         = false;
     btn.onclick          = () => { removeByEqId(edCurrentEqId); toast('Removed from request list','red'); };
-  } else if (!IS_LOGIN) {
-    btn.textContent      = '+ Add to Request List';
-    btn.style.background = 'var(--blue)';
-    btn.style.color      = '#fff';
-    btn.style.outline    = 'none';
-    btn.disabled         = false;
-    btn.onclick          = () => requireAuth();
   } else if (!av) {
     btn.textContent      = 'Currently Unavailable';
     btn.style.background = 'var(--surface)';
@@ -2855,13 +2902,16 @@ function refreshEdActionBtn() {
     btn.style.color      = '#fff';
     btn.style.outline    = 'none';
     btn.disabled         = false;
-    btn.onclick          = () => { toggleEquipment(edCurrentEqId, getSelectedAccessories()); setTimeout(refreshEdActionBtn, 450); };
+    // Accessory selection only sticks server-side once there's a real cart row to attach it to —
+    // guests get the base equipment added now and can pick accessories again after signing in.
+    btn.onclick          = () => { toggleEquipment(edCurrentEqId, IS_LOGIN ? getSelectedAccessories() : undefined); setTimeout(refreshEdActionBtn, 450); };
   }
 }
 
 function openMo(id){document.getElementById(id)?.classList.add('on');}
 function closeMo(id){document.getElementById(id)?.classList.remove('on');}
 function requireAuth(){openMo('authMo');}
+function requireAuthForSubmit(){ try{ sessionStorage.setItem('fs_post_login_intent','submit'); }catch(e){} requireAuth(); }
 document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('on');}));
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelectorAll('.mo.on').forEach(m=>m.classList.remove('on'));if(panelOpen)togglePanel();}});
 
@@ -2879,7 +2929,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderGrid();
   buildFaqCatPills();
   renderFaqList();
-  if (IS_LOGIN) { loadList(); loadFavorites(); }
+  if (IS_LOGIN) { syncGuestCartOnLogin(); loadFavorites(); }
+  else { loadList(); }
 });
 </script>
 

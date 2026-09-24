@@ -410,7 +410,10 @@ class BookingsController extends Controller
                     'contact_person' => strtoupper(trim($request->input('new_client_name'))),
                     'email' => $email,
                     'phone' => $cpRaw,
-                    'client_type' => $request->input('new_client_type', 'first_time'),
+                    // Every new client starts as "New Customer" — same rule as
+                    // ClientsController::add_client, so Regular status is only ever earned via
+                    // the mark_regular_client action, never picked at creation time.
+                    'client_type' => 'first_time',
                 ]);
                 $clientId = $client->client_id;
             } catch (\Illuminate\Database\QueryException $e) {
@@ -423,6 +426,10 @@ class BookingsController extends Controller
 
         if (! $clientId) {
             return null;
+        }
+
+        if (! DB::table('clients')->where('client_id', $clientId)->value('is_active')) {
+            return ['type' => 'error', 'text' => 'This client is deactivated and cannot be booked for new requests. Reactivate them from Client Detail first.'];
         }
 
         $ds = $request->input('shoot_date_start', '');

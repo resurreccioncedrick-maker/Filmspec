@@ -280,9 +280,11 @@ class EquipmentController extends Controller
                 'condition' => in_array($request->input('condition'), array_keys($this->unitCondLabel), true) ? $request->input('condition') : 'good',
                 'status' => in_array($request->input('status'), array_keys($this->unitStatusLabel), true) ? $request->input('status') : 'available',
                 'location' => trim($request->input('location', '')) ?: null,
+                'date_acquired' => $request->input('date_acquired') ?: null,
                 'created_at' => now(), 'updated_at' => now(),
             ]);
             ActivityLog::record($request->user()->user_id, 'create', 'equipment', "Added physical unit $tag", $eid);
+            $this->recalcFromUnits($eid);
 
             return response()->json(['success' => true, 'unit_id' => $unitId]);
         }
@@ -301,6 +303,7 @@ class EquipmentController extends Controller
                 'updated_at' => now(),
             ]);
             ActivityLog::record($request->user()->user_id, 'update', 'equipment', "Updated physical unit {$unit->asset_tag}", $unit->equipment_id);
+            $this->recalcFromUnits($unit->equipment_id);
 
             return response()->json(['success' => true]);
         }
@@ -313,11 +316,36 @@ class EquipmentController extends Controller
             }
             DB::table('equipment_units')->where('unit_id', $unitId)->update(['status' => 'retired', 'updated_at' => now()]);
             ActivityLog::record($request->user()->user_id, 'update', 'equipment', "Retired physical unit {$unit->asset_tag}", $unit->equipment_id);
+            $this->recalcFromUnits($unit->equipment_id);
 
             return response()->json(['success' => true]);
         }
 
         return response()->json(['success' => false, 'error' => 'Unknown action']);
+    }
+
+    // Stock Quantity and Condition are no longer staff-typed at the model level once an
+    // equipment model has real Physical Units recorded — they're derived from those units
+    // instead, matching the panelist's "move to physical asset level" recommendation. Equipment
+    // with zero units yet (the common case for anything added before this feature, or not
+    // migrated to per-unit tracking) keeps its existing manually-set values untouched, so
+    // nothing regresses for models that never get per-unit records.
+    private array $unitCondRank = ['excellent' => 0, 'good' => 1, 'serviceable' => 2, 'damaged' => 3];
+
+    private function recalcFromUnits(int $eid): void
+    {
+        $activeUnits = DB::table('equipment_units')->where('equipment_id', $eid)->where('status', '!=', 'retired')->get();
+        if ($activeUnits->isEmpty()) {
+            return;
+        }
+
+        $worst = $activeUnits->sortByDesc(fn ($u) => $this->unitCondRank[$u->condition] ?? 0)->first();
+        $worstCondMap = ['excellent' => 'excellent', 'good' => 'good', 'serviceable' => 'fair', 'damaged' => 'under_repair'];
+
+        DB::table('equipment')->where('equipment_id', $eid)->update([
+            'stock_quantity' => $activeUnits->count(),
+            'condition_status' => $worstCondMap[$worst->condition] ?? 'good',
+        ]);
     }
 
     private function handleAction(Request $request, $user, string $role): ?array
@@ -332,28 +360,33 @@ class EquipmentController extends Controller
                 if ($up['success']) $imgPath = $up['path'];
             }
 
+            $requiresOp = $request->boolean('requires_operator', true);
+
             try {
+                // Serial Number, Date Acquired, Condition, and Stock Quantity all moved to the
+                // physical-unit level (Physical Units panel, added after saving) per the
+                // panelist recommendation — a brand-new model starts with no units, so these
+                // start at safe defaults and pick up real values once units are recorded.
                 $eid = DB::table('equipment')->insertGetId([
                     'category_id' => (int) $request->input('category_id'),
                     'equipment_name' => $request->input('equipment_name', ''),
                     'brand' => $request->input('brand', ''),
                     'model' => $request->input('model', ''),
-                    'serial_number' => $request->input('serial_number', '') ?: null,
+                    'serial_number' => null,
                     'description' => $request->input('description', ''),
                     'daily_rate' => (float) $request->input('daily_rate', 0),
-                    'condition_status' => $request->input('condition_status', 'good'),
-                    'date_acquired' => $request->input('date_acquired') ?: null,
+                    'condition_status' => 'good',
                     'notes' => $request->input('notes', ''),
-                    'operator_note' => $request->input('operator_note', '') ?: null,
+                    'operator_note' => $requiresOp ? ($request->input('operator_note', '') ?: null) : null,
                     'image_path' => $imgPath,
-                    'stock_quantity' => max(1, (int) $request->input('stock_quantity', 1)),
-                    'requires_operator' => 1,
+                    'stock_quantity' => 1,
+                    'requires_operator' => $requiresOp ? 1 : 0,
                 ]);
             } catch (\Illuminate\Database\QueryException $e) {
                 return ['type' => 'danger', 'text' => 'Failed to add. ' . (str_contains($e->getMessage(), 'Duplicate') ? 'Serial number already exists.' : 'Database error.')];
             }
 
-            $this->syncOperatorPositions($eid, (array) $request->input('operator_positions', []));
+            $this->syncOperatorPositions($eid, $requiresOp ? (array) $request->input('operator_positions', []) : []);
             ActivityLog::record($uid, 'create', 'equipment', 'Added: ' . $request->input('equipment_name', ''), $eid);
 
             return ['type' => 'success', 'text' => 'Equipment <strong>' . e($request->input('equipment_name', '')) . '</strong> added.'];
@@ -371,8 +404,15 @@ class EquipmentController extends Controller
                 }
             }
 
-            $newAvailStatus = $request->input('availability_status', 'available');
-            if ($newAvailStatus !== 'under_repair' && $newAvailStatus !== 'retired') {
+            // Once real Physical Units exist for this model, Stock Quantity and Condition are
+            // derived (recalcFromUnits(), kept in sync on every unit add/update/retire) and
+            // Availability is driven by the normal checkout/checkin/retire flows — none of the
+            // three are accepted from this form anymore. Equipment with no units yet falls back
+            // to the original manually-set behavior so nothing regresses for it.
+            $hasUnits = DB::table('equipment_units')->where('equipment_id', $eid)->where('status', '!=', 'retired')->exists();
+
+            $newAvailStatus = $request->input('availability_status', $old->availability_status ?? 'available');
+            if (! $hasUnits && $newAvailStatus !== 'under_repair' && $newAvailStatus !== 'retired') {
                 $hasOpenIncident = DB::table('incident_reports')->where('equipment_id', $eid)->where('status', 'open')->exists();
                 $hasActiveRepair = DB::table('repair_purchase_tickets')->where('equipment_id', $eid)
                     ->whereIn('status', ['requested', 'approved', 'in_progress'])->exists();
@@ -381,28 +421,33 @@ class EquipmentController extends Controller
                 }
             }
 
+            $requiresOp = $request->boolean('requires_operator', true);
+
+            $payload = [
+                'category_id' => (int) $request->input('category_id'),
+                'equipment_name' => $request->input('equipment_name', ''),
+                'brand' => $request->input('brand', ''),
+                'model' => $request->input('model', ''),
+                'description' => $request->input('description', ''),
+                'daily_rate' => (float) $request->input('daily_rate', 0),
+                'notes' => $request->input('notes', ''),
+                'operator_note' => $requiresOp ? ($request->input('operator_note', '') ?: null) : null,
+                'image_path' => $imgPath,
+                'requires_operator' => $requiresOp ? 1 : 0,
+            ];
+            if (! $hasUnits) {
+                $payload['stock_quantity'] = max(1, (int) $request->input('stock_quantity', 1));
+                $payload['condition_status'] = $request->input('condition_status', 'good');
+                $payload['availability_status'] = $newAvailStatus;
+            }
+
             try {
-                DB::table('equipment')->where('equipment_id', $eid)->update([
-                    'category_id' => (int) $request->input('category_id'),
-                    'equipment_name' => $request->input('equipment_name', ''),
-                    'brand' => $request->input('brand', ''),
-                    'model' => $request->input('model', ''),
-                    'serial_number' => $request->input('serial_number', '') ?: null,
-                    'description' => $request->input('description', ''),
-                    'daily_rate' => (float) $request->input('daily_rate', 0),
-                    'condition_status' => $request->input('condition_status', 'good'),
-                    'availability_status' => $request->input('availability_status', 'available'),
-                    'notes' => $request->input('notes', ''),
-                    'operator_note' => $request->input('operator_note', '') ?: null,
-                    'image_path' => $imgPath,
-                    'stock_quantity' => max(1, (int) $request->input('stock_quantity', 1)),
-                    'requires_operator' => 1,
-                ]);
+                DB::table('equipment')->where('equipment_id', $eid)->update($payload);
             } catch (\Illuminate\Database\QueryException $e) {
                 return ['type' => 'danger', 'text' => 'Update failed.'];
             }
 
-            $this->syncOperatorPositions($eid, (array) $request->input('operator_positions', []));
+            $this->syncOperatorPositions($eid, $requiresOp ? (array) $request->input('operator_positions', []) : []);
             ActivityLog::record($uid, 'update', 'equipment', 'Updated: ' . $request->input('equipment_name', ''), $eid);
 
             return ['type' => 'success', 'text' => 'Equipment updated.'];

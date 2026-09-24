@@ -641,9 +641,25 @@
 .csd-empty{padding:12px;font-size:.8rem;color:var(--text-muted,var(--muted))}
 .csd-ref{font-weight:700;font-size:.85rem;color:var(--text)}
 .csd-sub{font-size:.75rem;color:var(--text-muted,var(--muted));margin-top:2px}
+
+.rp-step-lbl{display:flex;align-items:center;gap:8px;font-size:.78rem;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 8px}
+.rp-step-n{display:flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;font-size:.68rem;font-weight:800;flex-shrink:0;text-transform:none;letter-spacing:0}
+.rp-summary{background:var(--s2,rgba(59,130,246,.05));border:1px solid var(--border);border-radius:var(--radius-md);padding:4px 12px;margin-bottom:4px}
+.rp-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:.83rem;color:var(--text-muted,var(--muted));border-bottom:1px solid var(--border)}
+.rp-row:last-child{border-bottom:none}
+.rp-row strong{color:var(--text);font-weight:700}
+.rp-row-suggest strong{color:var(--accent)}
+.rp-found{display:none;align-items:center;gap:5px;font-size:.74rem;color:var(--green);font-weight:600;margin-top:5px}
+.rp-found.show{display:flex}
+.rp-2col{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
+.rp-2col .form-group{margin-bottom:12px}
+@media (max-width:640px){.rp-2col{grid-template-columns:1fr}}
+.rp-amt-wrap{position:relative}
+.rp-amt-wrap .rp-peso{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-weight:700;pointer-events:none}
+.rp-amt-wrap input{padding-left:26px !important;font-size:1.05rem;font-weight:700}
 </style>
 <div class="modal-overlay" id="modalAddPayment">
-  <div class="modal" style="max-width:540px">
+  <div class="modal" style="max-width:720px">
     <div class="modal-header">
       <h3 class="modal-title"><i data-feather="credit-card" style="width:18px;height:18px;margin-right:8px;vertical-align:middle"></i>Record Payment</h3>
       <button class="modal-close" data-modal-close><i data-feather="x"></i></button>
@@ -651,63 +667,70 @@
     <form method="POST" action="{{ $billingBase }}" onsubmit="return prepPayment()">
       @csrf
       <input type="hidden" name="action" value="record_payment">
+      <input type="hidden" name="payment_type" id="payType" value="downpayment">
       <div class="modal-body">
-        <div class="form-group">
-          <label>Booking *</label>
-          <div style="position:relative">
-            <input type="text" id="bkgSearchTxt" class="form-control" placeholder="Search by reference or client name…" autocomplete="off"
-                   oninput="openBkgSearch(this.value)" onfocus="openBkgSearch(this.value)" onblur="closeBkgSearch(200)">
-            <input type="hidden" name="booking_id" id="bkgSelectedId">
-            <div class="crew-slot-drop" id="bkgDrop"></div>
+        <div class="rp-2col">
+
+          <div>
+            <div class="rp-step-lbl"><span class="rp-step-n">1</span> Select Booking / Invoice</div>
+            <div class="form-group">
+              <label>Booking Reference *</label>
+              <div style="position:relative">
+                <input type="text" id="bkgSearchTxt" class="form-control" placeholder="Search by reference or client name…" autocomplete="off"
+                       oninput="openBkgSearch(this.value)" onfocus="openBkgSearch(this.value)" onblur="closeBkgSearch(200)">
+                <input type="hidden" name="booking_id" id="bkgSelectedId">
+                <div class="crew-slot-drop" id="bkgDrop"></div>
+              </div>
+              <div class="rp-found" id="bkgFoundNote"><i data-feather="check-circle" style="width:12px;height:12px"></i> Booking found</div>
+            </div>
+
+            <div id="balanceInfo" style="display:none">
+              <div class="rp-step-lbl" style="margin-top:16px"><span class="rp-step-n">2</span> Billing Summary <span style="font-weight:400;color:var(--text-muted);font-size:.72rem">(Auto-filled)</span></div>
+              <div class="rp-summary">
+                <div class="rp-row"><span>Billing Total</span><strong id="bkTotal">—</strong></div>
+                <div class="rp-row"><span>Total Paid to Date</span><strong id="bkPaid" style="color:var(--green)">—</strong></div>
+                <div class="rp-row"><span>Outstanding Balance</span><strong id="bkBalance" style="color:var(--red)">—</strong></div>
+                <div class="rp-row"><span>Payment Purpose</span><strong id="bkPurpose">—</strong></div>
+                <div class="rp-row"><span>Document Type</span><strong id="bkDocType">—</strong></div>
+                <div class="rp-row rp-row-suggest"><span>Suggested Amount Due</span><strong id="bkSuggested">—</strong></div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div id="balanceInfo" style="display:none;background:rgba(59,130,246,.08);border-radius:var(--radius-md);padding:12px;margin-bottom:14px">
-          <div style="font-size:.83rem;color:var(--accent)">
-            Total: <strong id="bkTotal">—</strong> &nbsp;·&nbsp;
-            Paid: <strong id="bkPaid" style="color:var(--green)">—</strong> &nbsp;·&nbsp;
-            Balance: <strong id="bkBalance" style="color:var(--red)">—</strong>
+
+          <div>
+            <div class="rp-step-lbl"><span class="rp-step-n">3</span> Payment Details</div>
+            <div class="form-group">
+              <label>Amount Received (₱) *</label>
+              <div class="rp-amt-wrap">
+                <span class="rp-peso">₱</span>
+                <input type="number" name="amount" id="payAmount" class="form-control" step="0.01" min="0.01" required oninput="onPayAmountChange()">
+              </div>
+              <div id="payAmountMax" style="font-size:.72rem;color:var(--text-muted);margin-top:3px"></div>
+            </div>
+            <div class="form-group">
+              <label>Payment Method *</label>
+              <select name="payment_method" id="billingPayMethod" class="form-control" required onchange="toggleBillingRefField()">
+                <option value="cash" selected>Cash</option>
+                <option value="gcash">GCash</option>
+              </select>
+            </div>
+            <div class="form-group" id="billingRefWrap" style="display:none">
+              <label>GCash Reference / Transaction ID</label>
+              <input type="text" name="reference_number" class="form-control" placeholder="GCash transaction ID">
+            </div>
+            <div class="form-group">
+              <label>Payment Date *</label>
+              <input type="date" name="payment_date" id="payDate" class="form-control" value="{{ now()->toDateString() }}" min="{{ now()->toDateString() }}" required>
+            </div>
+            <div class="form-group">
+              <label>Notes (Optional)</label>
+              <textarea name="notes" class="form-control" rows="2" placeholder="Additional payment notes…"></textarea>
+            </div>
+            <div id="payFullSettleNote" style="display:none;font-size:.78rem;color:var(--accent);background:rgba(59,130,246,.08);border-radius:6px;padding:8px 10px">
+              <i data-feather="info" style="width:12px;height:12px;vertical-align:middle"></i> This payment will fully settle the outstanding balance.
+            </div>
           </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Payment Type *</label>
-            <select name="payment_type" class="form-control" required>
-              <option value="downpayment">Downpayment</option>
-              <option value="final">Final Payment</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Payment Method *</label>
-            <select name="payment_method" id="billingPayMethod" class="form-control" required onchange="toggleBillingRefField()">
-              <option value="cash" selected>Cash</option>
-              <option value="gcash">GCash</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Amount (₱) *</label>
-            <input type="number" name="amount" id="payAmount" class="form-control" step="0.01" min="0.01" required>
-          </div>
-          <div class="form-group">
-            <label>Payment Date *</label>
-            <input type="date" name="payment_date" class="form-control" value="{{ now()->toDateString() }}" required>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group" id="billingRefWrap" style="display:none">
-            <label>GCash Reference / Transaction ID</label>
-            <input type="text" name="reference_number" class="form-control" placeholder="GCash transaction ID">
-          </div>
-        </div>
-        <div class="form-group">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-            <input type="checkbox" name="is_vat" value="1"> Issue Official Receipt (VAT transaction)
-          </label>
-        </div>
-        <div class="form-group">
-          <label>Notes</label>
-          <textarea name="notes" class="form-control" rows="2" placeholder="Additional payment notes"></textarea>
+
         </div>
       </div>
       <div class="modal-footer">
@@ -849,7 +872,7 @@ function _bkgDropHtml(items) {
     const amt = total > 0
       ? ` &middot; ₱${total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}, paid ₱${paid.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
       : '';
-    return `<div class="csd-item" data-id="${b.booking_id}" data-total="${total}" data-paid="${paid}" data-label="${_escH(_bkgLabel(b))}">
+    return `<div class="csd-item" data-id="${b.booking_id}" data-total="${total}" data-paid="${paid}" data-vat="${b.is_vat_registered ? 1 : 0}" data-label="${_escH(_bkgLabel(b))}">
       <div class="csd-ref">${_escH(b.booking_reference)}</div>
       <div class="csd-sub">${_escH(b.company_name || b.contact_person || '')}${amt}</div>
     </div>`;
@@ -874,7 +897,7 @@ function openBkgSearch(q) {
       document.getElementById('bkgSelectedId').value = el.dataset.id;
       document.getElementById('bkgSearchTxt').value = el.dataset.label;
       drop.style.display = 'none';
-      fillPaymentInfoFromData(parseFloat(el.dataset.total) || 0, parseFloat(el.dataset.paid) || 0);
+      fillPaymentInfoFromData(parseFloat(el.dataset.total) || 0, parseFloat(el.dataset.paid) || 0, el.dataset.vat === '1');
     });
   });
 }
@@ -888,21 +911,59 @@ function prepPayment() {
   }
   return true;
 }
-function fillPaymentInfoFromData(total, paid) {
-  const balance = Math.max(0, total - paid);
-  const info = document.getElementById('balanceInfo');
-  info.style.display = 'block';
-  document.getElementById('bkTotal').textContent = '₱' + total.toLocaleString('en-PH', { minimumFractionDigits: 2 });
-  document.getElementById('bkPaid').textContent = '₱' + paid.toLocaleString('en-PH', { minimumFractionDigits: 2 });
-  document.getElementById('bkBalance').textContent = '₱' + balance.toLocaleString('en-PH', { minimumFractionDigits: 2 });
-  document.getElementById('payAmount').value = balance > 0 ? balance.toFixed(2) : '';
+
+// Module-level state for the currently-selected booking, so the amount field can be edited
+// after selection and everything downstream (purpose, full-settle note) stays in sync.
+let _rpTotal = 0, _rpPaid = 0, _rpBalance = 0;
+
+function fillPaymentInfoFromData(total, paid, isVat) {
+  _rpTotal = total; _rpPaid = paid; _rpBalance = Math.max(0, total - paid);
+  const fmt = (n) => '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2 });
+
+  document.getElementById('bkgFoundNote').classList.add('show');
+  document.getElementById('balanceInfo').style.display = 'block';
+  document.getElementById('bkTotal').textContent = fmt(total);
+  document.getElementById('bkPaid').textContent = fmt(paid);
+  document.getElementById('bkBalance').textContent = fmt(_rpBalance);
+  document.getElementById('bkDocType').textContent = isVat ? 'Official Receipt (VAT)' : 'Acknowledgement Receipt';
+  document.getElementById('bkSuggested').textContent = _rpBalance > 0 ? fmt(_rpBalance) : '—';
+  document.getElementById('payAmountMax').textContent = _rpBalance > 0 ? 'Max: ' + fmt(_rpBalance) : '';
+
+  document.getElementById('payAmount').value = _rpBalance > 0 ? _rpBalance.toFixed(2) : '';
+  document.getElementById('payAmount').max = _rpBalance > 0 ? _rpBalance.toFixed(2) : '';
+  onPayAmountChange();
+}
+
+// Payment Type/Purpose auto-derive from where this payment lands relative to the booking's
+// billing state — first payment is a Downpayment, a payment that fully settles what's left is
+// the Final Payment, anything else in between is a Progress Payment. Still just a *default*:
+// the dropdown stays editable for the rare case staff need to override it.
+function onPayAmountChange() {
+  const amt = parseFloat(document.getElementById('payAmount').value) || 0;
+  let purpose = 'Downpayment', type = 'downpayment';
+  if (_rpPaid > 0) {
+    if (amt >= _rpBalance - 0.005 && _rpBalance > 0) { purpose = 'Final Balance'; type = 'final'; }
+    else { purpose = 'Progress Payment'; type = 'progress'; }
+  }
+  const purposeEl = document.getElementById('bkPurpose');
+  if (purposeEl) purposeEl.textContent = purpose;
+  const typeSel = document.getElementById('payType');
+  if (typeSel) typeSel.value = type;
+
+  const settleNote = document.getElementById('payFullSettleNote');
+  if (settleNote) settleNote.style.display = (_rpBalance > 0 && amt >= _rpBalance - 0.005) ? 'block' : 'none';
 }
 
 function resetPaymentModal() {
   document.getElementById('bkgSelectedId').value = '';
   document.getElementById('bkgSearchTxt').value = '';
+  document.getElementById('bkgFoundNote').classList.remove('show');
   document.getElementById('balanceInfo').style.display = 'none';
   document.getElementById('payAmount').value = '';
+  document.getElementById('payAmountMax').textContent = '';
+  document.getElementById('payFullSettleNote').style.display = 'none';
+  document.getElementById('payType').value = 'downpayment';
+  _rpTotal = 0; _rpPaid = 0; _rpBalance = 0;
 }
 
 function openPayForBooking(bookingId) {
@@ -910,7 +971,7 @@ function openPayForBooking(bookingId) {
   if (b) {
     document.getElementById('bkgSelectedId').value = b.booking_id;
     document.getElementById('bkgSearchTxt').value = _bkgLabel(b);
-    fillPaymentInfoFromData(parseFloat(b.final_amount) || 0, parseFloat(b.paid_so_far) || 0);
+    fillPaymentInfoFromData(parseFloat(b.final_amount) || 0, parseFloat(b.paid_so_far) || 0, !!b.is_vat_registered);
   }
   openModal('modalAddPayment');
 }

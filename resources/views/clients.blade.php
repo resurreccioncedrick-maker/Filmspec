@@ -91,6 +91,7 @@
           <th>Completed</th>
           <th>Last Booking</th>
           <th>Payment Terms</th>
+          <th>Status</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -149,36 +150,46 @@
             </span>
           </td>
           <td>
-            @if ($canManage && ($c->status ?? 'approved') === 'pending')
-            <form method="POST" action="{{ $clientsBase }}" style="display:inline">
-              @csrf
-              <input type="hidden" name="action" value="approve_client">
-              <input type="hidden" name="client_id" value="{{ $c->client_id }}">
-              <button type="submit" class="btn btn-sm" style="background:var(--greenl);color:var(--green);border:1px solid #86efac" title="Approve"
-                      onclick="return confirm('Approve {{ addslashes($displayName) }}\'s account?')">
-                <i data-feather="check" style="width:13px;height:13px"></i>
-              </button>
-            </form>
-            <button class="btn btn-sm btn-danger" onclick="openRejectClient({{ $c->client_id }}, {{ json_encode($displayName) }})" title="Reject">
-              <i data-feather="x" style="width:13px;height:13px"></i>
-            </button>
-            @endif
-            <a href="{{ route('client-detail', $c->client_id) }}" class="btn btn-sm btn-primary" title="View">
-              <i data-feather="eye" style="width:13px;height:13px"></i>
-            </a>
-            <button class="btn btn-sm btn-secondary"
-              onclick='editClient(@json($c))'
-              title="Edit">
-              <i data-feather="edit-2" style="width:13px;height:13px"></i>
-            </button>
-            <a href="{{ route('bookings') }}?client={{ $c->client_id }}"
-               class="btn btn-sm btn-secondary" title="View Bookings">
-              <i data-feather="calendar" style="width:13px;height:13px"></i>
-            </a>
-            <a href="{{ route('client-documents', $c->client_id) }}"
-               class="btn btn-sm btn-secondary" title="Documents">
-              <i data-feather="file-text" style="width:13px;height:13px"></i>
-            </a>
+            <span class="badge {{ ($c->is_active ?? true) ? 'badge-green' : 'badge-red' }}">
+              {{ ($c->is_active ?? true) ? 'Active' : 'Inactive' }}
+            </span>
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;align-items:center">
+              <a href="{{ route('client-detail', $c->client_id) }}" class="btn btn-outline btn-sm">
+                <i data-feather="eye" style="width:13px;height:13px"></i> View
+              </a>
+              <div class="action-menu-wrap">
+                <button type="button" class="btn-icon" onclick="toggleActionMenu(this)" title="More actions">
+                  <i data-feather="more-vertical"></i>
+                </button>
+                <div class="action-menu align-right">
+                  @if ($canManage && ($c->status ?? 'approved') === 'pending')
+                  <form method="POST" action="{{ $clientsBase }}">
+                    @csrf
+                    <input type="hidden" name="action" value="approve_client">
+                    <input type="hidden" name="client_id" value="{{ $c->client_id }}">
+                    <button type="submit" class="text-success" onclick="return confirm('Approve {{ addslashes($displayName) }}\'s account?')">
+                      <i data-feather="check"></i> Approve Account
+                    </button>
+                  </form>
+                  <button type="button" class="text-danger" onclick="closeActionMenus(); openRejectClient({{ $c->client_id }}, {{ json_encode($displayName) }})">
+                    <i data-feather="x"></i> Reject Account
+                  </button>
+                  <div class="action-menu-divider"></div>
+                  @endif
+                  <button type="button" onclick="closeActionMenus(); editClient(@json($c))">
+                    <i data-feather="edit-2"></i> Edit
+                  </button>
+                  <a href="{{ route('bookings') }}?client={{ $c->client_id }}">
+                    <i data-feather="calendar"></i> View Bookings
+                  </a>
+                  <a href="{{ route('client-documents', $c->client_id) }}">
+                    <i data-feather="file-text"></i> Documents
+                  </a>
+                </div>
+              </div>
+            </div>
           </td>
         </tr>
         @endforeach
@@ -233,24 +244,15 @@
           <label>Address</label>
           <input type="text" name="address" class="form-control" placeholder="Full address">
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Entity Type</label>
-            <select name="entity_type" class="form-control" onchange="onAddEntityTypeChange(this.value)">
-              <option value="individual">Individual</option>
-              <option value="student">Student</option>
-              <option value="company">Company</option>
-              <option value="ngo">NGO / Non-Profit</option>
-              <option value="government">Government</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Client Status</label>
-            <select name="client_type" class="form-control">
-              <option value="first_time">New Customer</option>
-              <option value="regular">Regular</option>
-            </select>
-          </div>
+        <div class="form-group">
+          <label>Entity Type</label>
+          <select name="entity_type" class="form-control" onchange="onAddEntityTypeChange(this.value)">
+            <option value="individual">Individual</option>
+            <option value="student">Student</option>
+            <option value="company">Company</option>
+            <option value="ngo">NGO / Non-Profit</option>
+            <option value="government">Government</option>
+          </select>
         </div>
         <div id="add_vat_notice" style="display:none;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.3);border-radius:6px;padding:8px 12px;font-size:12px;color:#c084fc;margin-bottom:10px">
           Companies are subject to 12% VAT on all fees.
@@ -260,6 +262,7 @@
           <textarea name="notes" class="form-control" rows="2" placeholder="Internal notes…"></textarea>
         </div>
         <div style="font-size:.75rem;color:var(--text-muted);background:var(--s2);border-radius:6px;padding:8px 10px">
+          New clients start as <strong>New Customer</strong> and are promoted to Regular from Client Detail once eligible.
           Payment Terms and Loyalty Discount are set from the client's <strong>Billing</strong> tab after they're added.
         </div>
       </div>
@@ -308,24 +311,15 @@
           <label>Address</label>
           <input type="text" name="address" id="edit_caddress" class="form-control">
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Entity Type</label>
-            <select name="entity_type" id="edit_centity" class="form-control" onchange="onEditEntityTypeChange(this.value)">
-              <option value="individual">Individual</option>
-              <option value="student">Student</option>
-              <option value="company">Company</option>
-              <option value="ngo">NGO / Non-Profit</option>
-              <option value="government">Government</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Client Status</label>
-            <select name="client_type" id="edit_ctype" class="form-control">
-              <option value="first_time">New Customer</option>
-              <option value="regular">Regular</option>
-            </select>
-          </div>
+        <div class="form-group">
+          <label>Entity Type</label>
+          <select name="entity_type" id="edit_centity" class="form-control" onchange="onEditEntityTypeChange(this.value)">
+            <option value="individual">Individual</option>
+            <option value="student">Student</option>
+            <option value="company">Company</option>
+            <option value="ngo">NGO / Non-Profit</option>
+            <option value="government">Government</option>
+          </select>
         </div>
         <div id="edit_vat_notice" style="display:none;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.3);border-radius:6px;padding:8px 12px;font-size:12px;color:#c084fc;margin-bottom:10px">
           Companies are subject to 12% VAT on all fees.
@@ -335,6 +329,7 @@
           <textarea name="notes" id="edit_cnotes" class="form-control" rows="2"></textarea>
         </div>
         <div style="font-size:.75rem;color:var(--text-muted);background:var(--s2);border-radius:6px;padding:8px 10px">
+          Regular Client status is promoted from Client Detail once eligible, not editable here.
           Payment Terms and Loyalty Discount are managed on the client's <a href="#" id="edit_cbilling_link">Billing tab</a>.
         </div>
       </div>
@@ -385,7 +380,6 @@ function editClient(c) {
   document.getElementById('edit_cphone').value   = c.phone          || '';
   document.getElementById('edit_caddress').value = c.address        || '';
   document.getElementById('edit_centity').value  = c.entity_type    || 'individual';
-  document.getElementById('edit_ctype').value    = c.client_type    || 'first_time';
   document.getElementById('edit_cnotes').value   = c.notes          || '';
   const billingLink = document.getElementById('edit_cbilling_link');
   if (billingLink) billingLink.href = '/clients/' + c.client_id + '?tab=billing';
@@ -415,6 +409,32 @@ function openRejectClient(cid, name) {
   document.getElementById('reject_cname').textContent = name;
   openModal('modalRejectClient');
 }
+
+function closeActionMenus() {
+  document.querySelectorAll('.action-menu.show').forEach(function (m) {
+    m.classList.remove('show', 'drop-up');
+  });
+}
+
+function toggleActionMenu(trigger) {
+  var menu = trigger.nextElementSibling;
+  var wasOpen = menu.classList.contains('show');
+  closeActionMenus();
+  if (wasOpen) return;
+
+  menu.classList.add('show');
+  var rect = menu.getBoundingClientRect();
+  if (rect.bottom > window.innerHeight) {
+    menu.classList.add('drop-up');
+  }
+}
+
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('.action-menu-wrap')) closeActionMenus();
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') closeActionMenus();
+});
 </script>
 @endpush
 @endsection

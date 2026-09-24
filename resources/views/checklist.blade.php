@@ -184,6 +184,7 @@
         @foreach ($equipLines as $eq)
         @php
           $isOut = $dir === 'out';
+          $lineKey = ($eq->item_type === 'accessory' ? 'acc_' : 'eq_') . $eq->ref_id;
           $checked = $isOut ? $eq->co_checked : $eq->ci_checked;
           $condVal = $isOut ? ($eq->condition_out ?? 'good') : ($eq->condition_in ?? 'good');
           $qActual = $isOut ? ($eq->co_qty ?? $eq->quantity) : ($eq->ci_qty ?? $eq->quantity);
@@ -194,7 +195,7 @@
         <tr style="{{ $rowStyle }}">
           @if ($canManage)
           <td style="text-align:center">
-            <input type="checkbox" name="items[{{ $eq->equipment_id }}][checked]" value="1"
+            <input type="checkbox" name="items[{{ $lineKey }}][checked]" value="1"
                    {{ $checked ? 'checked' : '' }}
                    onchange="this.closest('tr').style.background=this.checked?'var(--greenl)':''"
                    class="checklist-cb" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
@@ -209,12 +210,14 @@
               <div style="width:38px;height:38px;border-radius:6px;background:var(--s3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.5px;flex-shrink:0">{{ strtoupper(substr($eq->category_name ?? '', 0, 2)) }}</div>
               @endif
               <div>
-                <div style="font-weight:600;font-size:.875rem">{{ $eq->equipment_name }}</div>
+                <div style="font-weight:600;font-size:.875rem">{{ $eq->item_name }}
+                  @if ($eq->item_type === 'accessory')<span class="badge badge-gray" style="margin-left:5px;font-size:9px;vertical-align:middle">ACCESSORY</span>@endif
+                </div>
                 <div style="font-size:.72rem;color:var(--muted)">{{ trim($eq->brand . ' ' . $eq->model) }}</div>
               </div>
             </div>
             @if ($canManage)
-            <input type="hidden" name="items[{{ $eq->equipment_id }}][quantity_expected]" value="{{ $eq->quantity }}">
+            <input type="hidden" name="items[{{ $lineKey }}][quantity_expected]" value="{{ $eq->quantity }}">
             @endif
           </td>
           <td><span class="badge badge-blue">{{ $eq->category_name }}</span></td>
@@ -222,7 +225,7 @@
           @if ($isOut)
           <td>
             @if ($canManage)
-            <input type="number" name="items[{{ $eq->equipment_id }}][quantity_actual]"
+            <input type="number" name="items[{{ $lineKey }}][quantity_actual]"
                    value="{{ $qActual }}" min="0" max="{{ $eq->quantity * 10 }}"
                    style="width:60px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;font-size:13px;font-family:var(--font-mono);background:var(--surface);color:var(--text);outline:none">
             @else
@@ -231,7 +234,7 @@
           </td>
           <td>
             @if ($canManage)
-            <select name="items[{{ $eq->equipment_id }}][condition_out]"
+            <select name="items[{{ $lineKey }}][condition_out]"
                     style="padding:4px 8px;border:1px solid var(--border2);border-radius:5px;font-size:12px;background:var(--surface);color:var(--text);outline:none">
               @foreach ($condOut as $v => $l)
               <option value="{{ $v }}" {{ $condVal === $v ? 'selected' : '' }}>{{ $l }}</option>
@@ -244,7 +247,7 @@
           @else
           <td>
             @if ($canManage)
-            <input type="number" name="items[{{ $eq->equipment_id }}][quantity_actual]"
+            <input type="number" name="items[{{ $lineKey }}][quantity_actual]"
                    value="{{ $qActual }}" min="0" max="{{ $eq->quantity * 10 }}"
                    style="width:60px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;font-size:13px;font-family:var(--font-mono);background:var(--surface);color:var(--text);outline:none">
             @else
@@ -253,7 +256,7 @@
           </td>
           <td>
             @if ($canManage)
-            <select name="items[{{ $eq->equipment_id }}][condition_in]"
+            <select name="items[{{ $lineKey }}][condition_in]"
                     onchange="highlightDamaged(this)"
                     style="padding:4px 8px;border:1px solid var(--border2);border-radius:5px;font-size:12px;background:var(--surface);color:var(--text);outline:none">
               @foreach ($condIn as $v => $l)
@@ -286,7 +289,7 @@
           </td>
           <td>
             @if ($canManage)
-            <input type="text" name="items[{{ $eq->equipment_id }}][notes]"
+            <input type="text" name="items[{{ $lineKey }}][notes]"
                    value="{{ $notes }}"
                    placeholder="Notes…"
                    style="width:140px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;font-size:12px;background:var(--surface);color:var(--text);outline:none">
