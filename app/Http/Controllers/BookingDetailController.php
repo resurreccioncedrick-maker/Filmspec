@@ -165,7 +165,14 @@ class BookingDetailController extends Controller
                 $q->select('accessory_id')->from('booking_accessories')->where('booking_id', $id);
             })
             ->orderBy('a.accessory_name')
-            ->select('a.accessory_id', 'a.accessory_name', 'a.daily_rate', 'a.is_included', 'a.quantity')
+            ->select('a.accessory_id', 'a.accessory_name', 'a.daily_rate', 'a.is_included')
+            // For an individually-tracked accessory, a.quantity is a nominal 1 (its real stock is
+            // in accessory_units) — same distinction addBookingAccessory() applies server-side —
+            // so the "available" count shown here must come from accessory_units, not a.quantity,
+            // or it wrongly caps display at 1 unit regardless of how many units actually exist.
+            ->selectRaw("CASE WHEN a.tracking_method = 'individual'
+                THEN (SELECT COUNT(*) FROM accessory_units au WHERE au.accessory_id = a.accessory_id AND au.status != 'retired')
+                ELSE a.quantity END AS quantity")
             ->selectRaw('COALESCE((SELECT SUM(ba2.quantity) FROM booking_accessories ba2
                 JOIN bookings b2 ON ba2.booking_id=b2.booking_id
                 WHERE ba2.accessory_id=a.accessory_id
@@ -649,6 +656,13 @@ class BookingDetailController extends Controller
         if ($booking->booking_status === 'confirmed' && ! $ceConfirmed) {
             return ['type' => 'error', 'text' => 'Cannot release — the cost estimate must be <strong>confirmed</strong> first. Use Confirm CE, then try again.'];
         }
+        // Confirming the CE only sends it to the client (cost_approval_status becomes
+        // 'pending_client') — it is not the client's approval. Matches the gate already
+        // enforced on the Checklist OUT page (ChecklistController::index()).
+        $costApproved = ($booking->cost_approval_status ?? null) === 'client_approved';
+        if ($booking->booking_status === 'confirmed' && ! $costApproved) {
+            return ['type' => 'error', 'text' => 'Cannot release — the client has not approved the cost estimate yet.'];
+        }
 
         $crewCount = DB::table('booking_crew')->where('booking_id', $id)->count();
         if ($crewCount === 0) {
@@ -758,6 +772,12 @@ class BookingDetailController extends Controller
         $ceConfirmed = DB::table('cost_estimates')->where('booking_id', $id)->orderByDesc('ce_id')->value('status') === 'confirmed';
         if ($booking->booking_status === 'confirmed' && ! $ceConfirmed) {
             return ['type' => 'error', 'text' => 'Cannot release — the cost estimate must be confirmed first.'];
+        }
+        // Same client-approval gate as checkout() / ChecklistController::index() — confirming the
+        // CE only sends it to the client, it does not mean the client approved it.
+        $costApproved = ($booking->cost_approval_status ?? null) === 'client_approved';
+        if ($booking->booking_status === 'confirmed' && ! $costApproved) {
+            return ['type' => 'error', 'text' => 'Cannot release — the client has not approved the cost estimate yet.'];
         }
         if (DB::table('booking_crew')->where('booking_id', $id)->count() === 0) {
             return ['type' => 'error', 'text' => 'Cannot release — no crew assigned.'];
@@ -870,6 +890,14 @@ class BookingDetailController extends Controller
 
     private function completeBooking(int $id, $booking, int $uid): array
     {
+        // Only reachable from the UI at 'pending_inspection' (Skip Inspection) or 'returned'
+        // (normal path) — matches confirmInspection()'s own status guard, and prevents a
+        // direct POST from jumping a booking straight to 'completed' from an earlier stage
+        // (e.g. 'confirmed'/'ongoing') without equipment ever having been returned.
+        if (! in_array($booking->booking_status, ['pending_inspection', 'returned'], true)) {
+            return ['type' => 'danger', 'text' => 'Booking cannot be completed from its current status.'];
+        }
+
         $prevStatus = $booking->booking_status;
         DB::table('bookings')->where('booking_id', $id)->update(['booking_status' => 'completed', 'updated_at' => now()]);
         DB::table('crew_members as cm')
@@ -1504,6 +1532,28 @@ class BookingDetailController extends Controller
             $rate = (float) $crew->base_rate_12hr;
             $exists = DB::table('booking_crew')->where('booking_id', $id)->where('crew_id', $crewId)->exists();
             if (! $exists) {
+                // Same double-booking + personal-unavailability checks as addCrew()/batchAddCrew() —
+                // approving a field request must not be able to book a crew member who is already
+                // committed elsewhere on overlapping dates.
+                $crewConflictRef = DB::table('booking_crew as bc')
+                    ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
+                    ->where('bc.crew_id', $crewId)->where('bc.booking_id', '!=', $id)
+                    ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
+                    ->where('b.shoot_date_start', '<=', $booking->shoot_date_end)
+                    ->where('b.shoot_date_end', '>=', $booking->shoot_date_start)
+                    ->value('b.booking_reference');
+                if ($crewConflictRef) {
+                    return ['type' => 'danger', 'text' => '<strong>' . e(trim($crew->first_name . ' ' . $crew->last_name)) . '</strong> is already assigned to booking <strong>' . e($crewConflictRef) . '</strong> on overlapping dates.'];
+                }
+                $unavailBlock = DB::table('crew_unavailability')->where('crew_id', $crewId)
+                    ->where('date_from', '<=', $booking->shoot_date_end)->where('date_to', '>=', $booking->shoot_date_start)
+                    ->select('date_from', 'date_to', 'reason')->first();
+                if ($unavailBlock) {
+                    $bReason = $unavailBlock->reason ? ' (' . e($unavailBlock->reason) . ')' : '';
+
+                    return ['type' => 'danger', 'text' => '<strong>' . e(trim($crew->first_name . ' ' . $crew->last_name)) . '</strong> has a personal unavailability block on <strong>' . e($unavailBlock->date_from . ' – ' . $unavailBlock->date_to) . '</strong>' . $bReason . '.'];
+                }
+
                 DB::table('booking_crew')->insert([
                     'booking_id' => $id, 'crew_id' => $crewId, 'position_id' => $req->position_id,
                     'rate_used' => $rate, 'hours_worked' => $numDays, 'notes' => 'Field request: ' . ($req->reason ?? ''),
@@ -1603,7 +1653,14 @@ class BookingDetailController extends Controller
             ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
             ->where('ba.booking_id', '!=', $id)
             ->sum('ba.quantity');
-        $stock = max(1, (int) $acc->quantity);
+        // accessories.quantity is only meaningful for tracking_method='quantity' — an
+        // individually-tracked accessory keeps quantity at a nominal 1 (its real stock lives in
+        // accessory_units), matching AccessoriesController::index()'s total_units logic. Using
+        // the raw quantity column here would wrongly cap an individually-tracked accessory at 1
+        // unit total regardless of how many accessory_units rows actually exist.
+        $stock = ($acc->tracking_method ?? 'quantity') === 'individual'
+            ? max(1, (int) DB::table('accessory_units')->where('accessory_id', $aid)->where('status', '!=', 'retired')->count())
+            : max(1, (int) $acc->quantity);
         if ($inUse + $qty > $stock) {
             $avail = max(0, $stock - $inUse);
 
