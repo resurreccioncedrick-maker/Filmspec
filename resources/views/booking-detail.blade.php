@@ -421,6 +421,14 @@
   @if ($booking->client_type === 'first_time')
   {!! $chkRow($payOk, '50% Downpayment', $payOk ? 'Paid' : '₱' . number_format($required50 - $paidAmt, 2) . ' outstanding') !!}
   @endif
+  @if ($allOk)
+  <div style="padding:12px 16px;background:#f0fdf4">
+    <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'out']) }}" class="btn btn-success btn-sm" style="width:100%;justify-content:center">
+      <i data-feather="clipboard"></i> Open Checklist OUT to Release Equipment
+    </a>
+    <p style="font-size:.72rem;color:#15803d;margin:6px 0 0;text-align:center">Equipment isn't marked as released — and can't go out to the field — until it's checked out here.</p>
+  </div>
+  @endif
 </div>
 @endif
 
@@ -446,9 +454,10 @@
 </div>
 @elseif (($booking->cost_approval_status ?? null) === 'client_approved' && $st === 'confirmed')
 <div class="card" style="margin-bottom:18px;border-left:4px solid #22c55e">
-  <div class="card-body" style="padding:14px 18px;display:flex;align-items:center;gap:8px">
-    <i data-feather="check-circle" style="width:15px;height:15px;color:#16a34a"></i>
-    <span style="font-weight:700;font-size:13px;color:#15803d">Client approved the cost estimate — equipment release is authorized.</span>
+  <div class="card-body" style="padding:14px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <i data-feather="check-circle" style="width:15px;height:15px;color:#16a34a;flex-shrink:0"></i>
+    <span style="font-weight:700;font-size:13px;color:#15803d;flex:1;min-width:200px">Client approved the cost estimate — equipment release is authorized once the checklist below is clear.</span>
+    <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'out']) }}" class="btn btn-success btn-sm"><i data-feather="clipboard"></i> Open Checklist OUT</a>
   </div>
 </div>
 @endif

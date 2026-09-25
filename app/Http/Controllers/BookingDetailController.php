@@ -290,7 +290,10 @@ class BookingDetailController extends Controller
         $vehicleRates = DB::table('vehicle_rates')->where('is_active', 1)->orderBy('base_rate')->get();
 
         $totalEquipQtyAll = (int) DB::table('booking_equipment')->where('booking_id', $id)->sum('quantity');
-        $driverNeeded = ((float) ($booking->transportation_cost ?? 0) > 0) || $totalEquipQtyAll > 5;
+        // >= 5, matching ChecklistController's actual release gate — this used to say "> 5" here,
+        // so a booking with exactly 5 total equipment quantity showed "Ready to Release" on this
+        // page while the real checklist-out gate correctly still blocked it over the missing driver.
+        $driverNeeded = ((float) ($booking->transportation_cost ?? 0) > 0) || $totalEquipQtyAll >= 5;
         $driverCount = DB::table('booking_crew as bc')
             ->join('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
             ->where('bc.booking_id', $id)->where(DB::raw('LOWER(cp.position_name)'), 'like', '%driver%')
@@ -654,14 +657,14 @@ class BookingDetailController extends Controller
 
         $totalEquipQty = (int) DB::table('booking_equipment')->where('booking_id', $id)->sum('quantity');
         $transCost = (float) ($booking->transportation_cost ?? 0);
-        $driverNeeded = $transCost > 0 || $totalEquipQty > 5;
+        $driverNeeded = $transCost > 0 || $totalEquipQty >= 5;
         if ($driverNeeded) {
             $driverCount = DB::table('booking_crew as bc')
                 ->join('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
                 ->where('bc.booking_id', $id)->where(DB::raw('LOWER(cp.position_name)'), 'like', '%driver%')
                 ->count();
             if (! $driverCount) {
-                $why = $transCost > 0 ? 'transportation is charged on this booking' : "total equipment quantity is $totalEquipQty units (>5)";
+                $why = $transCost > 0 ? 'transportation is charged on this booking' : "total equipment quantity is $totalEquipQty units (>=5)";
 
                 return ['type' => 'error', 'text' => "Cannot release — a <strong>Driver</strong> must be assigned because $why. Add a crew member with the Driver position, then release."];
             }
