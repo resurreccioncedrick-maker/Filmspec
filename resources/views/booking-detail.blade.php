@@ -406,12 +406,15 @@
     <div style="position:absolute;top:15px;left:18px;right:18px;height:2px;background:#E2EAF4"></div>
     <div style="display:flex;position:relative">
       @foreach ($steps as $step)
-      <div style="display:flex;flex-direction:column;align-items:center;gap:9px;flex:1">
+      @php $clickable = $step['label'] === 'Transport'; @endphp
+      <{{ $clickable ? 'button' : 'div' }}
+        @if ($clickable) type="button" onclick="openModal('modalAssignTransport')" title="Open Add/Edit Transport" @endif
+        style="display:flex;flex-direction:column;align-items:center;gap:9px;flex:1;background:none;border:none;font-family:inherit;{{ $clickable ? 'cursor:pointer' : '' }}">
         <div style="width:32px;height:32px;border-radius:999px;background:{{ $step['ok'] ? '#16A34A' : '#DC2626' }};display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px #fff">
           <i data-feather="{{ $step['ok'] ? 'check' : 'x' }}" style="width:14px;height:14px;color:#fff;stroke-width:3"></i>
         </div>
-        <div style="font-size:11.5px;font-weight:600;color:#385270;text-align:center">{{ $step['label'] }}</div>
-      </div>
+        <div style="font-size:11.5px;font-weight:600;color:{{ $clickable ? '#0060C7' : '#385270' }};text-align:center;{{ $clickable ? 'text-decoration:underline' : '' }}">{{ $step['label'] }}</div>
+      </{{ $clickable ? 'button' : 'div' }}>
       @endforeach
     </div>
   </div>
