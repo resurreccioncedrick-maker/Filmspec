@@ -21,16 +21,24 @@
 .dash-title { font-family:var(--font-display);font-size:24px;letter-spacing:.5px;color:var(--text);line-height:1; }
 .dash-date  { font-size:12px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:5px; }
 
-/* Needs Attention */
+/* Needs Attention — Spotlight: the worst item leads as one large callout, the
+   other two fold into small side chips, instead of three equally-weighted cards. */
 .attn-wrap { background:#fef2f2;border:1px solid #fecaca;border-radius:var(--radius-md);padding:18px 20px;margin-bottom:20px; }
 .attn-head { display:flex;align-items:center;gap:8px;margin-bottom:14px;font-weight:700;font-size:14px;color:#991b1b; }
-.attn-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:14px; }
-.attn-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px; }
-.attn-card .num { font-family:var(--font-display);font-size:26px;color:var(--text);line-height:1;display:flex;align-items:center;gap:8px; }
-.attn-card .lbl { font-size:12px;color:var(--sub);font-weight:600;margin-top:4px; }
-.attn-card a { font-size:11.5px;color:var(--accent);text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:3px;margin-top:8px; }
-.attn-card a:hover { text-decoration:underline; }
-.attn-card.clear { opacity:.55; }
+.attn-spot-grid { display:grid;grid-template-columns:1.3fr 1fr;gap:14px; }
+.attn-spot-main { display:block;border-radius:10px;padding:20px;color:#fff;text-decoration:none;position:relative;overflow:hidden; }
+.attn-spot-main.red { background:linear-gradient(135deg,#dc2626,#b91c1c); }
+.attn-spot-main.orange { background:linear-gradient(135deg,#ea580c,#c2410c); }
+.attn-spot-main .eyebrow { font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.85; }
+.attn-spot-main .big { font-family:var(--font-display);font-size:48px;line-height:1;margin:6px 0; }
+.attn-spot-main .msg { font-size:13px;font-weight:600;line-height:1.4;max-width:34ch; }
+.attn-spot-main .cta { display:inline-flex;align-items:center;gap:5px;margin-top:14px;font-size:12px;font-weight:700;background:rgba(255,255,255,.18);padding:7px 12px;border-radius:7px; }
+.attn-spot-main:hover .cta { background:rgba(255,255,255,.28); }
+.attn-spot-side { display:flex;flex-direction:column;gap:10px; }
+.attn-spot-chip { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;flex:1;display:flex;align-items:center;gap:10px;text-decoration:none;transition:border-color .12s; }
+.attn-spot-chip:hover { border-color:var(--accent); }
+.attn-spot-chip .num { font-family:var(--font-display);font-size:22px;color:var(--text);line-height:1; }
+.attn-spot-chip .lbl { font-size:11.5px;color:var(--sub);font-weight:600;margin-top:2px; }
 
 /* Today's Operations */
 .today-ops-grid { display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px; }
@@ -107,7 +115,7 @@
 
 @media (max-width:1100px) {
   .today-ops-grid { grid-template-columns:repeat(2,1fr); }
-  .attn-grid { grid-template-columns:1fr; }
+  .attn-spot-grid { grid-template-columns:1fr; }
   .dash-grid-main { grid-template-columns:1fr; }
 }
 @media (max-width:560px) {
@@ -133,31 +141,66 @@
   </div>
 </div>
 
-<!-- ══ NEEDS ATTENTION ══ -->
-@php $needsAttentionTotal = $pendingApprovalCount + $overdueReturns + $openIncidents; @endphp
-<div class="attn-wrap" style="{{ $needsAttentionTotal === 0 ? 'background:var(--greenl);border-color:rgba(22,163,74,.25)' : '' }}">
-  <div class="attn-head" style="{{ $needsAttentionTotal === 0 ? 'color:var(--green)' : '' }}">
-    <i data-feather="{{ $needsAttentionTotal === 0 ? 'check-circle' : 'alert-triangle' }}" style="width:16px;height:16px"></i>
+<!-- ══ NEEDS ATTENTION — Spotlight ══ -->
+@php
+  $attnItems = [
+    [
+      'count' => $pendingApprovalCount, 'label' => 'Requests Awaiting Review',
+      'message' => 'Field resource requests are waiting on your approval.',
+      'href' => route('bookings') . '?approval=pending_approval', 'cta' => 'Review Requests',
+      'icon' => 'file-text', 'color' => 'orange',
+    ],
+    [
+      'count' => $overdueReturns, 'label' => 'Overdue Returns',
+      'message' => 'Equipment is past its expected return date.',
+      'href' => route('bookings') . '?status=ongoing', 'cta' => 'View Overdue Returns',
+      'icon' => 'rotate-ccw', 'color' => 'red',
+    ],
+    [
+      'count' => $openIncidents, 'label' => 'Open Incidents',
+      'message' => 'Reported damage or loss is still unresolved.',
+      'href' => route('incidents'), 'cta' => 'Review Incidents',
+      'icon' => 'alert-triangle', 'color' => 'red',
+    ],
+  ];
+  usort($attnItems, fn ($a, $b) => $b['count'] <=> $a['count']);
+  $attnSpot = $attnItems[0];
+  $attnSide = array_slice($attnItems, 1);
+  $attnAllClear = $attnSpot['count'] === 0;
+@endphp
+<div class="attn-wrap" style="{{ $attnAllClear ? 'background:var(--greenl);border-color:rgba(22,163,74,.25)' : '' }}">
+  <div class="attn-head" style="{{ $attnAllClear ? 'color:var(--green)' : '' }}">
+    <i data-feather="{{ $attnAllClear ? 'check-circle' : 'alert-triangle' }}" style="width:16px;height:16px"></i>
     Needs Attention
     <span style="font-weight:400;font-size:11.5px;opacity:.8">— items that require your action</span>
   </div>
-  <div class="attn-grid">
-    <div class="attn-card {{ $pendingApprovalCount === 0 ? 'clear' : '' }}">
-      <div class="num"><i data-feather="file-text" style="width:18px;height:18px;color:var(--orange)"></i>{{ $pendingApprovalCount }}</div>
-      <div class="lbl">Requests Awaiting Review</div>
-      <a href="{{ route('bookings') }}?approval=pending_approval">View Requests <i data-feather="arrow-right" style="width:11px;height:11px"></i></a>
-    </div>
-    <div class="attn-card {{ $overdueReturns === 0 ? 'clear' : '' }}">
-      <div class="num"><i data-feather="rotate-ccw" style="width:18px;height:18px;color:var(--red)"></i>{{ $overdueReturns }}</div>
-      <div class="lbl">Overdue Returns</div>
-      <a href="{{ route('bookings') }}?status=ongoing">View Overdue <i data-feather="arrow-right" style="width:11px;height:11px"></i></a>
-    </div>
-    <div class="attn-card {{ $openIncidents === 0 ? 'clear' : '' }}">
-      <div class="num"><i data-feather="alert-triangle" style="width:18px;height:18px;color:var(--red)"></i>{{ $openIncidents }}</div>
-      <div class="lbl">Open Incidents</div>
-      <a href="{{ route('incidents') }}">View Incidents <i data-feather="arrow-right" style="width:11px;height:11px"></i></a>
+
+  @if ($attnAllClear)
+  <div style="font-size:13px;color:var(--green);font-weight:600;padding:6px 2px">
+    Nothing needs your attention right now — requests, returns, and incidents are all clear.
+  </div>
+  @else
+  <div class="attn-spot-grid">
+    <a href="{{ $attnSpot['href'] }}" class="attn-spot-main {{ $attnSpot['color'] }}">
+      <div class="eyebrow">Needs attention most</div>
+      <div class="big">{{ $attnSpot['count'] }}</div>
+      <div class="msg">{{ $attnSpot['label'] }} — {{ $attnSpot['message'] }}</div>
+      <span class="cta"><i data-feather="arrow-right" style="width:13px;height:13px"></i> {{ $attnSpot['cta'] }}</span>
+    </a>
+    <div class="attn-spot-side">
+      @foreach ($attnSide as $item)
+      @php $chipColor = $item['count'] > 0 ? $item['color'] : 'green'; @endphp
+      <a href="{{ $item['href'] }}" class="attn-spot-chip">
+        <i data-feather="{{ $item['icon'] }}" style="width:18px;height:18px;color:var(--{{ $chipColor }})"></i>
+        <div>
+          <div class="num">{{ $item['count'] }}</div>
+          <div class="lbl">{{ $item['label'] }}</div>
+        </div>
+      </a>
+      @endforeach
     </div>
   </div>
+  @endif
 </div>
 
 <!-- ══ TODAY'S OPERATIONS ══ -->

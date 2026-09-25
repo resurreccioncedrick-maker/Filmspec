@@ -29,7 +29,6 @@ use App\Http\Controllers\IncidentsController;
 use App\Http\Controllers\PaymentReceiptController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\ProfitLossController;
 use App\Http\Controllers\FaqController;
 use App\Http\Controllers\FavoritesController;
 use App\Http\Controllers\FieldRequestsController;
@@ -86,11 +85,6 @@ Route::post('/bookings/{id}', [BookingDetailController::class, 'act'])
     ->middleware(['auth', 'can_access:bookings'])
     ->whereNumber('id')
     ->name('booking-detail.act');
-
-// Profit & Loss — Part 13. Deliberately not open to traffic: this is owner/finance data.
-Route::get('/profit-loss', [ProfitLossController::class, 'index'])
-    ->middleware(['auth', 'can_access:profit_loss'])
-    ->name('profit-loss');
 
 // Calendar Data — Part 17. An analytics read of the shoot calendar, distinct from the
 // booking-creation calendar widget on the Dashboard.

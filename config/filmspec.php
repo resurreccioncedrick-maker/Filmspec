@@ -41,7 +41,7 @@ return [
     // Mirrors core/auth.php ROLE_PERMISSIONS from the legacy app — module
     // names correspond to the pages being ported over one by one.
     'role_permissions' => [
-        'super_admin'        => ['dashboard', 'equipment', 'accessories', 'crew', 'bookings', 'clients', 'billing', 'reports', 'users', 'activity', 'profile', 'superadmin', 'attendance', 'pos', 'incidents', 'transport', 'reminders', 'faqs', 'field_requests', 'repair_purchase', 'cost_estimates', 'crew_data', 'equipment_data', 'profit_loss', 'calendar_data', 'support_chat', 'data_retention'],
+        'super_admin'        => ['dashboard', 'equipment', 'accessories', 'crew', 'bookings', 'clients', 'billing', 'reports', 'users', 'activity', 'profile', 'superadmin', 'attendance', 'pos', 'incidents', 'transport', 'reminders', 'faqs', 'field_requests', 'repair_purchase', 'cost_estimates', 'crew_data', 'equipment_data', 'calendar_data', 'support_chat', 'data_retention'],
         // 'admin' isn't offered anywhere a new user is created (add_user's role dropdown
         // only lists the roles actually in this array) but the roles table carries a leftover
         // 'admin' row, and every action-level check across the app (BookingDetailController,
@@ -50,14 +50,14 @@ return [
         // so assigning it (a raw DB edit, or a future admin-tool change) can't become a
         // silent full-lockout instead of the "same as operations_manager" every action check
         // already assumes.
-        'admin'              => ['dashboard', 'equipment', 'accessories', 'crew', 'bookings', 'clients', 'billing', 'reports', 'users', 'activity', 'profile', 'attendance', 'pos', 'incidents', 'transport', 'reminders', 'faqs', 'field_requests', 'repair_purchase', 'cost_estimates', 'crew_data', 'equipment_data', 'profit_loss', 'calendar_data', 'support_chat'],
-        'operations_manager' => ['dashboard', 'equipment', 'accessories', 'crew', 'bookings', 'clients', 'billing', 'reports', 'users', 'activity', 'profile', 'attendance', 'pos', 'incidents', 'transport', 'reminders', 'faqs', 'field_requests', 'repair_purchase', 'cost_estimates', 'crew_data', 'equipment_data', 'profit_loss', 'calendar_data', 'support_chat'],
+        'admin'              => ['dashboard', 'equipment', 'accessories', 'crew', 'bookings', 'clients', 'billing', 'reports', 'users', 'activity', 'profile', 'attendance', 'pos', 'incidents', 'transport', 'reminders', 'faqs', 'field_requests', 'repair_purchase', 'cost_estimates', 'crew_data', 'equipment_data', 'calendar_data', 'support_chat'],
+        'operations_manager' => ['dashboard', 'equipment', 'accessories', 'crew', 'bookings', 'clients', 'billing', 'reports', 'users', 'activity', 'profile', 'attendance', 'pos', 'incidents', 'transport', 'reminders', 'faqs', 'field_requests', 'repair_purchase', 'cost_estimates', 'crew_data', 'equipment_data', 'calendar_data', 'support_chat'],
         'traffic'            => ['dashboard', 'bookings', 'clients', 'crew', 'profile', 'attendance', 'incidents', 'transport', 'reminders', 'faqs', 'field_requests', 'repair_purchase', 'cost_estimates', 'crew_data', 'equipment_data', 'calendar_data', 'support_chat'],
         // Part B1: view-only bookings access for accounting — no mutating action in
         // BookingDetailController::act() grants the 'accounting' role, so this only ever
         // opens booking-detail read-only; it's what makes Cost Estimates' "view booking"
         // link actually work for them instead of dead-ending in a 403.
-        'accounting'         => ['dashboard', 'billing', 'reports', 'profile', 'reminders', 'faqs', 'repair_purchase', 'cost_estimates', 'crew_data', 'equipment_data', 'profit_loss', 'calendar_data', 'bookings', 'support_chat'],
+        'accounting'         => ['dashboard', 'billing', 'reports', 'profile', 'reminders', 'faqs', 'repair_purchase', 'cost_estimates', 'crew_data', 'equipment_data', 'calendar_data', 'bookings', 'support_chat'],
         'client'             => ['portal'],
         'crew'               => ['crew_portal'],
     ],
@@ -100,7 +100,6 @@ return [
         'cost_estimates' => 'cost-estimates',
         'crew_data' => 'crew-data',
         'equipment_data' => 'equipment-data',
-        'profit_loss' => 'profit-loss',
         'calendar_data' => 'calendar-data',
         'support_chat' => 'support-chat',
         'data_retention' => 'data-retention',

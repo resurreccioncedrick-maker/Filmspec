@@ -55,7 +55,7 @@ class ClientBookingDetailController extends Controller
             $act = $request->input('action', '');
 
             if ($act === 'client_approve_cost' && ($booking->cost_approval_status ?? null) === 'pending_client') {
-                DB::table('bookings')->where('booking_id', $id)->update(['cost_approval_status' => 'client_approved', 'updated_at' => now()]);
+                DB::table('bookings')->where('booking_id', $id)->update(['cost_approval_status' => 'client_approved', 'cost_approved_at' => now(), 'updated_at' => now()]);
                 $booking->cost_approval_status = 'client_approved';
                 $costApprovalMsg = ['type' => 'success', 'text' => 'You have approved the cost estimate. The FilmSpec team will proceed with equipment release.'];
             }

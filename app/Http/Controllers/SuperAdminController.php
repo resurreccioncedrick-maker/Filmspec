@@ -37,7 +37,7 @@ class SuperAdminController extends Controller
         'transport' => 'Transport', 'reminders' => 'Reminders', 'faqs' => 'FAQs',
         'field_requests' => 'Field Requests', 'repair_purchase' => 'Repairs & Purchases',
         'cost_estimates' => 'Cost Estimates', 'crew_data' => 'Crew Data',
-        'equipment_data' => 'Equipment Data', 'profit_loss' => 'Profit & Loss',
+        'equipment_data' => 'Equipment Data',
         'calendar_data' => 'Calendar', 'support_chat' => 'Support Chat',
         'data_retention' => 'Data Retention', 'portal' => 'Client Portal',
         'crew_portal' => 'Crew Portal',
@@ -47,7 +47,7 @@ class SuperAdminController extends Controller
     // doesn't affect what config('filmspec.role_permissions') actually grants.
     private array $moduleGroups = [
         'Operations' => ['dashboard', 'bookings', 'clients', 'crew', 'equipment', 'accessories', 'attendance', 'calendar_data'],
-        'Finance' => ['billing', 'pos', 'cost_estimates', 'profit_loss', 'repair_purchase', 'reports'],
+        'Finance' => ['billing', 'pos', 'cost_estimates', 'repair_purchase', 'reports'],
         'Field & Incidents' => ['incidents', 'transport', 'field_requests'],
         'Communication' => ['reminders', 'faqs', 'support_chat'],
         'Data & Reporting' => ['crew_data', 'equipment_data'],

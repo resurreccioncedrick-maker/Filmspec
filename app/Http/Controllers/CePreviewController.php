@@ -93,6 +93,7 @@ class CePreviewController extends Controller
         ];
 
         $mode = 'cart';
+        $preparedByName = '';
         $crewTotal = 0.0;
         $ceBd = null;
         $ceBdDiscounted = false;
@@ -108,7 +109,8 @@ class CePreviewController extends Controller
         return view('ce-preview', compact(
             'mode', 'equipLines', 'equipTotal', 'estimatedCrewLines', 'crewTotal', 'clientName',
             'ceNumber', 'baseTransRate', 'grand', 'vat', 'subtotal', 'infoRows', 'ceBd', 'ceBdDiscounted',
-            'cePricingMode', 'cePricingInput', 'accLines', 'accTotal', 'transCost', 'transZone', 'transMult', 'zoneLabels'
+            'cePricingMode', 'cePricingInput', 'accLines', 'accTotal', 'transCost', 'transZone', 'transMult', 'zoneLabels',
+            'preparedByName'
         ));
     }
 
@@ -324,6 +326,7 @@ class CePreviewController extends Controller
         $shootDate = $booking->shoot_date_start ? date('F j, Y', strtotime($booking->shoot_date_start)) : '—';
         $location = $booking->shoot_location ?? '';
         $ceNumber = $ce ? $ce->ce_reference : ('CE-' . date('Y') . '-' . str_pad((string) $bid, 4, '0', STR_PAD_LEFT));
+        $preparedByName = $booking->ce_prepared_by ?? '';
 
         $ceTypeLabels = ['fs_front' => 'FS FRONT', 'client_direct' => 'CLIENT DIRECT', 'partner_front' => 'PARTNER FRONT'];
         $infoRows = [
@@ -436,7 +439,7 @@ class CePreviewController extends Controller
             'transCost' => $transCost, 'transZone' => $transZone, 'transMult' => $transMult, 'zoneLabels' => $zoneLabels,
             'cePricingMode' => $cePricingMode, 'cePricingInput' => $cePricingInput, 'ceVatExempt' => $ceVatExempt,
             'ceBd' => $ceBd, 'ceBdDiscounted' => $ceBdDiscounted, 'grand' => $grand, 'vat' => $vat, 'subtotal' => $subtotal,
-            'clientName' => $clientName, 'ceNumber' => $ceNumber, 'infoRows' => $infoRows,
+            'clientName' => $clientName, 'ceNumber' => $ceNumber, 'infoRows' => $infoRows, 'preparedByName' => $preparedByName,
             'ceVersion' => $ceVersion, 'isSuperseded' => $isSuperseded, 'ceStatus' => $ce->status ?? 'draft',
             'booking' => $booking, 'canManage' => $canManage, 'canDiscount' => $canDiscount,
             'availEquip' => $availEquip, 'availCrew' => $availCrew, 'positions' => $positions,

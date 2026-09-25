@@ -339,14 +339,15 @@ class BookingCosting
         ]);
     }
 
-    // References run YY-MM-NN — the sequence is per calendar month (26-09-01, 26-09-02, ...),
-    // matching how the reference tool numbers its CEs. A new draft spun up after a prior CE
-    // was confirmed keeps that booking's base reference with a revision suffix (-R2, -R3, ...)
-    // so a booking's CE history stays visually linked.
+    // New base references are standardized to CE-{year}-#### (4-digit, sequential per calendar
+    // year), matching the panelist revision's "standardize CE numbering" requirement. A new
+    // draft spun up after a prior CE was confirmed keeps that booking's base reference with a
+    // revision suffix (-R2, -R3, ...) so a booking's CE history stays visually linked —
+    // CE-2026-0001-R1, -R2, etc.
     //
     // NN is MAX+1 rather than COUNT+1 so deleting a CE can never hand out a number twice.
-    // Pre-existing CE-YYYY-#### references are left alone — some are already out with
-    // clients — and the two formats coexist without any display code caring.
+    // Pre-existing legacy references (YY-MM-NN or CE-YYYY-####) are left alone — some are
+    // already out with clients — and the formats coexist without any display code caring.
     private static function nextCeReference(int $bookingId): string
     {
         $existing = DB::table('cost_estimates')->where('booking_id', $bookingId)
@@ -359,17 +360,17 @@ class BookingCosting
             return $base . '-R' . ($count + 1);
         }
 
-        $prefix = date('y-m');
+        $prefix = 'CE-' . date('Y');
         $maxSeq = 0;
         $refs = DB::table('cost_estimates')->where('ce_reference', 'like', $prefix . '-%')
             ->pluck('ce_reference');
         foreach ($refs as $ref) {
-            if (preg_match('/^\d{2}-\d{2}-(\d+)/', $ref, $m)) {
+            if (preg_match('/^CE-\d{4}-(\d+)/', $ref, $m)) {
                 $maxSeq = max($maxSeq, (int) $m[1]);
             }
         }
 
-        return $prefix . '-' . str_pad((string) ($maxSeq + 1), 2, '0', STR_PAD_LEFT);
+        return $prefix . '-' . str_pad((string) ($maxSeq + 1), 4, '0', STR_PAD_LEFT);
     }
 
     public static function generateCostEstimate(int $id, int $userId): void
@@ -426,7 +427,13 @@ class BookingCosting
         self::updateBookingTotal($id);
     }
 
-    public static function confirmCe(int $bookingId, int $userId): array
+    // Confirming a CE is the one moment a booking can end up with two rows both saying
+    // "confirmed" (this booking already had one confirmed, then got revised and re-confirmed).
+    // Demoting every other confirmed row for the same booking to 'superseded' here — in the same
+    // action that creates the new confirmed row — is what CeAnalytics::onlyLatestConfirmed()'s
+    // dedup filter used to have to work around; this makes 'superseded' a real, stored fact
+    // instead of something inferred at query time.
+    public static function confirmCe(int $bookingId, int $userId, ?string $note = null): array
     {
         $latest = DB::table('cost_estimates')->where('booking_id', $bookingId)->orderByDesc('ce_id')->first();
         if (! $latest) {
@@ -436,11 +443,41 @@ class BookingCosting
             return ['type' => 'danger', 'text' => 'This cost estimate is already confirmed.'];
         }
 
+        $now = now();
         DB::table('cost_estimates')->where('ce_id', $latest->ce_id)->update([
-            'status' => 'confirmed', 'confirmed_by' => $userId, 'confirmed_at' => now(),
+            'status' => 'confirmed', 'confirmed_by' => $userId, 'confirmed_at' => $now,
+            'confirmation_note' => $note !== null && trim($note) !== '' ? trim($note) : null,
         ]);
+        DB::table('cost_estimates')->where('booking_id', $bookingId)
+            ->where('ce_id', '!=', $latest->ce_id)->where('status', 'confirmed')
+            ->update(['status' => 'superseded', 'superseded_at' => $now]);
 
-        return ['type' => 'success', 'text' => 'Cost estimate <strong>' . e($latest->ce_reference) . '</strong> confirmed.'];
+        $msg = 'Cost estimate <strong>' . e($latest->ce_reference) . '</strong> confirmed.';
+
+        // Timeline validation: a normal CE shouldn't be confirmed after its shoot has already
+        // happened — flagged here rather than blocked outright, since legitimate paperwork
+        // (recording a historical/migrated CE) can legitimately trail the shoot date.
+        $shootEnd = DB::table('bookings')->where('booking_id', $bookingId)->value('shoot_date_end');
+        if ($shootEnd && strtotime($shootEnd) < strtotime('today')) {
+            $msg .= ' <strong>Note:</strong> the shoot date has already passed — confirming this as a historical/migration record.';
+        }
+
+        return ['type' => 'success', 'text' => $msg];
+    }
+
+    // Marks the latest draft as 'issued' (Issued / Awaiting Confirmation) — an optional
+    // pipeline step for when a quotation has gone out to the client but isn't confirmed yet.
+    // Purely additive: Confirm CE still works directly from 'draft', this doesn't gate it.
+    public static function issueCe(int $bookingId): array
+    {
+        $latest = DB::table('cost_estimates')->where('booking_id', $bookingId)->orderByDesc('ce_id')->first();
+        if (! $latest || $latest->status !== 'draft') {
+            return ['type' => 'danger', 'text' => 'Only a draft cost estimate can be marked as issued.'];
+        }
+
+        DB::table('cost_estimates')->where('ce_id', $latest->ce_id)->update(['status' => 'issued']);
+
+        return ['type' => 'success', 'text' => 'Cost estimate <strong>' . e($latest->ce_reference) . '</strong> marked as issued — awaiting confirmation.'];
     }
 
     // Applies a new pricing mode to the booking's current CE. Caller is responsible for

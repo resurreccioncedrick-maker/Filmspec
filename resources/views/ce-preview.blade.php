@@ -73,69 +73,77 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   .ce-footer{grid-template-columns:1fr;gap:26px}
 }
 
-{{-- This block matches FilmSpec's actual Excel/PDF cost-estimate template (the document the
-     company sends to clients) — Arial throughout, black-bordered tables, a plain white ground
-     with the FilmSpec blue used only for the "COST ESTIMATE" banner and the red "FS Front" tag,
-     no rounded corners or shadows. Only the client-facing/print document changes; the internal
-     editor cards (.editor-grid/.ecard etc.) below are untouched. --}}
-.ce-sheet{background:#fff;border:1.5px solid #000;border-radius:0;overflow:hidden;margin-bottom:28px;box-shadow:none;font-family:Arial,Helvetica,sans-serif;color:#000;--muted:#000;--sub:#000;--border:#000}
+{{-- Restored the earlier blue-branded on-screen look for the client-facing document (design
+     only — same markup/classes/data as before, just re-themed). The black/white Arial styling
+     this replaces was written to match FilmSpec's official Excel/PDF template; that template is
+     untouched here (see exports/ce-document-pdf.blade.php) — only what the client sees on screen
+     in ce-preview changes. --}}
+.ce-sheet{background:#fff;border:1px solid #A8D0FF;border-radius:10px;overflow:hidden;margin-bottom:24px;box-shadow:0 2px 10px rgba(0,61,128,.08);font-family:'DM Sans',sans-serif;color:var(--text)}
 
-.ce-header{display:grid;grid-template-columns:1fr 1fr;border-bottom:1.5px solid #000}
-.ce-header-left{background:#fff;color:#000;padding:14px 18px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;border-right:1.5px solid #000}
-.ce-header-left .addr{font-size:10px;font-weight:700;font-style:italic;margin-top:6px;line-height:1.6}
-.ce-header-right{background:#fff;padding:0;display:flex;flex-direction:column}
-.ce-type{font-family:Arial,Helvetica,sans-serif;font-size:19px;letter-spacing:.5px;color:#fff;line-height:1;font-weight:700;background:#003D80;padding:10px 14px;text-align:center}
-.ce-num{font-size:12px;color:#000;font-weight:700;font-style:italic;text-align:center;padding:6px 14px;border-bottom:1px solid #000}
-.ce-meta{display:grid;grid-template-columns:auto 1fr;font-size:11px;border-collapse:collapse}
-.ce-meta .lbl{color:#000;font-weight:400;padding:3px 8px;border-top:1px solid #000;text-align:right}
-.ce-meta .val{color:#000;font-weight:700;font-style:italic;padding:3px 8px;border-top:1px solid #000;text-align:left}
-.ce-meta .fsfront{grid-column:1/-1;text-align:center;color:#c0392b;font-weight:700;font-style:italic;font-size:13px;padding:5px 8px;border-top:1px solid #000}
+.ce-header{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid #003D80}
+.ce-header-left{background:#fff;color:#000;padding:16px 20px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;border-right:2px solid #003D80}
+.ce-header-left .addr{font-size:9.5px;font-weight:600;font-style:normal;margin-top:6px;line-height:1.6;color:var(--sub)}
+.ce-header-right{background:#E5F0FF;padding:0;display:flex;flex-direction:column;justify-content:center}
+.ce-type{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:2px;color:#003D80;line-height:1;font-weight:400;background:transparent;padding:14px 18px 2px;text-align:left}
+.ce-num{font-family:'JetBrains Mono',monospace;font-size:12px;color:#003D80;font-weight:700;font-style:normal;text-align:left;padding:0 18px 8px;border-bottom:none}
+.ce-meta{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:11px;padding:8px 18px 14px}
+.ce-meta .lbl{color:#4a6fa5;font-weight:600;padding:2px 0;border-top:none;text-align:right}
+.ce-meta .val{color:#003D80;font-weight:700;font-style:normal;padding:2px 0;border-top:none;text-align:left;font-family:'JetBrains Mono',monospace}
+.ce-meta .fsfront{grid-column:1/-1;text-align:left;color:#c0392b;font-weight:700;font-style:normal;font-size:12px;padding:4px 0 0;border-top:none}
 
-.ce-info{border-bottom:1.5px solid #000}
-.ce-info-row{display:grid;grid-template-columns:160px 1fr;border-bottom:1px solid #000;min-height:22px;align-items:center}
+.ce-info{border-bottom:1.5px solid #A8D0FF}
+.ce-info-row{display:grid;grid-template-columns:160px 1fr;border-bottom:1px solid var(--border,#e2e8f0);min-height:26px;align-items:center}
 .ce-info-row:last-child{border-bottom:none}
-.ce-info-lbl{padding:3px 10px;font-size:11px;font-weight:700;color:#000;text-transform:uppercase;letter-spacing:0;background:#fff;border-right:none}
-.ce-info-val{padding:3px 12px;font-size:11px;font-weight:700;font-style:italic;color:#000}
+.ce-info-lbl{padding:5px 14px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.03em;background:#fff;border-right:none}
+.ce-info-val{padding:5px 14px;font-size:12px;font-weight:600;font-style:normal;color:#0f172a}
 
-.ce-section-hdr{background:#fff;color:#000;padding:6px 14px;font-size:11px;font-weight:700;font-style:italic;letter-spacing:0;text-transform:uppercase;text-align:center;border-bottom:1.5px solid #000}
+/* On-screen "Client & Project Information" card (internal editor view) — same markup, its own
+   softer variant so it doesn't need the client sheet's blue header/table treatment above. */
+.ce-info.ce-info-soft{border-bottom:none}
+.ce-info-soft .ce-info-row{grid-template-columns:150px 1fr;border-bottom:1px solid var(--border,#e2e8f0);min-height:40px}
+.ce-info-soft .ce-info-row:nth-child(even){background:#f8fafc}
+.ce-info-soft .ce-info-lbl{font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;background:transparent;padding:10px 16px}
+.ce-info-soft .ce-info-val{font-size:13px;font-weight:600;font-style:normal;color:#0f172a;padding:10px 16px}
 
-.ce-tbl{width:100%;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif}
-.ce-tbl th{background:#fff;color:#000;font-size:10.5px;font-weight:700;letter-spacing:0;text-transform:uppercase;padding:5px 10px;text-align:left;border:1px solid #000}
+.ce-section-hdr{background:#003D80;color:#fff;padding:7px 16px;font-size:10.5px;font-weight:700;font-style:normal;letter-spacing:1.2px;text-transform:uppercase;text-align:left;border-bottom:none}
+
+.ce-tbl{width:100%;border-collapse:collapse;font-family:'DM Sans',sans-serif}
+.ce-tbl th{background:#D0E8FF;color:#003D80;font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:7px 10px;text-align:left;border:1px solid #A8D0FF}
 .ce-tbl th.right{text-align:right}
-.ce-tbl td{padding:4px 10px;font-size:11px;border:1px solid #000;vertical-align:middle;color:#000}
-.ce-tbl td.right{text-align:right;font-family:Arial,Helvetica,sans-serif;font-size:11px}
-.ce-tbl td.mono{font-family:Arial,Helvetica,sans-serif;font-size:11px}
-.ce-tbl tr:nth-child(even) td{background:#fff}
-.ce-tbl tr:hover td{background:#fff}
-.ce-tbl .subtot td{background:#fff!important;font-weight:700;color:#000;font-style:italic}
-.ce-tbl .grandtot td{background:#fff!important;color:#000!important;font-weight:700;font-size:11px}
-.ce-tbl .grandtot td.right{font-family:Arial,Helvetica,sans-serif}
-.ce-tbl .catgroup td{background:#fff!important;color:#000!important;font-weight:700;font-style:italic;border:none;border-top:1px solid #000;padding-top:8px}
+.ce-tbl td{padding:6px 10px;font-size:12px;border:1px solid var(--border,#e2e8f0);vertical-align:middle;color:var(--text)}
+.ce-tbl td.right{text-align:right;font-family:'JetBrains Mono',monospace;font-size:11.5px}
+.ce-tbl td.mono{font-family:'JetBrains Mono',monospace;font-size:11.5px}
+.ce-tbl tr:nth-child(even) td{background:#f9fbff}
+.ce-tbl tr:hover td{background:#f0f7ff}
+.ce-tbl .subtot td{background:#D0E8FF!important;font-weight:700;color:#003D80;font-style:normal}
+.ce-tbl .grandtot td{background:#003D80!important;color:#fff!important;font-weight:800;font-size:12px}
+.ce-tbl .grandtot td.right{font-family:'JetBrains Mono',monospace}
+.ce-tbl .catgroup td{background:#f0f7ff!important;color:#003D80!important;font-weight:700;font-style:normal;border:none;border-top:1px solid #A8D0FF;padding-top:8px}
 
-.ce-totals{padding:10px 16px;background:#fff;border-top:none}
+.ce-totals{padding:12px 18px;background:#fff;border-top:none}
 .ce-totals table{width:100%;max-width:380px;margin-left:auto;border-collapse:collapse}
-.ce-totals td{padding:4px 10px;font-size:11.5px}
-.ce-totals td.lbl{color:#000;font-weight:700;font-style:italic}
-.ce-totals td.val{text-align:right;font-family:Arial,Helvetica,sans-serif;font-weight:700;font-style:italic;color:#000}
-.ce-totals .vat td.lbl{color:#000}
-.ce-totals .vat td.val{color:#000}
-.ce-totals .grand td{background:#fff;color:#000;font-weight:700;font-size:12.5px;padding:8px 10px;border-top:1.5px solid #000}
-.ce-totals .grand td.val{font-family:Arial,Helvetica,sans-serif;text-align:right}
+.ce-totals td{padding:5px 10px;font-size:12px}
+.ce-totals td.lbl{color:var(--sub);font-weight:600;font-style:normal}
+.ce-totals td.val{text-align:right;font-family:'JetBrains Mono',monospace;font-weight:700;font-style:normal;color:#003D80}
+.ce-totals .vat td.lbl{color:var(--sub)}
+.ce-totals .vat td.val{color:#003D80}
+.ce-totals .grand td{background:#003D80;color:#fff;font-weight:800;font-size:14px;padding:10px 12px;border-top:none}
+.ce-totals .grand td.val{font-family:'JetBrains Mono',monospace;text-align:right}
 
-.ce-words{padding:10px 16px;border-top:none;font-size:11px;font-style:italic;color:#000;font-weight:700;background:#fff;text-align:center;text-decoration:underline}
+.ce-words{padding:10px 18px;border-top:1px solid #A8D0FF;font-size:11.5px;font-style:italic;color:#003D80;font-weight:700;background:#E5F0FF;text-align:left;text-decoration:none}
 
-.ce-footer{padding:18px 16px 14px;border-top:none;display:grid;grid-template-columns:1fr 1fr;gap:40px;font-family:Arial,Helvetica,sans-serif}
-.ce-sig{border-top:1px solid #000;padding-top:4px;font-size:10px;color:#000;text-align:center;margin-top:30px}
+.ce-footer{padding:20px 18px 16px;border-top:1px solid #A8D0FF;display:grid;grid-template-columns:1fr 1fr;gap:40px;font-family:'DM Sans',sans-serif}
+.ce-sig{border-top:1px solid #94a3b8;padding-top:5px;font-size:10.5px;color:var(--sub);text-align:center;margin-top:32px}
 
-.ce-notes{padding:8px 14px;background:#fff;border-top:none;font-size:10.5px;font-weight:700;font-style:italic;color:#000;line-height:1.7;text-align:center}
+.ce-notes{padding:9px 16px;background:#fdf6e8;border-top:1px solid #A8D0FF;font-size:10.5px;font-weight:600;font-style:normal;color:#92400e;line-height:1.7;text-align:center}
 
-.ce-summary-row{display:grid;grid-template-columns:1fr auto;align-items:center;padding:5px 14px;border-bottom:1px solid #000}
+.ce-summary-row{display:grid;grid-template-columns:1fr auto;align-items:center;padding:6px 16px;border-bottom:1px solid var(--border,#e2e8f0)}
 .ce-summary-row:last-child{border-bottom:none}
-.ce-summary-lbl{font-size:11.5px;font-weight:700;font-style:italic;color:#000}
-.ce-summary-val{font-family:Arial,Helvetica,sans-serif;font-size:11.5px;font-weight:700;font-style:italic;color:#000}
-.ce-summary-row.grand{border-top:1.5px solid #000}
-.ce-summary-row.grand .ce-summary-lbl{color:#000;font-size:13px}
-.ce-summary-row.grand .ce-summary-val{font-size:14px;color:#000}
+.ce-summary-lbl{font-size:12px;font-weight:600;font-style:normal;color:var(--sub)}
+.ce-summary-val{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;font-style:normal;color:#003D80}
+.ce-summary-row.grand{border-top:2px solid #003D80;background:#E5F0FF}
+.ce-summary-row.grand .ce-summary-lbl{color:#003D80;font-size:13.5px}
+.ce-summary-row.grand .ce-summary-val{font-size:15px;color:#003D80}
 
 .sheet-tabs{display:flex;gap:0;margin-bottom:0;border-bottom:none}
 .stab{padding:9px 24px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--muted);border:1px solid var(--border);border-bottom:none;border-radius:6px 6px 0 0;margin-right:4px;background:var(--bg);transition:all .15s}
@@ -240,6 +248,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   // exercised before BookingCosting has computed a real $ceBd) — reads the configurable rate
   // instead of a hardcoded 12/112, matching BookingCosting::extractVat() and CartController.
   $vatRate = (float) config('filmspec.vat_rate');
+  // ?tab_embed=1 is how Booking Detail's own Cost Estimate tab loads this page — unlike
+  // ?embed=1 (the Client Preview thumbnail, which hides this whole bar), the tab still wants
+  // Export reachable, just none of the navigation/toggle chrome that duplicates what the
+  // surrounding Booking Detail page already has (breadcrumb, logo, Internal/For Client toggle,
+  // Print, and a Back to Booking button pointing at the very page this is already embedded in).
+  $tabEmbed = request()->boolean('tab_embed');
 @endphp
 
 {{-- ?embed=1 is how the Client Preview thumbnail (below) loads this same page — its own
@@ -250,6 +264,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 @unless (request()->boolean('embed'))
 <div class="top-bar no-print">
   <div style="display:flex;flex-direction:column;gap:3px">
+    @unless ($tabEmbed)
     @if ($mode === 'booking')
     <div class="bcrumb">
       @if ($role === 'client')
@@ -266,8 +281,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:26px;object-fit:contain;background:rgba(255,255,255,.92);padding:2px 8px;border-radius:4px">
       <span>— Cost Estimate</span>
     </div>
+    @else
+    <div class="top-bar-logo" style="display:flex;align-items:center;gap:10px">
+      <span>Cost Estimate</span>
+    </div>
+    @endunless
   </div>
   <div class="top-bar-actions">
+    @unless ($tabEmbed)
     @if ($mode === 'booking' && $role !== 'client')
     <span style="display:inline-flex;border:1px solid rgba(255,255,255,.35);border-radius:6px;overflow:hidden;margin-right:6px">
       <a href="?booking_id={{ $bid }}{{ $ceId ? '&ce_id='.$ceId : '' }}&view=internal"
@@ -277,6 +298,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     </span>
     @endif
     <button class="tbtn" onclick="window.print()">Print</button>
+    @endunless
     @if ($mode === 'booking')
     {{-- Same Export ▾ pattern every other staff page uses (partials/export-dropdown.blade.php),
          hand-built here with inline SVGs instead of data-feather — this standalone document page
@@ -311,6 +333,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       Save as PDF
     </button>
     @endif
+    @unless ($tabEmbed)
     @if ($mode === 'booking' && $role === 'client')
     <a href="{{ route('client-booking-detail', $bid) }}"><button class="tbtn">&larr; Booking</button></a>
     @elseif ($mode === 'booking')
@@ -318,6 +341,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     @else
     <a href="{{ route('home') }}"><button class="tbtn">&larr; Back to Cart</button></a>
     @endif
+    @endunless
   </div>
 </div>
 @endunless
@@ -493,7 +517,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <span class="lbl">Date:</span><span class="val">{{ date('F d, Y') }}</span>
         <span class="lbl">DUE Date:</span><span class="val">{{ date('F d, Y', strtotime('+30 days')) }}</span>
         <div class="fsfront">FS Front</div>
-        <span class="lbl">PREPARED BY:</span><span class="val">Glen Resurreccion</span>
+        <span class="lbl">PREPARED BY:</span><span class="val">{{ $preparedByName ?: '—' }}</span>
       </div>
     </div>
   </div>
@@ -626,7 +650,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 
   <div class="ce-footer" style="grid-template-columns:1fr 1fr;padding-bottom:0">
-    <div style="font-size:11px;font-style:italic;font-weight:700">Prepared by: &nbsp;Glen Resurreccion</div>
+    <div style="font-size:11px;font-style:italic;font-weight:700">Prepared by: &nbsp;{{ $preparedByName ?: '—' }}</div>
     <div style="font-size:11px;font-style:italic;font-weight:700">Noted by: <span class="ce-sig" style="display:inline-block;min-width:160px;margin-top:0;border-top:none;padding-top:0"></span></div>
   </div>
   <div style="padding:18px 16px 16px;font-family:Arial,Helvetica,sans-serif">
@@ -657,7 +681,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <span class="lbl">Date:</span><span class="val">{{ date('F d, Y') }}</span>
         <span class="lbl">DUE Date:</span><span class="val">{{ date('F d, Y', strtotime('+30 days')) }}</span>
         <div class="fsfront">FS Front</div>
-        <span class="lbl">PREPARED BY:</span><span class="val">Glen Resurreccion</span>
+        <span class="lbl">PREPARED BY:</span><span class="val">{{ $preparedByName ?: '—' }}</span>
       </div>
     </div>
   </div>
@@ -804,7 +828,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     @endif
   </div>
   <div class="ce-footer" style="grid-template-columns:1fr 1fr;padding-bottom:0">
-    <div style="font-size:11px;font-style:italic;font-weight:700">Prepared by: &nbsp;Glen Resurreccion</div>
+    <div style="font-size:11px;font-style:italic;font-weight:700">Prepared by: &nbsp;{{ $preparedByName ?: '—' }}</div>
     <div style="font-size:11px;font-style:italic;font-weight:700">Noted by: <span class="ce-sig" style="display:inline-block;min-width:160px;margin-top:0;border-top:none;padding-top:0"></span></div>
   </div>
   <div style="padding:18px 16px 16px;font-family:Arial,Helvetica,sans-serif">
@@ -829,7 +853,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <span class="lbl">Date:</span><span class="val">{{ date('F d, Y') }}</span>
         <span class="lbl">DUE Date:</span><span class="val">{{ date('F d, Y', strtotime('+30 days')) }}</span>
         <div class="fsfront">FS Front</div>
-        <span class="lbl">PREPARED BY:</span><span class="val">Glen Resurreccion</span>
+        <span class="lbl">PREPARED BY:</span><span class="val">{{ $preparedByName ?: '—' }}</span>
       </div>
     </div>
   </div>
@@ -952,7 +976,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 
   <div class="ce-footer" style="grid-template-columns:1fr 1fr;padding-bottom:0">
-    <div style="font-size:11px;font-style:italic;font-weight:700">Prepared by: &nbsp;Glen Resurreccion</div>
+    <div style="font-size:11px;font-style:italic;font-weight:700">Prepared by: &nbsp;{{ $preparedByName ?: '—' }}</div>
     <div style="font-size:11px;font-style:italic;font-weight:700">Noted by: <span class="ce-sig" style="display:inline-block;min-width:160px;margin-top:0;border-top:none;padding-top:0"></span></div>
   </div>
   <div style="padding:18px 16px 16px;font-family:Arial,Helvetica,sans-serif">
@@ -1003,7 +1027,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         @endif
       </div>
       <div class="ecard-body" style="padding:0">
-        <div class="ce-info">
+        <div class="ce-info ce-info-soft">
           @foreach ($infoRows as $l => $v)
           <div class="ce-info-row">
             <div class="ce-info-lbl">{{ $l }}:</div>
@@ -1141,8 +1165,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
     <div class="ce-footer" style="border:1px solid var(--border);border-radius:8px;background:#fff;margin-bottom:16px">
       <div>
-        <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">Prepared by:</div>
-        <div class="ce-sig">Glen Resurreccion</div>
+        <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px;display:flex;align-items:center;gap:6px">
+          Prepared by:
+          @if ($canManage)
+          <button type="button" class="edit-mini-btn" style="padding:1px 8px;font-size:10px" onclick="openDocMo('moEditInfo')"><i data-feather="edit-2" style="width:9px;height:9px"></i></button>
+          @endif
+        </div>
+        <div class="ce-sig">{{ $preparedByName ?: '—' }}</div>
       </div>
       <div>
         <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">Received &amp; Conformed by:</div>
@@ -1209,6 +1238,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <input type="text" name="ce_contact_number" value="{{ $booking->ce_contact_number ?? '' }}" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
       <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Contact Email</label>
         <input type="email" name="ce_contact_email" value="{{ $booking->ce_contact_email ?? '' }}" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Prepared By</label>
+        <input type="text" name="ce_prepared_by" value="{{ $booking->ce_prepared_by ?? '' }}" placeholder="Staff name shown on the CE document" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
     </div>
     <div class="doc-foot"><button type="button" class="tbtn" style="background:#f1f5f9;color:#334155" onclick="closeDocMo('moEditInfo')">Cancel</button><button type="submit" class="doc-accept-btn">Save Changes</button></div>
   </form>

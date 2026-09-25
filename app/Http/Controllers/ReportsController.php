@@ -17,12 +17,6 @@ class ReportsController extends Controller
         $dbFrom = $dateFrom;
         $dbTo = $dateTo . ' 23:59:59';
 
-        $revenueData = DB::table('payments')
-            ->whereBetween('payment_date', [$dbFrom, $dbTo])
-            ->selectRaw("DATE_FORMAT(payment_date,'%b %d') AS label, DATE_FORMAT(payment_date,'%Y-%m-%d') AS sort_key, SUM(amount) AS total, COUNT(*) AS transactions")
-            ->groupBy('sort_key', 'label')->orderBy('sort_key')
-            ->get();
-
         $bookingsByType = DB::table('bookings')
             ->where('booking_status', '!=', 'cancelled')
             ->whereBetween('created_at', [$dbFrom, $dbTo])
@@ -62,16 +56,24 @@ class ReportsController extends Controller
         // silently SUM(payments.amount) — the exact same query as "Payment Collection" below,
         // just grouped differently — so the two labels always showed the same number with no
         // real "sales" concept behind either of them.
-        $kpis = [
-            'period_sales' => (float) DB::table('bookings')
-                ->where('booking_status', '!=', 'cancelled')
-                ->whereBetween('created_at', [$dbFrom, $dbTo])->sum('final_amount'),
-            'payments_collected' => (float) DB::table('payments')->whereBetween('payment_date', [$dbFrom, $dbTo])->sum('amount'),
-            'total_revenue' => (float) DB::table('payments')->sum('amount'),
-            'total_bookings' => (int) DB::table('bookings')->whereBetween('created_at', [$dbFrom, $dbTo])->count(),
-            'completed' => (int) DB::table('bookings')->where('booking_status', 'completed')->whereBetween('created_at', [$dbFrom, $dbTo])->count(),
-            'outstanding_bal' => (float) DB::table('statement_of_accounts')->where('status', '!=', 'paid')->sum('balance'),
-            'open_incidents' => (int) DB::table('incident_reports')->where('status', 'open')->count(),
+        $kpis = $this->periodKpis($dbFrom, $dbTo);
+        $kpis['outstanding_bal'] = (float) DB::table('statement_of_accounts')->where('status', '!=', 'paid')->sum('balance');
+        $kpis['open_incidents'] = (int) DB::table('incident_reports')->where('status', 'open')->count();
+
+        // Trend badges (↑12% vs previous period) — always computed against the same-length
+        // window immediately before the selected range, independent of the "vs Prev/vs Last
+        // Year" compare toggle below (that one overlays a second line on the chart; this is a
+        // simple always-on KPI comparison). Outstanding/Open Incidents are current snapshots,
+        // not period totals, so a "previous period" trend for them wouldn't mean anything real.
+        $prevDiff = strtotime($dateTo) - strtotime($dateFrom);
+        $prevTo = date('Y-m-d', strtotime($dateFrom) - 86400);
+        $prevFrom = date('Y-m-d', strtotime($prevTo) - $prevDiff);
+        $prevKpis = $this->periodKpis($prevFrom, $prevTo . ' 23:59:59');
+        $kpiTrends = [
+            'period_sales' => $this->pctChange($kpis['period_sales'], $prevKpis['period_sales']),
+            'payments_collected' => $this->pctChange($kpis['payments_collected'], $prevKpis['payments_collected']),
+            'total_bookings' => $this->pctChange($kpis['total_bookings'], $prevKpis['total_bookings']),
+            'completed' => $this->pctChange($kpis['completed'], $prevKpis['completed']),
         ];
 
         $equipAvail = [
@@ -108,11 +110,11 @@ class ReportsController extends Controller
             ->limit(20)
             ->get();
 
-        $collectionData = DB::table('payments')
-            ->whereBetween('payment_date', [$dbFrom, $dbTo])
-            ->selectRaw("DATE_FORMAT(payment_date,'%b %Y') AS label, DATE_FORMAT(payment_date,'%Y-%m') AS sort_key, SUM(amount) AS collected, COUNT(*) AS transactions")
-            ->groupBy('sort_key', 'label')->orderBy('sort_key')
-            ->get();
+        // Monthly Sales + Collections, one continuous month-by-month axis for the whole selected
+        // range (not just months that happen to have data) — both series plot on the exact same
+        // X-axis this way, matching the panelist's example (Mar|Apr|May|Jun|...) instead of two
+        // series whose labels could silently drift apart when one has a month the other doesn't.
+        $salesMonthly = $this->monthlySeries($dateFrom, $dateTo);
 
         $feedbackStats = DB::table('booking_feedback')
             ->selectRaw('COUNT(*) AS total, AVG(rating) AS avg_rating')
@@ -128,11 +130,11 @@ class ReportsController extends Controller
             ->limit(8)
             ->get();
 
-        [$comparePreset, $compFrom, $compTo, $compareRevenueData] = $this->resolveComparison($request, $dateFrom, $dateTo);
+        [$comparePreset, $compFrom, $compTo, $compareMonthly] = $this->resolveComparison($request, $dateFrom, $dateTo);
 
         if ($request->has('export')) {
             return $this->export($request->query('export'), $request->query('format', 'csv'), compact(
-                'revenueData', 'collectionData', 'bookingsByType', 'totalBookingsByType',
+                'salesMonthly', 'bookingsByType', 'totalBookingsByType',
                 'topEquipment', 'equipAvail', 'crewPerf', 'topClients', 'damagedReport'
             ));
         }
@@ -140,14 +142,81 @@ class ReportsController extends Controller
         return view('reports', [
             'dateFrom' => $dateFrom, 'dateTo' => $dateTo,
             'preset' => $request->query('preset', ''), 'compareActive' => $comparePreset,
-            'compFrom' => $compFrom, 'compTo' => $compTo,
-            'revenueData' => $revenueData, 'compareRevenueData' => $compareRevenueData,
+            'compFrom' => $compFrom, 'compTo' => $compTo, 'compareMonthly' => $compareMonthly,
             'bookingsByType' => $bookingsByType, 'totalBookingsByType' => $totalBookingsByType,
-            'topEquipment' => $topEquipment, 'crewPerf' => $crewPerf, 'kpis' => $kpis,
+            'topEquipment' => $topEquipment, 'crewPerf' => $crewPerf, 'kpis' => $kpis, 'kpiTrends' => $kpiTrends,
             'equipAvail' => $equipAvail, 'availTotal' => $availTotal, 'topClients' => $topClients,
-            'damagedReport' => $damagedReport, 'collectionData' => $collectionData,
+            'damagedReport' => $damagedReport, 'salesMonthly' => $salesMonthly,
             'feedbackStats' => $feedbackStats, 'recentFeedback' => $recentFeedback,
         ]);
+    }
+
+    /** Sales/Bookings-count KPIs for one date range — shared by the main period and the
+     *  previous-period comparison used for the KPI trend badges. */
+    private function periodKpis(string $dbFrom, string $dbTo): array
+    {
+        return [
+            'period_sales' => (float) DB::table('bookings')
+                ->where('booking_status', '!=', 'cancelled')
+                ->whereBetween('created_at', [$dbFrom, $dbTo])->sum('final_amount'),
+            'payments_collected' => (float) DB::table('payments')->whereBetween('payment_date', [$dbFrom, $dbTo])->sum('amount'),
+            'total_bookings' => (int) DB::table('bookings')->whereBetween('created_at', [$dbFrom, $dbTo])->count(),
+            'completed' => (int) DB::table('bookings')->where('booking_status', 'completed')->whereBetween('created_at', [$dbFrom, $dbTo])->count(),
+        ];
+    }
+
+    /** @return array{pct: int, dir: string, isNew?: bool}|null null when there's nothing to compare against. */
+    private function pctChange(float $curr, float $prev): ?array
+    {
+        if ($curr == 0.0 && $prev == 0.0) {
+            return null;
+        }
+        // A near-zero (not necessarily exactly zero) previous period turns any real current
+        // value into a meaningless four/five-digit percentage — "New" reads honestly instead
+        // of implying a precision the underlying comparison doesn't have.
+        if ($prev < ($curr * 0.02)) {
+            return ['pct' => 0, 'dir' => 'up', 'isNew' => true];
+        }
+        $pct = (($curr - $prev) / abs($prev)) * 100;
+
+        return ['pct' => min(999, (int) round(abs($pct))), 'dir' => $pct >= 0 ? 'up' : 'down'];
+    }
+
+    /** Continuous month-by-month Sales + Collections series covering $dateFrom–$dateTo. */
+    private function monthlySeries(string $dateFrom, string $dateTo)
+    {
+        $dbFrom = $dateFrom;
+        $dbTo = $dateTo . ' 23:59:59';
+
+        $salesRaw = DB::table('bookings')
+            ->where('booking_status', '!=', 'cancelled')
+            ->whereBetween('created_at', [$dbFrom, $dbTo])
+            ->selectRaw("DATE_FORMAT(created_at,'%Y-%m') AS sort_key, SUM(final_amount) AS total, COUNT(*) AS bookings_count")
+            ->groupBy('sort_key')
+            ->get()->keyBy('sort_key');
+
+        $collRaw = DB::table('payments')
+            ->whereBetween('payment_date', [$dbFrom, $dbTo])
+            ->selectRaw("DATE_FORMAT(payment_date,'%Y-%m') AS sort_key, SUM(amount) AS collected, COUNT(*) AS transactions")
+            ->groupBy('sort_key')
+            ->get()->keyBy('sort_key');
+
+        $months = collect();
+        $cursor = \Illuminate\Support\Carbon::parse($dateFrom)->startOfMonth();
+        $rangeEnd = \Illuminate\Support\Carbon::parse($dateTo)->startOfMonth();
+        while ($cursor->lte($rangeEnd)) {
+            $key = $cursor->format('Y-m');
+            $sales = $salesRaw->get($key);
+            $coll = $collRaw->get($key);
+            $months->push((object) [
+                'label' => $cursor->format('M Y'), 'sort_key' => $key,
+                'sales_total' => (float) ($sales->total ?? 0), 'bookings_count' => (int) ($sales->bookings_count ?? 0),
+                'collected_total' => (float) ($coll->collected ?? 0), 'transactions' => (int) ($coll->transactions ?? 0),
+            ]);
+            $cursor->addMonth();
+        }
+
+        return $months;
     }
 
     private function resolveDateRange(Request $request): array
@@ -190,23 +259,22 @@ class ReportsController extends Controller
             $compTo = date('Y-m-d', strtotime($dateTo . ' -1 year'));
         }
 
-        $compareRevenueData = collect();
+        // Same monthly shape as the main period's series — overlaid on the Financial Trend
+        // chart by month POSITION (1st month vs 1st month, 2nd vs 2nd, ...), not by matching
+        // calendar month, same convention the daily version of this comparison used before.
+        $compareMonthly = collect();
         if ($compFrom && $compTo) {
-            $compareRevenueData = DB::table('payments')
-                ->whereBetween('payment_date', [$compFrom, $compTo . ' 23:59:59'])
-                ->selectRaw("DATE_FORMAT(payment_date,'%b %d') AS label, DATE_FORMAT(payment_date,'%Y-%m-%d') AS sort_key, SUM(amount) AS total")
-                ->groupBy('sort_key', 'label')->orderBy('sort_key')
-                ->get();
+            $compareMonthly = $this->monthlySeries($compFrom, $compTo);
         }
 
-        return [$comparePreset, $compFrom, $compTo, $compareRevenueData];
+        return [$comparePreset, $compFrom, $compTo, $compareMonthly];
     }
 
     private function export(string $type, string $format, array $data): StreamedResponse|Response
     {
         [$title, $headers, $rows] = match ($type) {
             'collection' => ['Collection', ['Month', 'Payments', 'Collected (PHP)'],
-                $data['collectionData']->map(fn ($r) => [$r->label, $r->transactions, $r->collected])->all()],
+                $data['salesMonthly']->map(fn ($r) => [$r->label, $r->transactions, $r->collected_total])->all()],
             'bookings' => ['Bookings by Type', ['Project Type', 'Count', 'Share %'],
                 $data['bookingsByType']->map(fn ($bt) => [ucfirst(str_replace('_', ' ', $bt->project_type)), $bt->total, round($bt->total / $data['totalBookingsByType'] * 100, 1)])->all()],
             'equipment' => ['Top Equipment', ['Equipment', 'Brand', 'Rentals', 'Total Revenue (PHP)'],
@@ -221,8 +289,8 @@ class ReportsController extends Controller
             'incidents' => ['Incidents Report', ['Date', 'Equipment', 'Booking', 'Type', 'Charge (PHP)', 'Status'],
                 $data['damagedReport']->map(fn ($dr) => [date('Y-m-d', strtotime($dr->incident_date)), $dr->equipment_name, $dr->booking_reference, $dr->incident_type, $dr->charge_amount, $dr->status])->all()],
             // 'ce_financials' moved to CostEstimatesController::exportFinancials() in Part 11.
-            default => ['Daily Payments Trend', ['Date', 'Transactions', 'Payments Collected (PHP)'],
-                $data['revenueData']->map(fn ($r) => [$r->label, $r->transactions, $r->total])->all()],
+            default => ['Monthly Financial Trend', ['Month', 'Bookings', 'Sales (PHP)', 'Payments', 'Collected (PHP)'],
+                $data['salesMonthly']->map(fn ($r) => [$r->label, $r->bookings_count, $r->sales_total, $r->transactions, $r->collected_total])->all()],
         };
 
         return DataExporter::respond($format, $title, $headers, $rows, 'filmspec-' . $type);

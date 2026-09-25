@@ -30,12 +30,18 @@
   'extraParams' => array_filter(['q' => $search]),
 ])
 
-<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-  <div style="font-size:1.1rem;font-weight:700;color:var(--blue-700)">{{ $period['label'] }}</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:6px">
+  <div style="font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)">
+    Selected Analytics Period: <span style="color:var(--blue-700)">{{ $period['label'] }}</span>
+  </div>
   <div style="font-size:.83rem;color:var(--text-muted)">
     {{ $kpis['shoots'] }} Confirmed Shoot{{ $kpis['shoots'] === 1 ? '' : 's' }} ·
     ₱{{ number_format($kpis['spend'], 2) }} Confirmed Crew Cost
   </div>
+</div>
+<div style="font-size:.75rem;color:var(--text-muted);display:flex;align-items:center;gap:5px;margin-bottom:14px">
+  <i data-feather="info" style="width:11px;height:11px"></i>
+  Data shown is based on current confirmed cost estimates. Amounts are ex-VAT unless otherwise stated.
 </div>
 
 <!-- KPIs -->
@@ -75,24 +81,60 @@
   {{ $kpis['shoots_needing_crew'] }} confirmed shoot{{ $kpis['shoots_needing_crew'] === 1 ? '' : 's' }} in this period {{ $kpis['shoots_needing_crew'] === 1 ? 'has' : 'have' }} no crew assigned. Please review and assign crew to ensure complete data.
 </div>
 @endif
+@if ($needsRoleCount > 0)
+<div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:10px 16px;border-radius:8px;margin-bottom:16px;font-size:13px;display:flex;align-items:center;gap:8px">
+  <i data-feather="alert-triangle" style="width:14px;height:14px;flex-shrink:0"></i>
+  {{ $needsRoleCount }} crew member{{ $needsRoleCount === 1 ? '' : 's' }} in this period {{ $needsRoleCount === 1 ? 'is' : 'are' }} assigned without a production role — Needs Role Assignment. Excluded from the Roles table below until assigned.
+</div>
+@endif
 
-<!-- Spend chart -->
-<div class="card" style="margin-bottom:22px">
-  <div class="card-header">
-    <h2 class="card-title">Confirmed Crew Cost Trend
-      <span style="font-weight:400;color:var(--text-muted);font-size:.8rem">
-        {{ $monthly->first()->label ?? '' }} – {{ $monthly->last()->label ?? '' }}
-      </span>
-    </h2>
-    <div class="tabs" style="margin-bottom:0">
-      @foreach ([6, 12] as $cm)
-      <a href="{{ route('crew-data', array_filter(['period' => $period['mode'], 'm' => $period['month'], 'chart' => $cm, 'q' => $search])) }}"
-         class="tab-btn {{ $kpis['chart_months'] === $cm ? 'active' : '' }}">{{ $cm }} MONTHS</a>
-      @endforeach
+<!-- Spend chart + Period Summary -->
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:22px" class="crew-chart-grid">
+  <div class="card" style="margin-bottom:0">
+    <div class="card-header">
+      <h2 class="card-title">Confirmed Crew Cost Trend
+        <span style="font-weight:400;color:var(--text-muted);font-size:.8rem">
+          {{ $monthly->first()->label ?? '' }} – {{ $monthly->last()->label ?? '' }}
+        </span>
+      </h2>
+      <div class="tabs" style="margin-bottom:0">
+        @foreach ([6, 12] as $cm)
+        <a href="{{ route('crew-data', array_filter(['period' => $period['mode'], 'm' => $period['month'], 'chart' => $cm, 'q' => $search])) }}"
+           class="tab-btn {{ $kpis['chart_months'] === $cm ? 'active' : '' }}">{{ $cm }} MONTHS</a>
+        @endforeach
+      </div>
+    </div>
+    <div class="card-body">
+      <div style="height:220px"><canvas id="crewSpendChart"></canvas></div>
     </div>
   </div>
-  <div class="card-body">
-    <div style="height:220px"><canvas id="crewSpendChart"></canvas></div>
+
+  <div class="card" style="margin-bottom:0">
+    <div class="card-header"><h2 class="card-title">Period Summary <span style="font-weight:400;color:var(--text-muted);font-size:.8rem">{{ $periodSummary['range'] }}</span></h2></div>
+    <div class="card-body" style="padding:6px 20px 14px">
+      @php
+        $psRows = [
+          ['Total Confirmed Shoots', $periodSummary['total_confirmed_shoots']],
+          ['Crew-Assigned Shoots', $periodSummary['crew_assigned_shoots']],
+          ['Shoots Needing Crew', $periodSummary['shoots_needing_crew']],
+          ['Unique Crew Members', $periodSummary['unique_crew_members']],
+          ['Total Shoot Days', rtrim(rtrim(number_format($periodSummary['total_shoot_days'], 1), '0'), '.')],
+          ['Attendance Exceptions (No-Shows)', $periodSummary['attendance_exceptions']],
+        ];
+      @endphp
+      @foreach ($psRows as [$label, $val])
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;font-size:.83rem;border-bottom:1px solid var(--border)">
+        <span style="color:var(--text-muted)">{{ $label }}</span>
+        <span style="font-weight:700">{{ $val }}</span>
+      </div>
+      @endforeach
+      @if ($periodSummary['shoots_needing_crew'] > 0)
+      <div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:8px 10px;border-radius:6px;margin-top:10px;font-size:.75rem;display:flex;align-items:flex-start;gap:6px">
+        <i data-feather="alert-triangle" style="width:12px;height:12px;flex-shrink:0;margin-top:2px"></i>
+        <span>{{ $periodSummary['shoots_needing_crew'] }} confirmed shoot{{ $periodSummary['shoots_needing_crew'] === 1 ? ' does' : 's do' }} not have any crew assigned. Please review and assign crew to ensure complete data.</span>
+      </div>
+      @endif
+    </div>
   </div>
 </div>
 
@@ -108,6 +150,18 @@
           <i data-feather="search"></i>
           <input type="text" name="q" class="form-control" placeholder="Search person or role…" value="{{ $search }}">
         </div>
+        <select name="role" class="form-control" style="max-width:180px">
+          <option value="">All Roles</option>
+          @foreach ($roleOptions as $opt)
+          <option value="{{ $opt }}" {{ $roleFilter === $opt ? 'selected' : '' }}>{{ $opt }}</option>
+          @endforeach
+        </select>
+        <select name="engagement" class="form-control" style="max-width:180px">
+          <option value="">All Engagement Types</option>
+          @foreach ($engagementOptions as $val => $label)
+          <option value="{{ $val }}" {{ $engagementFilter === $val ? 'selected' : '' }}>{{ $label }}</option>
+          @endforeach
+        </select>
         <button type="submit" class="btn btn-primary btn-sm"><i data-feather="filter"></i> Filter</button>
       </div>
     </form>

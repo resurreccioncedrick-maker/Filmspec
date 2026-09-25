@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Support\CeAnalytics;
 use App\Support\DataExporter;
 use App\Support\ReportPeriod;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class EquipmentDataController extends Controller
 {
     private const DEFAULT_LIMIT = 15;
+    private const BOOKINGS_PER_PAGE = 5;
 
     public function index(Request $request): View|StreamedResponse|Response
     {
@@ -25,28 +27,33 @@ class EquipmentDataController extends Controller
         $sort = in_array($request->query('sort'), ['pesos', 'quantity', 'days'], true)
             ? $request->query('sort') : 'pesos';
         $showAll = (bool) $request->query('all', false);
+        $category = trim((string) $request->query('category', ''));
+        // Every equipment row in the catalog is FilmSpec-owned — outsourced/partner equipment
+        // was retired as a feature (see BookingCosting::generateCostEstimate()'s $oTotal note),
+        // so this filter has only one real value. Kept as a dropdown (rather than removed) so
+        // the control matches the reference and is honest that "Partner" has no data behind it.
+        $ownership = $request->query('ownership', '') === 'filmspec' ? 'filmspec' : '';
+        $search = trim((string) $request->query('q', ''));
+        $page = max(1, (int) $request->query('p', 1));
+
+        $categoryOptions = DB::table('equipment_categories')->orderBy('category_name')->pluck('category_name');
 
         $confirmedCes = CeAnalytics::confirmedCes($period['from'], $period['to']);
         $bookingIds = $confirmedCes->pluck('booking_id');
-        $usage = $this->computeUsage($period, $sort, $bookingIds);
+        $usage = $this->computeUsage($sort, $bookingIds, $category);
 
         $usageTotalCount = $usage->count();
         $usageShown = $showAll ? $usage : $usage->take(self::DEFAULT_LIMIT);
 
-        // Grouped by category for display, preserving the chosen sort inside each group and
-        // ordering groups by their own total so the biggest category leads.
-        $byCategory = $usageShown->groupBy(fn ($r) => $r->category_name ?: 'Other')
-            ->map(fn ($rows) => (object) [
-                'rows' => $rows->values(),
-                'earnings' => (float) $rows->sum('earnings'),
-                'qty' => (int) $rows->sum('total_qty'),
-            ])
-            ->sortByDesc('earnings');
+        $categoryBreakdown = $usage->groupBy(fn ($r) => $r->category_name ?: 'Other')
+            ->map(fn ($rows, $cat) => (object) ['category' => $cat, 'earnings' => (float) $rows->sum('earnings')])
+            ->sortByDesc('earnings')->values();
 
         $neverUsed = DB::table('equipment as e')
             ->leftJoin('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
             ->whereNotIn('e.equipment_id', $usage->pluck('equipment_id'))
             ->where('e.condition_status', '!=', 'retired')
+            ->when($category !== '', fn ($q) => $q->where('ec.category_name', $category))
             ->orderBy('e.equipment_name')
             ->select('e.equipment_id', 'e.equipment_name', 'e.brand', 'ec.category_name')
             ->get();
@@ -61,11 +68,20 @@ class EquipmentDataController extends Controller
             ->select('b.booking_id', 'b.booking_reference', 'b.project_title')
             ->get();
 
-        $pastShoots = $this->pastShoots($confirmedCes, $bookingIds);
+        $allPastShoots = $this->pastShoots($confirmedCes, $bookingIds, $category);
+        if ($search !== '') {
+            $needle = mb_strtolower($search);
+            $allPastShoots = $allPastShoots->filter(fn ($s) => str_contains(mb_strtolower($s->project_title), $needle)
+                || str_contains(mb_strtolower((string) $s->client_name), $needle)
+                || str_contains(mb_strtolower($s->ce_reference), $needle))->values();
+        }
+        $pastShootsTotal = $allPastShoots->count();
+        $pastShootsPages = max(1, (int) ceil($pastShootsTotal / self::BOOKINGS_PER_PAGE));
+        $pastShoots = $allPastShoots->forPage($page, self::BOOKINGS_PER_PAGE)->values();
 
-        // Earnings trend — same shape as Cost Estimates' and Crew Data's recap charts: the
-        // chart window is independent of the table period (see ReportPeriod), so an August
-        // table can sit beside a Mar–Aug trend without those two ranges fighting each other.
+        // Confirmed Equipment Value Trend — same shape as Cost Estimates' and Crew Data's recap
+        // charts: the chart window is independent of the table period (see ReportPeriod), so an
+        // August table can sit beside a Mar–Aug trend without those two ranges fighting.
         $chartMonths = $period['chart_months'];
         $chartKeys = ReportPeriod::chartMonthKeys($chartMonths);
         $chartCes = CeAnalytics::confirmedCes(
@@ -73,7 +89,10 @@ class EquipmentDataController extends Controller
             now()->endOfDay()->toDateTimeString()
         );
         $chartUsage = DB::table('booking_equipment as be')
+            ->join('equipment as e', 'be.equipment_id', '=', 'e.equipment_id')
+            ->leftJoin('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
             ->whereIn('be.booking_id', $chartCes->pluck('booking_id'))
+            ->when($category !== '', fn ($q) => $q->where('ec.category_name', $category))
             ->select('be.booking_id')
             ->selectRaw('SUM(IF(be.subtotal>0,be.subtotal,be.quantity*be.days*be.daily_rate)) AS earnings')
             ->groupBy('be.booking_id')
@@ -89,8 +108,9 @@ class EquipmentDataController extends Controller
             ];
         });
 
-        // "vs last period" pills on Earned/Shoots — not Distinct Items Used, which is a catalog
-        // breadth count more than a trend anyone tracks period over period.
+        // "vs last period" pills on Confirmed Equipment Value/Shoots — not Equipment Models
+        // Quoted, which is a catalog breadth count more than a trend anyone tracks period over
+        // period.
         $prevPeriod = ReportPeriod::previous($period);
         $equipDeltas = ['fs_earned' => null, 'shoots' => null];
         if ($prevPeriod) {
@@ -105,12 +125,15 @@ class EquipmentDataController extends Controller
 
         return view('equipment-data', [
             'period' => $period, 'sort' => $sort, 'showAll' => $showAll,
-            'pastShoots' => $pastShoots,
+            'category' => $category, 'categoryOptions' => $categoryOptions, 'ownership' => $ownership,
+            'search' => $search, 'page' => $page,
+            'pastShoots' => $pastShoots, 'pastShootsTotal' => $pastShootsTotal, 'pastShootsPages' => $pastShootsPages,
             'shootTotals' => [
-                'shoots' => $pastShoots->count(),
-                'matched' => (int) $pastShoots->sum('matched_count'),
+                'shoots' => $allPastShoots->count(),
+                'matched' => (int) $allPastShoots->sum('matched_count'),
             ],
-            'byCategory' => $byCategory, 'usageTotalCount' => $usageTotalCount,
+            'usageShown' => $usageShown, 'usageTotalCount' => $usageTotalCount,
+            'categoryBreakdown' => $categoryBreakdown,
             'shownCount' => $usageShown->count(), 'defaultLimit' => self::DEFAULT_LIMIT,
             'neverUsed' => $neverUsed,
             'missingCe' => $missingCe,
@@ -128,14 +151,16 @@ class EquipmentDataController extends Controller
 
     /**
      * Owned gear: what each item earned at CE rates, plus the quantity and day counts the
-     * reference shows as "×16 · 5d". Shared by index() and export() so both stay identical.
+     * reference shows as "Qty: 16 · Quoted Days: 5". Shared by index() and export() so both
+     * stay identical.
      */
-    private function computeUsage(array $period, string $sort, $bookingIds)
+    private function computeUsage(string $sort, $bookingIds, string $category = '')
     {
         $usage = DB::table('booking_equipment as be')
             ->join('equipment as e', 'be.equipment_id', '=', 'e.equipment_id')
             ->leftJoin('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
             ->whereIn('be.booking_id', $bookingIds)
+            ->when($category !== '', fn ($q) => $q->where('ec.category_name', $category))
             ->groupBy('e.equipment_id', 'e.equipment_name', 'e.brand', 'ec.category_name')
             ->select('e.equipment_id', 'e.equipment_name', 'e.brand', 'ec.category_name')
             ->selectRaw('COUNT(DISTINCT be.booking_id) AS shoots')
@@ -155,29 +180,46 @@ class EquipmentDataController extends Controller
         $period = ReportPeriod::resolve($request);
         $sort = in_array($request->query('sort'), ['pesos', 'quantity', 'days'], true)
             ? $request->query('sort') : 'pesos';
+        $category = trim((string) $request->query('category', ''));
 
         $bookingIds = CeAnalytics::confirmedCes($period['from'], $period['to'])->pluck('booking_id');
-        $usage = $this->computeUsage($period, $sort, $bookingIds);
+        $usage = $this->computeUsage($sort, $bookingIds, $category);
 
-        $headers = ['Equipment', 'Category', 'Brand', 'Shoots', 'Total Qty', 'Total Days', 'Earnings'];
+        $userId = Auth::id();
+        $generatedBy = $userId ? trim((string) DB::table('users')->where('user_id', $userId)
+            ->selectRaw("CONCAT(first_name,' ',last_name) AS n")->value('n')) : null;
+        $infoRows = [
+            ['Applied Period Filter', $period['label'] ?? 'All time'],
+            ['Category Filter', $category ?: 'All Categories'],
+            ['Ownership Filter', 'FilmSpec-Owned (all catalog equipment)'],
+            ['Data Source', 'Current confirmed Cost Estimates only — draft, cancelled, and superseded CE revisions are excluded'],
+            ['Generated', now()->format('M j, Y g:i A')],
+            ['Generated By', $generatedBy ?: 'Unknown'],
+        ];
+
+        $headers = ['Equipment', 'Category', 'Brand', 'Confirmed CE Shoots', 'Qty Quoted', 'Quoted Rental Days', 'Confirmed Value'];
         $rows = $usage->map(fn ($u) => [
             $u->equipment_name, $u->category_name ?: 'Other', $u->brand,
             (int) $u->shoots, (int) $u->total_qty, (int) $u->total_days,
             '₱' . number_format((float) $u->earnings, 2),
         ])->all();
 
-        return DataExporter::respond($request->query('export'), 'Equipment Data', $headers, $rows, 'equipment-data-export');
+        return DataExporter::respondSections($request->query('export'), 'Equipment Analytics', [
+            ['title' => 'Report Info', 'rows' => $infoRows],
+            ['title' => 'Equipment Breakdown', 'headers' => $headers, 'rows' => $rows],
+        ], 'equipment-analytics-export');
     }
 
     /**
-     * One card per confirmed shoot: what the CE matched to the catalog.
+     * One row per confirmed shoot: what the CE matched to the catalog.
      *
      * FS equipment lines carry an equipment_id foreign key so they are matched by
-     * construction.
+     * construction — see booking_equipment's FK to equipment, which makes an "unmatched" line
+     * impossible rather than merely unlikely.
      *
      * One grouped query, not one per shoot.
      */
-    private function pastShoots($confirmedCes, $bookingIds)
+    private function pastShoots($confirmedCes, $bookingIds, string $category = '')
     {
         if ($bookingIds->isEmpty()) {
             return collect();
@@ -185,8 +227,11 @@ class EquipmentDataController extends Controller
 
         $equipByBooking = DB::table('booking_equipment as be')
             ->join('equipment as e', 'be.equipment_id', '=', 'e.equipment_id')
+            ->leftJoin('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
             ->whereIn('be.booking_id', $bookingIds)
-            ->select('be.booking_id', 'be.quantity', 'be.days', 'e.equipment_name', 'e.brand')
+            ->when($category !== '', fn ($q) => $q->where('ec.category_name', $category))
+            ->select('be.booking_id', 'be.quantity', 'be.days', 'be.subtotal', 'be.daily_rate',
+                'e.equipment_name', 'e.brand')
             ->get()->groupBy('booking_id');
 
         $ceTypeLabels = ['fs_front' => 'FS FRONT', 'client_direct' => 'CLIENT DIRECT', 'partner_front' => 'PARTNER FRONT'];
@@ -210,6 +255,7 @@ class EquipmentDataController extends Controller
                 'confirmed_at' => $ce->confirmed_at,
                 'matched' => $matched->values(),
                 'matched_count' => $matched->count(),
+                'matched_value' => (float) $matched->sum(fn ($m) => $m->subtotal > 0 ? $m->subtotal : $m->quantity * $m->days * $m->daily_rate),
             ];
         })->values();
     }

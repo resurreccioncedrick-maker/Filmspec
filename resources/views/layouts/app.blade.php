@@ -65,7 +65,6 @@
         'cost-estimates' => ['icon' => 'file-text', 'label' => 'Cost Estimates', 'mod' => 'cost_estimates'],
         'crew-data' => ['icon' => 'user-check', 'label' => 'Crew Analytics', 'mod' => 'crew_data'],
         'equipment-data' => ['icon' => 'trending-up', 'label' => 'Equipment Analytics', 'mod' => 'equipment_data'],
-        'profit-loss' => ['icon' => 'dollar-sign', 'label' => 'Profit and Loss', 'mod' => 'profit_loss'],
         'calendar-data' => ['icon' => 'calendar', 'label' => 'Calendar Analytics', 'mod' => 'calendar_data'],
       ]],
     ],

@@ -24,34 +24,47 @@
     @include('partials.stat-comparison', ['delta' => $ceDeltas['packaged_cost']])
     <div class="stat-icon"><i data-feather="package"></i></div>
     <div class="stat-value">₱{{ number_format($ceFinancials['packaged_cost'], 2) }}</div>
-    <div class="stat-label">Packaged Cost (ex-VAT) · {{ $ceFinancials['count'] }} confirmed CE{{ $ceFinancials['count'] === 1 ? '' : 's' }}</div>
+    <div class="stat-label">Confirmed CE Value (ex-VAT) · {{ $ceFinancials['count'] }} confirmed CE{{ $ceFinancials['count'] === 1 ? '' : 's' }}</div>
   </div>
   <div class="stat-card green">
     @include('partials.stat-comparison', ['delta' => $ceDeltas['crew_total']])
     <div class="stat-icon"><i data-feather="users"></i></div>
     <div class="stat-value">₱{{ number_format($ceFinancials['crew_total'], 2) }}</div>
-    <div class="stat-label" title="The crew cost frozen on each estimate at the moment it was confirmed — will differ from Crew Data's live figure if crew were reassigned or a no-show happened afterward.">Crew (Quoted) · {{ $ceFinancials['crew_pct'] }}% of packaged cost</div>
+    <div class="stat-label" title="The crew cost frozen on each estimate at the moment it was confirmed — will differ from Crew Data's live figure if crew were reassigned or a no-show happened afterward.">Crew Quoted · {{ $ceFinancials['crew_pct'] }}% of Confirmed CE Value</div>
   </div>
   <div class="stat-card">
     @include('partials.stat-comparison', ['delta' => $ceDeltas['net_total']])
     <div class="stat-icon"><i data-feather="trending-up"></i></div>
     <div class="stat-value">₱{{ number_format($ceFinancials['net_total'], 2) }}</div>
-    <div class="stat-label">Net for FilmSpec (ex-VAT) · {{ $ceFinancials['net_pct'] }}%</div>
+    <div class="stat-label">FilmSpec Portion (ex-VAT) · {{ $ceFinancials['net_pct'] }}%</div>
   </div>
 </div>
 
-<div class="stats-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:22px">
+<div style="font-size:.75rem;color:var(--text-muted);display:flex;align-items:center;gap:5px;margin:-8px 0 14px">
+  <i data-feather="info" style="width:11px;height:11px"></i>
+  All amounts on this page are ex-VAT and based on CE Confirmation Date. Only the current active confirmed version of each CE is counted — draft, superseded, and cancelled revisions are excluded.
+</div>
+
+<div class="stats-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:8px">
   <div class="stat-card">
     <div class="stat-icon"><i data-feather="camera"></i></div>
     <div class="stat-value">₱{{ number_format($ceFinancials['fs_equipment_listed'], 2) }}</div>
-    <div class="stat-label">FS Equipment Listed · at CE rates, before package discount</div>
+    <div class="stat-label">Equipment List Value · at CE rates, before package discount</div>
   </div>
   <div class="stat-card">
     <div class="stat-icon"><i data-feather="divide"></i></div>
     <div class="stat-value">₱{{ number_format($ceFinancials['avg_per_ce'], 2) }}</div>
-    <div class="stat-label">Average Per CE · net billed</div>
+    <div class="stat-label">Average Confirmed CE Value</div>
   </div>
 </div>
+@if ($ceFinancials['discount_total'] > 0)
+<div style="font-size:.78rem;color:var(--text-muted);margin-bottom:22px">
+  Package Discount Applied: <strong style="color:var(--text)">₱{{ number_format($ceFinancials['discount_total'], 2) }}</strong>
+  (Equipment List Value ₱{{ number_format($ceFinancials['fs_equipment_listed'], 2) }} → Confirmed CE Value ₱{{ number_format($ceFinancials['packaged_cost'], 2) }})
+</div>
+@else
+<div style="margin-bottom:22px"></div>
+@endif
 
 <!-- Recap chart -->
 <div class="card" style="margin-bottom:16px">
@@ -76,13 +89,13 @@
 <!-- Where the packaged cost goes + by client -->
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px">
   <div class="card">
-    <div class="card-header"><h2 class="card-title">Where the Packaged Cost Goes</h2></div>
+    <div class="card-header"><h2 class="card-title">Confirmed CE Composition</h2></div>
     <div class="card-body">
       @php
         $pcTotal = $ceFinancials['packaged_cost'] ?: 1;
         $segs = [
-          ['Net for FilmSpec', $ceFinancials['net_total'], '#0060C7'],
-          ['Crew', $ceFinancials['crew_total'], '#2e9e7a'],
+          ['FilmSpec Portion', $ceFinancials['net_total'], '#0060C7'],
+          ['Crew Quoted', $ceFinancials['crew_total'], '#2e9e7a'],
         ];
       @endphp
       <div style="display:flex;height:16px;border-radius:4px;overflow:hidden;margin-bottom:12px">
@@ -99,7 +112,7 @@
       </div>
       @endforeach
       <div style="display:flex;justify-content:space-between;padding-top:8px;margin-top:6px;border-top:2px solid var(--border);font-weight:700">
-        <span>Packaged cost</span>
+        <span>Confirmed CE Value</span>
         <span style="font-family:monospace">₱{{ number_format($ceFinancials['packaged_cost'], 2) }}</span>
       </div>
     </div>
@@ -107,7 +120,7 @@
 
   <div class="card">
     <div class="card-header">
-      <h2 class="card-title">By Client <span class="badge badge-gray" style="margin-left:4px">{{ $ceByClient->count() }}</span></h2>
+      <h2 class="card-title">Confirmed CEs by Client <span class="badge badge-gray" style="margin-left:4px">{{ $ceByClient->count() }}</span></h2>
     </div>
     <div class="table-wrap" style="max-height:280px;overflow-y:auto">
       @if ($ceByClient->isEmpty())
@@ -137,7 +150,7 @@
      so switching the period filter above (e.g. to "3 Months") doesn't look like it silently
      failed to update this row — it's a different question on purpose. -->
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-  <span style="font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)">Right Now — {{ now()->format('F Y') }}</span>
+  <span style="font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)">Current CE Pipeline — As of {{ now()->format('M j, Y') }}</span>
   <span style="font-size:.72rem;color:var(--text-muted)" title="Always the current calendar month, independent of the period filter above">
     <i data-feather="info" style="width:11px;height:11px;vertical-align:middle"></i> not affected by the filter above
   </span>
@@ -161,17 +174,19 @@
   <div class="stat-card">
     <div class="stat-icon"><i data-feather="dollar-sign"></i></div>
     <div class="stat-value">₱{{ number_format($kpis['confirmed_value'] / 1000, 1) }}k</div>
-    <div class="stat-label">Confirmed Value This Month</div>
+    <div class="stat-label">Confirmed CE Value This Month</div>
   </div>
 </div>
 
 <!-- Status tabs -->
 <div class="tabs" style="margin-bottom:18px">
-  @foreach (['all' => 'All', 'confirmed' => 'Confirmed', 'draft' => 'Draft', 'cancelled' => 'Cancelled'] as $k => $l)
+  @php
+    $tabBadge = ['confirmed' => 'badge-green', 'draft' => 'badge-orange', 'issued' => 'badge-blue', 'superseded' => 'badge-gray', 'cancelled' => 'badge-red', 'all' => 'badge-gray'];
+  @endphp
+  @foreach (['all' => 'All', 'confirmed' => 'Confirmed', 'draft' => 'Draft', 'issued' => 'Issued', 'superseded' => 'Superseded', 'cancelled' => 'Cancelled'] as $k => $l)
   <a href="{{ $ceBase }}?tab={{ $k }}{{ $search ? '&q=' . urlencode($search) : '' }}" class="tab-btn {{ $tab === $k ? 'active' : '' }}">
     {{ $l }}
-    <span class="badge {{ $k === 'confirmed' ? 'badge-green' : ($k === 'draft' ? 'badge-orange' : ($k === 'cancelled' ? 'badge-red' : 'badge-gray')) }}"
-          style="margin-left:4px">{{ $tabCounts[$k] }}</span>
+    <span class="badge {{ $tabBadge[$k] }}" style="margin-left:4px">{{ $tabCounts[$k] }}</span>
   </a>
   @endforeach
 </div>
@@ -181,7 +196,7 @@
     <h2 class="card-title">Saved Cost Estimates</h2>
     <div style="display:flex;align-items:center;gap:10px">
       <span style="font-size:.78rem;color:var(--text-muted)">{{ $total }} record{{ $total === 1 ? '' : 's' }}</span>
-      @include('partials.export-dropdown', ['id' => 'CeFinancials', 'label' => 'Export Financials', 'exportValue' => 'ce_financials'])
+      @include('partials.export-dropdown', ['id' => 'CeFinancials', 'label' => 'Export CE Analytics', 'exportValue' => 'ce_financials'])
     </div>
   </div>
   <div class="card-body" style="padding-bottom:0">
@@ -223,7 +238,11 @@
       <tr>
         <td style="white-space:nowrap">
           <span style="font-family:monospace;font-size:.85rem;font-weight:700">{{ $r->ce_reference }}</span>
-          @if ($r->is_revision)<div><span class="badge badge-orange" style="margin-top:2px">Revision</span></div>@endif
+          @if ($r->is_revision)
+          <div><span class="badge badge-orange" style="margin-top:2px">{{ preg_match('/-(R\d+)$/', $r->ce_reference, $rm) ? $rm[1] : 'Revision' }}</span>
+          @if ($r->status === 'confirmed')<span class="badge badge-green" style="margin-top:2px">Current Version</span>@endif
+          </div>
+          @endif
         </td>
         <td style="white-space:nowrap;font-size:.83rem">
           {{ $r->generated_at ? date('M j, Y', strtotime($r->generated_at)) : '—' }}
@@ -248,12 +267,14 @@
         <td>
           @if ($r->booking_status === 'cancelled')
             <span class="badge badge-red">Cancelled</span>
-          @elseif ($r->status === 'confirmed' && $r->is_superseded)
+          @elseif ($r->status === 'superseded')
             <span class="badge badge-gray" title="A newer revision of this booking's CE has since been confirmed">Superseded</span>
+          @elseif ($r->status === 'issued')
+            <span class="badge badge-blue" title="Sent to client, awaiting confirmation">Issued</span>
           @else
             <span class="badge {{ $statusBadge[$r->status] ?? 'badge-gray' }}">{{ ucfirst($r->status) }}</span>
             @if ($r->confirmed_by_name)
-            <div style="font-size:.7rem;color:var(--muted);margin-top:2px">by {{ $r->confirmed_by_name }}</div>
+            <div style="font-size:.7rem;color:var(--muted);margin-top:2px" title="{{ $r->confirmation_note }}">by {{ $r->confirmed_by_name }}</div>
             @endif
           @endif
         </td>
@@ -309,8 +330,8 @@
     data: {
       labels: rows.map(r => r.label),
       datasets: [
-        { label: 'Net (FS)', data: rows.map(r => r.net_total), backgroundColor: '#0060C7' },
-        { label: 'Crew', data: rows.map(r => r.crew_total), backgroundColor: '#2e9e7a' }
+        { label: 'FilmSpec Portion', data: rows.map(r => r.net_total), backgroundColor: '#0060C7' },
+        { label: 'Crew Quoted', data: rows.map(r => r.crew_total), backgroundColor: '#2e9e7a' }
       ]
     },
     options: {

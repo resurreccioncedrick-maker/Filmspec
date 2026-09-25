@@ -39,15 +39,18 @@ class CeAnalytics
             DB::table('cost_estimates as ce')
                 ->join('bookings as b', 'ce.booking_id', '=', 'b.booking_id')
                 ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+                ->leftJoin('users as u', 'ce.confirmed_by', '=', 'u.user_id')
         )
             ->where('b.booking_status', '!=', 'cancelled')
             ->whereBetween('ce.confirmed_at', [$from, $to])
             ->orderByDesc('ce.confirmed_at')
             ->select('ce.ce_id', 'ce.ce_reference', 'ce.grand_total', 'ce.subtotal', 'ce.crew_total',
                 'ce.outsourced_total', 'ce.equipment_total', 'ce.accessories_total', 'ce.transport_total',
-                'ce.confirmed_at', 'b.booking_id', 'b.project_title', 'b.booking_reference',
+                'ce.discount', 'ce.confirmed_at', 'ce.confirmation_note',
+                'b.booking_id', 'b.project_title', 'b.booking_reference',
                 'b.shoot_date_start', 'b.shoot_date_end',
-                'c.company_name', 'c.contact_person')
+                'c.company_name', 'c.contact_person',
+                DB::raw("CONCAT(u.first_name,' ',u.last_name) AS confirmed_by_name"))
             ->get();
 
         // company_name is often an empty string rather than NULL, so SQL COALESCE won't fall
@@ -68,6 +71,9 @@ class CeAnalytics
             'count' => $confirmedCes->count(),
             // FS equipment at CE rates, before any package discount (Part 11 / item 26).
             'fs_equipment_listed' => (float) $confirmedCes->sum(fn ($r) => (float) $r->equipment_total + (float) $r->accessories_total),
+            // Package discount applied on confirmed CEs — shown explicitly rather than left as
+            // an unexplained gap between Equipment List Value and the Confirmed CE Value.
+            'discount_total' => (float) $confirmedCes->sum('discount'),
         ];
         // Outsourced/partner equipment was removed as a feature (see BookingCosting) and is no
         // longer surfaced as its own metric, but old confirmed CEs from before the removal can

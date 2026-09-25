@@ -361,7 +361,9 @@ class BookingDetailController extends Controller
             BookingCosting::generateCostEstimate($id, $uid);
             $msg = ['type' => 'success', 'text' => 'Cost estimate generated.'];
         } elseif ($action === 'confirm_ce' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
-            $msg = BookingCosting::confirmCe($id, $uid);
+            $msg = BookingCosting::confirmCe($id, $uid, $request->input('confirmation_note'));
+        } elseif ($action === 'issue_ce' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+            $msg = BookingCosting::issueCe($id);
         } elseif ($action === 'update_ce_pricing' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
             $msg = $this->updateCePricing($request, $id, $uid);
         } elseif ($action === 'update_project_details' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
@@ -1076,6 +1078,13 @@ class BookingDetailController extends Controller
 
     private function addCrew(Request $request, int $id, $booking): array
     {
+        // Historical-analytics protection (Part 11 panelist revision): a completed shoot's crew
+        // roster is what Crew Analytics reports against — changing it after the fact would
+        // silently rewrite history for a shoot that already happened.
+        if (($booking->booking_status ?? null) === 'completed') {
+            return ['type' => 'error', 'text' => 'This booking is completed — its crew roster is locked to protect historical analytics.'];
+        }
+
         $cid = (int) $request->input('crew_id');
         $posid = (int) $request->input('position_id');
         $rate = (float) $request->input('rate_used');
@@ -1139,6 +1148,11 @@ class BookingDetailController extends Controller
 
     private function removeCrew(Request $request, int $id, int $uid): array
     {
+        // Same historical-analytics protection as addCrew() — see its comment.
+        if (DB::table('bookings')->where('booking_id', $id)->value('booking_status') === 'completed') {
+            return ['type' => 'error', 'text' => 'This booking is completed — its crew roster is locked to protect historical analytics.'];
+        }
+
         $bcid = (int) $request->input('bk_crew_id');
         $crewName = DB::table('booking_crew as bc')
             ->join('crew_members as cm', 'bc.crew_id', '=', 'cm.crew_id')
@@ -1690,6 +1704,7 @@ class BookingDetailController extends Controller
             'ce_contact_person' => trim((string) $request->input('ce_contact_person', '')) ?: null,
             'ce_contact_number' => trim((string) $request->input('ce_contact_number', '')) ?: null,
             'ce_contact_email' => $email ?: null,
+            'ce_prepared_by' => trim((string) $request->input('ce_prepared_by', '')) ?: null,
             'updated_at' => now(),
         ]);
 

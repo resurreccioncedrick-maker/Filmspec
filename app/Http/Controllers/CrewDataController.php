@@ -7,6 +7,7 @@ use App\Support\DataExporter;
 use App\Support\ReportPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -21,8 +22,14 @@ class CrewDataController extends Controller
 
         $period = ReportPeriod::resolve($request);
         $search = trim((string) $request->query('q', ''));
+        $roleFilter = trim((string) $request->query('role', ''));
+        $engagementFilter = trim((string) $request->query('engagement', ''));
 
-        [$byPerson, $byRole, $crewLines, $bookingIds] = $this->crewByPersonAndRole($period, $search);
+        [$byPerson, $byRole, $crewLines, $bookingIds, $needsRoleCount] =
+            $this->crewByPersonAndRole($period, $search, $roleFilter, $engagementFilter);
+
+        $roleOptions = DB::table('crew_positions')->orderBy('position_name')->pluck('position_name');
+        $engagementOptions = ['staff' => 'Staff', 'freelance' => 'Freelance', 'on_call' => 'On-Call'];
 
         $spendTotal = (float) $crewLines->sum(fn ($r) => $r->rate_used * $r->paid_days);
 
@@ -60,7 +67,6 @@ class CrewDataController extends Controller
             ];
         });
 
-        $monthsInWindow = max(1, $monthly->count());
         $crewBooked = $crewLines->pluck('crew_id')->unique()->count();
 
         // Crew-Assigned Shoots = confirmed-CE bookings in this window that actually have a
@@ -68,9 +74,24 @@ class CrewDataController extends Controller
         $crewAssignedShoots = $crewLines->pluck('booking_id')->unique()->count();
         $shootsNeedingCrew = max(0, $bookingIds->count() - $crewAssignedShoots);
 
-        // "vs last period" pills on Crew Spend and Crew Booked — not Average Per Month, which
-        // is already an average across the chart window, so comparing it to itself wouldn't
-        // mean much. Null for 'all' mode, where the view just omits the pill.
+        // Period Summary card — scoped to the CHART window (6M/12M), not the KPI row's period
+        // filter above, since it's meant to summarize what the trend chart right above it covers.
+        $periodSummaryShoots = $chartBookingIds->unique()->count();
+        $periodSummaryAssigned = $chartCrewLines->pluck('booking_id')->unique()->count();
+        $periodSummary = [
+            'range' => ($chartKeys ? \Illuminate\Support\Carbon::createFromFormat('Y-m', $chartKeys[0])->format('M Y') : '')
+                . ' – ' . ($chartKeys ? \Illuminate\Support\Carbon::createFromFormat('Y-m', end($chartKeys))->format('M Y') : ''),
+            'total_confirmed_shoots' => $periodSummaryShoots,
+            'crew_assigned_shoots' => $periodSummaryAssigned,
+            'shoots_needing_crew' => max(0, $periodSummaryShoots - $periodSummaryAssigned),
+            'unique_crew_members' => $chartCrewLines->pluck('crew_id')->unique()->count(),
+            'total_shoot_days' => (float) $chartCrewLines->sum('hours_worked'),
+            'attendance_exceptions' => (int) $chartNoShowDays->sum(),
+        ];
+
+        // "vs last period" pills on Crew Spend and Crew Booked — not an average, which is
+        // already an average across the chart window, so comparing it to itself wouldn't mean
+        // much. Null for 'all' mode, where the view just omits the pill.
         $prevPeriod = ReportPeriod::previous($period);
         $crewDeltas = ['spend' => null, 'crew_booked' => null];
         if ($prevPeriod) {
@@ -81,8 +102,11 @@ class CrewDataController extends Controller
 
         return view('crew-data', [
             'period' => $period, 'search' => $search,
+            'roleFilter' => $roleFilter, 'engagementFilter' => $engagementFilter,
+            'roleOptions' => $roleOptions, 'engagementOptions' => $engagementOptions,
             'byPerson' => $byPerson, 'byRole' => $byRole, 'monthly' => $monthly,
-            'crewDeltas' => $crewDeltas,
+            'crewDeltas' => $crewDeltas, 'needsRoleCount' => $needsRoleCount,
+            'periodSummary' => $periodSummary,
             'kpis' => [
                 'spend' => $spendTotal,
                 'shoots' => $bookingIds->count(),
@@ -90,7 +114,6 @@ class CrewDataController extends Controller
                 'crew_booked' => $crewBooked,
                 'crew_assigned_shoots' => $crewAssignedShoots,
                 'shoots_needing_crew' => $shootsNeedingCrew,
-                'avg_per_month' => round((float) $monthly->sum('spend') / $monthsInWindow, 2),
                 'avg_per_shoot' => $crewAssignedShoots ? round($spendTotal / $crewAssignedShoots, 2) : 0.0,
                 'chart_months' => $chartMonths,
             ],
@@ -102,9 +125,9 @@ class CrewDataController extends Controller
      * the by-person and by-role tables, factored out so export() can never drift from what's
      * actually shown on screen for the same period/search.
      *
-     * @return array{0: \Illuminate\Support\Collection, 1: \Illuminate\Support\Collection, 2: \Illuminate\Support\Collection, 3: \Illuminate\Support\Collection}
+     * @return array{0: \Illuminate\Support\Collection, 1: \Illuminate\Support\Collection, 2: \Illuminate\Support\Collection, 3: \Illuminate\Support\Collection, 4: int}
      */
-    private function crewByPersonAndRole(array $period, string $search): array
+    private function crewByPersonAndRole(array $period, string $search, string $roleFilter = '', string $engagementFilter = ''): array
     {
         $confirmedCes = CeAnalytics::confirmedCes($period['from'], $period['to']);
         $bookingIds = $confirmedCes->pluck('booking_id');
@@ -112,15 +135,23 @@ class CrewDataController extends Controller
         // Deliberately reads LIVE booking_crew assignments for confirmed bookings rather than
         // a frozen snapshot: booking_crew isn't versioned the way cost_estimates is, so this
         // can legitimately differ from the CE's stored crew_total if crew was reassigned
-        // after confirmation.
+        // after confirmation. Once a booking is completed, BookingDetailController::addCrew()/
+        // removeCrew() refuse further roster changes so this can't silently rewrite history for
+        // a shoot that already happened (Part 11 panelist revision — "assignment history
+        // protection").
         $crewLines = DB::table('booking_crew as bc')
             ->join('crew_members as cm', 'bc.crew_id', '=', 'cm.crew_id')
             ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
             ->leftJoin('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
             ->whereIn('bc.booking_id', $bookingIds)
             ->select('bc.booking_id', 'bc.crew_id', 'bc.hours_worked', 'bc.rate_used',
-                'cm.first_name', 'cm.last_name', 'cp.position_name', 'b.shoot_date_end')
+                'cm.first_name', 'cm.last_name', 'cm.employment_type', 'cp.position_name', 'b.shoot_date_end')
             ->get();
+
+        // A crew line with no assigned production role isn't a legitimate "Unassigned" role —
+        // it's incomplete data that needs a human to fix, so it's counted here and surfaced as
+        // a warning instead of being grouped into the Roles table as though it were a real role.
+        $needsRoleCount = $crewLines->whereNull('position_name')->pluck('crew_id')->unique()->count();
 
         // Real attendance, not the planned assignment, decides whether a day actually got
         // paid: a booking_crew row's hours_worked/rate_used only ever record what was PLANNED
@@ -148,6 +179,7 @@ class CrewDataController extends Controller
             return (object) [
                 'name' => trim($first->first_name . ' ' . $first->last_name),
                 'positions' => $rows->pluck('position_name')->filter()->unique()->implode(', '),
+                'employment_type' => $first->employment_type,
                 'shoots' => $rows->pluck('booking_id')->unique()->count(),
                 'days' => (float) $rows->sum('paid_days'),
                 'paid' => (float) $rows->sum(fn ($r) => $r->rate_used * $r->paid_days),
@@ -156,7 +188,9 @@ class CrewDataController extends Controller
             ];
         })->sortByDesc('paid')->values();
 
-        $byRole = $crewLines->groupBy(fn ($r) => $r->position_name ?: 'Unassigned')->map(function ($rows, $role) {
+        // "Unassigned" is excluded here (not grouped in) — it isn't a real production role, see
+        // $needsRoleCount above.
+        $byRole = $crewLines->whereNotNull('position_name')->groupBy('position_name')->map(function ($rows, $role) {
             return (object) [
                 'role' => $role,
                 'shoots' => $rows->pluck('booking_id')->unique()->count(),
@@ -171,8 +205,15 @@ class CrewDataController extends Controller
                 || str_contains(mb_strtolower($p->positions), $needle))->values();
             $byRole = $byRole->filter(fn ($r) => str_contains(mb_strtolower($r->role), $needle))->values();
         }
+        if ($roleFilter !== '') {
+            $byPerson = $byPerson->filter(fn ($p) => str_contains($p->positions, $roleFilter))->values();
+            $byRole = $byRole->filter(fn ($r) => $r->role === $roleFilter)->values();
+        }
+        if ($engagementFilter !== '') {
+            $byPerson = $byPerson->filter(fn ($p) => $p->employment_type === $engagementFilter)->values();
+        }
 
-        return [$byPerson, $byRole, $crewLines, $bookingIds];
+        return [$byPerson, $byRole, $crewLines, $bookingIds, $needsRoleCount];
     }
 
     /** Export ▾ — two datasets (by-crew, by-role), same computation index() uses. */
@@ -180,29 +221,49 @@ class CrewDataController extends Controller
     {
         $period = ReportPeriod::resolve($request);
         $search = trim((string) $request->query('q', ''));
+        $roleFilter = trim((string) $request->query('role', ''));
+        $engagementFilter = trim((string) $request->query('engagement', ''));
         $type = $request->query('export', 'by_person');
 
-        [$byPerson, $byRole] = $this->crewByPersonAndRole($period, $search);
+        [$byPerson, $byRole] = $this->crewByPersonAndRole($period, $search, $roleFilter, $engagementFilter);
+
+        $userId = Auth::id();
+        $generatedBy = $userId ? trim((string) DB::table('users')->where('user_id', $userId)
+            ->selectRaw("CONCAT(first_name,' ',last_name) AS n")->value('n')) : null;
+        $infoRows = [
+            ['Applied Period Filter', $period['label'] ?? 'All time'],
+            ['Role Filter', $roleFilter ?: 'All Roles'],
+            ['Engagement Type Filter', $engagementFilter ?: 'All Engagement Types'],
+            ['Search', $search ?: '—'],
+            ['Crew Cost Source', 'Confirmed cost estimates\' bookings, live booking_crew assignments minus logged no-show/back-out attendance days'],
+            ['Generated', now()->format('M j, Y g:i A')],
+            ['Generated By', $generatedBy ?: 'Unknown'],
+        ];
 
         if ($type === 'by_role') {
-            $headers = ['Role', 'Shoots', 'Headcount', 'Paid'];
+            $headers = ['Production Role', 'Shoots', 'Unique Crew', 'Confirmed Crew Cost'];
             $rows = $byRole->map(fn ($r) => [
                 $r->role, $r->shoots, $r->headcount, '₱' . number_format($r->paid, 2),
             ])->all();
-            $title = 'Crew Data — By Role';
-            $filename = 'crew-data-by-role';
+            $title = 'Crew Analytics — By Role';
+            $sectionTitle = 'Crew by Role';
+            $filename = 'crew-analytics-by-role';
         } else {
-            $headers = ['Crew Member', 'Positions', 'Shoots', 'Paid Days', 'Paid', 'No-Shows', 'Last Worked'];
+            $headers = ['Crew Member', 'Positions', 'Shoots', 'Shoot Days', 'Confirmed Crew Cost', 'Attendance Exceptions', 'Last Worked'];
             $rows = $byPerson->map(fn ($p) => [
-                $p->name, $p->positions ?: '—', $p->shoots, $p->days,
+                $p->name, $p->positions ?: 'Unassigned', $p->shoots, $p->days,
                 '₱' . number_format($p->paid, 2), $p->no_shows,
                 $p->last_worked ? \Illuminate\Support\Carbon::parse($p->last_worked)->format('M j, Y') : '—',
             ])->all();
-            $title = 'Crew Data — By Crew Member';
-            $filename = 'crew-data-by-person';
+            $title = 'Crew Analytics — By Crew Member';
+            $sectionTitle = 'Crew Members';
+            $filename = 'crew-analytics-by-person';
         }
 
-        return DataExporter::respond($request->query('format', 'csv'), $title, $headers, $rows, $filename);
+        return DataExporter::respondSections($request->query('format', 'csv'), $title, [
+            ['title' => 'Report Info', 'rows' => $infoRows],
+            ['title' => $sectionTitle, 'headers' => $headers, 'rows' => $rows],
+        ], $filename);
     }
 
     /** Same paid-days-minus-no-shows logic as the main query, for an arbitrary window — used

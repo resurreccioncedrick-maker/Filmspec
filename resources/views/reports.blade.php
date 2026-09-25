@@ -148,6 +148,22 @@
 </div>
 @endif
 
+@php
+  // ↑12% vs previous period, same treatment on every applicable card — $t is one
+  // $kpiTrends[...] entry (or null when there's nothing to compare against).
+  $trendBadge = function (?array $t) {
+      if (! $t) return '';
+      if (! empty($t['isNew'])) {
+          return '<div style="font-size:10.5px;font-weight:700;margin-top:4px;color:var(--green)">'
+              . 'New <span style="font-weight:400;color:var(--muted)">vs previous period</span></div>';
+      }
+      $color = $t['dir'] === 'up' ? 'var(--green)' : 'var(--red)';
+      $arrow = $t['dir'] === 'up' ? '&uarr;' : '&darr;';
+
+      return '<div style="font-size:10.5px;font-weight:700;margin-top:4px;color:' . $color . '">'
+          . $arrow . ' ' . $t['pct'] . '% <span style="font-weight:400;color:var(--muted)">vs previous period</span></div>';
+  };
+@endphp
 <!-- KPI STRIP -->
 <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:22px">
   <div class="stat-card green">
@@ -155,12 +171,14 @@
     <div class="stat-value">₱{{ number_format($kpis['period_sales'] / 1000, 1) }}k</div>
     <div class="stat-label">Period Sales</div>
     <div style="font-size:10px;color:var(--muted);margin-top:2px">Booking value created in period, excl. cancelled</div>
+    {!! $trendBadge($kpiTrends['period_sales']) !!}
   </div>
   <div class="stat-card" style="--sb:var(--blue-600, #2563eb)">
     <div class="stat-icon" style="background:var(--bluel,#eff6ff);color:var(--blue-600,#2563eb)"><i data-feather="credit-card"></i></div>
     <div class="stat-value">₱{{ number_format($kpis['payments_collected'] / 1000, 1) }}k</div>
     <div class="stat-label">Payments Collected</div>
     <div style="font-size:10px;color:var(--muted);margin-top:2px">Cash received in period, any booking</div>
+    {!! $trendBadge($kpiTrends['payments_collected']) !!}
   </div>
   <div class="stat-card orange">
     <div class="stat-icon" style="background:var(--orangel);color:var(--orange)"><i data-feather="alert-circle"></i></div>
@@ -173,12 +191,14 @@
     <div class="stat-value">{{ $kpis['total_bookings'] }}</div>
     <div class="stat-label">Total Bookings</div>
     <div style="font-size:10px;color:var(--muted);margin-top:2px">Created in period, any status</div>
+    {!! $trendBadge($kpiTrends['total_bookings']) !!}
   </div>
   <div class="stat-card" style="--sb:var(--green)">
     <div class="stat-icon" style="background:var(--greenl);color:var(--green)"><i data-feather="check-circle"></i></div>
     <div class="stat-value">{{ $kpis['completed'] }}</div>
     <div class="stat-label">Completed Bookings</div>
     <div style="font-size:10px;color:var(--muted);margin-top:2px">Created in period, status = completed</div>
+    {!! $trendBadge($kpiTrends['completed']) !!}
   </div>
 </div>
 
@@ -188,93 +208,53 @@
   <div class="rpt-section-line"></div>
 </div>
 
+@php
+  $ftSalesTotal = $salesMonthly->sum('sales_total');
+  $ftCollTotal = $salesMonthly->sum('collected_total');
+  $ftBookingsTotal = $salesMonthly->sum('bookings_count');
+  $ftTxTotal = $salesMonthly->sum('transactions');
+@endphp
 <div class="hero-chart-card" style="margin-bottom:16px">
   <div class="hero-chart-head">
     <div>
-      <div class="hero-chart-title">Payments Received — Daily Trend</div>
-      <div class="hero-chart-value">₱{{ number_format($kpis['payments_collected'], 2) }}</div>
-      <div class="hero-chart-sub">Cash received {{ \Illuminate\Support\Carbon::parse($dateFrom)->format('M j, Y') }} — {{ \Illuminate\Support\Carbon::parse($dateTo)->format('M j, Y') }} (not booking value)</div>
+      <div class="hero-chart-title">Financial Trend — <span id="ftModeLabel">Sales</span></div>
+      <div class="hero-chart-value" id="ftValue">₱{{ number_format($ftSalesTotal, 2) }}</div>
+      <div class="hero-chart-sub" id="ftSub">Booking value created {{ \Illuminate\Support\Carbon::parse($dateFrom)->format('M j, Y') }} — {{ \Illuminate\Support\Carbon::parse($dateTo)->format('M j, Y') }} (contracted, not necessarily collected)</div>
     </div>
-    @if ($revenueData->isNotEmpty())
-    @php $revTotal = $revenueData->sum('total'); $txTotal = $revenueData->sum('transactions'); @endphp
-    <div style="display:flex;gap:0;align-items:center">
-      <div class="kpi-mini"><div class="kpi-mini-val">{{ $revenueData->count() }}</div><div class="kpi-mini-lbl">Days</div></div>
-      <div class="kpi-mini-sep"></div>
-      <div class="kpi-mini"><div class="kpi-mini-val">{{ $txTotal }}</div><div class="kpi-mini-lbl">Transactions</div></div>
-      <div class="kpi-mini-sep"></div>
-      <div class="kpi-mini"><div class="kpi-mini-val">₱{{ $txTotal > 0 ? number_format($revTotal / $txTotal, 0) : '—' }}</div><div class="kpi-mini-lbl">Avg / Txn</div></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px">
+      <div style="display:flex;border:1.5px solid var(--border);border-radius:20px;overflow:hidden">
+        <button type="button" class="preset-btn active" id="ftBtnSales" onclick="setFinTrendMode('sales')" style="border-radius:0;border:none">Sales</button>
+        <button type="button" class="preset-btn" id="ftBtnCollections" onclick="setFinTrendMode('collections')" style="border-radius:0;border:none;border-left:1.5px solid var(--border)">Collections</button>
+      </div>
+      <div style="display:flex;gap:0;align-items:center">
+        <div class="kpi-mini"><div class="kpi-mini-val" id="ftCountVal">{{ $ftBookingsTotal }}</div><div class="kpi-mini-lbl" id="ftCountLbl">Bookings</div></div>
+        <div class="kpi-mini-sep"></div>
+        <div class="kpi-mini"><div class="kpi-mini-val">{{ $salesMonthly->count() }}</div><div class="kpi-mini-lbl">Months</div></div>
+      </div>
     </div>
-    @endif
   </div>
   <div class="hero-chart-body">
-    @if ($revenueData->isEmpty())
-    <div class="empty-state" style="padding:32px 0"><i data-feather="bar-chart-2"></i><h3>No payment data for this period</h3></div>
+    @if ($salesMonthly->isEmpty())
+    <div class="empty-state" style="padding:32px 0"><i data-feather="bar-chart-2"></i><h3>No financial data for this period</h3></div>
     @else
-    <canvas id="revenueChart" height="95"></canvas>
+    <canvas id="finTrendChart" height="80"></canvas>
     <div class="table-wrap" style="border-top:1px solid var(--border)">
       <table>
-        <thead><tr><th>Date</th><th style="text-align:right">Transactions</th><th style="text-align:right">Sales</th>@if ($compareActiveQ && $compareRevenueData->isNotEmpty())<th style="text-align:right;color:#7c3aed">Comparison</th>@endif</tr></thead>
+        <thead><tr><th>Month</th><th style="text-align:right" id="ftColHead">Bookings</th><th style="text-align:right" id="ftAmtHead">Sales</th></tr></thead>
         <tbody>
-          @php $compareMap = $compareRevenueData->keyBy('sort_key'); @endphp
-          @foreach ($revenueData as $r)
+          @foreach ($salesMonthly as $r)
           <tr>
             <td style="font-weight:600">{{ $r->label }}</td>
-            <td style="text-align:right">{{ (int) $r->transactions }}</td>
-            <td style="text-align:right;font-family:var(--font-m)">₱{{ number_format((float) $r->total, 2) }}</td>
-            @if ($compareActiveQ && $compareRevenueData->isNotEmpty())
-            @php $cr = $compareMap->get($r->sort_key); @endphp
-            <td style="text-align:right;color:#7c3aed;font-size:.8rem">{{ $cr ? '₱' . number_format((float) $cr->total, 2) : '—' }}</td>
-            @endif
+            <td style="text-align:right" class="ft-count-cell" data-sales="{{ $r->bookings_count }}" data-coll="{{ $r->transactions }}">{{ $r->bookings_count }}</td>
+            <td style="text-align:right;font-family:var(--font-m)" class="ft-amt-cell" data-sales="{{ $r->sales_total }}" data-coll="{{ $r->collected_total }}">₱{{ number_format($r->sales_total, 2) }}</td>
           </tr>
           @endforeach
         </tbody>
         <tfoot>
           <tr style="background:var(--s2)">
             <td style="font-weight:700">Total</td>
-            <td style="text-align:right;font-weight:700">{{ $txTotal }}</td>
-            <td style="text-align:right;font-weight:700;font-family:var(--font-m)">₱{{ number_format($revTotal, 2) }}</td>
-            @if ($compareActiveQ && $compareRevenueData->isNotEmpty())
-            <td style="text-align:right;font-weight:700;color:#7c3aed">₱{{ number_format($compareRevenueData->sum('total'), 2) }}</td>
-            @endif
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-    @endif
-  </div>
-</div>
-
-<div class="hero-chart-card" style="margin-bottom:0">
-  <div class="hero-chart-head">
-    <div>
-      <div class="hero-chart-title">Payment Collection</div>
-      @php $cTotal = $collectionData->sum('collected'); $cTx = $collectionData->sum('transactions'); @endphp
-      <div class="hero-chart-value" style="font-size:32px;color:var(--green)">₱{{ number_format($cTotal, 2) }}</div>
-      <div class="hero-chart-sub">{{ $cTx }} payments collected</div>
-    </div>
-  </div>
-  <div class="hero-chart-body">
-    @if ($collectionData->isEmpty())
-    <div class="empty-state" style="padding:32px 0"><i data-feather="credit-card"></i><h3>No collection data for this period</h3></div>
-    @else
-    <canvas id="collectionChart" height="75"></canvas>
-    <div class="table-wrap" style="border-top:1px solid var(--border)">
-      <table>
-        <thead><tr><th>Month</th><th style="text-align:right">Payments</th><th style="text-align:right">Amount Collected</th></tr></thead>
-        <tbody>
-          @foreach ($collectionData as $r)
-          <tr>
-            <td style="font-weight:600">{{ $r->label }}</td>
-            <td style="text-align:right">{{ (int) $r->transactions }}</td>
-            <td style="text-align:right;font-family:var(--font-m)">₱{{ number_format((float) $r->collected, 2) }}</td>
-          </tr>
-          @endforeach
-        </tbody>
-        <tfoot>
-          <tr style="background:var(--s2)">
-            <td style="font-weight:700">Total</td>
-            <td style="text-align:right;font-weight:700">{{ $cTx }}</td>
-            <td style="text-align:right;font-weight:700;font-family:var(--font-m)">₱{{ number_format($cTotal, 2) }}</td>
+            <td style="text-align:right;font-weight:700" id="ftCountFoot">{{ $ftBookingsTotal }}</td>
+            <td style="text-align:right;font-weight:700;font-family:var(--font-m)" id="ftAmtFoot">₱{{ number_format($ftSalesTotal, 2) }}</td>
           </tr>
         </tfoot>
       </table>
@@ -303,7 +283,11 @@
     @if ($bookingsByType->isEmpty())
     <div class="empty-state" style="padding:32px 0"><i data-feather="layers"></i><h3>No bookings in this period</h3></div>
     @else
-    <div class="donut-wrap"><canvas id="typeChart" style="max-width:220px;max-height:220px"></canvas></div>
+    {{-- Horizontal bar instead of a donut — with this few categories a donut is usually one
+         giant slice and a sliver, which reads worse than a simple ranked bar list. --}}
+    <div style="padding:16px 20px 4px">
+      <canvas id="typeChart" height="{{ max(90, $bookingsByType->count() * 42) }}"></canvas>
+    </div>
     <div class="table-wrap" style="border-top:1px solid var(--border)">
       <table>
         <thead><tr><th>Type</th><th>Count</th><th style="text-align:right">Share</th></tr></thead>
@@ -581,9 +565,6 @@
 
 @php
   $jsTypePcts = $bookingsByType->map(fn ($r) => round($r->total / $totalBookingsByType * 100, 1))->values();
-  $jsRevLabels = $revenueData->pluck('label');
-  $jsRevValues = $revenueData->pluck('total')->map(fn ($v) => (float) $v);
-  $jsCompareRevValues = $compareRevenueData->pluck('total')->map(fn ($v) => (float) $v);
   $jsTypeLabels = $bookingsByType->map(fn ($r) => ucfirst(str_replace('_', ' ', $r->project_type)));
   $jsTypeValues = $bookingsByType->pluck('total')->map(fn ($v) => (int) $v);
   $jsTopEquipLabels = $topEquipment->take(8)->pluck('equipment_name');
@@ -595,9 +576,13 @@
   $availRetired = $equipAvail['retired'];
   $jsAvailLabels = ['Available', 'Booked', 'In Use', 'Under Repair', 'Retired'];
   $jsAvailValues = [$availAvailable, $availBooked, $availRented, $availRepair, $availRetired];
-  $jsCollLabels = $collectionData->pluck('label');
-  $jsCollValues = $collectionData->pluck('collected')->map(fn ($v) => (float) $v);
-  $showCompareLine = $compareActiveQ && $compareRevenueData->isNotEmpty();
+
+  $jsFtLabels = $salesMonthly->pluck('label');
+  $jsFtSalesValues = $salesMonthly->pluck('sales_total')->map(fn ($v) => (float) $v);
+  $jsFtCollValues = $salesMonthly->pluck('collected_total')->map(fn ($v) => (float) $v);
+  $showCompareLine = $compareActive && $compareMonthly->isNotEmpty();
+  $jsFtCompareSalesValues = $compareMonthly->pluck('sales_total')->map(fn ($v) => (float) $v);
+  $jsFtCompareCollValues = $compareMonthly->pluck('collected_total')->map(fn ($v) => (float) $v);
 @endphp
 
 @push('scripts')
@@ -610,59 +595,118 @@ const BLUE_SHADES = [
 
 const _typePcts = @json($jsTypePcts);
 
-@if ($revenueData->isNotEmpty())
-const revDatasets = [{
-  label: '{{ \Illuminate\Support\Carbon::parse($dateFrom)->format('Y') }}-{{ \Illuminate\Support\Carbon::parse($dateTo)->format('Y') }} Period',
-  data: @json($jsRevValues),
-  borderColor: '#0060C7',
-  backgroundColor: 'rgba(0,96,199,0.07)',
-  fill: true,tension:0.45,pointRadius:5,pointHoverRadius:8,
-  pointBackgroundColor:'#fff',pointBorderColor:'#0060C7',pointBorderWidth:2.5,borderWidth:2.5,
-}@if ($showCompareLine),{
-  label: 'Comparison Period',
-  data: @json($jsCompareRevValues),
-  borderColor: '#7c3aed',
-  backgroundColor: 'rgba(124,58,237,0.05)',
-  fill:true,tension:0.45,pointRadius:4,pointHoverRadius:7,
-  pointBackgroundColor:'#fff',pointBorderColor:'#7c3aed',pointBorderWidth:2,borderWidth:2,
-  borderDash:[5,3],
-}@endif];
+@if ($salesMonthly->isNotEmpty())
+const ftLabels = @json($jsFtLabels);
+const ftSalesValues = @json($jsFtSalesValues);
+const ftCollValues = @json($jsFtCollValues);
+const ftCompareSalesValues = @json($jsFtCompareSalesValues);
+const ftCompareCollValues = @json($jsFtCompareCollValues);
+const ftShowCompare = {{ $showCompareLine ? 'true' : 'false' }};
 
-new Chart(document.getElementById('revenueChart'), {
+const ftDatasets = [
+  {
+    label: 'Sales', data: ftSalesValues, hidden: false,
+    borderColor: '#0060C7', backgroundColor: 'rgba(0,96,199,0.07)',
+    fill: true, tension: 0.45, pointRadius: 5, pointHoverRadius: 8,
+    pointBackgroundColor: '#fff', pointBorderColor: '#0060C7', pointBorderWidth: 2.5, borderWidth: 2.5,
+  },
+  {
+    label: 'Collections', data: ftCollValues, hidden: true,
+    borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,0.07)',
+    fill: true, tension: 0.45, pointRadius: 5, pointHoverRadius: 8,
+    pointBackgroundColor: '#fff', pointBorderColor: '#16a34a', pointBorderWidth: 2.5, borderWidth: 2.5,
+  },
+];
+@if ($showCompareLine)
+ftDatasets.push({
+  label: 'Comparison — Sales', data: ftCompareSalesValues, hidden: false, isCompare: true, compareFor: 'sales',
+  borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.05)',
+  fill: true, tension: 0.45, pointRadius: 4, pointHoverRadius: 7,
+  pointBackgroundColor: '#fff', pointBorderColor: '#7c3aed', pointBorderWidth: 2, borderWidth: 2, borderDash: [5, 3],
+});
+ftDatasets.push({
+  label: 'Comparison — Collections', data: ftCompareCollValues, hidden: true, isCompare: true, compareFor: 'collections',
+  borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.05)',
+  fill: true, tension: 0.45, pointRadius: 4, pointHoverRadius: 7,
+  pointBackgroundColor: '#fff', pointBorderColor: '#7c3aed', pointBorderWidth: 2, borderWidth: 2, borderDash: [5, 3],
+});
+@endif
+
+const finTrendChart = new Chart(document.getElementById('finTrendChart'), {
   type: 'line',
-  data: { labels: @json($jsRevLabels), datasets: revDatasets },
+  data: { labels: ftLabels, datasets: ftDatasets },
   options: {
-    responsive:true,
-    plugins:{
-      legend:{display:{{ $showCompareLine ? 'true' : 'false' }}},
-      tooltip:{backgroundColor:'#1e293b',padding:12,cornerRadius:8,
-        callbacks:{label:v=>'  ₱'+v.raw.toLocaleString('en-PH',{minimumFractionDigits:2})}}
+    responsive: true,
+    plugins: {
+      legend: { display: ftShowCompare, labels: { font: { size: 11 }, boxWidth: 10 } },
+      tooltip: { backgroundColor: '#1e293b', padding: 12, cornerRadius: 8,
+        callbacks: { label: v => '  ' + v.dataset.label + ': ₱' + v.raw.toLocaleString('en-PH', { minimumFractionDigits: 2 }) } }
     },
-    scales:{
-      x:{grid:{display:false},ticks:{font:{size:11}}},
-      y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.05)'},
-         ticks:{callback:v=>'₱'+Number(v).toLocaleString('en-PH',{maximumFractionDigits:0}),font:{size:11}}}
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+      y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' },
+        ticks: { callback: v => '₱' + Number(v).toLocaleString('en-PH', { maximumFractionDigits: 0 }), font: { size: 11 } } }
     }
   }
 });
+
+function setFinTrendMode(mode) {
+  const isSales = mode === 'sales';
+  document.getElementById('ftBtnSales').classList.toggle('active', isSales);
+  document.getElementById('ftBtnCollections').classList.toggle('active', !isSales);
+  document.getElementById('ftModeLabel').textContent = isSales ? 'Sales' : 'Collections';
+  document.getElementById('ftCountLbl').textContent = isSales ? 'Bookings' : 'Payments';
+  document.getElementById('ftColHead').textContent = isSales ? 'Bookings' : 'Payments';
+  document.getElementById('ftAmtHead').textContent = isSales ? 'Sales' : 'Collected';
+
+  const sumKey = isSales ? 'sales' : 'coll';
+  let amtTotal = 0, countTotal = 0;
+  document.querySelectorAll('.ft-count-cell').forEach(td => {
+    const v = parseInt(td.dataset[sumKey], 10) || 0;
+    td.textContent = v;
+    countTotal += v;
+  });
+  document.querySelectorAll('.ft-amt-cell').forEach(td => {
+    const v = parseFloat(td.dataset[sumKey]) || 0;
+    td.textContent = '₱' + v.toLocaleString('en-PH', { minimumFractionDigits: 2 });
+    amtTotal += v;
+  });
+  document.getElementById('ftCountVal').textContent = countTotal;
+  document.getElementById('ftCountFoot').textContent = countTotal;
+  document.getElementById('ftAmtFoot').textContent = '₱' + amtTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 });
+  document.getElementById('ftValue').textContent = '₱' + amtTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 });
+  document.getElementById('ftSub').textContent = isSales
+    ? 'Booking value created {{ $dateFrom }} — {{ $dateTo }} (contracted, not necessarily collected)'
+    : 'Cash received {{ $dateFrom }} — {{ $dateTo }} (not booking value)';
+
+  finTrendChart.data.datasets.forEach(ds => {
+    if (ds.isCompare) { ds.hidden = ds.compareFor !== mode; return; }
+    ds.hidden = (ds.label === 'Sales') !== isSales;
+  });
+  finTrendChart.update();
+}
 @endif
 
 @if ($bookingsByType->isNotEmpty())
 new Chart(document.getElementById('typeChart'), {
-  type:'doughnut',
-  data:{
-    labels:@json($jsTypeLabels),
-    datasets:[{
-      data:@json($jsTypeValues),
+  type: 'bar',
+  data: {
+    labels: @json($jsTypeLabels),
+    datasets: [{
+      data: @json($jsTypeValues),
       backgroundColor: BLUE_SHADES.slice(0, {{ $bookingsByType->count() }}),
-      borderWidth:3,borderColor:'var(--surface)',hoverOffset:6
+      borderRadius: 4, borderSkipped: false,
     }]
   },
-  options:{
-    cutout:'65%',
-    plugins:{
-      legend:{position:'bottom',labels:{font:{size:11},boxWidth:10,padding:10,color:'#64748b'}},
-      tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+ctx.raw+' ('+(_typePcts[ctx.dataIndex]??0)+'%)'}}
+  options: {
+    indexAxis: 'y',
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ' ' + ctx.raw + ' booking' + (ctx.raw === 1 ? '' : 's') + ' (' + (_typePcts[ctx.dataIndex] ?? 0) + '%)' } }
+    },
+    scales: {
+      x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' }, ticks: { font: { size: 11 }, precision: 0 } },
+      y: { grid: { display: false }, ticks: { font: { size: 11 } } }
     }
   }
 });
@@ -710,35 +754,6 @@ new Chart(document.getElementById('availChart'), {
     }
   }
 });
-
-@if ($collectionData->isNotEmpty())
-new Chart(document.getElementById('collectionChart'), {
-  type:'line',
-  data:{
-    labels:@json($jsCollLabels),
-    datasets:[{
-      label:'Collected',
-      data:@json($jsCollValues),
-      borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,0.07)',
-      fill:true,tension:0.45,pointRadius:5,pointHoverRadius:8,
-      pointBackgroundColor:'#fff',pointBorderColor:'#16a34a',pointBorderWidth:2.5,borderWidth:2.5,
-    }]
-  },
-  options:{
-    responsive:true,
-    plugins:{
-      legend:{display:false},
-      tooltip:{backgroundColor:'#1e293b',padding:12,cornerRadius:8,
-        callbacks:{label:v=>'  ₱'+v.raw.toLocaleString('en-PH',{minimumFractionDigits:2})}}
-    },
-    scales:{
-      x:{grid:{display:false},ticks:{font:{size:11}}},
-      y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.05)'},
-         ticks:{callback:v=>'₱'+Number(v).toLocaleString('en-PH',{maximumFractionDigits:0}),font:{size:11}}}
-    }
-  }
-});
-@endif
 
 // Export ▾ open/close is handled by the shared .export-toggle delegated listener in
 // public/assets/js/app.js — this page only needs its own format-pill behavior, since it's

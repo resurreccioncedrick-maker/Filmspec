@@ -227,9 +227,19 @@
         @if ($ce->status === 'confirmed')
         <span class="badge badge-green" style="align-self:center"><i data-feather="check" style="width:11px;height:11px"></i> Confirmed</span>
         @elseif (in_array($role, ['super_admin', 'admin', 'operations_manager'], true))
+        @if ($ce->status === 'draft')
         <form method="POST" action="{{ $actionUrl }}" style="display:inline">
           @csrf
+          <input type="hidden" name="action" value="issue_ce">
+          <button type="submit" class="btn btn-outline btn-sm" title="Mark as issued/sent to client, before final confirmation"><i data-feather="send"></i> Mark Issued</button>
+        </form>
+        @elseif ($ce->status === 'issued')
+        <span class="badge badge-blue" style="align-self:center">Issued — Awaiting Confirmation</span>
+        @endif
+        <form method="POST" action="{{ $actionUrl }}" style="display:inline" onsubmit="return fillCeConfirmNote(this)">
+          @csrf
           <input type="hidden" name="action" value="confirm_ce">
+          <input type="hidden" name="confirmation_note" value="">
           <button type="submit" class="btn btn-success btn-sm"><i data-feather="check"></i> Confirm CE</button>
         </form>
         @endif
@@ -247,9 +257,19 @@
         @if ($ce->status === 'confirmed')
         <span class="badge badge-green" style="align-self:center"><i data-feather="check" style="width:11px;height:11px"></i> Confirmed</span>
         @elseif (in_array($role, ['super_admin', 'admin', 'operations_manager'], true))
+        @if ($ce->status === 'draft')
         <form method="POST" action="{{ $actionUrl }}" style="display:inline">
           @csrf
+          <input type="hidden" name="action" value="issue_ce">
+          <button type="submit" class="btn btn-outline btn-sm" title="Mark as issued/sent to client, before final confirmation"><i data-feather="send"></i> Mark Issued</button>
+        </form>
+        @elseif ($ce->status === 'issued')
+        <span class="badge badge-blue" style="align-self:center">Issued — Awaiting Confirmation</span>
+        @endif
+        <form method="POST" action="{{ $actionUrl }}" style="display:inline" onsubmit="return fillCeConfirmNote(this)">
+          @csrf
           <input type="hidden" name="action" value="confirm_ce">
+          <input type="hidden" name="confirmation_note" value="">
           <button type="submit" class="btn btn-success btn-sm"><i data-feather="check"></i> Confirm CE</button>
         </form>
         @endif
@@ -544,7 +564,7 @@
       <a href="{{ route('ce-preview', ['booking_id' => $id]) }}" class="btn btn-outline btn-sm" target="_blank">Open Full Page <i data-feather="external-link" style="width:12px;height:12px"></i></a>
     </div>
     <div class="card-body" style="padding:0">
-      <iframe src="{{ route('ce-preview', ['booking_id' => $id]) }}" style="width:100%;height:1400px;border:none;display:block"></iframe>
+      <iframe src="{{ route('ce-preview', ['booking_id' => $id, 'tab_embed' => 1]) }}" style="width:100%;height:1400px;border:none;display:block"></iframe>
     </div>
   </div>
 </div>
@@ -2315,6 +2335,16 @@
 
 @push('scripts')
 <script>
+// Optional audit note captured at CE-confirm time — e.g. "client approved via email Sep 20".
+// Cancelling the prompt still confirms the CE (note is a nice-to-have, not a gate).
+function fillCeConfirmNote(form) {
+  var note = window.prompt('Optional: how was this cost estimate confirmed/accepted? (e.g. "Client approved via email")', '');
+  if (note !== null) {
+    form.querySelector('input[name="confirmation_note"]').value = note;
+  }
+  return true;
+}
+
 function closeActionMenus() {
   document.querySelectorAll('.action-menu.show').forEach(function (m) {
     m.classList.remove('show', 'drop-up');
