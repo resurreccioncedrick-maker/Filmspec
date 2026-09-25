@@ -396,24 +396,24 @@
 
   $transportDetail = ! $driverNeeded ? 'Transport confirmed' : ($driverOk ? 'Driver assigned' : 'Driver not yet assigned');
 @endphp
-<div class="card" style="margin-bottom:18px;border:1px solid {{ $allOk ? '#BBF7D0' : '#E2EAF4' }};border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,30,80,.06);padding:22px 24px 20px">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-    <span style="font-size:15.5px;font-weight:700;color:#0B1A33">Release Readiness</span>
-    <span style="font-size:12px;font-weight:700;padding:4px 11px;border-radius:999px;background:{{ $allOk ? '#DCFCE7' : '#FFEDD5' }};color:{{ $allOk ? '#15803D' : '#9A3412' }}">{{ $metConds }}/{{ $totalConds }} ready</span>
+<div class="card" style="margin-bottom:14px;border:1px solid {{ $allOk ? '#BBF7D0' : '#E2EAF4' }};border-radius:11px;overflow:hidden;box-shadow:0 1px 4px rgba(0,30,80,.06);padding:14px 16px 12px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px">
+    <span style="font-size:13px;font-weight:700;color:#0B1A33">Release Readiness</span>
+    <span style="font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;background:{{ $allOk ? '#DCFCE7' : '#FFEDD5' }};color:{{ $allOk ? '#15803D' : '#9A3412' }}">{{ $metConds }}/{{ $totalConds }} ready</span>
   </div>
 
-  <div style="position:relative;padding:0 4px 4px">
-    <div style="position:absolute;top:15px;left:18px;right:18px;height:2px;background:#E2EAF4"></div>
+  <div style="position:relative;padding:0 4px 2px">
+    <div style="position:absolute;top:10px;left:14px;right:14px;height:2px;background:#E2EAF4"></div>
     <div style="display:flex;position:relative">
       @foreach ($steps as $step)
       @php $clickable = $step['label'] === 'Transport'; @endphp
       <{{ $clickable ? 'button' : 'div' }}
         @if ($clickable) type="button" onclick="openModal('modalAssignTransport')" title="Open Add/Edit Transport" @endif
-        style="display:flex;flex-direction:column;align-items:center;gap:9px;flex:1;background:none;border:none;font-family:inherit;{{ $clickable ? 'cursor:pointer' : '' }}">
-        <div style="width:32px;height:32px;border-radius:999px;background:{{ $step['ok'] ? '#16A34A' : '#DC2626' }};display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px #fff">
-          <i data-feather="{{ $step['ok'] ? 'check' : 'x' }}" style="width:14px;height:14px;color:#fff;stroke-width:3"></i>
+        style="display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;background:none;border:none;font-family:inherit;{{ $clickable ? 'cursor:pointer' : '' }}">
+        <div style="width:21px;height:21px;border-radius:999px;background:{{ $step['ok'] ? '#16A34A' : '#DC2626' }};display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px #fff">
+          <i data-feather="{{ $step['ok'] ? 'check' : 'x' }}" style="width:10px;height:10px;color:#fff;stroke-width:3"></i>
         </div>
-        <div style="font-size:11.5px;font-weight:600;color:{{ $clickable ? '#0060C7' : '#385270' }};text-align:center;{{ $clickable ? 'text-decoration:underline' : '' }}">{{ $step['label'] }}</div>
+        <div style="font-size:9.5px;font-weight:600;color:{{ $clickable ? '#0060C7' : '#385270' }};text-align:center;{{ $clickable ? 'text-decoration:underline' : '' }}">{{ $step['label'] }}</div>
       </{{ $clickable ? 'button' : 'div' }}>
       @endforeach
     </div>
@@ -428,21 +428,21 @@
     if (! $transportConfirmed) $blockers[] = 'Transport hasn\'t been reviewed yet — open Add/Edit Transport, even to confirm none is needed';
     elseif (! $driverOk) $blockers[] = 'Driver not yet assigned — this booking\'s transport requires one';
   @endphp
-  <div style="margin-top:18px;padding:11px 14px;background:#FFF7ED;border-radius:9px;display:flex;align-items:flex-start;gap:9px">
-    <i data-feather="alert-circle" style="width:14px;height:14px;color:#B45309;flex-shrink:0;margin-top:1px"></i>
-    <span style="font-size:12.5px;font-weight:600;color:#9A3412">{{ implode(' · ', $blockers) }}</span>
+  <div style="margin-top:11px;padding:7px 10px;background:#FFF7ED;border-radius:7px;display:flex;align-items:flex-start;gap:7px">
+    <i data-feather="alert-circle" style="width:12px;height:12px;color:#B45309;flex-shrink:0;margin-top:1px"></i>
+    <span style="font-size:10.5px;font-weight:600;color:#9A3412">{{ implode(' · ', $blockers) }}</span>
   </div>
   @endunless
 
-  <div style="margin-top:16px">
+  <div style="margin-top:10px">
     @if ($allOk)
-    <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'out']) }}" class="btn" style="width:100%;justify-content:center;padding:12px;border-radius:10px;font-size:13.5px;font-weight:700;background:#16A34A;color:#fff;border:none;display:flex;align-items:center;gap:8px">
-      <i data-feather="clipboard" style="width:14px;height:14px"></i> Open Checklist OUT
+    <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'out']) }}" class="btn" style="width:100%;justify-content:center;padding:8px;border-radius:8px;font-size:11.5px;font-weight:700;background:#16A34A;color:#fff;border:none;display:flex;align-items:center;gap:6px">
+      <i data-feather="clipboard" style="width:12px;height:12px"></i> Open Checklist OUT
     </a>
-    <p style="font-size:11.5px;color:#7695B0;margin:8px 0 0;text-align:center">Equipment isn't marked as released — and can't go out to the field — until it's checked out here.</p>
+    <p style="font-size:9.5px;color:#7695B0;margin:5px 0 0;text-align:center">Equipment isn't marked as released — and can't go out to the field — until it's checked out here.</p>
     @else
-    <button type="button" disabled style="width:100%;padding:12px;border-radius:10px;font-size:13.5px;font-weight:700;background:#F3F0EA;color:#B0A99C;border:none;cursor:not-allowed;display:flex;align-items:center;justify-content:center;gap:8px">
-      <i data-feather="lock" style="width:14px;height:14px"></i> Locked until all steps are ready
+    <button type="button" disabled style="width:100%;padding:8px;border-radius:8px;font-size:11.5px;font-weight:700;background:#F3F0EA;color:#B0A99C;border:none;cursor:not-allowed;display:flex;align-items:center;justify-content:center;gap:6px">
+      <i data-feather="lock" style="width:12px;height:12px"></i> Locked until all steps are ready
     </button>
     @endif
   </div>
