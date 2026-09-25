@@ -69,6 +69,11 @@ class FieldRequestsController extends Controller
                 ->where('eta', '<', now())->count(),
         ];
 
+        // Per-tab counts — without these the tab strip gave no clue that, say, "3 Awaiting
+        // Review" (shown in the KPI card above) actually lives under the Pending Review tab
+        // while the default Active tab (approved/dispatched only) shows nothing at all.
+        $tabCounts = DB::table('booking_equipment_requests')->selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status');
+
         $vehicleRates = DB::table('vehicle_rates')->where('is_active', 1)->orderBy('base_rate')->get();
         // Shared by the Driver dropdown (any active crew can drive) and the crew-assignment
         // picker for unassigned requests (JS re-sorts this same list by matching position_id).
@@ -82,7 +87,7 @@ class FieldRequestsController extends Controller
 
         return view('field-requests', [
             'msg' => $msg, 'requests' => $requests, 'stats' => $stats, 'statusFilter' => $statusFilter,
-            'vehicleRates' => $vehicleRates, 'activeDrivers' => $activeDrivers,
+            'vehicleRates' => $vehicleRates, 'activeDrivers' => $activeDrivers, 'tabCounts' => $tabCounts,
         ]);
     }
 

@@ -549,6 +549,10 @@ class BookingDetailController extends Controller
             'location_zone' => $zone ?: null, 'transport_multiplier' => $mult,
             'transportation_cost' => $transCost, 'vehicle_rate_id' => $vid ?: null,
             'driver_required' => $vid ? $driverRequired : false,
+            // Set on every save, whatever the outcome (a real vehicle or an explicit "no
+            // transport needed") — this is what the release gate actually checks, not whether
+            // a vehicle happens to be selected.
+            'transport_confirmed_at' => now(),
         ]);
 
         $parts = [];
@@ -679,6 +683,12 @@ class BookingDetailController extends Controller
             return ['type' => 'error', 'text' => 'Cannot release — no crew assigned. Assign at least one crew member (operator, driver, etc.) before releasing equipment.'];
         }
 
+        // Transport must have been explicitly reviewed at least once (even if the answer was
+        // "no transport needed") — otherwise a booking nobody has looked at looks identical to
+        // one that genuinely doesn't need transport, and release would slip through unnoticed.
+        if (empty($booking->transport_confirmed_at)) {
+            return ['type' => 'error', 'text' => 'Cannot release — transport hasn\'t been reviewed yet. Open Add/Edit Transport, even to confirm none is needed.'];
+        }
         // Transport being assigned doesn't automatically mean a driver is required — staff mark
         // that explicitly on the Assign Transport form (driver_required).
         $driverNeeded = ! empty($booking->vehicle_rate_id) && (bool) ($booking->driver_required ?? false);
@@ -791,6 +801,18 @@ class BookingDetailController extends Controller
         }
         if (DB::table('booking_crew')->where('booking_id', $id)->count() === 0) {
             return ['type' => 'error', 'text' => 'Cannot release — no crew assigned.'];
+        }
+        if (empty($booking->transport_confirmed_at)) {
+            return ['type' => 'error', 'text' => 'Cannot release — transport hasn\'t been reviewed yet.'];
+        }
+        if (! empty($booking->vehicle_rate_id) && (bool) ($booking->driver_required ?? false)) {
+            $driverCount = DB::table('booking_crew as bc')
+                ->join('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
+                ->where('bc.booking_id', $id)->where(DB::raw('LOWER(cp.position_name)'), 'like', '%driver%')
+                ->count();
+            if (! $driverCount) {
+                return ['type' => 'error', 'text' => 'Cannot release — a Driver must be assigned because this booking\'s transport requires one.'];
+            }
         }
         if ($booking->client_type === 'first_time' && (float) $booking->final_amount > 0) {
             $paidAmt = (float) DB::table('payments')->where('booking_id', $id)->sum('amount');

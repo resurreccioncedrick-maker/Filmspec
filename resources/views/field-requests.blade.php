@@ -29,11 +29,11 @@
 </div>
 
 <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
-  <div class="stat-card {{ $stats['pending'] > 0 ? 'orange' : '' }}">
+  <a href="{{ $base }}?status=pending" class="stat-card {{ $stats['pending'] > 0 ? 'orange' : '' }}" style="text-decoration:none;color:inherit;display:block">
     <div class="stat-icon" style="{{ $stats['pending'] > 0 ? 'background:var(--orangel);color:var(--orange)' : '' }}"><i data-feather="file-text"></i></div>
     <div class="stat-value">{{ $stats['pending'] }}</div>
     <div class="stat-label">Awaiting Review</div>
-  </div>
+  </a>
   <div class="stat-card">
     <div class="stat-icon"><i data-feather="package"></i></div>
     <div class="stat-value" style="color:var(--green)">{{ $stats['approved'] }}</div>
@@ -51,12 +51,16 @@
   </div>
 </div>
 
+@php
+  $activeCount = ($tabCounts['approved'] ?? 0) + ($tabCounts['dispatched'] ?? 0);
+  $allCount = $tabCounts->sum();
+@endphp
 <div class="tabs" style="margin-bottom:18px">
-  <a href="{{ $base }}?status=active" class="tab-btn {{ $statusFilter === 'active' ? 'active' : '' }}">Active</a>
+  <a href="{{ $base }}?status=active" class="tab-btn {{ $statusFilter === 'active' ? 'active' : '' }}">Active @if($activeCount > 0)<span class="badge badge-gray" style="margin-left:5px">{{ $activeCount }}</span>@endif</a>
   @foreach ($statusLabels as $key => $label)
-  <a href="{{ $base }}?status={{ $key }}" class="tab-btn {{ $statusFilter === $key ? 'active' : '' }}">{{ $label }}</a>
+  <a href="{{ $base }}?status={{ $key }}" class="tab-btn {{ $statusFilter === $key ? 'active' : '' }}">{{ $label }} @if(($tabCounts[$key] ?? 0) > 0)<span class="badge {{ $key === 'pending' ? 'badge-yellow' : 'badge-gray' }}" style="margin-left:5px">{{ $tabCounts[$key] }}</span>@endif</a>
   @endforeach
-  <a href="{{ $base }}?status=all" class="tab-btn {{ $statusFilter === 'all' ? 'active' : '' }}">All</a>
+  <a href="{{ $base }}?status=all" class="tab-btn {{ $statusFilter === 'all' ? 'active' : '' }}">All @if($allCount > 0)<span class="badge badge-gray" style="margin-left:5px">{{ $allCount }}</span>@endif</a>
 </div>
 
 <div class="card">

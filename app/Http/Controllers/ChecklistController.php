@@ -145,6 +145,18 @@ class ChecklistController extends Controller
 
                 return redirect()->route('booking-detail', $bid);
             }
+            // "No transport" and "nobody has decided about transport yet" used to look
+            // identical — this column is only ever set once the Assign Transport form is
+            // actually submitted, whatever the outcome.
+            if (empty($booking->transport_confirmed_at)) {
+                $request->session()->flash('bd_flash', [
+                    'type' => 'danger',
+                    'text' => "Equipment can't be checked out yet — transport hasn't been reviewed. "
+                        . 'Open Add/Edit Transport on the booking page first, even to confirm none is needed.',
+                ]);
+
+                return redirect()->route('booking-detail', $bid);
+            }
         }
 
         $msg = null;
@@ -212,14 +224,15 @@ class ChecklistController extends Controller
         $paidAmt = (float) DB::table('payments')->where('booking_id', $bid)->sum('amount');
         $req50 = (float) ($booking->final_amount ?? 0) * 0.5;
         $payGate = $booking->client_type !== 'first_time' || $paidAmt >= $req50;
-        $gateOk = $totalItems > 0 && $crewCount > 0 && (! $driverNeeded || $driverCount > 0) && $payGate && $costApproved;
+        $transportConfirmed = ! empty($booking->transport_confirmed_at);
+        $gateOk = $totalItems > 0 && $crewCount > 0 && $transportConfirmed && (! $driverNeeded || $driverCount > 0) && $payGate && $costApproved;
 
         return view('checklist', [
             'msg' => $msg, 'canManage' => $canManage, 'booking' => $booking, 'bid' => $bid, 'dir' => $dir,
             'equipLines' => $equipLines, 'totalItems' => $totalItems, 'outChecked' => $outChecked,
             'inChecked' => $inChecked, 'damaged' => $damaged,
             'crewCount' => $crewCount, 'driverNeeded' => $driverNeeded, 'driverCount' => $driverCount,
-            'costApproved' => $costApproved,
+            'costApproved' => $costApproved, 'transportConfirmed' => $transportConfirmed,
             'paidAmt' => $paidAmt, 'req50' => $req50, 'payGate' => $payGate, 'gateOk' => $gateOk,
             'condOut' => $this->condOut, 'condIn' => $this->condIn, 'condBadge' => $this->condBadge,
         ]);

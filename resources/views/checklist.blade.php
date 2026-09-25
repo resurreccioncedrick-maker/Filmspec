@@ -104,17 +104,18 @@
       @endif
     </div>
 
-    @if ($driverNeeded)
     <div style="display:flex;align-items:center;gap:10px;font-size:.875rem">
-      @if ($driverCount > 0)
-      <i data-feather="check-circle" style="color:var(--green);width:16px;height:16px;flex-shrink:0"></i>
-      <span style="color:var(--text)">Driver assigned</span>
-      @else
+      @if (! $transportConfirmed)
+      <i data-feather="x-circle" style="color:var(--red);width:16px;height:16px;flex-shrink:0"></i>
+      <span style="color:var(--red)"><strong>Transport not yet reviewed.</strong> Open Add/Edit Transport on the booking page, even to confirm none is needed.</span>
+      @elseif ($driverNeeded && $driverCount === 0)
       <i data-feather="x-circle" style="color:var(--red);width:16px;height:16px;flex-shrink:0"></i>
       <span style="color:var(--red)"><strong>Driver required</strong> — this booking's transport requires one. Assign a crew member with the Driver position.</span>
+      @else
+      <i data-feather="check-circle" style="color:var(--green);width:16px;height:16px;flex-shrink:0"></i>
+      <span style="color:var(--text)">{{ $driverNeeded ? 'Driver assigned' : 'Transport confirmed' }}</span>
       @endif
     </div>
-    @endif
 
     @if ($booking->client_type === 'first_time')
     <div style="display:flex;align-items:center;gap:10px;font-size:.875rem">

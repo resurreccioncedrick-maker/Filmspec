@@ -277,6 +277,7 @@ class DemoRefillTransactions extends Command
                     'start' => $start, 'end' => $end, 'status' => $this->pickStatus($m, $start),
                     'created' => $start->copy()->subDays(random_int(7, 21)),
                     'transport' => false, 'forceNoDriver' => false, 'pendingApproval' => false,
+                    'transportUnreviewed' => false,
                 ];
             }
         }
@@ -306,6 +307,12 @@ class DemoRefillTransactions extends Command
         $confirmedIdxs = collect($eligible)->filter(fn ($idx) => $bookingSpecs[$idx]['status'] === 'confirmed' && $idx !== $firstConfirmed)->values();
         if ($confirmedIdxs->isNotEmpty()) {
             $bookingSpecs[$confirmedIdxs->first()]['pendingApproval'] = true;
+        }
+        // And a third 'confirmed' booking where transport has never even been reviewed —
+        // distinct blocking reason from the two above (missing driver / pending approval).
+        $confirmedIdxs2 = $confirmedIdxs->filter(fn ($idx) => $idx !== ($confirmedIdxs->first()))->values();
+        if ($confirmedIdxs2->isNotEmpty()) {
+            $bookingSpecs[$confirmedIdxs2->first()]['transportUnreviewed'] = true;
         }
 
         $yearPrefix = 'CE-' . $this->today->format('Y');
@@ -457,6 +464,9 @@ class DemoRefillTransactions extends Command
             // still needs this true, or its deliberately-blocked gate demo would stop blocking
             // now that "transport assigned" no longer auto-implies "driver required".
             $driverRequired = $useTransport && ($driverAssigned || $spec['forceNoDriver']);
+            // Staff review transport (even to conclude none is needed) as part of normal booking
+            // setup — except the one deliberate demo booking showing the "never reviewed" block.
+            $transportConfirmedAt = $spec['transportUnreviewed'] ? null : $spec['created']->copy()->addDay();
 
             DB::table('bookings')->where('booking_id', $bookingId)->update([
                 'total_amount' => $subtotal, 'vat_amount' => $vat, 'final_amount' => $grand,
@@ -467,6 +477,7 @@ class DemoRefillTransactions extends Command
                 'location_zone' => $useTransport ? 'manila' : null,
                 'transport_multiplier' => 1.00,
                 'driver_required' => $driverRequired,
+                'transport_confirmed_at' => $transportConfirmedAt,
             ]);
 
             if ($ceStatus !== 'confirmed') {

@@ -377,20 +377,23 @@
   // sends it to the client (cost_approval_status becomes 'pending_client'); it does not mean
   // the client said yes. Equipment must never go out to the field before that approval lands.
   $costApprovalOk = ($booking->cost_approval_status ?? null) === 'client_approved';
-  $allOk = $crewOk && $equipOk && $payOk && $driverOk && $costApprovalOk;
-  // Transport being assigned at all is what's tracked here, not specifically "needs a driver" —
-  // some transport is just a delivery/courier fee (driver_required=false), in which case this
-  // step is automatically satisfied the moment transport is set.
-  $transportAssigned = ! empty($booking->vehicle_rate_id);
-  $totalConds = 3 + ($transportAssigned ? 1 : 0) + ($booking->client_type === 'first_time' ? 1 : 0);
-  $metConds = ($equipOk ? 1 : 0) + ($crewOk ? 1 : 0) + ($costApprovalOk ? 1 : 0) + ($transportAssigned && $driverOk ? 1 : 0) + ($booking->client_type === 'first_time' && $payOk ? 1 : 0);
+  // Transport is always tracked, whether or not the booking ends up using it — "no transport
+  // needed" and "nobody has looked at transport yet" used to be indistinguishable (both just
+  // null/zero columns), letting a booking reach "ready" without staff ever opening Assign
+  // Transport. transport_confirmed_at is set the moment that form is actually submitted, with
+  // any outcome; this is what's required here, not specifically having a vehicle selected.
+  $transportConfirmed = ! empty($booking->transport_confirmed_at);
+  $transportOk = $transportConfirmed && $driverOk;
+  $allOk = $crewOk && $equipOk && $payOk && $transportOk && $costApprovalOk;
+  $totalConds = 4 + ($booking->client_type === 'first_time' ? 1 : 0);
+  $metConds = ($equipOk ? 1 : 0) + ($crewOk ? 1 : 0) + ($costApprovalOk ? 1 : 0) + ($transportOk ? 1 : 0) + ($booking->client_type === 'first_time' && $payOk ? 1 : 0);
 
   $steps = [
       ['label' => 'Equipment', 'ok' => $equipOk],
       ['label' => 'Crew', 'ok' => $crewOk],
       ['label' => 'Cost Approval', 'ok' => $costApprovalOk],
+      ['label' => 'Transport', 'ok' => $transportOk],
   ];
-  if ($transportAssigned) $steps[] = ['label' => 'Transport', 'ok' => $driverOk];
   if ($booking->client_type === 'first_time') $steps[] = ['label' => 'Payment', 'ok' => $payOk];
 
   $transportDetail = ! $driverNeeded ? 'Transport confirmed' : ($driverOk ? 'Driver assigned' : 'Driver not yet assigned');
@@ -421,7 +424,8 @@
     if (! $equipOk) $blockers[] = 'No equipment added';
     if (! $crewOk) $blockers[] = 'No crew assigned';
     if (! $costApprovalOk) $blockers[] = 'Client has not approved the cost estimate yet';
-    if ($transportAssigned && ! $driverOk) $blockers[] = 'Driver not yet assigned — this booking\'s transport requires one';
+    if (! $transportConfirmed) $blockers[] = 'Transport hasn\'t been reviewed yet — open Add/Edit Transport, even to confirm none is needed';
+    elseif (! $driverOk) $blockers[] = 'Driver not yet assigned — this booking\'s transport requires one';
     if ($booking->client_type === 'first_time' && ! $payOk) $blockers[] = '₱' . number_format($required50 - $paidAmt, 2) . ' downpayment still outstanding';
   @endphp
   <div style="margin-top:18px;padding:11px 14px;background:#FFF7ED;border-radius:9px;display:flex;align-items:flex-start;gap:9px">
