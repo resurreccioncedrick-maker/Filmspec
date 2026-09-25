@@ -56,15 +56,19 @@ class FixMissingImages extends Command
         return self::SUCCESS;
     }
 
-    private function missing($q, string $col)
+    // "Missing" means either the column is empty, OR it points at a path with no real file
+    // behind it — the ordinary case here, since uploaded photos lived on the app container's
+    // ephemeral filesystem before a persistent volume existed and were lost on redeploy, while
+    // the database (restored separately from a SQL-only backup) still references the old paths.
+    private function broken($rows, string $col)
     {
-        return $q->where(fn ($w) => $w->whereNull($col)->orWhere($col, ''));
+        return $rows->filter(fn ($r) => ! $r->{$col} || ! Storage::disk('public')->exists($r->{$col}));
     }
 
     private function fixEquipment(): int
     {
         $cats = DB::table('equipment_categories')->pluck('category_name', 'category_id');
-        $rows = $this->missing(DB::table('equipment'), 'image_path')->get();
+        $rows = $this->broken(DB::table('equipment')->get(), 'image_path');
         foreach ($rows as $r) {
             $catName = $cats[$r->category_id] ?? 'Other';
             $path = 'assets/fixed/equipment/eq-' . $r->equipment_id . '.svg';
@@ -77,7 +81,7 @@ class FixMissingImages extends Command
 
     private function fixAccessories(): int
     {
-        $rows = $this->missing(DB::table('accessories'), 'image_path')->get();
+        $rows = $this->broken(DB::table('accessories')->get(), 'image_path');
         foreach ($rows as $r) {
             $path = 'assets/fixed/accessories/ac-' . $r->accessory_id . '.svg';
             $this->putCard($path, 'Other', $r->accessory_name);
@@ -89,7 +93,7 @@ class FixMissingImages extends Command
 
     private function fixCrew(): int
     {
-        $rows = $this->missing(DB::table('crew_members'), 'photo_path')->get();
+        $rows = $this->broken(DB::table('crew_members')->get(), 'photo_path');
         foreach ($rows as $i => $r) {
             $initials = mb_strtoupper(mb_substr($r->first_name, 0, 1) . mb_substr($r->last_name, 0, 1));
             [$c1] = self::PALETTE[abs(crc32($r->first_name . $r->last_name)) % count(self::PALETTE)];
