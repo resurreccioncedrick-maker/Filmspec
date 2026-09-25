@@ -101,7 +101,7 @@
           $displayName = $c->company_name ? $c->company_name : $c->contact_person;
           $completed = (int) ($c->completed_bookings ?? 0);
           $totalB = (int) ($c->total_bookings ?? 0);
-          $nearPromo = ($c->client_type === 'first_time' && $completed >= 4);
+          $nearPromo = ($c->client_type === 'first_time' && $completed === 3);
           $et = $c->entity_type ?? 'individual';
         @endphp
         <tr>
@@ -138,7 +138,7 @@
           <td style="text-align:center">
             <span style="color:var(--green);font-weight:500">{{ $completed }}</span>
             @if ($c->client_type === 'first_time')
-            <span style="color:var(--muted);font-size:11px"> / 5</span>
+            <span style="color:var(--muted);font-size:11px"> / 4</span>
             @endif
           </td>
           <td style="white-space:nowrap">

@@ -52,7 +52,7 @@ class EquipmentDataController extends Controller
         $neverUsed = DB::table('equipment as e')
             ->leftJoin('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
             ->whereNotIn('e.equipment_id', $usage->pluck('equipment_id'))
-            ->where('e.condition_status', '!=', 'retired')
+            ->where('e.availability_status', '!=', 'retired')
             ->when($category !== '', fn ($q) => $q->where('ec.category_name', $category))
             ->orderBy('e.equipment_name')
             ->select('e.equipment_id', 'e.equipment_name', 'e.brand', 'ec.category_name')

@@ -175,7 +175,7 @@ function validateReset() {
   const p1 = document.getElementById('pwInput').value;
   const p2 = document.getElementById('pw2Input').value;
   if (p1 !== p2) { document.getElementById('matchErr').style.display = 'block'; return false; }
-  if (pwScore < 2) { alert('Password is too weak. Please choose at least a Fair-strength password.'); return false; }
+  if (pwScore < 3) { alert('Password is too weak. Please choose at least a Fair-strength password.'); return false; }
   return true;
 }
 </script>

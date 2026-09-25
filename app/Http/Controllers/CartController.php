@@ -388,6 +388,21 @@ class CartController extends Controller
 
             $numDays = max(1, (int) (new \DateTime($dateStart))->diff(new \DateTime($dateEnd))->days + 1);
 
+            // Re-check each equipment item against the client's chosen shoot dates — addEquipment()
+            // only verified availability_status at add-to-cart time (before dates were even picked),
+            // which says nothing about another booking already holding this equipment on an
+            // overlapping date range. Same overlap logic BookingDetailController/FieldRequestsController
+            // use for staff-side equipment assignment (App\Support\EquipmentAvailability).
+            $dateCheckBooking = (object) ['shoot_date_start' => $dateStart, 'shoot_date_end' => $dateEnd];
+            foreach ($items as $it) {
+                if ($it->item_type === 'equipment' && $it->equipment_id) {
+                    $conflict = \App\Support\EquipmentAvailability::check((int) $it->equipment_id, (int) $it->quantity, 0, $dateCheckBooking);
+                    if ($conflict) {
+                        return response()->json(['error' => $conflict['text']]);
+                    }
+                }
+            }
+
             $year = date('Y');
             $lastNum = (int) DB::table('bookings')
                 ->where('booking_reference', 'like', "FS-$year-%")

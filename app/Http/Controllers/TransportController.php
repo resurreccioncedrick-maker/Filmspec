@@ -227,7 +227,7 @@ class TransportController extends Controller
             if (! $vehicle) {
                 return ['type' => 'danger', 'text' => 'Vehicle not found.'];
             }
-            if ($vehicle->status === 'out_of_service' || $vehicle->status === 'maintenance') {
+            if ($vehicle->status !== 'available') {
                 return ['type' => 'danger', 'text' => 'This vehicle is not currently available for assignment.'];
             }
 
@@ -270,6 +270,13 @@ class TransportController extends Controller
             $inUse = (int) DB::table('bookings')->where('vehicle_rate_id', $vid)->count();
             if ($inUse > 0) {
                 return ['type' => 'danger', 'text' => "Cannot delete: vehicle type is used in $inUse booking(s)."];
+            }
+            // fleet_vehicles.vehicle_type_id has a restrictOnDelete FK to this table — without this
+            // check, deleting a vehicle type that still has fleet vehicles of that type would throw
+            // an unhandled SQL constraint-violation error instead of this friendly message.
+            $fleetInUse = (int) DB::table('fleet_vehicles')->where('vehicle_type_id', $vid)->count();
+            if ($fleetInUse > 0) {
+                return ['type' => 'danger', 'text' => "Cannot delete: vehicle type is used by $fleetInUse fleet vehicle(s)."];
             }
             DB::table('vehicle_rates')->where('vehicle_id', $vid)->delete();
 

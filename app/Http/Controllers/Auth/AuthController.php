@@ -302,7 +302,7 @@ class AuthController extends Controller
             'email' => $pending['email'],
             'phone' => $pending['phone'],
             'client_type' => 'first_time',
-            'is_vat_registered' => $pending['entity_type'] === 'ngo' ? 0 : 1,
+            'is_vat_registered' => $pending['entity_type'] === 'company' ? 1 : 0,
         ]);
         \DB::table('clients')->where('user_id', $user->user_id)->update([
             'entity_type' => $pending['entity_type'],
