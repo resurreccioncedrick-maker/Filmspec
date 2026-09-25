@@ -371,9 +371,15 @@ class BookingDetailController extends Controller
             BookingCosting::generateCostEstimate($id, $uid);
             $msg = ['type' => 'success', 'text' => 'Cost estimate generated.'];
         } elseif ($action === 'confirm_ce' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
-            $msg = BookingCosting::confirmCe($id, $uid, $request->input('confirmation_note'));
+            // The booking itself must be approved before its cost estimate can be confirmed —
+            // otherwise a project that was never approved could still have a confirmed CE.
+            $msg = ($booking->approval_status ?? null) !== 'approved'
+                ? ['type' => 'danger', 'text' => 'Cannot confirm the cost estimate — approve the booking first.']
+                : BookingCosting::confirmCe($id, $uid, $request->input('confirmation_note'));
         } elseif ($action === 'issue_ce' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
-            $msg = BookingCosting::issueCe($id);
+            $msg = ($booking->approval_status ?? null) !== 'approved'
+                ? ['type' => 'danger', 'text' => 'Cannot mark the cost estimate as issued — approve the booking first.']
+                : BookingCosting::issueCe($id);
         } elseif ($action === 'update_ce_pricing' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
             $msg = $this->updateCePricing($request, $id, $uid);
         } elseif ($action === 'update_project_details' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
@@ -1981,6 +1987,11 @@ class BookingDetailController extends Controller
     {
         $mode = $request->input('mode');
         if ($mode === 'confirm') {
+            $approvalStatus = DB::table('bookings')->where('booking_id', $id)->value('approval_status');
+            if ($approvalStatus !== 'approved') {
+                return ['type' => 'danger', 'text' => 'Cannot confirm the cost estimate — approve the booking first.'];
+            }
+
             return BookingCosting::confirmCe($id, $uid);
         }
         if ($mode === 'draft') {

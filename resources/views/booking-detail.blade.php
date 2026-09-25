@@ -226,22 +226,8 @@
         <a href="{{ route('ce-preview', ['booking_id' => $id]) }}" class="btn btn-outline btn-sm"><i data-feather="eye"></i> View CE</a>
         @if ($ce->status === 'confirmed')
         <span class="badge badge-green" style="align-self:center"><i data-feather="check" style="width:11px;height:11px"></i> Confirmed</span>
-        @elseif (in_array($role, ['super_admin', 'admin', 'operations_manager'], true))
-        @if ($ce->status === 'draft')
-        <form method="POST" action="{{ $actionUrl }}" style="display:inline">
-          @csrf
-          <input type="hidden" name="action" value="issue_ce">
-          <button type="submit" class="btn btn-outline btn-sm" title="Mark as issued/sent to client, before final confirmation"><i data-feather="send"></i> Mark Issued</button>
-        </form>
-        @elseif ($ce->status === 'issued')
-        <span class="badge badge-blue" style="align-self:center">Issued — Awaiting Confirmation</span>
-        @endif
-        <form method="POST" action="{{ $actionUrl }}" style="display:inline" onsubmit="return fillCeConfirmNote(this)">
-          @csrf
-          <input type="hidden" name="action" value="confirm_ce">
-          <input type="hidden" name="confirmation_note" value="">
-          <button type="submit" class="btn btn-success btn-sm"><i data-feather="check"></i> Confirm CE</button>
-        </form>
+        @else
+        <span class="badge badge-gray" style="align-self:center" title="Mark Issued / Confirm CE become available once the booking itself is approved">Approve booking to issue/confirm CE</span>
         @endif
         @endif
         @if ($pendingCancellation)
