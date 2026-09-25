@@ -394,43 +394,57 @@
       ['label' => 'Transport', 'ok' => $transportOk],
   ];
 
-  $transportDetail = ! $driverNeeded ? 'Transport confirmed' : ($driverOk ? 'Driver assigned' : 'Driver not yet assigned');
+  // General term, not "Driver" — a booking's transport can be missing a driver, a vehicle, or
+  // just an unfinalized fee. The row/banner text says "setup incomplete" rather than singling
+  // out the driver as if that's always the specific thing missing.
+  $rows = [
+      ['label' => 'Equipment', 'ok' => $equipOk, 'detail' => $equipOk ? "$equipCount item" . ($equipCount != 1 ? 's' : '') . ' added' : 'No equipment added'],
+      ['label' => 'Crew', 'ok' => $crewOk, 'detail' => $crewOk ? "$crewCount member" . ($crewCount != 1 ? 's' : '') . ' assigned' : 'No crew assigned'],
+      ['label' => 'Cost Approval', 'ok' => $costApprovalOk, 'detail' => $costApprovalOk ? 'Approved' : 'Client has not approved yet'],
+      ['label' => 'Transport', 'ok' => $transportOk, 'clickable' => true,
+          'detail' => ! $transportConfirmed ? 'Not yet reviewed' : ($transportOk ? 'Confirmed' : 'Setup incomplete'),
+      ],
+  ];
 @endphp
 <div class="card" style="margin-bottom:14px;border:1px solid {{ $allOk ? '#BBF7D0' : '#E2EAF4' }};border-radius:11px;overflow:hidden;box-shadow:0 1px 4px rgba(0,30,80,.06);padding:14px 16px 12px">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
     <span style="font-size:13px;font-weight:700;color:#0B1A33">Release Readiness</span>
     <span style="font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;background:{{ $allOk ? '#DCFCE7' : '#FFEDD5' }};color:{{ $allOk ? '#15803D' : '#9A3412' }}">{{ $metConds }}/{{ $totalConds }} ready</span>
   </div>
 
-  <div style="position:relative;padding:0 4px 2px">
-    <div style="position:absolute;top:10px;left:14px;right:14px;height:2px;background:#E2EAF4"></div>
-    <div style="display:flex;position:relative">
-      @foreach ($steps as $step)
-      @php $clickable = $step['label'] === 'Transport'; @endphp
-      <{{ $clickable ? 'button' : 'div' }}
-        @if ($clickable) type="button" onclick="openModal('modalAssignTransport')" title="Open Add/Edit Transport" @endif
-        style="display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;background:none;border:none;font-family:inherit;{{ $clickable ? 'cursor:pointer' : '' }}">
-        <div style="width:21px;height:21px;border-radius:999px;background:{{ $step['ok'] ? '#16A34A' : '#DC2626' }};display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px #fff">
-          <i data-feather="{{ $step['ok'] ? 'check' : 'x' }}" style="width:10px;height:10px;color:#fff;stroke-width:3"></i>
-        </div>
-        <div style="font-size:9.5px;font-weight:600;color:{{ $clickable ? '#0060C7' : '#385270' }};text-align:center;{{ $clickable ? 'text-decoration:underline' : '' }}">{{ $step['label'] }}</div>
-      </{{ $clickable ? 'button' : 'div' }}>
-      @endforeach
-    </div>
+  <div style="display:flex;gap:3px;margin-bottom:6px">
+    @foreach ($rows as $row)
+    <div style="flex:1;height:4px;border-radius:2px;background:{{ $row['ok'] ? '#16A34A' : '#E7ECF3' }}"></div>
+    @endforeach
+  </div>
+
+  <div>
+    @foreach ($rows as $row)
+    @php $clickable = ! empty($row['clickable']); @endphp
+    <{{ $clickable ? 'button' : 'div' }}
+      @if ($clickable) type="button" onclick="openModal('modalAssignTransport')" title="Open Add/Edit Transport" @endif
+      style="width:100%;display:flex;align-items:center;gap:9px;padding:6px 2px;background:none;border:none;font-family:inherit;text-align:left;{{ $clickable ? 'cursor:pointer' : '' }}">
+      <div style="width:18px;height:18px;border-radius:999px;background:{{ $row['ok'] ? '#DCFCE7' : '#FEE2E2' }};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <i data-feather="{{ $row['ok'] ? 'check' : 'x' }}" style="width:9px;height:9px;color:{{ $row['ok'] ? '#16A34A' : '#DC2626' }};stroke-width:3.5"></i>
+      </div>
+      <span style="font-size:11px;font-weight:600;color:{{ $clickable ? '#0060C7' : '#0B1A33' }};flex:1;{{ $clickable ? 'text-decoration:underline' : '' }}">{{ $row['label'] }}</span>
+      <span style="font-size:10.5px;font-weight:600;color:{{ $row['ok'] ? '#16A34A' : '#DC2626' }}">{{ $row['detail'] }}</span>
+    </{{ $clickable ? 'button' : 'div' }}>
+    @endforeach
   </div>
 
   @unless ($allOk)
   @php
-    $blockers = [];
-    if (! $equipOk) $blockers[] = 'No equipment added';
-    if (! $crewOk) $blockers[] = 'No crew assigned';
-    if (! $costApprovalOk) $blockers[] = 'Client has not approved the cost estimate yet';
-    if (! $transportConfirmed) $blockers[] = 'Transport hasn\'t been reviewed yet — open Add/Edit Transport, even to confirm none is needed';
-    elseif (! $driverOk) $blockers[] = 'Driver not yet assigned — this booking\'s transport requires one';
+    $blockedDetail = ! $transportConfirmed
+        ? 'Open Add/Edit Transport on the booking page, even to confirm none is needed.'
+        : (! $driverOk ? 'Assign a crew member with the Driver position, then this unlocks automatically.' : '');
+    $firstIssue = collect($rows)->first(fn ($r) => ! $r['ok']);
   @endphp
-  <div style="margin-top:11px;padding:7px 10px;background:#FFF7ED;border-radius:7px;display:flex;align-items:flex-start;gap:7px">
-    <i data-feather="alert-circle" style="width:12px;height:12px;color:#B45309;flex-shrink:0;margin-top:1px"></i>
-    <span style="font-size:10.5px;font-weight:600;color:#9A3412">{{ implode(' · ', $blockers) }}</span>
+  <div style="margin-top:9px;padding:7px 10px;background:#FFF7ED;border-radius:7px">
+    <div style="font-size:10.5px;font-weight:700;color:#9A3412">Not ready yet — {{ $metConds }}/{{ $totalConds }} steps met</div>
+    @if ($blockedDetail)
+    <div style="font-size:10px;color:#B45309;margin-top:2px">{{ $blockedDetail }}</div>
+    @endif
   </div>
   @endunless
 
