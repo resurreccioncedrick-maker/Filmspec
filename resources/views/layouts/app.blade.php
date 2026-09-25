@@ -123,6 +123,14 @@
     ));
   }
 
+  // Same "Pending Review" count FieldRequestsController::index() shows on its own tab —
+  // the nav item had no badge at all, so a pending field request was invisible to staff
+  // unless they happened to click into the page.
+  $fieldRequestsBadgeCount = 0;
+  if ($canAccess('field_requests')) {
+    $fieldRequestsBadgeCount = \Illuminate\Support\Facades\DB::table('booking_equipment_requests')->where('status', 'pending')->count();
+  }
+
   $pageUrl = fn (string $page) => route(config("filmspec.ported_pages.$page"));
 
   $curPage = array_search(Route::currentRouteName(), config('filmspec.ported_pages'), true) ?: '';
@@ -186,6 +194,7 @@
             @if ($urlKey === 'billing' && $billingBadgeCount > 0)<span class="superadmin-badge" style="background:var(--orange, #f97316)" title="Pending discount approvals + unbilled confirmed bookings">{{ $billingBadgeCount }}</span>@endif
             @if ($urlKey === 'support_chat' && $supportChatBadgeCount > 0)<span class="superadmin-badge" style="background:var(--orange, #f97316)" title="Conversations with new messages">{{ $supportChatBadgeCount }}</span>@endif
             @if ($urlKey === 'bookings' && $bookingsBadgeCount > 0)<span class="superadmin-badge" style="background:var(--orange, #f97316)" title="Bookings with new comments">{{ $bookingsBadgeCount }}</span>@endif
+            @if ($urlKey === 'field_requests' && $fieldRequestsBadgeCount > 0)<span class="superadmin-badge" style="background:var(--orange, #f97316)" title="Field requests awaiting review">{{ $fieldRequestsBadgeCount }}</span>@endif
           </a>
         @endif
       @endforeach
