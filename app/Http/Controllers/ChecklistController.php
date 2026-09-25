@@ -183,9 +183,9 @@ class ChecklistController extends Controller
         $damaged = $equipLines->filter(fn ($e) => in_array($e->condition_in, ['damaged', 'missing'], true))->count();
 
         $crewCount = (int) DB::table('booking_crew')->where('booking_id', $bid)->count();
-        $totalEquipQtyAll = (int) DB::table('booking_equipment')->where('booking_id', $bid)->sum('quantity');
-        $transCost = (float) ($booking->transportation_cost ?? 0);
-        $driverNeeded = $transCost > 0 || $totalEquipQtyAll >= 5;
+        // Driver is only required when FilmSpec transport is assigned to this booking, not merely
+        // because the equipment quantity is large (a self-pickup of 5+ items needs no driver).
+        $driverNeeded = ! empty($booking->vehicle_rate_id);
         $driverCount = 0;
         if ($driverNeeded) {
             $driverCount = (int) DB::table('booking_crew as bc')
@@ -203,7 +203,7 @@ class ChecklistController extends Controller
             'equipLines' => $equipLines, 'totalItems' => $totalItems, 'outChecked' => $outChecked,
             'inChecked' => $inChecked, 'damaged' => $damaged,
             'crewCount' => $crewCount, 'driverNeeded' => $driverNeeded, 'driverCount' => $driverCount,
-            'transCost' => $transCost, 'paidAmt' => $paidAmt, 'req50' => $req50, 'payGate' => $payGate, 'gateOk' => $gateOk,
+            'paidAmt' => $paidAmt, 'req50' => $req50, 'payGate' => $payGate, 'gateOk' => $gateOk,
             'condOut' => $this->condOut, 'condIn' => $this->condIn, 'condBadge' => $this->condBadge,
         ]);
     }

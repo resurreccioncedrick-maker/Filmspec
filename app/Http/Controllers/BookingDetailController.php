@@ -289,11 +289,11 @@ class BookingDetailController extends Controller
         $positions = DB::table('crew_positions')->orderBy('position_name')->get();
         $vehicleRates = DB::table('vehicle_rates')->where('is_active', 1)->orderBy('base_rate')->get();
 
-        $totalEquipQtyAll = (int) DB::table('booking_equipment')->where('booking_id', $id)->sum('quantity');
-        // >= 5, matching ChecklistController's actual release gate — this used to say "> 5" here,
-        // so a booking with exactly 5 total equipment quantity showed "Ready to Release" on this
-        // page while the real checklist-out gate correctly still blocked it over the missing driver.
-        $driverNeeded = ((float) ($booking->transportation_cost ?? 0) > 0) || $totalEquipQtyAll >= 5;
+        // A driver is only required when FilmSpec transport is actually assigned to the booking
+        // (vehicle_rate_id set via Assign Transport) — not merely because the equipment quantity
+        // is large. A client picking up/returning equipment themselves needs no driver regardless
+        // of quantity, matching ChecklistController's gate.
+        $driverNeeded = ! empty($booking->vehicle_rate_id);
         $driverCount = DB::table('booking_crew as bc')
             ->join('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
             ->where('bc.booking_id', $id)->where(DB::raw('LOWER(cp.position_name)'), 'like', '%driver%')
@@ -655,18 +655,16 @@ class BookingDetailController extends Controller
             return ['type' => 'error', 'text' => 'Cannot release — no crew assigned. Assign at least one crew member (operator, driver, etc.) before releasing equipment.'];
         }
 
-        $totalEquipQty = (int) DB::table('booking_equipment')->where('booking_id', $id)->sum('quantity');
-        $transCost = (float) ($booking->transportation_cost ?? 0);
-        $driverNeeded = $transCost > 0 || $totalEquipQty >= 5;
+        // Driver is only required when FilmSpec transport is assigned to this booking, not merely
+        // because the equipment quantity is large (a self-pickup of 5+ items needs no driver).
+        $driverNeeded = ! empty($booking->vehicle_rate_id);
         if ($driverNeeded) {
             $driverCount = DB::table('booking_crew as bc')
                 ->join('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
                 ->where('bc.booking_id', $id)->where(DB::raw('LOWER(cp.position_name)'), 'like', '%driver%')
                 ->count();
             if (! $driverCount) {
-                $why = $transCost > 0 ? 'transportation is charged on this booking' : "total equipment quantity is $totalEquipQty units (>=5)";
-
-                return ['type' => 'error', 'text' => "Cannot release — a <strong>Driver</strong> must be assigned because $why. Add a crew member with the Driver position, then release."];
+                return ['type' => 'error', 'text' => 'Cannot release — a <strong>Driver</strong> must be assigned because transport is assigned to this booking. Add a crew member with the Driver position, then release.'];
             }
         }
 

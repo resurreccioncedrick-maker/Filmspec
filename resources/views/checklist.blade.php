@@ -101,7 +101,7 @@
       <span style="color:var(--text)">Driver assigned</span>
       @else
       <i data-feather="x-circle" style="color:var(--red);width:16px;height:16px;flex-shrink:0"></i>
-      <span style="color:var(--red)"><strong>Driver required</strong> — {{ $transCost > 0 ? 'transportation is billed on this booking' : 'total equipment qty ≥ 5' }}. Assign a crew member with the Driver position.</span>
+      <span style="color:var(--red)"><strong>Driver required</strong> — transport is assigned on this booking. Assign a crew member with the Driver position.</span>
       @endif
     </div>
     @endif
