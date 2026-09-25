@@ -296,11 +296,10 @@ class BookingDetailController extends Controller
         $positions = DB::table('crew_positions')->orderBy('position_name')->get();
         $vehicleRates = DB::table('vehicle_rates')->where('is_active', 1)->orderBy('base_rate')->get();
 
-        // A driver is only required when FilmSpec transport is actually assigned to the booking
-        // (vehicle_rate_id set via Assign Transport) — not merely because the equipment quantity
-        // is large. A client picking up/returning equipment themselves needs no driver regardless
-        // of quantity, matching ChecklistController's gate.
-        $driverNeeded = ! empty($booking->vehicle_rate_id);
+        // Transport being assigned doesn't automatically mean a driver is required — some
+        // transport is just a delivery/courier fee. Staff say so explicitly on the Assign
+        // Transport form (driver_required), matching ChecklistController's gate.
+        $driverNeeded = ! empty($booking->vehicle_rate_id) && (bool) ($booking->driver_required ?? false);
         $driverCount = DB::table('booking_crew as bc')
             ->join('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
             ->where('bc.booking_id', $id)->where(DB::raw('LOWER(cp.position_name)'), 'like', '%driver%')
@@ -536,6 +535,10 @@ class BookingDetailController extends Controller
         $transCost = round((float) $rawCost, 2);
         $driverCid = (int) $request->input('driver_crew_id', 0);
         $driverRate = (float) $request->input('driver_rate', 0);
+        // Not every transport arrangement needs a FilmSpec driver — some is just a delivery/
+        // courier fee. Staff say so explicitly here rather than the release gate assuming a
+        // driver is always required whenever transport is on the booking.
+        $driverRequired = $request->boolean('driver_required');
 
         // Still needed for transport_multiplier, which CePreviewController also uses to scale
         // the equipment total on the CE document — not just the transport line itself.
@@ -545,6 +548,7 @@ class BookingDetailController extends Controller
         DB::table('bookings')->where('booking_id', $id)->update([
             'location_zone' => $zone ?: null, 'transport_multiplier' => $mult,
             'transportation_cost' => $transCost, 'vehicle_rate_id' => $vid ?: null,
+            'driver_required' => $vid ? $driverRequired : false,
         ]);
 
         $parts = [];
@@ -675,16 +679,16 @@ class BookingDetailController extends Controller
             return ['type' => 'error', 'text' => 'Cannot release — no crew assigned. Assign at least one crew member (operator, driver, etc.) before releasing equipment.'];
         }
 
-        // Driver is only required when FilmSpec transport is assigned to this booking, not merely
-        // because the equipment quantity is large (a self-pickup of 5+ items needs no driver).
-        $driverNeeded = ! empty($booking->vehicle_rate_id);
+        // Transport being assigned doesn't automatically mean a driver is required — staff mark
+        // that explicitly on the Assign Transport form (driver_required).
+        $driverNeeded = ! empty($booking->vehicle_rate_id) && (bool) ($booking->driver_required ?? false);
         if ($driverNeeded) {
             $driverCount = DB::table('booking_crew as bc')
                 ->join('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
                 ->where('bc.booking_id', $id)->where(DB::raw('LOWER(cp.position_name)'), 'like', '%driver%')
                 ->count();
             if (! $driverCount) {
-                return ['type' => 'error', 'text' => 'Cannot release — a <strong>Driver</strong> must be assigned because transport is assigned to this booking. Add a crew member with the Driver position, then release.'];
+                return ['type' => 'error', 'text' => 'Cannot release — a <strong>Driver</strong> must be assigned because this booking\'s transport requires one. Add a crew member with the Driver position, then release.'];
             }
         }
 
@@ -1375,7 +1379,7 @@ class BookingDetailController extends Controller
             'delivery_address' => $sourceBooking->delivery_address, 'notes' => $sourceBooking->notes,
             'created_by' => $user->user_id, 'location_zone' => $zone, 'transport_multiplier' => $multiplier,
             'location_lat' => $sourceBooking->location_lat, 'location_lng' => $sourceBooking->location_lng,
-            'vehicle_rate_id' => $vid, 'approval_status' => $approvalSt,
+            'vehicle_rate_id' => $vid, 'driver_required' => (bool) ($sourceBooking->driver_required ?? false), 'approval_status' => $approvalSt,
             'created_at' => now(), 'updated_at' => now(),
         ]);
 

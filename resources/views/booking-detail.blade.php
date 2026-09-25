@@ -378,48 +378,70 @@
   // the client said yes. Equipment must never go out to the field before that approval lands.
   $costApprovalOk = ($booking->cost_approval_status ?? null) === 'client_approved';
   $allOk = $crewOk && $equipOk && $payOk && $driverOk && $costApprovalOk;
-  $totalConds = 3 + ($driverNeeded ? 1 : 0) + ($booking->client_type === 'first_time' ? 1 : 0);
-  $metConds = ($equipOk ? 1 : 0) + ($crewOk ? 1 : 0) + ($costApprovalOk ? 1 : 0) + ($driverNeeded && $driverOk ? 1 : 0) + ($booking->client_type === 'first_time' && $payOk ? 1 : 0);
+  // Transport being assigned at all is what's tracked here, not specifically "needs a driver" —
+  // some transport is just a delivery/courier fee (driver_required=false), in which case this
+  // step is automatically satisfied the moment transport is set.
+  $transportAssigned = ! empty($booking->vehicle_rate_id);
+  $totalConds = 3 + ($transportAssigned ? 1 : 0) + ($booking->client_type === 'first_time' ? 1 : 0);
+  $metConds = ($equipOk ? 1 : 0) + ($crewOk ? 1 : 0) + ($costApprovalOk ? 1 : 0) + ($transportAssigned && $driverOk ? 1 : 0) + ($booking->client_type === 'first_time' && $payOk ? 1 : 0);
+
+  $steps = [
+      ['label' => 'Equipment', 'ok' => $equipOk],
+      ['label' => 'Crew', 'ok' => $crewOk],
+      ['label' => 'Cost Approval', 'ok' => $costApprovalOk],
+  ];
+  if ($transportAssigned) $steps[] = ['label' => 'Transport', 'ok' => $driverOk];
+  if ($booking->client_type === 'first_time') $steps[] = ['label' => 'Payment', 'ok' => $payOk];
+
+  $transportDetail = ! $driverNeeded ? 'Transport confirmed' : ($driverOk ? 'Driver assigned' : 'Driver not yet assigned');
 @endphp
-<div class="card" style="margin-bottom:18px;border:1.5px solid {{ $allOk ? '#bbf7d0' : '#fecaca' }};overflow:hidden">
-  <div style="padding:10px 16px;display:flex;align-items:center;gap:10px;background:{{ $allOk ? '#f0fdf4' : '#fef2f2' }};border-bottom:1.5px solid {{ $allOk ? '#bbf7d0' : '#fecaca' }}">
-    <i data-feather="{{ $allOk ? 'check-circle' : 'alert-triangle' }}" style="width:15px;height:15px;color:{{ $allOk ? '#16a34a' : '#d97706' }};flex-shrink:0"></i>
-    <span style="font-weight:700;font-size:.88rem;color:{{ $allOk ? '#15803d' : '#92400e' }};flex:1">{{ $allOk ? 'Ready to Release' : 'Release Readiness' }}</span>
-    @if (! $allOk)
-    <span style="font-size:.72rem;font-weight:700;background:#fee2e2;color:#dc2626;border-radius:12px;padding:2px 10px;white-space:nowrap">{{ $metConds }}/{{ $totalConds }} conditions met</span>
+<div class="card" style="margin-bottom:18px;border:1px solid {{ $allOk ? '#BBF7D0' : '#E2EAF4' }};border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,30,80,.06);padding:22px 24px 20px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <span style="font-size:15.5px;font-weight:700;color:#0B1A33">Release Readiness</span>
+    <span style="font-size:12px;font-weight:700;padding:4px 11px;border-radius:999px;background:{{ $allOk ? '#DCFCE7' : '#FFEDD5' }};color:{{ $allOk ? '#15803D' : '#9A3412' }}">{{ $metConds }}/{{ $totalConds }} ready</span>
+  </div>
+
+  <div style="position:relative;padding:0 4px 4px">
+    <div style="position:absolute;top:15px;left:18px;right:18px;height:2px;background:#E2EAF4"></div>
+    <div style="display:flex;position:relative">
+      @foreach ($steps as $step)
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px;flex:1">
+        <div style="width:32px;height:32px;border-radius:999px;background:{{ $step['ok'] ? '#16A34A' : '#DC2626' }};display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px #fff">
+          <i data-feather="{{ $step['ok'] ? 'check' : 'x' }}" style="width:14px;height:14px;color:#fff;stroke-width:3"></i>
+        </div>
+        <div style="font-size:11.5px;font-weight:600;color:#385270;text-align:center">{{ $step['label'] }}</div>
+      </div>
+      @endforeach
+    </div>
+  </div>
+
+  @unless ($allOk)
+  @php
+    $blockers = [];
+    if (! $equipOk) $blockers[] = 'No equipment added';
+    if (! $crewOk) $blockers[] = 'No crew assigned';
+    if (! $costApprovalOk) $blockers[] = 'Client has not approved the cost estimate yet';
+    if ($transportAssigned && ! $driverOk) $blockers[] = 'Driver not yet assigned — this booking\'s transport requires one';
+    if ($booking->client_type === 'first_time' && ! $payOk) $blockers[] = '₱' . number_format($required50 - $paidAmt, 2) . ' downpayment still outstanding';
+  @endphp
+  <div style="margin-top:18px;padding:11px 14px;background:#FFF7ED;border-radius:9px;display:flex;align-items:flex-start;gap:9px">
+    <i data-feather="alert-circle" style="width:14px;height:14px;color:#B45309;flex-shrink:0;margin-top:1px"></i>
+    <span style="font-size:12.5px;font-weight:600;color:#9A3412">{{ implode(' · ', $blockers) }}</span>
+  </div>
+  @endunless
+
+  <div style="margin-top:16px">
+    @if ($allOk)
+    <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'out']) }}" class="btn" style="width:100%;justify-content:center;padding:12px;border-radius:10px;font-size:13.5px;font-weight:700;background:#16A34A;color:#fff;border:none;display:flex;align-items:center;gap:8px">
+      <i data-feather="clipboard" style="width:14px;height:14px"></i> Open Checklist OUT
+    </a>
+    <p style="font-size:11.5px;color:#7695B0;margin:8px 0 0;text-align:center">Equipment isn't marked as released — and can't go out to the field — until it's checked out here.</p>
     @else
-    <span style="font-size:.72rem;font-weight:600;color:#16a34a">All conditions met</span>
+    <button type="button" disabled style="width:100%;padding:12px;border-radius:10px;font-size:13.5px;font-weight:700;background:#F3F0EA;color:#B0A99C;border:none;cursor:not-allowed;display:flex;align-items:center;justify-content:center;gap:8px">
+      <i data-feather="lock" style="width:14px;height:14px"></i> Locked until all steps are ready
+    </button>
     @endif
   </div>
-  @php
-    $chkRow = function (bool $ok, string $label, string $detail, bool $warn = false) {
-        $clr = $ok ? '#16a34a' : ($warn ? '#b45309' : '#dc2626');
-        $bg = $ok ? '' : ($warn ? 'rgba(245,158,11,.04)' : 'rgba(239,68,68,.04)');
-        $icon = $ok ? 'check-circle' : ($warn ? 'alert-circle' : 'x-circle');
-        echo '<div style="display:flex;align-items:center;gap:12px;padding:9px 16px;border-bottom:1px solid var(--border2);background:' . $bg . '">'
-            . '<i data-feather="' . $icon . '" style="width:13px;height:13px;color:' . $clr . ';flex-shrink:0"></i>'
-            . '<span style="font-weight:600;font-size:.82rem;color:var(--text)">' . $label . '</span>'
-            . '<span style="margin-left:auto;font-size:.78rem;font-weight:' . ($ok ? '400' : '600') . ';color:' . $clr . '">' . $detail . '</span>'
-            . '</div>';
-    };
-  @endphp
-  {!! $chkRow($equipOk, 'Equipment', $equipOk ? "$equipCount item" . ($equipCount != 1 ? 's' : '') . ' added' : 'No equipment added', ! $equipOk) !!}
-  {!! $chkRow($crewOk, 'Crew', $crewOk ? "$crewCount member" . ($crewCount != 1 ? 's' : '') . ' assigned' : 'No crew assigned') !!}
-  {!! $chkRow($costApprovalOk, 'Client Cost Approval', $costApprovalOk ? 'Approved' : 'Client has not approved the cost estimate yet') !!}
-  @if ($driverNeeded)
-  {!! $chkRow($driverOk, 'Driver', $driverOk ? 'Assigned' : 'Driver not yet assigned') !!}
-  @endif
-  @if ($booking->client_type === 'first_time')
-  {!! $chkRow($payOk, '50% Downpayment', $payOk ? 'Paid' : '₱' . number_format($required50 - $paidAmt, 2) . ' outstanding') !!}
-  @endif
-  @if ($allOk)
-  <div style="padding:12px 16px;background:#f0fdf4">
-    <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'out']) }}" class="btn btn-success btn-sm" style="width:100%;justify-content:center">
-      <i data-feather="clipboard"></i> Open Checklist OUT to Release Equipment
-    </a>
-    <p style="font-size:.72rem;color:#15803d;margin:6px 0 0;text-align:center">Equipment isn't marked as released — and can't go out to the field — until it's checked out here.</p>
-  </div>
-  @endif
 </div>
 @endif
 
@@ -443,15 +465,10 @@
     <p style="font-size:12.5px;color:#7f1d1d;margin:0">Adjust the crew and transport assignment, then resend for client approval.</p>
   </div>
 </div>
-@elseif (($booking->cost_approval_status ?? null) === 'client_approved' && $st === 'confirmed')
-<div class="card" style="margin-bottom:18px;border-left:4px solid #22c55e">
-  <div class="card-body" style="padding:14px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <i data-feather="check-circle" style="width:15px;height:15px;color:#16a34a;flex-shrink:0"></i>
-    <span style="font-weight:700;font-size:13px;color:#15803d;flex:1;min-width:200px">Client approved the cost estimate — equipment release is authorized once the checklist below is clear.</span>
-    <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'out']) }}" class="btn btn-success btn-sm"><i data-feather="clipboard"></i> Open Checklist OUT</a>
-  </div>
-</div>
 @endif
+{{-- The client_approved + confirmed case used to show a third, redundant banner here with its
+     own "Open Checklist OUT" button — that state is now fully covered by the Release Readiness
+     card above, which is the single source of truth for whether release is authorized. --}}
 
 <!-- Tabs -->
 <div class="tabs">
@@ -1608,6 +1625,7 @@
   $_atZone = $booking->location_zone ?? '';
   $_atTransCost = number_format((float) ($booking->transportation_cost ?? 0), 2, '.', '');
   $_atVid = (int) ($booking->vehicle_rate_id ?? 0);
+  $_atDriverRequired = (bool) ($booking->driver_required ?? false);
 @endphp
 <div class="modal-overlay" id="modalAssignTransport">
   <div class="modal" style="max-width:520px">
@@ -1650,7 +1668,15 @@
         </div>
 
         <hr style="margin:4px 0;border-color:var(--border)">
-        <div style="font-size:.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em">Driver — Optional</div>
+        <div style="font-size:.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em">Driver</div>
+
+        <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;margin-bottom:0">
+          <input type="checkbox" name="driver_required" value="1" {{ $_atDriverRequired ? 'checked' : '' }} style="margin-top:2px">
+          <span>
+            <span style="font-weight:600;font-size:.85rem">This transport requires a FilmSpec driver</span><br>
+            <span style="font-size:.75rem;color:var(--muted)">Leave unchecked for a delivery/courier-style transport fee with no driver involved — equipment release won't be blocked waiting for one.</span>
+          </span>
+        </label>
 
         <div class="form-group" style="margin-bottom:0">
           <label>Assign Driver <span style="font-size:.75rem;font-weight:400;color:var(--muted)">— leave blank if no driver needed</span></label>

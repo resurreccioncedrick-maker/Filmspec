@@ -452,6 +452,12 @@ class DemoRefillTransactions extends Command
                 $costApproval = $spec['pendingApproval'] ? 'pending_client' : 'client_approved';
             }
 
+            // Transport alone doesn't imply a driver is required — that's a separate per-booking
+            // choice staff make on the Assign Transport form. The forceNoDriver demo booking
+            // still needs this true, or its deliberately-blocked gate demo would stop blocking
+            // now that "transport assigned" no longer auto-implies "driver required".
+            $driverRequired = $useTransport && ($driverAssigned || $spec['forceNoDriver']);
+
             DB::table('bookings')->where('booking_id', $bookingId)->update([
                 'total_amount' => $subtotal, 'vat_amount' => $vat, 'final_amount' => $grand,
                 'cost_approval_status' => $costApproval,
@@ -460,6 +466,7 @@ class DemoRefillTransactions extends Command
                 'transportation_cost' => $transportCost,
                 'location_zone' => $useTransport ? 'manila' : null,
                 'transport_multiplier' => 1.00,
+                'driver_required' => $driverRequired,
             ]);
 
             if ($ceStatus !== 'confirmed') {

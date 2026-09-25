@@ -198,9 +198,10 @@ class ChecklistController extends Controller
         $damaged = $equipLines->filter(fn ($e) => in_array($e->condition_in, ['damaged', 'missing'], true))->count();
 
         $crewCount = (int) DB::table('booking_crew')->where('booking_id', $bid)->count();
-        // Driver is only required when FilmSpec transport is assigned to this booking, not merely
-        // because the equipment quantity is large (a self-pickup of 5+ items needs no driver).
-        $driverNeeded = ! empty($booking->vehicle_rate_id);
+        // Transport being assigned doesn't automatically mean a driver is required — some
+        // transport is just a delivery/courier fee. Staff mark that explicitly on the Assign
+        // Transport form (driver_required).
+        $driverNeeded = ! empty($booking->vehicle_rate_id) && (bool) ($booking->driver_required ?? false);
         $driverCount = 0;
         if ($driverNeeded) {
             $driverCount = (int) DB::table('booking_crew as bc')
