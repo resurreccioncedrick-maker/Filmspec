@@ -387,9 +387,13 @@
   $crewOk = $crewCount > 0;
   $equipOk = $equipCount > 0;
   $driverOk = ! $driverNeeded || $driverCount > 0;
-  $allOk = $crewOk && $equipOk && $payOk && $driverOk;
-  $totalConds = 2 + ($driverNeeded ? 1 : 0) + ($booking->client_type === 'first_time' ? 1 : 0);
-  $metConds = ($equipOk ? 1 : 0) + ($crewOk ? 1 : 0) + ($driverNeeded && $driverOk ? 1 : 0) + ($booking->client_type === 'first_time' && $payOk ? 1 : 0);
+  // The client must have actually approved the cost estimate — staff confirming the CE only
+  // sends it to the client (cost_approval_status becomes 'pending_client'); it does not mean
+  // the client said yes. Equipment must never go out to the field before that approval lands.
+  $costApprovalOk = ($booking->cost_approval_status ?? null) === 'client_approved';
+  $allOk = $crewOk && $equipOk && $payOk && $driverOk && $costApprovalOk;
+  $totalConds = 3 + ($driverNeeded ? 1 : 0) + ($booking->client_type === 'first_time' ? 1 : 0);
+  $metConds = ($equipOk ? 1 : 0) + ($crewOk ? 1 : 0) + ($costApprovalOk ? 1 : 0) + ($driverNeeded && $driverOk ? 1 : 0) + ($booking->client_type === 'first_time' && $payOk ? 1 : 0);
 @endphp
 <div class="card" style="margin-bottom:18px;border:1.5px solid {{ $allOk ? '#bbf7d0' : '#fecaca' }};overflow:hidden">
   <div style="padding:10px 16px;display:flex;align-items:center;gap:10px;background:{{ $allOk ? '#f0fdf4' : '#fef2f2' }};border-bottom:1.5px solid {{ $allOk ? '#bbf7d0' : '#fecaca' }}">
@@ -415,6 +419,7 @@
   @endphp
   {!! $chkRow($equipOk, 'Equipment', $equipOk ? "$equipCount item" . ($equipCount != 1 ? 's' : '') . ' added' : 'No equipment added', ! $equipOk) !!}
   {!! $chkRow($crewOk, 'Crew', $crewOk ? "$crewCount member" . ($crewCount != 1 ? 's' : '') . ' assigned' : 'No crew assigned') !!}
+  {!! $chkRow($costApprovalOk, 'Client Cost Approval', $costApprovalOk ? 'Approved' : 'Client has not approved the cost estimate yet') !!}
   @if ($driverNeeded)
   {!! $chkRow($driverOk, 'Driver', $driverOk ? 'Assigned' : 'Driver not yet assigned') !!}
   @endif

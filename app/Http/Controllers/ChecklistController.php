@@ -122,14 +122,29 @@ class ChecklistController extends Controller
         }
 
         $ceConfirmed = DB::table('cost_estimates')->where('booking_id', $bid)->orderByDesc('ce_id')->value('status') === 'confirmed';
-        if ($dir === 'out' && ! $ceConfirmed && $booking->booking_status === 'confirmed') {
-            $request->session()->flash('bd_flash', [
-                'type' => 'danger',
-                'text' => "Equipment can't be checked out yet — the cost estimate hasn't been confirmed. "
-                    . 'Use <strong>Confirm CE</strong> on the booking page first.',
-            ]);
+        // Confirming the CE only sends it to the client (cost_approval_status becomes
+        // 'pending_client') — it is not the client's approval. Equipment must not be checked out
+        // until the client has actually approved, which is a separate, later event.
+        $costApproved = ($booking->cost_approval_status ?? null) === 'client_approved';
+        if ($dir === 'out' && $booking->booking_status === 'confirmed') {
+            if (! $ceConfirmed) {
+                $request->session()->flash('bd_flash', [
+                    'type' => 'danger',
+                    'text' => "Equipment can't be checked out yet — the cost estimate hasn't been confirmed. "
+                        . 'Use <strong>Confirm CE</strong> on the booking page first.',
+                ]);
 
-            return redirect()->route('booking-detail', $bid);
+                return redirect()->route('booking-detail', $bid);
+            }
+            if (! $costApproved) {
+                $request->session()->flash('bd_flash', [
+                    'type' => 'danger',
+                    'text' => "Equipment can't be checked out yet — the client hasn't approved the cost estimate. "
+                        . 'Wait for client approval on the booking page first.',
+                ]);
+
+                return redirect()->route('booking-detail', $bid);
+            }
         }
 
         $msg = null;
@@ -196,13 +211,14 @@ class ChecklistController extends Controller
         $paidAmt = (float) DB::table('payments')->where('booking_id', $bid)->sum('amount');
         $req50 = (float) ($booking->final_amount ?? 0) * 0.5;
         $payGate = $booking->client_type !== 'first_time' || $paidAmt >= $req50;
-        $gateOk = $totalItems > 0 && $crewCount > 0 && (! $driverNeeded || $driverCount > 0) && $payGate;
+        $gateOk = $totalItems > 0 && $crewCount > 0 && (! $driverNeeded || $driverCount > 0) && $payGate && $costApproved;
 
         return view('checklist', [
             'msg' => $msg, 'canManage' => $canManage, 'booking' => $booking, 'bid' => $bid, 'dir' => $dir,
             'equipLines' => $equipLines, 'totalItems' => $totalItems, 'outChecked' => $outChecked,
             'inChecked' => $inChecked, 'damaged' => $damaged,
             'crewCount' => $crewCount, 'driverNeeded' => $driverNeeded, 'driverCount' => $driverCount,
+            'costApproved' => $costApproved,
             'paidAmt' => $paidAmt, 'req50' => $req50, 'payGate' => $payGate, 'gateOk' => $gateOk,
             'condOut' => $this->condOut, 'condIn' => $this->condIn, 'condBadge' => $this->condBadge,
         ]);

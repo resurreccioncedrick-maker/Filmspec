@@ -94,6 +94,16 @@
       @endif
     </div>
 
+    <div style="display:flex;align-items:center;gap:10px;font-size:.875rem">
+      @if ($costApproved)
+      <i data-feather="check-circle" style="color:var(--green);width:16px;height:16px;flex-shrink:0"></i>
+      <span style="color:var(--text)">Client approved the cost estimate</span>
+      @else
+      <i data-feather="x-circle" style="color:var(--red);width:16px;height:16px;flex-shrink:0"></i>
+      <span style="color:var(--red)"><strong>Client cost approval required.</strong> The client hasn't approved the cost estimate yet — equipment cannot be released until they do.</span>
+      @endif
+    </div>
+
     @if ($driverNeeded)
     <div style="display:flex;align-items:center;gap:10px;font-size:.875rem">
       @if ($driverCount > 0)
