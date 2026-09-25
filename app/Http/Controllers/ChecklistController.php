@@ -221,11 +221,10 @@ class ChecklistController extends Controller
                 ->where('bc.booking_id', $bid)->where(DB::raw('LOWER(cp.position_name)'), 'like', '%driver%')
                 ->count();
         }
-        $paidAmt = (float) DB::table('payments')->where('booking_id', $bid)->sum('amount');
-        $req50 = (float) ($booking->final_amount ?? 0) * 0.5;
-        $payGate = $booking->client_type !== 'first_time' || $paidAmt >= $req50;
+        // Payment collection is accounting's own workspace (Billing & POS) — it no longer gates
+        // equipment release.
         $transportConfirmed = ! empty($booking->transport_confirmed_at);
-        $gateOk = $totalItems > 0 && $crewCount > 0 && $transportConfirmed && (! $driverNeeded || $driverCount > 0) && $payGate && $costApproved;
+        $gateOk = $totalItems > 0 && $crewCount > 0 && $transportConfirmed && (! $driverNeeded || $driverCount > 0) && $costApproved;
 
         return view('checklist', [
             'msg' => $msg, 'canManage' => $canManage, 'booking' => $booking, 'bid' => $bid, 'dir' => $dir,
@@ -233,7 +232,7 @@ class ChecklistController extends Controller
             'inChecked' => $inChecked, 'damaged' => $damaged,
             'crewCount' => $crewCount, 'driverNeeded' => $driverNeeded, 'driverCount' => $driverCount,
             'costApproved' => $costApproved, 'transportConfirmed' => $transportConfirmed,
-            'paidAmt' => $paidAmt, 'req50' => $req50, 'payGate' => $payGate, 'gateOk' => $gateOk,
+            'gateOk' => $gateOk,
             'condOut' => $this->condOut, 'condIn' => $this->condIn, 'condBadge' => $this->condBadge,
         ]);
     }

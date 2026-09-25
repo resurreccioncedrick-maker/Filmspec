@@ -190,7 +190,7 @@
         @if ($booking->final_amount > 0)
         &nbsp;·&nbsp; Required: <strong>₱{{ number_format($booking->final_amount * 0.5, 2) }}</strong>
         @endif
-        before equipment can be released.
+        per payment terms — collected separately in Billing & POS, doesn't block equipment release.
       </div>
     </div>
     @endif
@@ -367,9 +367,6 @@
 @php
   $crewCount = $crewLines->count();
   $equipCount = $equipmentLines->count();
-  $paidAmt = $payments->sum('amount');
-  $required50 = $booking->client_type === 'first_time' ? ($booking->final_amount * 0.5) : 0;
-  $payOk = $booking->client_type !== 'first_time' || $paidAmt >= $required50;
   $crewOk = $crewCount > 0;
   $equipOk = $equipCount > 0;
   $driverOk = ! $driverNeeded || $driverCount > 0;
@@ -384,9 +381,11 @@
   // any outcome; this is what's required here, not specifically having a vehicle selected.
   $transportConfirmed = ! empty($booking->transport_confirmed_at);
   $transportOk = $transportConfirmed && $driverOk;
-  $allOk = $crewOk && $equipOk && $payOk && $transportOk && $costApprovalOk;
-  $totalConds = 4 + ($booking->client_type === 'first_time' ? 1 : 0);
-  $metConds = ($equipOk ? 1 : 0) + ($crewOk ? 1 : 0) + ($costApprovalOk ? 1 : 0) + ($transportOk ? 1 : 0) + ($booking->client_type === 'first_time' && $payOk ? 1 : 0);
+  // Payment collection is accounting's own workspace (Billing & POS), not an equipment-release
+  // concern — it deliberately doesn't gate or appear in this checklist.
+  $allOk = $crewOk && $equipOk && $transportOk && $costApprovalOk;
+  $totalConds = 4;
+  $metConds = ($equipOk ? 1 : 0) + ($crewOk ? 1 : 0) + ($costApprovalOk ? 1 : 0) + ($transportOk ? 1 : 0);
 
   $steps = [
       ['label' => 'Equipment', 'ok' => $equipOk],
@@ -394,7 +393,6 @@
       ['label' => 'Cost Approval', 'ok' => $costApprovalOk],
       ['label' => 'Transport', 'ok' => $transportOk],
   ];
-  if ($booking->client_type === 'first_time') $steps[] = ['label' => 'Payment', 'ok' => $payOk];
 
   $transportDetail = ! $driverNeeded ? 'Transport confirmed' : ($driverOk ? 'Driver assigned' : 'Driver not yet assigned');
 @endphp
@@ -426,7 +424,6 @@
     if (! $costApprovalOk) $blockers[] = 'Client has not approved the cost estimate yet';
     if (! $transportConfirmed) $blockers[] = 'Transport hasn\'t been reviewed yet — open Add/Edit Transport, even to confirm none is needed';
     elseif (! $driverOk) $blockers[] = 'Driver not yet assigned — this booking\'s transport requires one';
-    if ($booking->client_type === 'first_time' && ! $payOk) $blockers[] = '₱' . number_format($required50 - $paidAmt, 2) . ' downpayment still outstanding';
   @endphp
   <div style="margin-top:18px;padding:11px 14px;background:#FFF7ED;border-radius:9px;display:flex;align-items:flex-start;gap:9px">
     <i data-feather="alert-circle" style="width:14px;height:14px;color:#B45309;flex-shrink:0;margin-top:1px"></i>
@@ -1385,11 +1382,6 @@
             <span>{{ $equipmentLines->count() }} item(s) on booking</span>
           </div>
         </div>
-        @if ($booking->client_type === 'first_time')
-        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:11px 14px;font-size:12.5px;color:#92400e;margin-bottom:12px">
-          <strong>⚠ New Customer:</strong> 50% downpayment (₱{{ number_format($booking->final_amount * 0.5, 2) }}) must be collected before equipment can be released.
-        </div>
-        @endif
         <p style="font-size:13px;color:#475569;line-height:1.6">Approving will move this booking to <strong>Confirmed</strong> status. You can then assign crew, add equipment, and release items for the shoot.</p>
       </div>
       <div class="modal-footer">

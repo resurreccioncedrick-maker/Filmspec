@@ -117,17 +117,6 @@
       @endif
     </div>
 
-    @if ($booking->client_type === 'first_time')
-    <div style="display:flex;align-items:center;gap:10px;font-size:.875rem">
-      @if ($payGate)
-      <i data-feather="check-circle" style="color:var(--green);width:16px;height:16px;flex-shrink:0"></i>
-      <span style="color:var(--text)">50% downpayment received (₱{{ number_format($paidAmt, 2) }})</span>
-      @else
-      <i data-feather="x-circle" style="color:var(--red);width:16px;height:16px;flex-shrink:0"></i>
-      <span style="color:var(--red)"><strong>New client — 50% downpayment required.</strong> Minimum ₱{{ number_format($req50, 2) }}. Paid so far: ₱{{ number_format($paidAmt, 2) }}.</span>
-      @endif
-    </div>
-    @endif
 
   </div>
 </div>

@@ -716,7 +716,7 @@ footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-al
       @if ($booking->client_type === 'first_time' && in_array($booking->booking_status, ['pending', 'confirmed']))
       <div style="background:#fefce8;border:1px solid #fde047;color:#a16207;padding:10px 12px;border-radius:6px;font-size:11.5px;margin-bottom:14px;display:flex;align-items:flex-start;gap:7px">
         <span style="font-weight:700">!</span>
-        <div><strong>New Customer — 50% Downpayment Required</strong> before equipment can be released.
+        <div><strong>New Customer — 50% Downpayment Required</strong> per your payment terms.
         @if ($booking->final_amount > 0)
         &nbsp;Amount due: <strong>₱{{ number_format($booking->final_amount * 0.5, 2) }}</strong>
         @endif

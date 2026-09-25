@@ -702,13 +702,8 @@ class BookingDetailController extends Controller
             }
         }
 
-        if ($booking->client_type === 'first_time' && (float) $booking->final_amount > 0) {
-            $paidAmt = (float) DB::table('payments')->where('booking_id', $id)->sum('amount');
-            $required50 = (float) $booking->final_amount * 0.5;
-            if ($paidAmt < $required50) {
-                return ['type' => 'error', 'text' => 'Cannot release: New customer must pay at least 50% (₱' . number_format($required50, 2) . ') before equipment is released. Paid so far: ₱' . number_format($paidAmt, 2) . '.'];
-            }
-        }
+        // Payment collection is accounting's own workspace (Billing & POS) — it no longer gates
+        // equipment release.
 
         DB::table('equipment_transactions')->insert([
             'booking_id' => $id, 'equipment_id' => $eid, 'transaction_type' => 'checkout', 'transaction_date' => now(),
@@ -814,12 +809,8 @@ class BookingDetailController extends Controller
                 return ['type' => 'error', 'text' => 'Cannot release — a Driver must be assigned because this booking\'s transport requires one.'];
             }
         }
-        if ($booking->client_type === 'first_time' && (float) $booking->final_amount > 0) {
-            $paidAmt = (float) DB::table('payments')->where('booking_id', $id)->sum('amount');
-            if ($paidAmt < (float) $booking->final_amount * 0.5) {
-                return ['type' => 'error', 'text' => 'Cannot release — 50% downpayment required for new clients.'];
-            }
-        }
+        // Payment collection is accounting's own workspace (Billing & POS) — it no longer gates
+        // equipment release.
 
         $pendingItems = DB::table('booking_equipment as be')
             ->where('be.booking_id', $id)
