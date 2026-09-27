@@ -188,7 +188,7 @@ button{font-family:var(--font-b);cursor:pointer}
 
 /* ─── HERO ─── */
 .hero{
-  background:linear-gradient(145deg,#ffffff 0%,#eef4ff 55%,#f0f5fb 100%);
+  background:#0B1A33;
   border-bottom:1px solid var(--border);
   min-height:86vh;
   display:flex;
@@ -196,42 +196,14 @@ button{font-family:var(--font-b);cursor:pointer}
   position:relative;
   overflow:hidden;
 }
-.hero-grid{
-  position:absolute;inset:0;
-  background-image:
-    linear-gradient(rgba(0,60,199,.04) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(0,60,199,.04) 1px,transparent 1px);
-  background-size:56px 56px;
-  pointer-events:none;
-}
-.hero-orb{position:absolute;border-radius:50%;pointer-events:none;}
-.hero-orb.a{
-  width:700px;height:700px;
-  top:-250px;left:-160px;
-  background:radial-gradient(circle,rgba(0,96,199,.09) 0%,transparent 65%);
-  animation:orbdrift 12s ease-in-out infinite alternate;
-}
-.hero-orb.b{
-  width:600px;height:600px;
-  bottom:-220px;right:-160px;
-  background:radial-gradient(circle,rgba(124,58,237,.06) 0%,transparent 65%);
-  animation:orbdrift 9s ease-in-out infinite alternate-reverse;
-}
-@keyframes orbdrift{to{transform:translate(48px,38px) scale(1.07)}}
-.hero-diag{
-  position:absolute;top:0;right:0;
-  width:55%;height:100%;
-  background:linear-gradient(140deg,transparent 52%,rgba(0,60,199,.04) 52%);
-  pointer-events:none;
-}
-.hero-strip{
-  position:absolute;top:0;bottom:0;left:0;
-  width:4px;
-  background:repeating-linear-gradient(to bottom,
-    var(--blue) 0,var(--blue) 16px,
-    transparent 16px,transparent 26px);
-  opacity:.18;
-}
+.hero-slides{position:absolute;inset:0}
+.hero-slide{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.4s ease}
+.hero-slide.on{opacity:1}
+.hero-scrim{position:absolute;inset:0;background:linear-gradient(100deg,rgba(5,10,20,.90) 0%,rgba(5,10,20,.78) 40%,rgba(5,10,20,.42) 100%)}
+.hero-dots{position:absolute;right:28px;bottom:22px;z-index:3;display:flex;gap:7px}
+.hero-dots span{width:18px;height:3px;border-radius:2px;background:#fff;opacity:.35;transition:opacity .3s}
+.hero-dots span.on{opacity:1}
+.hero-right-slides,.hero-right-scrim{display:none}
 .hero-inner{
   position:relative;z-index:2;
   max-width:1180px;margin:0 auto;
@@ -245,28 +217,31 @@ button{font-family:var(--font-b);cursor:pointer}
 .hero-left{}
 .hero-right{
   padding-left:52px;
-  border-left:1px solid var(--border);
+  border-left:1px solid rgba(255,255,255,.18);
+  position:relative;
 }
 .hero-logo-wrap{
-  display:inline-block;
+  display:inline-flex;
+  align-items:center;
 }
 .hero-logo-img{
-  height:80px;
+  height:100px;
   width:auto;
   display:block;
+  filter:drop-shadow(0 3px 14px rgba(0,0,0,.6));
 }
 .hero-eq-line{
   font-family:var(--font-d);
   font-size:clamp(13px,1.8vw,17px);
   letter-spacing:4px;
-  color:var(--muted);
+  color:rgba(255,255,255,.4);
   text-transform:uppercase;
 }
 .hero-tag{
   display:inline-flex;align-items:center;gap:7px;
-  background:rgba(0,96,199,.08);
-  border:1px solid rgba(0,96,199,.22);
-  color:var(--blue);
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.22);
+  color:#cfe0f2;
   font-size:10.5px;font-weight:700;
   text-transform:uppercase;letter-spacing:2px;
   padding:5px 14px;border-radius:20px;
@@ -275,7 +250,7 @@ button{font-family:var(--font-b);cursor:pointer}
 .hero-tag::before{
   content:'';
   width:6px;height:6px;border-radius:50%;
-  background:var(--blue);
+  background:#5aa8f0;
   animation:hpulse 2s ease-in-out infinite;
 }
 @keyframes hpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.65)}}
@@ -287,14 +262,24 @@ button{font-family:var(--font-b);cursor:pointer}
   margin-bottom:24px;
   color:#fff;
 }
-.hero h1 .accent{color:var(--blue);display:block}
-.hero h1 .dim{color:var(--muted)}
+.hero h1 .accent{color:#5aa8f0;display:block}
+.hero h1 .dim{color:rgba(255,255,255,.5)}
 .hero-sub{
   font-size:15px;
-  color:var(--sub);
+  color:#c2d2e4;
   max-width:450px;
   margin:0 0 36px;
   line-height:1.85;
+}
+.hero-right .hbtn.ghost{
+  background:rgba(255,255,255,.08);
+  color:#fff;
+  border:1.5px solid rgba(255,255,255,.45);
+}
+.hero-right .hbtn.ghost:hover{
+  background:rgba(255,255,255,.16);
+  color:#fff;
+  border-color:rgba(255,255,255,.7);
 }
 .hero-acts{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .hbtn{
@@ -422,20 +407,20 @@ button{font-family:var(--font-b);cursor:pointer}
   min-width:120px;
 }
 .hstat-mini+.hstat-mini{
-  border-left:1px solid var(--border);
+  border-left:1px solid rgba(255,255,255,.18);
   padding-left:28px;
   margin-left:28px;
 }
 .hstat-mini-n{
   font-family:var(--font-d);
   font-size:36px;
-  color:var(--text);
+  color:#fff;
   line-height:1;
   letter-spacing:.5px;
 }
 .hstat-mini-l{
   font-size:10px;
-  color:var(--muted);
+  color:rgba(255,255,255,.45);
   font-weight:600;
   text-transform:uppercase;
   letter-spacing:.8px;
@@ -1200,62 +1185,93 @@ textarea.fi{resize:vertical;min-height:60px}
 .site-footer{
   background:linear-gradient(180deg,#070e1a 0%,#050c17 100%);
   border-top:1px solid #1a2a45;
-  padding:28px 40px;
 }
-.footer-inner{
+.footer-top{
   max-width:1220px;
   margin:0 auto;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:20px;
-  flex-wrap:wrap;
+  padding:52px 40px 32px;
+  display:grid;
+  grid-template-columns:1.4fr 1fr 1fr 1fr;
+  gap:32px;
 }
 .footer-brand{
   display:flex;
-  align-items:center;
-  gap:12px;
+  flex-direction:column;
+  gap:10px;
 }
 .footer-logo{
   font-family:var(--font-d);
-  font-size:20px;
+  font-size:24px;
   letter-spacing:3px;
-  color:#60b0ff;
 }
+.footer-logo .fl-film{color:#e8f0fb}
+.footer-logo .fl-spec{color:#60b0ff}
 .footer-tagline{
-  font-size:11.5px;
-  color:#3d5a80;
-  font-weight:500;
-  letter-spacing:.3px;
+  font-size:12px;
+  color:#5a82ad;
+  line-height:1.7;
+  max-width:260px;
+  margin-bottom:8px;
 }
-.footer-copy{
-  font-size:11.5px;
-  color:#2e4a6a;
-  letter-spacing:.3px;
-}
-.footer-links{
-  display:flex;
-  align-items:center;
-  gap:22px;
-  flex-wrap:wrap;
+.footer-contact{display:flex;flex-direction:column;gap:16px;margin-top:4px}
+.footer-contact .fc-row{display:flex;gap:32px;flex-wrap:wrap}
+.footer-contact .fc-label{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#3d5a80;margin-bottom:5px}
+.footer-contact .fc-value{font-size:13px;color:#e8f0fb;line-height:1.55;text-decoration:none;display:block}
+a.footer-contact-link{transition:color .15s}
+a.footer-contact-link:hover{color:#60b0ff}
+.footer-contact .fc-sub{font-size:12px;color:#5a82ad;margin-top:2px}
+.footer-col-head{
+  font-size:11px;
+  font-weight:700;
+  color:#e8f0fb;
+  letter-spacing:1.4px;
+  text-transform:uppercase;
+  margin-bottom:16px;
 }
 .footer-link{
-  font-size:12px;
+  display:block;
+  font-size:12.5px;
   color:#5a82ad;
   letter-spacing:.2px;
   background:none;
   border:none;
   cursor:pointer;
   padding:0;
+  margin-bottom:11px;
   font-family:inherit;
+  text-align:left;
   transition:color .15s;
 }
 .footer-link:hover{color:#60b0ff}
+.footer-bottom{
+  border-top:1px solid #131e33;
+}
+.footer-bottom-inner{
+  max-width:1220px;
+  margin:0 auto;
+  padding:18px 40px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.footer-copy{
+  font-size:11px;
+  color:#2e4a6a;
+  letter-spacing:.3px;
+}
+@media(max-width:900px){
+  .footer-top{grid-template-columns:1fr 1fr;gap:28px}
+}
+@media(max-width:600px){
+  .footer-top{grid-template-columns:1fr}
+}
 
 @media(max-width:900px){
   .hero-inner{grid-template-columns:1fr;padding:72px 36px 60px}
-  .hero-right{padding-left:0;border-left:none;padding-top:40px;border-top:1px solid var(--border)}
-  .hero-logo-img{height:58px}
+  .hero-right{padding-left:0;border-left:none;padding-top:40px;border-top:1px solid rgba(255,255,255,.18)}
+  .hero-logo-img{height:96px}
   .steps-new{grid-template-columns:1fr 1fr;gap:8px}
   .steps-new::before{display:none}
   .acct-cards{grid-template-columns:1fr}
@@ -1287,7 +1303,6 @@ textarea.fi{resize:vertical;min-height:60px}
   .eq-page-count{padding:6px 14px;font-size:11px;align-self:auto}
   .hero-inner{padding:52px 20px 48px}
   .hero-logo-img{height:48px}
-  .hero-logo-wrap{padding:16px 22px;border-radius:10px}
   .steps-new{grid-template-columns:1fr 1fr}
   .hero-stats-strip{flex-wrap:wrap;gap:16px}
   .hstat-mini+.hstat-mini{border-left:none;padding-left:0;margin-left:0}
@@ -1329,6 +1344,7 @@ textarea.fi{resize:vertical;min-height:60px}
      already shown in the top nav, so it's not repeated here). Same markup,
      CSS only: hero-left's logo/eyebrow hidden, stats become their own row,
      hero-right becomes the gradient card. */
+  .hero{background:linear-gradient(145deg,#ffffff 0%,#eef4ff 55%,#f0f5fb 100%)}
   .hero-inner{display:flex;flex-direction:column;padding:16px}
   .hero-logo-wrap,.hero-left>div:nth-child(2){display:none}
   .hero-left{margin-bottom:0;margin-top:14px;order:2}
@@ -1339,12 +1355,19 @@ textarea.fi{resize:vertical;min-height:60px}
     border-radius:var(--radius-md);padding:14px 10px;
   }
   .hstat-mini{align-items:center;text-align:center}
-  .hstat-mini-n{font-size:26px}
+  .hstat-mini-n{font-size:26px;color:var(--text)}
+  .hstat-mini-l{color:var(--muted)}
+  .hstat-mini+.hstat-mini{border-color:var(--border)}
   .hero-right{
     padding:26px 22px!important;border:none;border-radius:16px;position:relative;overflow:hidden;
-    background:linear-gradient(135deg,var(--blue),var(--blue2));
   }
-  .hero-right::after{content:"";position:absolute;right:-30px;top:-30px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.08)}
+  .hero-slides,.hero-scrim,.hero-dots{display:none}
+  .hero-right-slides{display:block;position:absolute;inset:0}
+  .hero-right-scrim{
+    display:block;position:absolute;inset:0;
+    background:linear-gradient(160deg,rgba(5,10,20,.55) 0%,rgba(5,10,20,.72) 55%,rgba(5,10,20,.85) 100%);
+  }
+  .hero-right-content{position:relative;z-index:2}
   .hero-tag{display:none}
   .hero-right h1{position:relative;font-size:28px!important;line-height:1.05!important;color:#fff!important;margin-bottom:12px!important}
   .hero-right h1 span{color:#bfe0ff!important}
@@ -1493,6 +1516,7 @@ textarea.fi{resize:vertical;min-height:60px}
   <div class="nav-logo" onclick="showPage('home',null)"><img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:34px;object-fit:contain;display:block"></div>
   <div class="nav-links">
     <button class="nl on"  onclick="showPage('home',this)">Home</button>
+    <button class="nl"     onclick="showPage('about',this)">About</button>
     <button class="nl"     onclick="showPage('equipment',this)">Equipment</button>
     @if($isLoggedIn)
     <button class="nl"     onclick="showPage('mybookings',this)">My Bookings</button>
@@ -1515,13 +1539,14 @@ textarea.fi{resize:vertical;min-height:60px}
       </div>
       <form method="POST" action="{{ route('logout') }}" style="display:contents">@csrf<button type="submit" class="nav-btn">Logout</button></form>
     @else
-      <a href="{{ route('login') }}"><button class="nav-btn">Sign In</button></a>
+      <a href="{{ route('login') }}"><button class="nav-btn">Sign In to Book</button></a>
     @endif
   </div>
 </nav>
 <div class="nav-mobile-menu" id="navMobileMenu" onclick="if(event.target===this)toggleMobileMenu()">
   <div class="nav-mobile-drawer">
     <button class="nl on" onclick="showPage('home',this);toggleMobileMenu()">Home</button>
+    <button class="nl" onclick="showPage('about',this);toggleMobileMenu()">About</button>
     <button class="nl" onclick="showPage('equipment',this);toggleMobileMenu()">Equipment</button>
     @if($isLoggedIn)
     <button class="nl" onclick="showPage('mybookings',this);toggleMobileMenu()">My Bookings</button>
@@ -1538,17 +1563,22 @@ textarea.fi{resize:vertical;min-height:60px}
 
   <!-- HERO -->
   <div class="hero">
-    <div class="hero-grid"></div>
-    <div class="hero-orb a"></div>
-    <div class="hero-orb b"></div>
-    <div class="hero-diag"></div>
-    <div class="hero-strip"></div>
+    <div class="hero-slides">
+      <img class="hero-slide on" src="{{ asset('assets/images/hero/hero-1.jpg') }}" alt="">
+      <img class="hero-slide" src="{{ asset('assets/images/hero/hero-2.jpg') }}" alt="">
+      <img class="hero-slide" src="{{ asset('assets/images/hero/hero-3.jpg') }}" alt="">
+      <img class="hero-slide" src="{{ asset('assets/images/hero/hero-4.jpg') }}" alt="">
+    </div>
+    <div class="hero-scrim"></div>
+    <div class="hero-dots" id="heroDots">
+      <span class="on"></span><span></span><span></span><span></span>
+    </div>
     <div class="hero-inner">
       <div class="hero-left">
         <div class="hero-logo-wrap">
-          <img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" class="hero-logo-img">
+          <img src="{{ asset('assets/images/logo-badge.png') }}" alt="FilmSpec" class="hero-logo-img">
         </div>
-        <div style="margin-top:14px;font-size:10.5px;color:var(--muted);letter-spacing:2.5px;text-transform:uppercase;font-weight:600">Integrated Film Operations Platform</div>
+        <div style="margin-top:14px;font-size:10.5px;color:rgba(255,255,255,.45);letter-spacing:2.5px;text-transform:uppercase;font-weight:600">Integrated Film Operations Platform</div>
         <div class="hero-stats-strip" style="justify-content:flex-start;margin-top:40px">
           <div class="hstat-mini">
             <div class="hstat-mini-n">{{ $stats['equip'] }}</div>
@@ -1565,21 +1595,43 @@ textarea.fi{resize:vertical;min-height:60px}
         </div>
       </div>
       <div class="hero-right">
-        <div class="hero-tag">Professional Film Production</div>
-        <h1 style="font-family:var(--font-d);font-size:clamp(46px,5.5vw,78px);letter-spacing:1px;line-height:.88;color:var(--text);margin-bottom:22px">Everything<span style="color:var(--blue);display:block">Your Production</span>Needs</h1>
-        <p class="hero-sub">Access professional cameras, lighting, grip, and sound equipment — plus qualified crew — all in one platform built for Philippine film productions.</p>
-        <div class="hero-acts">
-          <button class="hbtn blue" onclick="showPage('equipment',null)">Browse Equipment</button>
-          @if($isLoggedIn)
-          <button class="hbtn ghost" onclick="showPage('mybookings',null)">My Bookings</button>
-          @else
-          <a href="{{ route('login') }}"><button class="hbtn ghost">Sign In</button></a>
-          @endif
+        <div class="hero-right-slides">
+          <img class="hero-slide on" src="{{ asset('assets/images/hero/hero-1.jpg') }}" alt="">
+          <img class="hero-slide" src="{{ asset('assets/images/hero/hero-2.jpg') }}" alt="">
+          <img class="hero-slide" src="{{ asset('assets/images/hero/hero-3.jpg') }}" alt="">
+          <img class="hero-slide" src="{{ asset('assets/images/hero/hero-4.jpg') }}" alt="">
         </div>
-        <div class="hero-eq-line" style="margin-top:24px">Film Gear &nbsp;&middot;&nbsp; Rental &nbsp;&middot;&nbsp; Made Easy</div>
+        <div class="hero-right-scrim"></div>
+        <div class="hero-right-content">
+          <div class="hero-tag">Professional Film Production</div>
+          <h1 style="font-family:var(--font-d);font-size:clamp(46px,5.5vw,78px);letter-spacing:1px;line-height:.88;color:#fff;margin-bottom:22px">Everything<span style="color:#5aa8f0;display:block">Your Production</span>Needs</h1>
+          <p class="hero-sub">Access professional cameras, lighting, grip, and sound equipment — plus qualified crew — all in one platform built for Philippine film productions.</p>
+          <div class="hero-acts">
+            <button class="hbtn blue" onclick="showPage('equipment',null)">Browse Equipment</button>
+            @if($isLoggedIn)
+            <button class="hbtn ghost" onclick="showPage('mybookings',null)">My Bookings</button>
+            @else
+            <a href="{{ route('login') }}"><button class="hbtn ghost">Sign In</button></a>
+            @endif
+          </div>
+          <div class="hero-eq-line" style="margin-top:24px">Film Gear &nbsp;&middot;&nbsp; Rental &nbsp;&middot;&nbsp; Made Easy</div>
+        </div>
       </div>
     </div>
   </div>
+  <script>
+  (function(){
+    var slides = document.querySelectorAll('.hero-slide');
+    var dots = document.querySelectorAll('#heroDots span');
+    if (!slides.length) return;
+    var i = 0;
+    setInterval(function(){
+      i = (i + 1) % 4;
+      slides.forEach(function(s, idx){ s.classList.toggle('on', idx % 4 === i); });
+      dots.forEach(function(d, idx){ d.classList.toggle('on', idx === i); });
+    }, 3200);
+  })();
+  </script>
 
   <!-- HOW IT WORKS -->
   <div class="hiw-section">
@@ -1952,6 +2004,148 @@ textarea.fi{resize:vertical;min-height:60px}
     </div>
   </div>
 </div>
+
+<!-- ════════ ABOUT ════════ -->
+<style>
+.abt-hero{position:relative;border-radius:20px;overflow:hidden;height:520px;margin:8px 0 60px;box-shadow:0 24px 50px -18px rgba(11,26,51,.3)}
+.abt-hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.4s ease}
+.abt-hero img.on{opacity:1}
+.abt-hero-scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,13,26,.25) 0%,rgba(6,13,26,.55) 55%,rgba(6,13,26,.85) 100%)}
+.abt-hero-content{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 48px}
+.abt-hero-eyebrow{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#7fb4ea;margin-bottom:16px}
+.abt-hero-title{font-family:var(--font-d);font-size:clamp(30px,4.6vw,48px);letter-spacing:.5px;color:#fff;margin:0 0 18px;max-width:640px;line-height:1.15}
+.abt-hero-title span{color:#7fb4ea}
+.abt-hero-sub{font-size:14px;line-height:1.8;color:#c9d9ec;max-width:520px;margin:0 auto 24px}
+.abt-hero-dots{position:absolute;right:24px;bottom:20px;z-index:2;display:flex;gap:7px}
+.abt-hero-dots span{width:18px;height:3px;border-radius:2px;background:#fff;opacity:.35;transition:opacity .3s}
+.abt-hero-dots span.on{opacity:1}
+.abt-hero-cap{position:absolute;left:24px;bottom:20px;z-index:2;font-size:11px;color:#9db8d6}
+.abt-split{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;margin-bottom:70px}
+.abt-collage{position:relative;height:360px}
+.abt-collage .main{position:absolute;left:0;top:30px;width:76%;height:300px;border-radius:16px;overflow:hidden;box-shadow:0 16px 34px -12px rgba(11,26,51,.28)}
+.abt-collage .main img{width:100%;height:100%;object-fit:cover;display:block}
+.abt-collage .accent{position:absolute;right:0;bottom:0;width:46%;height:170px;border-radius:16px;overflow:hidden;box-shadow:0 18px 36px -10px rgba(11,26,51,.35);border:4px solid var(--surface,#fff)}
+.abt-collage .accent img{width:100%;height:100%;object-fit:cover;display:block}
+.abt-collage.rev .main{left:auto;right:0}
+.abt-collage.rev .accent{right:auto;left:0}
+.abt-showcase{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.abt-showcase .card{position:relative;border-radius:14px;overflow:hidden;height:170px;box-shadow:0 10px 22px -10px rgba(11,26,51,.25)}
+.abt-showcase .card img{width:100%;height:100%;object-fit:cover;display:block}
+.abt-showcase .cap{position:absolute;left:0;right:0;bottom:0;padding:10px 12px;background:linear-gradient(0deg,rgba(11,26,51,.85) 0%,rgba(11,26,51,0) 100%);color:#fff;font-size:11.5px;font-weight:700}
+@media(max-width:900px){
+  .abt-split{grid-template-columns:1fr;gap:32px}
+  .abt-showcase{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:600px){
+  .abt-hero{height:440px}
+  .abt-collage{height:260px}
+  .abt-collage .accent{display:none}
+  .abt-collage .main{width:100%;top:0;height:100%}
+}
+</style>
+<div id="pg-about" class="pg">
+  <div class="ccon">
+
+    <div class="abt-hero" id="abtHero">
+      <img src="{{ asset('assets/images/about/hero-1.jpg') }}" class="on">
+      <img src="{{ asset('assets/images/about/hero-2.webp') }}">
+      <img src="{{ asset('assets/images/about/hero-3.jpg') }}">
+      <img src="{{ asset('assets/images/about/hero-4.jpg') }}">
+      <img src="{{ asset('assets/images/about/hero-5.jpg') }}">
+      <div class="abt-hero-scrim"></div>
+      <div class="abt-hero-content">
+        <div class="abt-hero-eyebrow">Makati &middot; Philippines</div>
+        <div class="abt-hero-title">The crew and gear behind every <span>frame</span>.</div>
+        <div class="abt-hero-sub">FilmSpec is a lighting, grip, and power equipment rental company serving the film, television, and advertising industry in the Philippines. Built and operated by active professionals in the production industry, we understand the technical and creative demands of every shoot because we experience them ourselves.</div>
+        <button class="hbtn blue" style="font-size:13px;padding:10px 20px" onclick="showPage('equipment',null)">Browse Equipment &rarr;</button>
+      </div>
+      <div class="abt-hero-cap" id="abtHeroCap">On set — camera operator</div>
+      <div class="abt-hero-dots" id="abtHeroDots">
+        <span class="on"></span><span></span><span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <div class="abt-split">
+      <div class="abt-collage">
+        <div class="main"><img src="{{ asset('assets/images/about/who-we-are-main.jpg') }}" alt="FilmSpec crew"></div>
+        <div class="accent"><img src="{{ asset('assets/images/about/who-we-are-accent.jpg') }}" alt="FilmSpec team on set"></div>
+      </div>
+      <div>
+        <div class="sec-label">Who We Are</div>
+        <div class="sec-title" style="font-size:30px">A crew-run rental house.</div>
+        <div class="sec-sub" style="max-width:480px">We are a group of cinematographers, directors, and producers from the Philippines providing dependable lighting, grip, and power for film, television, and advertising. Affordable, reliable gear that lets you focus on the vision.</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface-hover,#f4f7fb);border:1px solid var(--border,#e2e8f0);border-radius:18px;padding:40px 44px;margin-bottom:70px;display:flex;flex-direction:column;gap:18px;text-align:center">
+      <div class="sec-label" style="justify-content:center;display:flex">Our Mission</div>
+      <div style="font-size:14.5px;line-height:1.85;color:var(--text);max-width:720px;margin:0 auto">As a young company founded just a few years ago, our mission is to continually expand and meet the unique needs of each cinematographer we work with. We recognize that budgets for film projects are getting smaller, and our goal is to provide affordable yet reliable equipment and crew that will elevate the standards of advertising, television, and film production in our country.</div>
+      <div style="font-size:14.5px;line-height:1.85;color:var(--text);max-width:720px;margin:0 auto">By offering our own top-quality equipment and an experienced team, we strive to ensure a dependable system that lets our clients focus solely on their creative vision. Our ultimate aim is to contribute to the growth of the industry we are passionate about — making it better for all of us to work in and take pride in.</div>
+    </div>
+
+    <div class="abt-split">
+      <div>
+        <div class="sec-label">What We Do</div>
+        <div class="sec-title" style="font-size:30px">Curated by cinematographers.</div>
+        <div class="sec-sub" style="max-width:480px">Every piece of equipment in our inventory is carefully selected by active cinematographers with real production experience. We curate lighting, grip, and power solutions that meet industry standards — reliable, versatile, and built to perform on professional sets.</div>
+      </div>
+      <div class="abt-collage rev">
+        <div class="main"><img src="{{ asset('assets/images/about/what-we-do-main.jpg') }}" alt="Rigging a diffusion frame"></div>
+        <div class="accent"><img src="{{ asset('assets/images/about/what-we-do-accent.jpg') }}" alt="Unpacking equipment"></div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:70px">
+      <div class="sec-label" style="text-align:center;justify-content:center;display:flex">The Showcase</div>
+      <div class="sec-title" style="text-align:center;font-size:26px;margin-bottom:24px">What's in the truck.</div>
+      <div class="abt-showcase">
+        <div class="card"><img src="{{ asset('assets/images/about/showcase-crane.jpg') }}" alt="Camera crane"><div class="cap">Camera Crane</div></div>
+        <div class="card"><img src="{{ asset('assets/images/about/showcase-lighting-rack.jpg') }}" alt="Lighting rack"><div class="cap">Lighting Rack</div></div>
+        <div class="card"><img src="{{ asset('assets/images/about/showcase-led.jpg') }}" alt="LED fixtures"><div class="cap">LED Fixtures</div></div>
+        <div class="card"><img src="{{ asset('assets/images/about/showcase-detail.jpg') }}" alt="Lighting detail"><div class="cap">Lighting Detail</div></div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:60px;max-width:640px;margin-left:auto;margin-right:auto;border-top:1px solid var(--border,#e2e8f0);padding-top:36px">
+      <div style="text-align:center">
+        <div style="font-family:var(--font-d);font-size:32px;color:var(--blue)">{{ $stats['equip'] }}</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Equipment Items</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-family:var(--font-d);font-size:32px;color:var(--blue)">{{ $stats['crew'] }}</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Crew on Roster</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-family:var(--font-d);font-size:32px;color:var(--blue)">{{ $stats['done'] }}</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Shoots Completed</div>
+      </div>
+    </div>
+
+    <div style="padding:20px 22px;border-radius:14px;background:var(--surface-hover,#f4f7fb);border:1px solid var(--border,#e2e8f0);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:40px">
+      <div>
+        <div style="font-weight:700;font-size:14.5px;margin-bottom:3px">Have a shoot coming up?</div>
+        <div style="font-size:12.5px;color:var(--text-muted,#64748b)">Browse the equipment catalog or reach out to our team.</div>
+      </div>
+      <button class="hbtn blue" style="font-size:13px;padding:10px 18px" onclick="showPage('equipment',null)">Browse Equipment &rarr;</button>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var slides = document.querySelectorAll('#abtHero img');
+  var dots = document.querySelectorAll('#abtHeroDots span');
+  var cap = document.getElementById('abtHeroCap');
+  if (!slides.length) return;
+  var captions = ['On set — camera operator','Behind the lens','Crew in position','Rigging the set','Gear detail'];
+  var i = 0;
+  setInterval(function(){
+    i = (i + 1) % slides.length;
+    slides.forEach(function(s, idx){ s.classList.toggle('on', idx === i); });
+    dots.forEach(function(d, idx){ d.classList.toggle('on', idx === i); });
+    if (cap) cap.textContent = captions[i] || '';
+  }, 3200);
+})();
+</script>
 
 <!-- ════════ ACCOUNT ════════ -->
 @if($isLoggedIn)
@@ -3113,17 +3307,52 @@ document.addEventListener('visibilitychange', function () { if (!document.hidden
 @endif
 
 <footer class="site-footer">
-  <div class="footer-inner">
+  <div class="footer-top">
     <div class="footer-brand">
-      <span class="footer-logo">FilmSpec</span>
-      <span class="footer-tagline">Integrated Film Operations Platform</span>
+      <span class="footer-logo"><span class="fl-film">FILM</span><span class="fl-spec">SPEC</span></span>
+      <span class="footer-tagline">Professional cameras, lighting, grip and sound equipment — plus qualified crew — for Philippine film productions.</span>
+      <div class="footer-contact">
+        <div class="fc-row">
+          <div>
+            <div class="fc-label">Call</div>
+            <a href="tel:+639275056461" class="fc-value footer-contact-link">0927 505 6461</a>
+          </div>
+          <div>
+            <div class="fc-label">Email</div>
+            <a href="mailto:filmspecphilippines@gmail.com" class="fc-value footer-contact-link">filmspecphilippines@gmail.com</a>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="footer-links">
+
+    <div>
+      <div class="footer-col-head">Platform</div>
       <button class="footer-link" onclick="showPage('equipment',null)">Equipment Catalog</button>
+      <button class="footer-link" onclick="showPage('equipment',null)">Accessories</button>
+      <button class="footer-link" onclick="showPage('mybookings',null)">My Bookings</button>
+    </div>
+
+    <div>
+      <div class="footer-col-head">Company</div>
+      <button class="footer-link" onclick="showPage('about',null)">About Us</button>
       <button class="footer-link" onclick="showPage('help',null)">Help Center</button>
       <button class="footer-link" onclick="{{ $isLoggedIn ? "showPage('account',null)" : 'requireAuth()' }}">Contact Us</button>
+      @unless ($isLoggedIn)
+      <a href="{{ route('login') }}" class="footer-link" style="text-decoration:none">Client Sign-in</a>
+      @endunless
     </div>
-    <div class="footer-copy">&copy; {{ date('Y') }} FilmSpec. All rights reserved.</div>
+
+    <div>
+      <div class="footer-col-head">Legal</div>
+      <button class="footer-link" onclick="{{ $isLoggedIn ? "showPage('account',null)" : 'requireAuth()' }}">Privacy Notice</button>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <div class="footer-bottom-inner">
+      <div class="footer-copy">&copy; {{ date('Y') }} FilmSpec. All rights reserved.</div>
+      <div class="footer-copy">Gate 1, 9110 La Campana St. cor Trabajo St., Olympia, Makati City</div>
+    </div>
   </div>
 </footer>
 <script src="{{ asset('assets/js/keyboard-aware.js') }}"></script>
