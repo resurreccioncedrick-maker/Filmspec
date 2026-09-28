@@ -9,7 +9,7 @@
 @section('topbarActions')
 @include('partials.export-dropdown', ['id' => 'Clients'])
 @if ($canManage)
-<button onclick="openModal('modalAddClient')" class="btn btn-primary btn-sm"><i data-feather="user-plus" style="width:14px;height:14px;margin-right:4px;vertical-align:middle"></i> Add Client</button>
+<button onclick="resetAddClientForm();openModal('modalAddClient')" class="btn btn-primary btn-sm"><i data-feather="user-plus" style="width:14px;height:14px;margin-right:4px;vertical-align:middle"></i> Add Client</button>
 @endif
 @endsection
 
@@ -86,6 +86,7 @@
         <tr>
           <th>Client</th>
           <th>Type</th>
+          <th>Portal Account</th>
           <th>Contact</th>
           <th>Bookings</th>
           <th>Completed</th>
@@ -128,6 +129,15 @@
             </span>
             @if ($nearPromo)
             <div style="font-size:10px;color:var(--muted);margin-top:2px">1 more → Regular</div>
+            @endif
+          </td>
+          <td>
+            @if ($c->user_id)
+            <span class="badge badge-green" style="font-size:10.5px" title="Can sign in to the client portal">
+              <i data-feather="check-circle" style="width:11px;height:11px;vertical-align:middle;margin-right:2px"></i>Linked
+            </span>
+            @else
+            <span class="badge badge-gray" style="font-size:10.5px" title="Added by staff — no client-side login">None</span>
             @endif
           </td>
           <td>
@@ -216,47 +226,71 @@
       <h3><i data-feather="user-plus" style="width:16px;height:16px;margin-right:6px;vertical-align:middle"></i>Add Client</h3>
       <button class="modal-close" onclick="closeModal('modalAddClient')">&times;</button>
     </div>
-    <form method="POST" action="{{ $clientsBase }}">
+    <form method="POST" action="{{ $clientsBase }}" id="addClientForm">
       @csrf
       <input type="hidden" name="action" value="add_client">
+      <input type="hidden" name="entity_type" id="add_entity_type" value="individual">
       <div class="modal-body">
-        <div class="form-row">
+
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:8px">Client Type</div>
+        <div style="display:flex;gap:10px;margin-bottom:14px">
+          <label style="flex:1;display:flex;align-items:center;gap:8px;border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer">
+            <input type="radio" name="client_kind" value="individual" checked onchange="onAddClientKindChange('individual')"> Individual
+          </label>
+          <label style="flex:1;display:flex;align-items:center;gap:8px;border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer">
+            <input type="radio" name="client_kind" value="organization" onchange="onAddClientKindChange('organization')"> Organization
+          </label>
+        </div>
+
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:8px">Identity</div>
+        <div id="add_identity_individual" class="form-group">
+          <label>Individual Type</label>
+          <select id="add_individual_subtype" class="form-control" onchange="computeAddEntityType()">
+            <option value="individual">Individual</option>
+            <option value="student">Student</option>
+          </select>
+        </div>
+        <div id="add_identity_org" style="display:none">
           <div class="form-group">
-            <label>Company Name</label>
-            <input type="text" name="company_name" class="form-control" placeholder="Production company / studio">
+            <label>Organization Type</label>
+            <select id="add_org_subtype" class="form-control" onchange="computeAddEntityType()">
+              <option value="company">Company</option>
+              <option value="ngo">NGO / Non-Profit</option>
+              <option value="government">Government</option>
+            </select>
           </div>
+          <div class="form-group">
+            <label>Company / Organization Name <span class="req">*</span></label>
+            <input type="text" name="company_name" id="add_company_name" class="form-control" placeholder="Production company / studio">
+          </div>
+          <div id="add_vat_notice" style="display:none;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.3);border-radius:6px;padding:8px 12px;font-size:12px;color:#c084fc;margin-bottom:10px">
+            Companies are subject to 12% VAT on all fees.
+          </div>
+        </div>
+
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:8px">Contact</div>
+        <div class="form-row">
           <div class="form-group">
             <label>Contact Person <span class="req">*</span></label>
             <input type="text" name="contact_person" class="form-control" placeholder="Full name" required>
           </div>
-        </div>
-        <div class="form-row">
           <div class="form-group">
             <label>Email</label>
             <input type="email" name="email" class="form-control" placeholder="client@example.com">
           </div>
+        </div>
+        <div class="form-row">
           <div class="form-group">
             <label>Phone</label>
             <input type="text" name="phone" class="form-control" placeholder="+63 9xx xxx xxxx">
           </div>
+          <div class="form-group">
+            <label>Address</label>
+            <input type="text" name="address" class="form-control" placeholder="Full address">
+          </div>
         </div>
-        <div class="form-group">
-          <label>Address</label>
-          <input type="text" name="address" class="form-control" placeholder="Full address">
-        </div>
-        <div class="form-group">
-          <label>Entity Type</label>
-          <select name="entity_type" class="form-control" onchange="onAddEntityTypeChange(this.value)">
-            <option value="individual">Individual</option>
-            <option value="student">Student</option>
-            <option value="company">Company</option>
-            <option value="ngo">NGO / Non-Profit</option>
-            <option value="government">Government</option>
-          </select>
-        </div>
-        <div id="add_vat_notice" style="display:none;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.3);border-radius:6px;padding:8px 12px;font-size:12px;color:#c084fc;margin-bottom:10px">
-          Companies are subject to 12% VAT on all fees.
-        </div>
+
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:8px">Internal Info</div>
         <div class="form-group">
           <label>Notes</label>
           <textarea name="notes" class="form-control" rows="2" placeholder="Internal notes…"></textarea>
@@ -396,8 +430,24 @@ function editClient(c) {
   if (typeof feather !== 'undefined') feather.replace();
 }
 
-function onAddEntityTypeChange(val) {
+function onAddClientKindChange(kind) {
+  document.getElementById('add_identity_individual').style.display = kind === 'individual' ? '' : 'none';
+  document.getElementById('add_identity_org').style.display = kind === 'organization' ? '' : 'none';
+  document.getElementById('add_company_name').required = kind === 'organization';
+  computeAddEntityType();
+}
+function computeAddEntityType() {
+  const kind = document.querySelector('input[name="client_kind"]:checked')?.value || 'individual';
+  const val = kind === 'organization'
+    ? (document.getElementById('add_org_subtype')?.value || 'company')
+    : (document.getElementById('add_individual_subtype')?.value || 'individual');
+  document.getElementById('add_entity_type').value = val;
   document.getElementById('add_vat_notice').style.display = val === 'company' ? 'block' : 'none';
+}
+function resetAddClientForm() {
+  const form = document.getElementById('addClientForm');
+  if (form) form.reset();
+  onAddClientKindChange('individual');
 }
 
 function onEditEntityTypeChange(val) {

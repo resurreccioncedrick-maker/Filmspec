@@ -358,17 +358,17 @@
     </div>
   </div>
 
-  <!-- ── Section B: Equipment Details ── -->
+  <!-- ── Section B: Item Details ── -->
   <div class="section">
-    <div class="section-title">B — Equipment Details</div>
+    <div class="section-title">B — {{ $ir->equipment_name ? 'Equipment' : 'Accessory' }} Details</div>
     <div class="field-grid cols-3">
       <div class="field-item">
-        <label>Equipment Name</label>
-        <div class="field-value">{{ $ir->equipment_name }}</div>
+        <label>{{ $ir->equipment_name ? 'Equipment Name' : 'Accessory Name' }}</label>
+        <div class="field-value">{{ $ir->equipment_name ?: $ir->accessory_name }}</div>
       </div>
       <div class="field-item">
         <label>Brand</label>
-        <div class="field-value">{{ $ir->brand }}</div>
+        <div class="field-value">{{ $ir->brand ?: '—' }}</div>
       </div>
       <div class="field-item">
         <label>Serial No. / Barcode</label>

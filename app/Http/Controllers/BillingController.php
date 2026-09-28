@@ -123,8 +123,14 @@ class BillingController extends Controller
             ->whereMonth('payment_date', now()->month)->whereYear('payment_date', now()->year)
             ->sum('amount');
         $outstanding = (float) DB::table('statement_of_accounts')->where('status', '!=', 'paid')->sum('balance');
+        // Must match filteredOverdueQuery()'s definition of "overdue" exactly (due date passed,
+        // balance still outstanding) — it used to just check status != 'paid' with no balance
+        // floor, so a $0-balance SOA whose status was never flipped to 'paid' inflated this count
+        // while never actually appearing in the Overdue tab's own list below.
         $overdueCount = (int) DB::table('statement_of_accounts')
-            ->where('due_date', '<', now()->toDateString())->where('status', '!=', 'paid')
+            ->where('due_date', '<', now()->toDateString())
+            ->where('status', '!=', 'paid')
+            ->where('balance', '>', 0)
             ->count();
 
         // Relocated from the Cost Estimate editor — accounting/admin approve discounts here.
@@ -223,7 +229,12 @@ class BillingController extends Controller
         $odQuery = DB::table('statement_of_accounts as s')
             ->join('bookings as b', 's.booking_id', '=', 'b.booking_id')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
-            ->where('s.status', 'overdue')->where('s.balance', '>', 0);
+            // Same definition as $overdueCount above, not a literal status='overdue' match — that
+            // status only gets set by index()'s own auto-mark update, so relying on it here made
+            // this list depend on a side effect instead of just checking the real due date/balance.
+            ->where('s.due_date', '<', now()->toDateString())
+            ->where('s.status', '!=', 'paid')
+            ->where('s.balance', '>', 0);
         if ($odSearch) {
             $odQuery->where(function ($w) use ($odSearch) {
                 $w->where('b.booking_reference', 'like', "%$odSearch%")

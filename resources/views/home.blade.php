@@ -2998,6 +2998,8 @@ function openEqDetail(eid) {
       document.getElementById('edAccContent').style.display = '';
       const included = accs.filter(a => parseInt(a.is_included));
       const optional = accs.filter(a => !parseInt(a.is_included));
+      const cartItem = reqList.find(i => i.item_type === 'equipment' && parseInt(i.equipment_id) === eid);
+      const existingAccIds = (cartItem?.accessories || []).map(a => parseInt(a.accessory_id));
 
       const accThumb = (a) => a.image_path
         ? `<img src="${ASSET_BASE}/${escAttr(a.image_path)}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;border:1px solid var(--border)">`
@@ -3032,8 +3034,9 @@ function openEqDetail(eid) {
               <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
                 <span style="font-size:.78rem;font-weight:700;color:var(--blue);white-space:nowrap">+₱${rate.toLocaleString('en-PH')}/day</span>
                 <input type="checkbox" class="ed-opt-cb" data-id="${a.accessory_id}" data-rate="${rate}" data-name="${escAttr(a.accessory_name)}"
+                       ${existingAccIds.includes(parseInt(a.accessory_id)) ? 'checked' : ''}
                        style="width:16px;height:16px;cursor:pointer;accent-color:var(--blue)"
-                       onchange="updateEdPricing();this.closest('label').style.borderColor=this.checked?'var(--blue)':'var(--border)'">
+                       onchange="updateEdPricing();this.closest('label').style.borderColor=this.checked?'var(--blue)':'var(--border)';syncAccessoriesIfInList()">
               </div>
             </label>`;
         }).join('');
@@ -3043,10 +3046,31 @@ function openEqDetail(eid) {
       if (!included.length && !optional.length) {
         document.getElementById('edNoAccNote').style.display = '';
       }
+      updateEdPricing();
     })
     .catch(() => {
       document.getElementById('edAccLoading').textContent = 'Could not load accessories.';
     });
+}
+
+// Checking/unchecking an accessory while its equipment is already in the request list has
+// nowhere else to go — the modal's main button is just "In List — Remove" at that point, so
+// without this the selection was silently lost (accessories only ever got attached at the
+// moment the equipment itself was first added).
+function syncAccessoriesIfInList() {
+  if (!IS_LOGIN) return;
+  const item = reqList.find(i => i.item_type === 'equipment' && parseInt(i.equipment_id) === edCurrentEqId);
+  if (!item) return;
+  const fd = new FormData();
+  fd.append('_token', CSRF_TOKEN);
+  fd.append('action', 'add_equipment');
+  fd.append('equipment_id', edCurrentEqId);
+  fd.append('quantity', item.quantity || 1);
+  fd.append('days', item.days || 1);
+  fd.append('accessories_json', JSON.stringify(getSelectedAccessories()));
+  fetch('/cart', { method: 'POST', body: fd }).then(r => r.json()).then(d => {
+    if (d.ok) { loadList(); toast('Request list updated', 'blue'); }
+  });
 }
 
 function updateEdPricing() {

@@ -42,6 +42,16 @@ class DashboardController extends Controller
             ->where('shoot_date_end', '<', now()->toDateString())
             ->count();
 
+        // "Unresolved Payment Issues" — statements of account past their due date that
+        // still carry a balance, same definition BillingController uses for its own
+        // overdue count. Gated on the billing permission like totalRevenue, so a role
+        // without financial visibility (e.g. traffic) never sees it, even as a 0.
+        $unresolvedPaymentIssues = $canSeeFinancials ? (int) DB::table('statement_of_accounts')
+            ->where('due_date', '<', now()->toDateString())
+            ->where('status', '!=', 'paid')
+            ->where('balance', '>', 0)
+            ->count() : null;
+
         $today = now()->toDateString();
         $todayShoots = DB::table('bookings as b')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
@@ -195,7 +205,8 @@ class DashboardController extends Controller
             'calendarBookings', 'rentedAll', 'recentActivity', 'statusBadge', 'payBadge',
             'greeting', 'dashUserName', 'roleColors', 'canSeeFinancials',
             'unitsDueOutToday', 'dueBackToday', 'crewOnScheduleToday',
-            'requestsAwaitingReview', 'upcomingConfirmed', 'financialTrend', 'revenueDeltaPct', 'upcomingAgenda'
+            'requestsAwaitingReview', 'upcomingConfirmed', 'financialTrend', 'revenueDeltaPct', 'upcomingAgenda',
+            'unresolvedPaymentIssues'
         ));
     }
 }

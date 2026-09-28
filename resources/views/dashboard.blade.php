@@ -163,6 +163,14 @@
       'icon' => 'alert-triangle', 'color' => 'red',
     ],
   ];
+  if ($canSeeFinancials) {
+    $attnItems[] = [
+      'count' => $unresolvedPaymentIssues ?? 0, 'label' => 'Unresolved Payment Issues',
+      'message' => 'Statements of account are past due and still unpaid.',
+      'href' => route('billing') . '?tab=overdue', 'cta' => 'Review Overdue Accounts',
+      'icon' => 'credit-card', 'color' => 'red',
+    ];
+  }
   usort($attnItems, fn ($a, $b) => $b['count'] <=> $a['count']);
   $attnSpot = $attnItems[0];
   $attnSide = array_slice($attnItems, 1);

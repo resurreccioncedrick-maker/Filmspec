@@ -335,7 +335,7 @@ class DemoRefillTransactions extends Command
                 'shoot_date_start' => $spec['start']->toDateString(), 'shoot_date_end' => $spec['end']->toDateString(),
                 'ce_due_date' => $spec['start']->copy()->subDays(3)->toDateString(),
                 'shoot_location' => 'Metro Manila, Philippines',
-                'booking_status' => $spec['status'], 'is_archived' => 0,
+                'booking_status' => $spec['status'], 'is_archived' => 0, 'is_test' => 1,
                 'payment_status' => 'unpaid', 'approval_status' => 'approved',
                 'approved_by' => $this->ids['uid']['ops'], 'approved_at' => $spec['created']->copy()->addDay(),
                 'created_by' => $this->ids['uid']['traffic1'],

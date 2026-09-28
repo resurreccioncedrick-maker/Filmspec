@@ -109,6 +109,35 @@
           <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:10px">
             {{ \Illuminate\Support\Carbon::parse($firstDay['date'])->format('M j') }} – {{ \Illuminate\Support\Carbon::parse($lastDay['date'])->format('M j, Y') }}
           </div>
+          <div style="display:flex;gap:24px;flex-wrap:wrap;padding:10px 0;margin-bottom:10px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+            <div>
+              <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:3px">Location</div>
+              <div style="font-size:.83rem;font-weight:600;color:var(--text)">{{ $currentBk->shoot_location ?: 'Not set' }}</div>
+            </div>
+            <div>
+              <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:3px">Scheduled Call Time</div>
+              @if ($currentBk && $currentBk->call_time)
+              <div style="font-size:.83rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px">
+                {{ \Illuminate\Support\Carbon::parse($currentBk->call_time)->format('g:i A') }}
+                <button type="button" style="font-size:.7rem;font-weight:700;color:var(--blue-600,#2563eb);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0" onclick="toggleCallTimeEdit()">Change</button>
+              </div>
+              @else
+              <div style="font-size:.83rem;font-weight:600;color:var(--text-muted);display:flex;align-items:center;gap:8px">
+                Not set
+                <button type="button" style="font-size:.7rem;font-weight:700;color:var(--blue-600,#2563eb);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0" onclick="toggleCallTimeEdit()">Set</button>
+              </div>
+              @endif
+              <form method="POST" action="{{ $attBase }}" id="callTimeForm" style="display:none;margin-top:4px">
+                @csrf
+                <input type="hidden" name="action" value="set_call_time">
+                <input type="hidden" name="booking_id" value="{{ $filterBooking }}">
+                <div style="display:flex;gap:6px;align-items:center">
+                  <input type="time" name="call_time" class="form-control" style="width:auto;padding:4px 8px;font-size:.8rem" value="{{ $currentBk->call_time ? \Illuminate\Support\Carbon::parse($currentBk->call_time)->format('H:i') : '' }}">
+                  <button type="submit" class="btn btn-sm btn-outline" style="padding:3px 10px;font-size:.75rem">Save</button>
+                </div>
+              </form>
+            </div>
+          </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             @foreach ($scheduleDays as $d)
             <a href="{{ $attBase }}?booking_id={{ $filterBooking }}&date={{ $d['date'] }}"
@@ -457,6 +486,10 @@ function toggleReason(sel, crewId) {
   if (replace) {
     replace.style.display = (val === 'absent' || val === 'no_show') ? 'block' : 'none';
   }
+}
+function toggleCallTimeEdit() {
+  const f = document.getElementById('callTimeForm');
+  if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
 }
 function loadBookingCrew(bookingId) {
   if (bookingId) {

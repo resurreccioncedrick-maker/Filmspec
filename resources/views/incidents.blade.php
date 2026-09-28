@@ -113,8 +113,13 @@
         <td><span style="font-family:monospace;font-size:.85rem;font-weight:700">{{ $irNum }}</span></td>
         <td style="white-space:nowrap;font-size:.83rem">{{ date('M j, Y', strtotime($ir->incident_date)) }}</td>
         <td>
+          @if ($ir->equipment_name)
           <div style="font-weight:600">{{ $ir->equipment_name }}</div>
           <div style="font-size:.75rem;color:var(--muted)">{{ $ir->brand }}</div>
+          @else
+          <div style="font-weight:600">{{ $ir->accessory_name }}</div>
+          <span class="badge badge-gray" style="font-size:9px">ACCESSORY</span>
+          @endif
         </td>
         <td>
           <a href="{{ route('booking-detail', $ir->booking_id) }}" style="font-size:.83rem;color:var(--accent);font-family:monospace">{{ $ir->booking_reference }}</a>

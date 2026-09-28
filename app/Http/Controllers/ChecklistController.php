@@ -310,20 +310,17 @@ class ChecklistController extends Controller
                         DB::table('equipment')->where('equipment_id', $refId)->update(['availability_status' => $newEquipStatus]);
 
                         if (in_array($cond, ['damaged', 'missing'], true)) {
-                            $irExists = DB::table('incident_reports')->where('booking_id', $bid)->where('equipment_id', $refId)->where('status', '!=', 'resolved')->value('incident_id');
-                            if (! $irExists) {
-                                $irYear = date('Y');
-                                $irCount = (int) DB::table('incident_reports')->whereYear('created_at', $irYear)->count();
-                                $irNum = 'IR-' . $irYear . '-' . str_pad((string) ($irCount + 1), 4, '0', STR_PAD_LEFT);
-                                DB::table('incident_reports')->insert([
-                                    'booking_id' => $bid, 'equipment_id' => $refId, 'incident_number' => $irNum,
-                                    'reported_by' => $uid, 'incident_type' => $cond, 'incident_date' => now()->toDateString(),
-                                    'description' => "Auto-created on equipment check-in: condition reported as $cond.",
-                                    'status' => 'open',
-                                ]);
-                            }
+                            $this->createReturnIncident($bid, $uid, $cond, equipmentId: $refId);
                         }
                     }
+                }
+
+                // Accessories skip equipment_transactions/availability_status (they aren't
+                // serialized/tracked there), but a damaged/missing one is exactly as much an
+                // incident as damaged/missing equipment — this was the one piece of Return &
+                // Inspection Integration the checklist didn't already do for accessories.
+                if ($checked && $isAcc && in_array($cond, ['damaged', 'missing'], true)) {
+                    $this->createReturnIncident($bid, $uid, $cond, accessoryId: $refId);
                 }
             }
         }
@@ -360,5 +357,32 @@ class ChecklistController extends Controller
         ActivityLog::record($uid, 'checklist' . $d, 'booking', "Checklist $d saved for booking #$bid", $bid);
 
         return ['type' => 'success', 'text' => 'Checklist <strong>' . strtoupper($d) . '</strong> saved successfully.'];
+    }
+
+    private function createReturnIncident(int $bid, int $uid, string $cond, ?int $equipmentId = null, ?int $accessoryId = null): void
+    {
+        $irExists = DB::table('incident_reports')->where('booking_id', $bid)
+            ->where('status', '!=', 'resolved')
+            ->when($equipmentId, fn ($q) => $q->where('equipment_id', $equipmentId))
+            ->when($accessoryId, fn ($q) => $q->where('accessory_id', $accessoryId))
+            ->value('incident_id');
+        if ($irExists) {
+            return;
+        }
+
+        $itemDesc = $accessoryId
+            ? 'accessory check-in: ' . (DB::table('accessories')->where('accessory_id', $accessoryId)->value('accessory_name') ?? "#$accessoryId")
+            : 'equipment check-in';
+
+        $irYear = date('Y');
+        $irCount = (int) DB::table('incident_reports')->whereYear('created_at', $irYear)->count();
+        $irNum = 'IR-' . $irYear . '-' . str_pad((string) ($irCount + 1), 4, '0', STR_PAD_LEFT);
+        DB::table('incident_reports')->insert([
+            'booking_id' => $bid, 'equipment_id' => $equipmentId, 'accessory_id' => $accessoryId,
+            'incident_number' => $irNum, 'reported_by' => $uid, 'incident_type' => $cond,
+            'incident_date' => now()->toDateString(),
+            'description' => "Auto-created on $itemDesc: condition reported as $cond.",
+            'status' => 'open',
+        ]);
     }
 }

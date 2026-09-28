@@ -50,7 +50,7 @@ class AttendanceController extends Controller
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
             ->whereIn('b.booking_status', ['confirmed', 'ongoing'])
             ->orderByDesc('b.shoot_date_start')
-            ->select('b.booking_id', 'b.booking_reference', 'b.project_title', 'b.shoot_date_start', 'b.booking_status', 'c.company_name', 'c.contact_person')
+            ->select('b.booking_id', 'b.booking_reference', 'b.project_title', 'b.shoot_date_start', 'b.booking_status', 'b.shoot_location', 'b.call_time', 'c.company_name', 'c.contact_person')
             ->get();
 
         $bookingCrew = collect();
@@ -265,6 +265,15 @@ class AttendanceController extends Controller
     {
         $action = $request->input('action', '');
         $uid = $request->user()->user_id;
+
+        if ($action === 'set_call_time' && $canManage) {
+            $bid = (int) $request->input('booking_id');
+            $time = $request->input('call_time') ?: null;
+            DB::table('bookings')->where('booking_id', $bid)->update(['call_time' => $time]);
+            ActivityLog::record($uid, 'set_call_time', 'booking', "Set call time for booking #$bid");
+
+            return ['type' => 'success', 'text' => 'Scheduled call time updated.'];
+        }
 
         if ($action === 'log_attendance' && $canManage) {
             $bid = (int) $request->input('booking_id');

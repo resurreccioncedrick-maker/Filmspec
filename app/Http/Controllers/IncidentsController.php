@@ -62,6 +62,7 @@ class IncidentsController extends Controller
             ->leftJoin('users as u', 'ir.reported_by', '=', 'u.user_id')
             ->orderByDesc('ir.created_at')
             ->select('ir.*', 'e.equipment_name', 'e.brand', 'e.serial_number as equip_serial',
+                'ac.accessory_name',
                 'b.booking_reference', 'b.project_title', 'b.shoot_location',
                 'c.contact_person', 'c.company_name',
                 DB::raw("CONCAT(u.first_name,' ',u.last_name) AS reported_by_name"))
@@ -188,7 +189,10 @@ class IncidentsController extends Controller
 
         $incQuery = DB::table('incident_reports as ir')
             ->join('bookings as b', 'ir.booking_id', '=', 'b.booking_id')
-            ->join('equipment as e', 'ir.equipment_id', '=', 'e.equipment_id')
+            // Left, not inner — an accessory-only incident (ir.equipment_id null) must still
+            // show up here, not silently vanish from every incidents listing.
+            ->leftJoin('equipment as e', 'ir.equipment_id', '=', 'e.equipment_id')
+            ->leftJoin('accessories as ac', 'ir.accessory_id', '=', 'ac.accessory_id')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id');
         if ($tab !== 'all') {
             $incQuery->where('ir.status', $tab);
@@ -197,6 +201,7 @@ class IncidentsController extends Controller
             $incQuery->where(function ($w) use ($search) {
                 $w->where('b.booking_reference', 'like', "%$search%")
                     ->orWhere('e.equipment_name', 'like', "%$search%")
+                    ->orWhere('ac.accessory_name', 'like', "%$search%")
                     ->orWhere('ir.incident_number', 'like', "%$search%")
                     ->orWhere('c.contact_person', 'like', "%$search%")
                     ->orWhere('c.company_name', 'like', "%$search%");
@@ -247,16 +252,16 @@ class IncidentsController extends Controller
             return DataExporter::respond($request->query('format', 'csv'), 'Maintenance Schedule', $headers, $rows, 'maintenance-export');
         }
 
-        $headers = ['Incident #', 'Booking', 'Equipment', 'Type', 'Status', 'Cause', 'Resolution', 'Charge'];
+        $headers = ['Incident #', 'Booking', 'Item', 'Type', 'Status', 'Cause', 'Resolution', 'Charge'];
         $rows = $this->filteredIncidentsQuery($request)
             ->orderByDesc('ir.created_at')
-            ->select('ir.incident_number', 'b.booking_reference', 'e.equipment_name', 'ir.incident_type',
+            ->select('ir.incident_number', 'b.booking_reference', 'e.equipment_name', 'ac.accessory_name', 'ir.incident_type',
                 'ir.status', 'ir.cause', 'ir.resolution', 'ir.charge_amount')
             ->get()
             ->map(fn ($i) => [
                 $i->incident_number,
                 $i->booking_reference,
-                $i->equipment_name,
+                $i->equipment_name ?: $i->accessory_name,
                 $this->typeLabel[$i->incident_type] ?? ucfirst($i->incident_type),
                 ucfirst($i->status),
                 $this->causeLabel[$i->cause] ?? ucfirst((string) $i->cause),
@@ -272,11 +277,13 @@ class IncidentsController extends Controller
     {
         $ir = DB::table('incident_reports as ir')
             ->join('bookings as b', 'ir.booking_id', '=', 'b.booking_id')
-            ->join('equipment as e', 'ir.equipment_id', '=', 'e.equipment_id')
+            ->leftJoin('equipment as e', 'ir.equipment_id', '=', 'e.equipment_id')
+            ->leftJoin('accessories as ac', 'ir.accessory_id', '=', 'ac.accessory_id')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
             ->leftJoin('users as u', 'ir.reported_by', '=', 'u.user_id')
             ->where('ir.incident_id', $id)
             ->select('ir.*', 'e.equipment_name', 'e.brand', 'e.serial_number as equip_serial',
+                'ac.accessory_name',
                 'b.booking_reference', 'b.project_title', 'b.shoot_location',
                 'c.contact_person', 'c.company_name',
                 DB::raw("CONCAT(u.first_name,' ',u.last_name) AS reported_by_name"))
