@@ -126,21 +126,76 @@ class SuperAdminController extends Controller
             'unlinkedCrewMembers' => $unlinkedCrewMembers,
             'rolesDef' => $this->rolesDef, 'moduleLabels' => $this->moduleLabels,
             'moduleGroups' => $this->moduleGroups, 'permissions' => $permissions,
+            ...$this->backupHistory(),
         ]);
     }
 
     // Streams the live database as a downloadable .sql file. Read-only — never mutates
-    // anything, so unlike restore() this is safe to run without a confirmation step.
+    // anything, so unlike restore() this is safe to run without a confirmation step. Also
+    // saved to storage/app/backups (same as the scheduled job) so a manual download shows up
+    // in Recent Backups instead of leaving no trace once it's left the browser's downloads.
     public function backup(): Response
     {
         $sql = DatabaseBackup::dump();
         $filename = 'filmspec_backup_' . now()->format('Y-m-d_His') . '.sql';
+
+        $dir = storage_path('app/backups');
+        if (! is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        file_put_contents($dir . DIRECTORY_SEPARATOR . $filename, $sql);
 
         return response($sql, 200, [
             'Content-Type' => 'application/octet-stream',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
             'Content-Length' => (string) strlen($sql),
         ]);
+    }
+
+    /** Re-download a specific file already sitting in storage/app/backups (history list). */
+    public function downloadBackup(string $filename): Response
+    {
+        // Listing real filenames from the directory (rather than trusting the URL segment
+        // against a regex) is what actually rules out path traversal / arbitrary file reads —
+        // a regex can still be satisfied by a name that happens not to exist.
+        $dir = storage_path('app/backups');
+        $real = collect(glob($dir . DIRECTORY_SEPARATOR . '*.sql'))->map(fn ($f) => basename($f));
+        if (! $real->contains($filename)) {
+            abort(404);
+        }
+
+        return response(file_get_contents($dir . DIRECTORY_SEPARATOR . $filename), 200, [
+            'Content-Type' => 'application/octet-stream',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
+
+    /** Recent Backups list + status-strip figures for the Backup and Restore tab. */
+    private function backupHistory(): array
+    {
+        $dir = storage_path('app/backups');
+        $files = is_dir($dir) ? collect(glob($dir . DIRECTORY_SEPARATOR . '*.sql')) : collect();
+
+        $history = $files
+            ->map(fn ($f) => (object) [
+                'filename' => basename($f),
+                'size' => filesize($f),
+                'modified' => Carbon::createFromTimestamp(filemtime($f)),
+                'kind' => match (true) {
+                    str_starts_with(basename($f), 'pre_restore_') => 'pre-restore snapshot',
+                    str_starts_with(basename($f), 'filmspec_backup_') => 'backup',
+                    default => 'manual',
+                },
+            ])
+            ->sortByDesc('modified')
+            ->values();
+
+        return [
+            'backupHistory' => $history,
+            'lastBackup' => $history->first(),
+            'backupCount' => $history->count(),
+            'backupTotalBytes' => $history->sum('size'),
+        ];
     }
 
     /** Export ▾ — two independent datasets: the user list, and the full (uncapped) activity log. */

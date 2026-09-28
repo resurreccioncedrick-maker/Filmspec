@@ -310,6 +310,10 @@ Route::post('/superadmin/backup', [SuperAdminController::class, 'backup'])
     ->middleware(['auth', 'can_access:superadmin'])
     ->name('superadmin.backup');
 
+Route::get('/superadmin/backup/{filename}', [SuperAdminController::class, 'downloadBackup'])
+    ->middleware(['auth', 'can_access:superadmin'])
+    ->name('superadmin.backup.download');
+
 Route::match(['get', 'post'], '/data-retention', [DataRetentionController::class, 'index'])
     ->middleware(['auth', 'can_access:data_retention'])
     ->name('data-retention');

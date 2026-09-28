@@ -326,30 +326,70 @@
 <!-- BACKUP AND RESTORE TAB -->
 <div id="tab-settings" class="tab-pane">
 
-  <div class="card" style="margin-bottom:20px">
-    <div class="card-header"><h3 class="card-title">Database Backup</h3></div>
-    <div class="card-body">
-      <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Downloads a full .sql dump of the live database. Read-only — safe to run any time.</p>
-      <form method="POST" action="{{ route('superadmin.backup') }}">
-        @csrf
-        <button type="submit" class="btn btn-primary btn-sm"><i data-feather="download"></i> Download Backup</button>
-      </form>
+  <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+    <div class="stat-card">
+      <div class="stat-icon"><i data-feather="clock"></i></div>
+      <div class="stat-value" style="font-size:22px">{{ $lastBackup ? $lastBackup->modified->diffForHumans() : 'Never' }}</div>
+      <div class="stat-label">Last Backup{{ $lastBackup ? ' · ' . $lastBackup->modified->format('M j, g:i A') : '' }}</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-icon"><i data-feather="archive"></i></div>
+      <div class="stat-value">{{ $backupCount }}</div>
+      <div class="stat-label">Backups Kept · {{ number_format($backupTotalBytes / 1024, 0) }} KB total</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-icon"><i data-feather="check-circle"></i></div>
+      <div class="stat-value" style="font-size:22px">Daily · 2:00 AM</div>
+      <div class="stat-label">Scheduled Backups — Enabled, keeps last 14</div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-header"><h3 class="card-title" style="color:var(--red)">Database Restore</h3></div>
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header"><h3 class="card-title">Database Backup</h3></div>
     <div class="card-body">
-      <p style="color:var(--muted);font-size:13px;margin-bottom:14px">
-        <strong style="color:var(--red)">Destructive.</strong> Replaces all current data with the contents of the uploaded .sql file. This cannot be undone — download a fresh backup above first.
-      </p>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:14px">Downloads a full .sql dump of the live database, taken instantly. Read-only — safe to run any time, and it's saved here too.</p>
+      <form method="POST" action="{{ route('superadmin.backup') }}" style="margin-bottom:20px">
+        @csrf
+        <button type="submit" class="btn btn-primary btn-sm"><i data-feather="download"></i> Download Backup</button>
+      </form>
+
+      @if ($backupHistory->isNotEmpty())
+      <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Recent Backups</div>
+      <div class="card-scroll-sm" style="display:flex;flex-direction:column;gap:8px">
+        @foreach ($backupHistory->take(10) as $bk)
+        <div style="display:flex;align-items:center;gap:14px;padding:10px 14px;border:1px solid var(--border);border-radius:8px">
+          <div class="stat-icon" style="margin-bottom:0;width:32px;height:32px;flex-shrink:0"><i data-feather="file-text" style="width:15px;height:15px"></i></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-family:var(--font-mono,monospace);font-size:12px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $bk->filename }}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">{{ $bk->modified->format('M j, Y · g:i A') }} · {{ number_format($bk->size / 1024, 0) }} KB · {{ $bk->kind }}</div>
+          </div>
+          @if ($loop->first)
+          <span class="badge badge-green">Latest</span>
+          @endif
+          <a href="{{ route('superadmin.backup.download', $bk->filename) }}" class="btn btn-outline btn-sm" style="padding:6px 10px"><i data-feather="download" style="width:13px;height:13px"></i></a>
+        </div>
+        @endforeach
+      </div>
+      @endif
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;border-color:#fca5a5">
+    <div class="card-header" style="background:var(--redl);border-bottom-color:#fca5a5">
+      <h3 class="card-title" style="color:var(--red)">Database Restore</h3>
+      <span class="badge badge-red">Destructive</span>
+    </div>
+    <div class="card-body">
+      <div style="background:var(--redl);border:1px solid #fca5a5;border-radius:8px;padding:14px 16px;margin-bottom:16px;font-size:13px;color:#7f1d1d;line-height:1.6">
+        <strong>Replaces all current data</strong> with the contents of the uploaded file. Every booking, client, payment and equipment record made since that file was created will be gone. This cannot be undone — download a fresh backup above first.
+      </div>
       <form method="POST" action="{{ $adminBase }}" enctype="multipart/form-data" onsubmit="return confirm('This will permanently overwrite the live database with the uploaded file. Are you absolutely sure?')">
         @csrf
         <input type="hidden" name="action" value="restore_db">
         <div class="form-group"><label>SQL File *</label><input type="file" name="sql_file" accept=".sql" class="form-control" required></div>
         <div class="form-group">
           <label>Type <strong>RESTORE</strong> (all caps) to confirm *</label>
-          <input type="text" name="confirm_phrase" id="supaRestorePhrase" class="form-control" placeholder="RESTORE" required autocomplete="off" oninput="document.getElementById('supaRestoreBtn').disabled = (this.value !== 'RESTORE')">
+          <input type="text" name="confirm_phrase" id="supaRestorePhrase" class="form-control" placeholder="RESTORE" required autocomplete="off" oninput="document.getElementById('supaRestoreBtn').disabled = (this.value !== 'RESTORE'); this.style.borderColor = (this.value === 'RESTORE') ? 'var(--green)' : ''">
         </div>
         <button type="submit" class="btn btn-danger btn-sm" id="supaRestoreBtn" disabled><i data-feather="upload"></i> Restore Database</button>
       </form>
