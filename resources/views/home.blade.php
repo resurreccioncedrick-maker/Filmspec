@@ -2038,7 +2038,10 @@ a.footer-contact-link:hover{color:#60b0ff}
   .abt-showcase{grid-template-columns:repeat(2,1fr)}
 }
 @media(max-width:600px){
-  .abt-hero{height:440px}
+  .abt-hero{height:auto;min-height:0}
+  .abt-hero-content{position:relative;padding:36px 22px;justify-content:flex-start}
+  .abt-hero-sub{font-size:12.5px;line-height:1.6;margin-bottom:20px}
+  .abt-hero-cap,.abt-hero-dots{display:none}
   .abt-collage{height:260px}
   .abt-collage .accent{display:none}
   .abt-collage .main{width:100%;top:0;height:100%}
@@ -2107,28 +2110,6 @@ a.footer-contact-link:hover{color:#60b0ff}
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:60px;max-width:640px;margin-left:auto;margin-right:auto;border-top:1px solid var(--border,#e2e8f0);padding-top:36px">
-      <div style="text-align:center">
-        <div style="font-family:var(--font-d);font-size:32px;color:var(--blue)">{{ $stats['equip'] }}</div>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Equipment Items</div>
-      </div>
-      <div style="text-align:center">
-        <div style="font-family:var(--font-d);font-size:32px;color:var(--blue)">{{ $stats['crew'] }}</div>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Crew on Roster</div>
-      </div>
-      <div style="text-align:center">
-        <div style="font-family:var(--font-d);font-size:32px;color:var(--blue)">{{ $stats['done'] }}</div>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:2px">Shoots Completed</div>
-      </div>
-    </div>
-
-    <div style="padding:20px 22px;border-radius:14px;background:var(--surface-hover,#f4f7fb);border:1px solid var(--border,#e2e8f0);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:40px">
-      <div>
-        <div style="font-weight:700;font-size:14.5px;margin-bottom:3px">Have a shoot coming up?</div>
-        <div style="font-size:12.5px;color:var(--text-muted,#64748b)">Browse the equipment catalog or reach out to our team.</div>
-      </div>
-      <button class="hbtn blue" style="font-size:13px;padding:10px 18px" onclick="showPage('equipment',null)">Browse Equipment &rarr;</button>
-    </div>
   </div>
 </div>
 <script>
