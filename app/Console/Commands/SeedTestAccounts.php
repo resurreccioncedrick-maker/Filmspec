@@ -8,24 +8,29 @@ use Illuminate\Support\Facades\Hash;
 
 /**
  * Creates (or updates) one login per role, all addressed to the same real inbox via Gmail's
- * "+tag" sub-addressing — resurreccioncedrick+admin@gmail.com etc. all deliver to
- * resurreccioncedrick@gmail.com, so one person can receive the OTP for any role without
- * juggling separate inboxes. Idempotent: safe to re-run, upserts by email.
+ * "+tag" sub-addressing — jolomallare148+admin@gmail.com etc. all deliver to
+ * jolomallare148@gmail.com, so one person can receive the OTP for any role without juggling
+ * separate inboxes. Idempotent: safe to re-run, upserts by email. --email lets this run for
+ * more than one person's inbox without editing the command each time.
  */
 class SeedTestAccounts extends Command
 {
-    protected $signature = 'test-accounts:seed';
+    protected $signature = 'test-accounts:seed {--email=resurreccioncedrick@gmail.com : Base inbox all +tag logins deliver to}';
 
-    protected $description = 'Create/update one test login per role, all Gmail +tag addresses to one real inbox';
-
-    private const BASE_EMAIL = 'resurreccioncedrick';
-
-    private const DOMAIN = 'gmail.com';
+    protected $description = 'Create/update one test login per role, all +tag addresses to one real inbox';
 
     private const PASSWORD = 'Password123!';
 
     public function handle(): int
     {
+        $baseEmail = $this->option('email');
+        if (! str_contains($baseEmail, '@')) {
+            $this->error('--email must be a full address, e.g. name@gmail.com');
+
+            return self::FAILURE;
+        }
+        [$local, $domain] = explode('@', $baseEmail, 2);
+
         $roles = [
             'super_admin' => ['tag' => 'superadmin', 'name' => 'Super Admin'],
             'admin' => ['tag' => 'admin', 'name' => 'Admin'],
@@ -46,7 +51,7 @@ class SeedTestAccounts extends Command
                 continue;
             }
 
-            $email = self::BASE_EMAIL . '+' . $info['tag'] . '@' . self::DOMAIN;
+            $email = $local . '+' . $info['tag'] . '@' . $domain;
             $existing = DB::table('users')->where('email', $email)->first();
 
             $userFields = [
@@ -98,7 +103,7 @@ class SeedTestAccounts extends Command
         $this->newLine();
         $this->table(['Role', 'Login Email'], $rows);
         $this->info('Password for all: ' . self::PASSWORD);
-        $this->info('All verification codes land in: ' . self::BASE_EMAIL . '@' . self::DOMAIN);
+        $this->info('All verification codes land in: ' . $baseEmail);
 
         return self::SUCCESS;
     }
