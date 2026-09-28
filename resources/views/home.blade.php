@@ -1457,6 +1457,7 @@ a.footer-contact-link:hover{color:#60b0ff}
 
 /* Support chat (client-only, sticky bottom-right) */
 .sup-fab{position:fixed;bottom:22px;right:22px;width:44px;height:44px;border-radius:12px;background:var(--surface);border:1.5px solid var(--border2);box-shadow:0 2px 8px rgba(0,30,80,.08);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:900}
+.sup-fab.rl-hide{display:none}
 .sup-fab svg{width:19px;height:19px;color:var(--blue)}
 .sup-fab-badge{position:absolute;top:-3px;right:-3px;width:17px;height:17px;border-radius:50%;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
 .sup-overlay{display:none;position:fixed;inset:0;backdrop-filter:blur(6px) saturate(1.05);-webkit-backdrop-filter:blur(6px) saturate(1.05);background:rgba(11,26,51,.14);z-index:950}
@@ -2458,6 +2459,7 @@ function togglePanel() {
   panelOpen = !panelOpen;
   document.getElementById('rlPanel').classList.toggle('open', panelOpen);
   document.getElementById('rlOverlay').classList.toggle('on', panelOpen);
+  document.querySelector('.sup-fab')?.classList.toggle('rl-hide', panelOpen);
   if (panelOpen) loadList();
 }
 
@@ -2531,6 +2533,18 @@ function renderPanel(reqOps) {
       });
     }
 
+    let accHtml = '';
+    (item.accessories||[]).forEach(acc=>{
+      const accRate = parseFloat(acc.daily_rate||0);
+      const accSub  = accRate*days;
+      equipSubtotal += accSub;
+      accHtml += `<div class="rli-crew-est">
+        <span class="crew-est-icon">&#43;</span>
+        <span>${acc.accessory_name}</span>
+        <span class="rli-amount crew-est-amt">₱${fmt(accSub)}</span>
+      </div>`;
+    });
+
     html += `<div class="rli">
       <div class="rli-img">${img?`<img src="${ASSET_BASE}/${img}" alt="">`:(`<span class="eq-cat-icon">${catAbbr}</span>`)}</div>
       <div class="rli-info">
@@ -2540,6 +2554,7 @@ function renderPanel(reqOps) {
           ${qty>1?`<span style="font-size:11px;color:var(--muted)">×${qty}</span>`:''}
           <span class="rli-amount">₱${fmt(sub)}</span>
         </div>
+        ${accHtml}
         ${crewEstHtml}
       </div>
       <button class="rli-remove" onclick="removeItem(${item.cart_id})" title="Remove">&times;</button>
@@ -2552,11 +2567,11 @@ function renderPanel(reqOps) {
   box.style.display='block';
   box.innerHTML=`<div class="ce-sum">
     <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;font-weight:700">Estimated Cost</div>
-    <div class="ce-row"><span>Equipment (VAT incl.)</span><strong>₱${fmt(equipSubtotal)}</strong></div>
+    <div class="ce-row"><span>Equipment &amp; Accessories (VAT incl.)</span><strong>₱${fmt(equipSubtotal)}</strong></div>
     <div class="ce-row"><span>Crew TF</span><strong style="color:var(--muted);font-size:11px">TBD — assigned after booking</strong></div>
     <div class="ce-row"><span>Transportation</span><strong style="color:var(--muted);font-size:11px">TBD — based on shoot location</strong></div>
-    <div class="ce-row total"><span>Equipment Total</span><span>₱${fmt(equipSubtotal)}</span></div>
-    <div style="font-size:10px;color:var(--muted);margin-top:8px">Equipment rates include 12% VAT. Crew and transport costs will be confirmed by admin after booking review.</div>
+    <div class="ce-row total"><span>Estimated Total</span><span>₱${fmt(equipSubtotal)}</span></div>
+    <div style="font-size:10px;color:var(--muted);margin-top:8px">Rates include 12% VAT. Crew and transport costs will be confirmed by admin after booking review.</div>
   </div>`;
 
   const pb=document.getElementById('procBtn'); if(pb) pb.disabled=false;

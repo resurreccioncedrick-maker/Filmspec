@@ -69,6 +69,26 @@ class CartController extends Controller
             }
         }
 
+        // Accessories chosen alongside an equipment item are stored in their own table
+        // (booking_cart_accessories), keyed by cart_id — attach them here so the request
+        // list panel can actually show and cost them; previously this endpoint never
+        // returned them at all, so they were saved but invisible in the UI.
+        $cartIds = $items->pluck('cart_id')->all();
+        $accByCart = [];
+        if ($cartIds) {
+            $accRows = DB::table('booking_cart_accessories as bca')
+                ->join('accessories as a', 'bca.accessory_id', '=', 'a.accessory_id')
+                ->whereIn('bca.cart_id', $cartIds)
+                ->select('bca.cart_id', 'a.accessory_id', 'a.accessory_name', 'a.daily_rate')
+                ->get();
+            foreach ($accRows as $row) {
+                $accByCart[$row->cart_id][] = $row;
+            }
+        }
+        foreach ($items as $it) {
+            $it->accessories = $accByCart[$it->cart_id] ?? [];
+        }
+
         return response()->json(['items' => $items, 'required_operators' => $requiredOps]);
     }
 
