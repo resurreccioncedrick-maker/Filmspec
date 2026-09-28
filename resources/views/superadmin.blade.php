@@ -337,10 +337,10 @@
       <div class="stat-value">{{ $backupCount }}</div>
       <div class="stat-label">Backups Kept · {{ number_format($backupTotalBytes / 1024, 0) }} KB total</div>
     </div>
-    <div class="stat-card green">
-      <div class="stat-icon"><i data-feather="check-circle"></i></div>
-      <div class="stat-value" style="font-size:22px">Daily · 2:00 AM</div>
-      <div class="stat-label">Scheduled Backups — Enabled, keeps last 14</div>
+    <div class="stat-card {{ $scheduleEnabled ? 'green' : 'yellow' }}">
+      <div class="stat-icon"><i data-feather="{{ $scheduleEnabled ? 'check-circle' : 'alert-triangle' }}"></i></div>
+      <div class="stat-value" style="font-size:22px">{{ $scheduleEnabled ? sprintf('Daily · %d:00', $scheduleHour) : 'Not Configured' }}</div>
+      <div class="stat-label">Scheduled Backups{{ $scheduleEnabled ? " — keeps last $scheduleKeep" : '' }}</div>
     </div>
   </div>
 
@@ -354,10 +354,11 @@
       </form>
 
       @if ($backupHistory->isNotEmpty())
+      @php $visibleCount = 3; @endphp
       <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Recent Backups</div>
-      <div class="card-scroll-sm" style="display:flex;flex-direction:column;gap:8px">
-        @foreach ($backupHistory->take(10) as $bk)
-        <div style="display:flex;align-items:center;gap:14px;padding:10px 14px;border:1px solid var(--border);border-radius:8px">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        @foreach ($backupHistory as $bk)
+        <div @if ($loop->index >= $visibleCount) class="supaBackupExtra" style="display:none" @endif style="display:flex;align-items:center;gap:14px;padding:10px 14px;border:1px solid var(--border);border-radius:8px">
           <div class="stat-icon" style="margin-bottom:0;width:32px;height:32px;flex-shrink:0"><i data-feather="file-text" style="width:15px;height:15px"></i></div>
           <div style="flex:1;min-width:0">
             <div style="font-family:var(--font-mono,monospace);font-size:12px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $bk->filename }}</div>
@@ -370,7 +371,53 @@
         </div>
         @endforeach
       </div>
+      @if ($backupHistory->count() > $visibleCount)
+      <button type="button" class="btn btn-outline btn-sm" style="width:100%;justify-content:center;margin-top:10px" onclick="document.querySelectorAll('.supaBackupExtra').forEach(el=>el.style.display='flex');this.remove()">Show all {{ $backupHistory->count() }} backups</button>
       @endif
+      @endif
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header">
+      <h3 class="card-title">Scheduled Backups</h3>
+      <span class="badge {{ $scheduleEnabled ? 'badge-green' : 'badge-yellow' }}">{{ $scheduleEnabled ? 'Enabled' : 'Not Configured' }}</span>
+    </div>
+    <div class="card-body">
+      <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.6">
+        Right now, every backup on this server has been triggered manually. Turning this on runs an automatic backup on the schedule below and keeps a rolling window of recent copies — so a backup exists even on a day nobody remembers to click the button.
+      </p>
+      <form method="POST" action="{{ $adminBase }}" id="supaScheduleForm">
+        @csrf
+        <input type="hidden" name="action" value="update_backup_schedule">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 16px;background:var(--s2);border-radius:8px">
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer">
+            <span style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0">
+              <input type="checkbox" name="schedule_enabled" value="1" {{ $scheduleEnabled ? 'checked' : '' }}
+                     onchange="this.closest('form').querySelectorAll('select').forEach(s=>s.disabled=!this.checked);document.getElementById('supaScheduleStatus').textContent=this.checked?'On':'Off — recommended: on';this.closest('form').requestSubmit()"
+                     style="opacity:0;position:absolute;inset:0;margin:0;cursor:pointer;z-index:1">
+              <span style="position:absolute;inset:0;background:{{ $scheduleEnabled ? 'var(--accent)' : 'var(--border2)' }};border-radius:20px;transition:background .15s"></span>
+              <span style="position:absolute;top:2px;left:{{ $scheduleEnabled ? '20px' : '2px' }};width:18px;height:18px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .15s"></span>
+            </span>
+            <span>
+              <span style="display:block;font-size:13.5px;font-weight:700">Enable automatic backups</span>
+              <span id="supaScheduleStatus" style="display:block;font-size:12px;color:var(--muted)">{{ $scheduleEnabled ? 'On' : 'Off — recommended: on' }}</span>
+            </span>
+          </label>
+          <div style="display:flex;gap:10px">
+            <select name="schedule_hour" class="form-control" style="width:auto" {{ $scheduleEnabled ? '' : 'disabled' }} onchange="this.closest('form').requestSubmit()">
+              @foreach ([0,1,2,3,4,5,6] as $h)
+              <option value="{{ $h }}" {{ $scheduleHour === $h ? 'selected' : '' }}>Daily at {{ $h === 0 ? '12' : $h }}:00 {{ $h < 12 ? 'AM' : 'PM' }}</option>
+              @endforeach
+            </select>
+            <select name="schedule_keep" class="form-control" style="width:auto" {{ $scheduleEnabled ? '' : 'disabled' }} onchange="this.closest('form').requestSubmit()">
+              @foreach ([7,14,30] as $k)
+              <option value="{{ $k }}" {{ $scheduleKeep === $k ? 'selected' : '' }}>Keep last {{ $k }}</option>
+              @endforeach
+            </select>
+          </div>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -381,7 +428,21 @@
     </div>
     <div class="card-body">
       <div style="background:var(--redl);border:1px solid #fca5a5;border-radius:8px;padding:14px 16px;margin-bottom:16px;font-size:13px;color:#7f1d1d;line-height:1.6">
-        <strong>Replaces all current data</strong> with the contents of the uploaded file. Every booking, client, payment and equipment record made since that file was created will be gone. This cannot be undone — download a fresh backup above first.
+        <strong>Replaces all current data</strong> with the contents of the uploaded file. Every booking, client, payment and equipment record made since that file was created will be gone. This cannot be undone.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px">
+        <div style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--sub)">
+          <span style="width:20px;height:20px;border-radius:50%;background:var(--acclight);color:var(--accent);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">1</span>
+          Download a fresh backup above first, in case you need to undo this.
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--sub)">
+          <span style="width:20px;height:20px;border-radius:50%;background:var(--acclight);color:var(--accent);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">2</span>
+          Choose the <span style="font-family:var(--font-mono,monospace)">.sql</span> file you want to restore from.
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--sub)">
+          <span style="width:20px;height:20px;border-radius:50%;background:var(--acclight);color:var(--accent);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">3</span>
+          Type <span style="font-family:var(--font-mono,monospace);font-weight:700">RESTORE</span> to confirm you understand this replaces everything.
+        </div>
       </div>
       <form method="POST" action="{{ $adminBase }}" enctype="multipart/form-data" onsubmit="return confirm('This will permanently overwrite the live database with the uploaded file. Are you absolutely sure?')">
         @csrf

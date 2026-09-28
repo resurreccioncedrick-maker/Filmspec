@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Support\DatabaseBackup;
 use App\Support\DataExporter;
+use App\Support\Settings;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
@@ -195,6 +196,9 @@ class SuperAdminController extends Controller
             'lastBackup' => $history->first(),
             'backupCount' => $history->count(),
             'backupTotalBytes' => $history->sum('size'),
+            'scheduleEnabled' => Settings::get('backup_schedule_enabled', '0') === '1',
+            'scheduleHour' => (int) Settings::get('backup_schedule_hour', '2'),
+            'scheduleKeep' => (int) Settings::get('backup_schedule_keep', '14'),
         ];
     }
 
@@ -364,6 +368,20 @@ class SuperAdminController extends Controller
             ActivityLog::record($actorId, 'delete', 'user', "Deactivated user $uname", $uid);
 
             return ['type' => 'success', 'text' => "User <strong>$uname</strong> deactivated."];
+        }
+
+        if ($action === 'update_backup_schedule') {
+            $enabled = $request->boolean('schedule_enabled');
+            $hour = max(0, min(23, (int) $request->input('schedule_hour', 2)));
+            $keep = max(1, min(60, (int) $request->input('schedule_keep', 14)));
+
+            Settings::set('backup_schedule_enabled', $enabled ? '1' : '0');
+            Settings::set('backup_schedule_hour', (string) $hour);
+            Settings::set('backup_schedule_keep', (string) $keep);
+
+            ActivityLog::record($actorId, 'update', 'settings', 'Scheduled backups ' . ($enabled ? "enabled — daily at {$hour}:00, keeping last $keep" : 'disabled'));
+
+            return ['type' => 'success', 'text' => 'Scheduled backup settings saved.'];
         }
 
         if ($action === 'restore_db') {

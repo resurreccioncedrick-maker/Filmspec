@@ -25,7 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('support-chat:prune')->daily();
-        $schedule->command('backup:run')->dailyAt('02:00');
+        // Hourly, not dailyAt() — the command itself checks Settings for whether it's enabled
+        // and which hour to actually run at, so the admin panel's toggle/time dropdown take
+        // effect immediately instead of needing a redeploy to change a hardcoded schedule time.
+        $schedule->command('backup:run')->hourly();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
