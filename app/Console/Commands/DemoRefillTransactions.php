@@ -38,13 +38,19 @@ class DemoRefillTransactions extends Command
     private array $crewBusy = []; // crew_id => [[Carbon start, Carbon end], ...]
     private int $incidentSeq = 1;
 
+    // statement_of_accounts and booking_cancellations were missing from this list — both
+    // reference bookings.booking_id, so wiping and re-seeding 'bookings' without also clearing
+    // them left old SOA/cancellation rows pointing at booking_ids that either no longer exist
+    // or (worse) get reassigned to an unrelated new booking after re-seeding. This is exactly
+    // how two stale statement_of_accounts rows ended up "overdue" for bookings that no longer
+    // exist, inflating Billing's overdue count while its (inner-joined) list stayed empty.
     private const TRUNCATE = [
         'terms_acceptances', 'documents', 'booking_comments', 'client_support_messages',
         'data_erasure_requests', 'booking_equipment_requests', 'booking_feedback', 'reminders',
         'booking_discounts', 'transport_assignments', 'incident_reports', 'equipment_checklist',
         'equipment_transactions', 'crew_attendance', 'booking_accessories', 'booking_equipment',
-        'booking_crew', 'cost_estimates', 'payments', 'bookings', 'crew_qualifications',
-        'crew_unavailability', 'crew_members', 'clients',
+        'booking_crew', 'statement_of_accounts', 'booking_cancellations', 'cost_estimates',
+        'payments', 'bookings', 'crew_qualifications', 'crew_unavailability', 'crew_members', 'clients',
     ];
 
     public function handle(): int

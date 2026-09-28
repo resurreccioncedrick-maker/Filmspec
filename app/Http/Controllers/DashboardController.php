@@ -46,10 +46,15 @@ class DashboardController extends Controller
         // still carry a balance, same definition BillingController uses for its own
         // overdue count. Gated on the billing permission like totalRevenue, so a role
         // without financial visibility (e.g. traffic) never sees it, even as a 0.
-        $unresolvedPaymentIssues = $canSeeFinancials ? (int) DB::table('statement_of_accounts')
-            ->where('due_date', '<', now()->toDateString())
-            ->where('status', '!=', 'paid')
-            ->where('balance', '>', 0)
+        // Inner-joined to bookings/clients like Billing's own overdue list — a statement of
+        // accounts whose booking no longer exists (e.g. stale demo data) has no one left to
+        // collect from, so it must not inflate this count while never appearing in that list.
+        $unresolvedPaymentIssues = $canSeeFinancials ? (int) DB::table('statement_of_accounts as s')
+            ->join('bookings as b', 's.booking_id', '=', 'b.booking_id')
+            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+            ->where('s.due_date', '<', now()->toDateString())
+            ->where('s.status', '!=', 'paid')
+            ->where('s.balance', '>', 0)
             ->count() : null;
 
         $today = now()->toDateString();

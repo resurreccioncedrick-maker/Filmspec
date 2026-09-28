@@ -123,15 +123,12 @@ class BillingController extends Controller
             ->whereMonth('payment_date', now()->month)->whereYear('payment_date', now()->year)
             ->sum('amount');
         $outstanding = (float) DB::table('statement_of_accounts')->where('status', '!=', 'paid')->sum('balance');
-        // Must match filteredOverdueQuery()'s definition of "overdue" exactly (due date passed,
-        // balance still outstanding) — it used to just check status != 'paid' with no balance
-        // floor, so a $0-balance SOA whose status was never flipped to 'paid' inflated this count
-        // while never actually appearing in the Overdue tab's own list below.
-        $overdueCount = (int) DB::table('statement_of_accounts')
-            ->where('due_date', '<', now()->toDateString())
-            ->where('status', '!=', 'paid')
-            ->where('balance', '>', 0)
-            ->count();
+        // Reuses filteredOverdueQuery()'s own join+where (unfiltered, so an active search on the
+        // Overdue tab doesn't shrink this badge) instead of a separate hand-copied predicate —
+        // the two must be structurally identical, not just textually similar, or a data anomaly
+        // the join quietly drops (e.g. a statement_of_accounts row whose booking_id no longer
+        // exists) inflates this count while never actually appearing in the list below.
+        $overdueCount = (int) $this->filteredOverdueQuery(new Request())->count();
 
         // Relocated from the Cost Estimate editor — accounting/admin approve discounts here.
         $pendingDiscounts = DB::table('booking_discounts as bd')
