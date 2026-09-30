@@ -357,74 +357,77 @@
             @endif
           </td>
         </tr>
-        @endforeach
-      </tbody>
-    </table>
-  </div>
-
-  @if ($canManage)
-  {{-- Unit Check panel: one multi-unit item's controls at a time, picked from that line's
-       dropdown above, instead of everything expanding inline inside the table. Every unit's
-       real, name-attributed inputs exist in the DOM the whole time (just hidden) so Save
-       Checklist / Release All / Check All still submit every unit in one POST — the panel only
-       toggles which group is visible, it never moves data between them. --}}
-  <div class="unit-panel" id="unitPanel" style="display:none;margin:0 20px 16px;border:1.5px solid var(--accent);border-radius:10px;background:var(--acclight);overflow:hidden">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border2)">
-      <div>
-        <div id="upEyebrow" style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px">Checking</div>
-        <div id="upTag" style="font-family:var(--font-mono);font-weight:700;font-size:14px;margin-top:3px"></div>
-        <div id="upSn" style="font-size:11px;color:var(--muted);font-family:var(--font-mono)"></div>
-      </div>
-      <button type="button" onclick="closeUnitPanel()" style="border:none;background:none;color:var(--accent);cursor:pointer"><i data-feather="x" style="width:16px;height:16px"></i></button>
-    </div>
-    <div id="upIncidentBanner" style="display:none;padding:8px 16px;background:var(--redl);color:var(--red);font-size:11.5px;font-weight:600"></div>
-    <div style="padding:14px 16px">
-      @foreach ($equipLines->where('is_multi', true) as $eq)
-      @foreach ($eq->slots as $s)
-      @php
-        $slotBase = $eq->line_key . '_' . $s->slotKey;
-        $slotChecked = $isOut ? $s->co_checked : $s->ci_checked;
-        $slotCond = $isOut ? $s->condition_out : $s->condition_in;
-        $slotNotes = $isOut ? $s->co_notes : $s->ci_notes;
-        $condOptions = $isOut ? $condOut : $condIn;
-      @endphp
-      <div class="unit-slot-group" data-line="{{ $eq->line_key }}" data-slot="{{ $s->slotKey }}"
-           data-name="{{ $eq->item_name }}" data-tag="{{ $s->tag }}" data-sn="{{ $s->sn }}"
-           data-incident="{{ $s->incident_number }}" style="display:none">
-        <input type="hidden" name="items[{{ $slotBase }}][quantity_expected]" value="1">
-        <label style="display:flex;align-items:center;gap:9px;margin-bottom:12px;cursor:pointer">
-          <input type="checkbox" name="items[{{ $slotBase }}][checked]" value="1" {{ $slotChecked ? 'checked' : '' }}
-                 style="width:20px;height:20px;accent-color:var(--accent);cursor:pointer"
-                 class="checklist-cb"
-                 onchange="refreshLineTally('{{ $eq->line_key }}')">
-          <span style="font-weight:600;font-size:13px">This unit {{ $isOut ? 'released' : 'checked in' }}</span>
-        </label>
-        <div style="display:flex;gap:20px;flex-wrap:wrap">
-          <div>
-            <div style="font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Condition</div>
-            <select name="items[{{ $slotBase }}][condition_{{ $dir }}]" style="padding:5px 9px;border:1px solid var(--border2);border-radius:6px;font-size:12px">
+        {{-- Per-unit rows for a multi-unit line — real checkbox/condition/notes inputs, styled
+             exactly like an ordinary row (same cells, same controls) instead of a separate
+             floating panel. Only the one picked from the line's dropdown above is shown at a
+             time; every unit's inputs still exist in the DOM the whole time (just hidden) so
+             Save Checklist / Release All / Check All still submit every unit in one POST. --}}
+        @if ($canManage && $eq->is_multi)
+        @foreach ($eq->slots as $s)
+        @php
+          $slotBase = $eq->line_key . '_' . $s->slotKey;
+          $slotChecked = $isOut ? $s->co_checked : $s->ci_checked;
+          $slotCond = $isOut ? $s->condition_out : $s->condition_in;
+          $slotNotes = $isOut ? $s->co_notes : $s->ci_notes;
+          $condOptions = $isOut ? $condOut : $condIn;
+        @endphp
+        <tr class="unit-row" data-line="{{ $eq->line_key }}" data-slot="{{ $s->slotKey }}" style="display:none">
+          <td style="text-align:center">
+            <input type="checkbox" name="items[{{ $slotBase }}][checked]" value="1" {{ $slotChecked ? 'checked' : '' }}
+                   onchange="this.closest('tr').style.background=this.checked?'var(--greenl)':''; refreshLineTally('{{ $eq->line_key }}')"
+                   class="checklist-cb" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
+            <input type="hidden" name="items[{{ $slotBase }}][quantity_expected]" value="1">
+          </td>
+          <td style="padding-left:34px">
+            <div style="font-weight:600;font-size:.8rem;font-family:var(--font-mono)">{{ $s->tag }}</div>
+            <div style="font-size:.68rem;color:var(--muted);font-family:var(--font-mono)">{{ $s->sn }}</div>
+          </td>
+          <td>—</td>
+          <td>—</td>
+          <td>—</td>
+          <td>
+            <select name="items[{{ $slotBase }}][condition_{{ $dir }}]"
+                    @if (! $isOut) onchange="highlightDamaged(this)" @endif
+                    style="padding:4px 8px;border:1px solid var(--border2);border-radius:5px;font-size:12px;background:var(--surface);color:var(--text);outline:none">
               @foreach ($condOptions as $v => $l)
               <option value="{{ $v }}" {{ $slotCond === $v ? 'selected' : '' }}>{{ $l }}</option>
               @endforeach
             </select>
-          </div>
-          <div style="flex:1;min-width:160px">
-            <div style="font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Notes</div>
+          </td>
+          <td>
+            @if ($s->incident_number)
+            <span class="badge badge-red">{{ $s->incident_number }}</span>
+            @elseif ($isOut)
+              @if ($slotChecked && $fieldArrivalConfirmedAt)
+              <span class="badge badge-green">Arrived on Field</span>
+              @elseif ($slotChecked)
+              <span class="badge badge-green">Released</span>
+              @else
+              <span class="badge badge-gray">Pending</span>
+              @endif
+            @else
+              @if ($slotChecked)
+              <span class="badge {{ in_array($slotCond, ['damaged', 'missing'], true) ? 'badge-red' : 'badge-green' }}">
+                {{ in_array($slotCond, ['damaged', 'missing'], true) ? ucfirst($slotCond) : 'Returned' }}
+              </span>
+              @elseif ($s->co_checked)
+              <span class="badge badge-yellow">In Field</span>
+              @else
+              <span class="badge badge-gray">Not Out</span>
+              @endif
+            @endif
+          </td>
+          <td>
             <input type="text" name="items[{{ $slotBase }}][notes]" value="{{ $slotNotes }}" placeholder="Notes…"
-                   style="width:100%;padding:5px 9px;border:1px solid var(--border2);border-radius:6px;font-size:12px">
-          </div>
-        </div>
-      </div>
-      @endforeach
-      @endforeach
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--surface);border-top:1px solid var(--border2)">
-      <button type="button" class="btn btn-outline btn-sm" onclick="stepUnit(-1)"><i data-feather="arrow-left" style="width:13px;height:13px"></i> Prev Unit</button>
-      <span id="upCount" style="font-size:11.5px;color:var(--sub);font-weight:600"></span>
-      <button type="button" class="btn btn-outline btn-sm" onclick="stepUnit(1)">Next Unit <i data-feather="arrow-right" style="width:13px;height:13px"></i></button>
-    </div>
+                   style="width:140px;padding:4px 8px;border:1px solid var(--border2);border-radius:5px;font-size:12px;background:var(--surface);color:var(--text);outline:none">
+          </td>
+        </tr>
+        @endforeach
+        @endif
+        @endforeach
+      </tbody>
+    </table>
   </div>
-  @endif
 
   @if ($canManage)
   <div style="padding:16px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -466,7 +469,7 @@ function checkAll() {
     const row = cb.closest('tr');
     if (row) row.style.background = anyUnchecked ? 'var(--greenl)' : '';
   });
-  document.querySelectorAll('.unit-slot-group').forEach(g => refreshLineTally(g.dataset.line));
+  document.querySelectorAll('.unit-row').forEach(r => refreshLineTally(r.dataset.line));
 }
 
 function releaseAll() {
@@ -475,7 +478,7 @@ function releaseAll() {
     const row = cb.closest('tr');
     if (row) row.style.background = 'var(--greenl)';
   });
-  document.querySelectorAll('.unit-slot-group').forEach(g => refreshLineTally(g.dataset.line));
+  document.querySelectorAll('.unit-row').forEach(r => refreshLineTally(r.dataset.line));
   document.getElementById('checklistForm').submit();
 }
 
@@ -493,9 +496,9 @@ function highlightDamaged(sel) {
 // there is no separate JS state to keep in sync, so this can never drift from what will
 // actually be submitted.
 function refreshLineTally(line) {
-  const groups = document.querySelectorAll(`.unit-slot-group[data-line="${line}"]`);
-  const total = groups.length;
-  const done = Array.from(groups).filter(g => g.querySelector('.checklist-cb')?.checked).length;
+  const rows = document.querySelectorAll(`.unit-row[data-line="${line}"]`);
+  const total = rows.length;
+  const done = Array.from(rows).filter(r => r.querySelector('.checklist-cb')?.checked).length;
   const badge = document.querySelector(`.grp-badge[data-line="${line}"]`);
   if (badge) {
     badge.lastChild.textContent = done + '/' + total;
@@ -503,47 +506,17 @@ function refreshLineTally(line) {
   }
 }
 
-let currentLine = null;
-function lineGroups(line) {
-  return Array.from(document.querySelectorAll(`.unit-slot-group[data-line="${line}"]`));
-}
-function renderSlot(line, slotKey) {
-  const groups = lineGroups(line);
-  groups.forEach(g => g.style.display = 'none');
-  const active = groups.find(g => g.dataset.slot === slotKey);
-  if (! active) return;
-  active.style.display = '';
-  document.getElementById('upEyebrow').textContent = 'Checking · ' + active.dataset.name;
-  document.getElementById('upTag').textContent = active.dataset.tag;
-  document.getElementById('upSn').textContent = active.dataset.sn;
-  const idx = groups.indexOf(active);
-  document.getElementById('upCount').textContent = 'Unit ' + (idx + 1) + ' of ' + groups.length;
-  const banner = document.getElementById('upIncidentBanner');
-  if (active.dataset.incident) {
-    banner.style.display = '';
-    banner.textContent = active.dataset.incident + ' already open for this unit.';
-  } else {
-    banner.style.display = 'none';
-  }
-}
+// Picking a unit from its line's dropdown just shows that one real table row (styled exactly
+// like any other row) and hides its siblings — nothing is rendered client-side, every row's
+// inputs already exist in the DOM.
 function pickUnit(line, slotKey, selectEl) {
-  if (! slotKey) { closeUnitPanel(); return; }
-  currentLine = line;
-  document.getElementById('unitPanel').style.display = '';
-  renderSlot(line, slotKey);
-  document.getElementById('unitPanel').scrollIntoView({behavior: 'smooth', block: 'center'});
-}
-function stepUnit(dir) {
-  if (! currentLine) return;
-  const groups = lineGroups(currentLine);
-  const visible = groups.findIndex(g => g.style.display !== 'none');
-  const next = (visible + dir + groups.length) % groups.length;
-  renderSlot(currentLine, groups[next].dataset.slot);
-}
-function closeUnitPanel() {
-  document.getElementById('unitPanel').style.display = 'none';
-  currentLine = null;
-  document.querySelectorAll('.unit-pick').forEach(s => s.value = '');
+  document.querySelectorAll(`.unit-row[data-line="${line}"]`).forEach(r => r.style.display = 'none');
+  if (! slotKey) return;
+  const active = document.querySelector(`.unit-row[data-line="${line}"][data-slot="${slotKey}"]`);
+  if (active) {
+    active.style.display = '';
+    active.scrollIntoView({behavior: 'smooth', block: 'center'});
+  }
 }
 </script>
 @endpush
