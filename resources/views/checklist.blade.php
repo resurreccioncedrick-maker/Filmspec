@@ -18,8 +18,10 @@
 @section('content')
 @php $checklistBase = route('checklist'); @endphp
 <style>
-.grp-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--muted);background:var(--s2);border:1px solid var(--border);border-radius:20px;padding:4px 9px}
+.grp-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--muted);background:var(--s2);border:1px solid var(--border);border-radius:20px;padding:4px 9px;cursor:pointer}
 .grp-badge.on{color:var(--green);background:var(--greenl);border-color:#a7e0b8}
+.grp-badge .grp-chev{transition:transform .15s}
+.grp-badge.expanded .grp-chev{transform:rotate(180deg)}
 </style>
 
 @if ($msg)
@@ -217,12 +219,9 @@
           @if ($canManage)
           <td style="text-align:center">
             @if ($eq->is_multi)
-            {{-- A multi-unit line has no checkbox of its own — that would imply one action for
-                 several physical items. The real check happens per-unit in the panel below;
-                 this is just a read-only tally of how many of its units are done. --}}
-            <span class="grp-badge {{ $qActual >= $eq->quantity ? 'on' : '' }}" data-line="{{ $lineKey }}" title="Checked per-unit below">
-              <i data-feather="layers" style="width:12px;height:12px"></i>{{ $qActual }}/{{ $eq->quantity }}
-            </span>
+            {{-- A multi-unit line has no checkbox of its own — the actual quantity/tally lives
+                 in the Qty cell instead, and doubles as the toggle for its unit rows. --}}
+            <i data-feather="layers" style="width:14px;height:14px;color:var(--muted)"></i>
             @else
             <input type="checkbox" name="items[{{ $lineKey }}][checked]" value="1"
                    {{ $checked ? 'checked' : '' }}
@@ -251,23 +250,23 @@
             @endif
           </td>
           <td><span class="badge badge-blue">{{ $eq->category_name }}</span></td>
-          <td style="font-weight:600;font-family:var(--font-mono)">{{ $eq->quantity }}</td>
-
-          @if ($eq->is_multi)
-          <td colspan="2">
+          <td style="font-weight:600;font-family:var(--font-mono)">
+            @if ($eq->is_multi)
             @if ($canManage)
-            <select class="unit-pick" style="padding:4px 8px;border:1.5px solid var(--accent);border-radius:20px;font-size:12px;font-weight:600;color:var(--accent);background:var(--acclight)"
-                    onchange="pickUnit('{{ $lineKey }}', this.value, this)">
-              <option value="">{{ $eq->quantity }} units — select to check</option>
-              @foreach ($eq->slots as $s)
-              @php $slotCond = $isOut ? $s->condition_out : $s->condition_in; @endphp
-              <option value="{{ $s->slotKey }}">{{ $s->tag }} &middot; {{ $s->sn }}{{ in_array($slotCond, ['damaged','missing'], true) ? ' — Flagged' : '' }}</option>
-              @endforeach
-            </select>
+            <button type="button" class="grp-badge {{ $qActual >= $eq->quantity ? 'on' : '' }}" data-line="{{ $lineKey }}" onclick="toggleUnits('{{ $lineKey }}', this)" title="Click to check units individually">
+              <span class="grp-count">{{ $qActual }}/{{ $eq->quantity }}</span> <i data-feather="chevron-down" class="grp-chev" style="width:11px;height:11px"></i>
+            </button>
             @else
-            <span style="color:var(--muted);font-size:11px">{{ $qActual }} of {{ $eq->quantity }} — see units</span>
+            <span class="grp-badge {{ $qActual >= $eq->quantity ? 'on' : '' }}">{{ $qActual }}/{{ $eq->quantity }}</span>
+            @endif
+            @else
+            {{ $eq->quantity }}
             @endif
           </td>
+
+          @if ($eq->is_multi)
+          <td>—</td>
+          <td>—</td>
           @elseif ($isOut)
           <td>
             @if ($canManage)
@@ -501,21 +500,22 @@ function refreshLineTally(line) {
   const done = Array.from(rows).filter(r => r.querySelector('.checklist-cb')?.checked).length;
   const badge = document.querySelector(`.grp-badge[data-line="${line}"]`);
   if (badge) {
-    badge.lastChild.textContent = done + '/' + total;
+    const count = badge.querySelector('.grp-count');
+    if (count) count.textContent = done + '/' + total;
     badge.classList.toggle('on', done >= total);
   }
 }
 
-// Picking a unit from its line's dropdown just shows that one real table row (styled exactly
-// like any other row) and hides its siblings — nothing is rendered client-side, every row's
-// inputs already exist in the DOM.
-function pickUnit(line, slotKey, selectEl) {
-  document.querySelectorAll(`.unit-row[data-line="${line}"]`).forEach(r => r.style.display = 'none');
-  if (! slotKey) return;
-  const active = document.querySelector(`.unit-row[data-line="${line}"][data-slot="${slotKey}"]`);
-  if (active) {
-    active.style.display = '';
-    active.scrollIntoView({behavior: 'smooth', block: 'center'});
+// Clicking the Qty tally reveals all of that line's real unit rows at once (same table, same
+// controls as any other row) so they can be checked individually — clicking it again hides
+// them. Nothing is rendered client-side; every row's inputs already exist in the DOM.
+function toggleUnits(line, btn) {
+  const rows = document.querySelectorAll(`.unit-row[data-line="${line}"]`);
+  const showing = rows.length && rows[0].style.display !== 'none';
+  rows.forEach(r => r.style.display = showing ? 'none' : '');
+  btn.classList.toggle('expanded', ! showing);
+  if (! showing && rows.length) {
+    rows[0].scrollIntoView({behavior: 'smooth', block: 'center'});
   }
 }
 </script>
