@@ -17,6 +17,10 @@
 
 @section('content')
 @php $checklistBase = route('checklist'); @endphp
+<style>
+.grp-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--muted);background:var(--s2);border:1px solid var(--border);border-radius:20px;padding:4px 9px}
+.grp-badge.on{color:var(--green);background:var(--greenl);border-color:#a7e0b8}
+</style>
 
 @if ($msg)
 <div class="alert alert-{{ $msg['type'] }}" data-autohide>
@@ -49,6 +53,19 @@
     </div>
   </div>
 </div>
+
+@if ($fieldArrivalConfirmedAt)
+<div class="card" style="margin-bottom:20px;background:var(--acclight);border:1px solid var(--border2)">
+  <div class="card-body" style="display:flex;align-items:center;gap:10px;padding:14px 20px">
+    <i data-feather="map-pin" style="color:var(--accent);width:16px;height:16px;flex-shrink:0"></i>
+    <span style="font-size:.83rem;color:var(--sub)">
+      Crew confirmed field arrival on
+      {{ \Illuminate\Support\Carbon::parse($fieldArrivalConfirmedAt)->format('M j, Y g:i A') }}
+      @if ($fieldArrivalConfirmedByName)&middot; {{ trim($fieldArrivalConfirmedByName) }}@endif
+    </span>
+  </div>
+</div>
+@endif
 
 @if ($equipLines->isEmpty())
 <div class="card"><div class="empty-state">
@@ -184,21 +201,31 @@
         @foreach ($equipLines as $eq)
         @php
           $isOut = $dir === 'out';
-          $lineKey = ($eq->item_type === 'accessory' ? 'acc_' : 'eq_') . $eq->ref_id;
+          $lineKey = $eq->line_key;
           $checked = $isOut ? $eq->co_checked : $eq->ci_checked;
           $condVal = $isOut ? ($eq->condition_out ?? 'good') : ($eq->condition_in ?? 'good');
           $qActual = $isOut ? ($eq->co_qty ?? $eq->quantity) : ($eq->ci_qty ?? $eq->quantity);
           $notes = $isOut ? ($eq->co_notes ?? '') : ($eq->ci_notes ?? '');
           $rowStyle = $checked ? 'background:var(--greenl);' : '';
-          if (! $isOut && in_array($condVal, ['damaged', 'missing'], true)) $rowStyle = 'background:var(--redl);';
+          if (! $isOut && $eq->is_multi && $eq->any_damaged_in) $rowStyle = 'background:var(--redl);';
+          if (! $isOut && ! $eq->is_multi && in_array($condVal, ['damaged', 'missing'], true)) $rowStyle = 'background:var(--redl);';
         @endphp
         <tr style="{{ $rowStyle }}">
           @if ($canManage)
           <td style="text-align:center">
+            @if ($eq->is_multi)
+            {{-- A multi-unit line has no checkbox of its own — that would imply one action for
+                 several physical items. The real check happens per-unit in the panel below;
+                 this is just a read-only tally of how many of its units are done. --}}
+            <span class="grp-badge {{ $qActual >= $eq->quantity ? 'on' : '' }}" data-line="{{ $lineKey }}" title="Checked per-unit below">
+              <i data-feather="layers" style="width:12px;height:12px"></i>{{ $qActual }}/{{ $eq->quantity }}
+            </span>
+            @else
             <input type="checkbox" name="items[{{ $lineKey }}][checked]" value="1"
                    {{ $checked ? 'checked' : '' }}
                    onchange="this.closest('tr').style.background=this.checked?'var(--greenl)':''"
                    class="checklist-cb" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer">
+            @endif
           </td>
           @endif
           <td>
@@ -216,13 +243,29 @@
                 <div style="font-size:.72rem;color:var(--muted)">{{ trim($eq->brand . ' ' . $eq->model) }}</div>
               </div>
             </div>
-            @if ($canManage)
+            @if ($canManage && ! $eq->is_multi)
             <input type="hidden" name="items[{{ $lineKey }}][quantity_expected]" value="{{ $eq->quantity }}">
             @endif
           </td>
           <td><span class="badge badge-blue">{{ $eq->category_name }}</span></td>
           <td style="font-weight:600;font-family:var(--font-mono)">{{ $eq->quantity }}</td>
-          @if ($isOut)
+
+          @if ($eq->is_multi)
+          <td colspan="2">
+            @if ($canManage)
+            <select class="unit-pick" style="padding:4px 8px;border:1.5px solid var(--accent);border-radius:20px;font-size:12px;font-weight:600;color:var(--accent);background:var(--acclight)"
+                    onchange="pickUnit('{{ $lineKey }}', this.value, this)">
+              <option value="">{{ $eq->quantity }} units — select to check</option>
+              @foreach ($eq->slots as $s)
+              @php $slotCond = $isOut ? $s->condition_out : $s->condition_in; @endphp
+              <option value="{{ $s->slotKey }}">{{ $s->tag }} &middot; {{ $s->sn }}{{ in_array($slotCond, ['damaged','missing'], true) ? ' — Flagged' : '' }}</option>
+              @endforeach
+            </select>
+            @else
+            <span style="color:var(--muted);font-size:11px">{{ $qActual }} of {{ $eq->quantity }} — see units</span>
+            @endif
+          </td>
+          @elseif ($isOut)
           <td>
             @if ($canManage)
             <input type="number" name="items[{{ $lineKey }}][quantity_actual]"
@@ -268,8 +311,17 @@
             @endif
           </td>
           @endif
+
           <td>
-            @if ($isOut)
+            @if ($eq->is_multi)
+              @if ($isOut)
+                <span class="badge {{ $qActual >= $eq->quantity ? 'badge-green' : ($qActual > 0 ? 'badge-yellow' : 'badge-gray') }}">{{ $qActual }}/{{ $eq->quantity }} Released</span>
+              @else
+                <span class="badge {{ $eq->any_damaged_in ? 'badge-red' : ($qActual >= $eq->quantity ? 'badge-green' : 'badge-gray') }}">
+                  {{ $eq->any_damaged_in ? 'Damage Reported' : $qActual . '/' . $eq->quantity . ' Returned' }}
+                </span>
+              @endif
+            @elseif ($isOut)
               @if ($eq->co_checked)
               <span class="badge badge-green">Released</span>
               @else
@@ -288,7 +340,9 @@
             @endif
           </td>
           <td>
-            @if ($canManage)
+            @if ($eq->is_multi)
+            <span style="font-size:.78rem;color:var(--muted)">—</span>
+            @elseif ($canManage)
             <input type="text" name="items[{{ $lineKey }}][notes]"
                    value="{{ $notes }}"
                    placeholder="Notes…"
@@ -302,6 +356,70 @@
       </tbody>
     </table>
   </div>
+
+  @if ($canManage)
+  {{-- Unit Check panel: one multi-unit item's controls at a time, picked from that line's
+       dropdown above, instead of everything expanding inline inside the table. Every unit's
+       real, name-attributed inputs exist in the DOM the whole time (just hidden) so Save
+       Checklist / Release All / Check All still submit every unit in one POST — the panel only
+       toggles which group is visible, it never moves data between them. --}}
+  <div class="unit-panel" id="unitPanel" style="display:none;margin:0 20px 16px;border:1.5px solid var(--accent);border-radius:10px;background:var(--acclight);overflow:hidden">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border2)">
+      <div>
+        <div id="upEyebrow" style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px">Checking</div>
+        <div id="upTag" style="font-family:var(--font-mono);font-weight:700;font-size:14px;margin-top:3px"></div>
+        <div id="upSn" style="font-size:11px;color:var(--muted);font-family:var(--font-mono)"></div>
+      </div>
+      <button type="button" onclick="closeUnitPanel()" style="border:none;background:none;color:var(--accent);cursor:pointer"><i data-feather="x" style="width:16px;height:16px"></i></button>
+    </div>
+    <div id="upIncidentBanner" style="display:none;padding:8px 16px;background:var(--redl);color:var(--red);font-size:11.5px;font-weight:600"></div>
+    <div style="padding:14px 16px">
+      @foreach ($equipLines->where('is_multi', true) as $eq)
+      @foreach ($eq->slots as $s)
+      @php
+        $slotBase = $eq->line_key . '_' . $s->slotKey;
+        $slotChecked = $isOut ? $s->co_checked : $s->ci_checked;
+        $slotCond = $isOut ? $s->condition_out : $s->condition_in;
+        $slotNotes = $isOut ? $s->co_notes : $s->ci_notes;
+        $condOptions = $isOut ? $condOut : $condIn;
+      @endphp
+      <div class="unit-slot-group" data-line="{{ $eq->line_key }}" data-slot="{{ $s->slotKey }}"
+           data-name="{{ $eq->item_name }}" data-tag="{{ $s->tag }}" data-sn="{{ $s->sn }}"
+           data-incident="{{ $s->incident_number }}" style="display:none">
+        <input type="hidden" name="items[{{ $slotBase }}][quantity_expected]" value="1">
+        <label style="display:flex;align-items:center;gap:9px;margin-bottom:12px;cursor:pointer">
+          <input type="checkbox" name="items[{{ $slotBase }}][checked]" value="1" {{ $slotChecked ? 'checked' : '' }}
+                 style="width:20px;height:20px;accent-color:var(--accent);cursor:pointer"
+                 class="checklist-cb"
+                 onchange="refreshLineTally('{{ $eq->line_key }}')">
+          <span style="font-weight:600;font-size:13px">This unit {{ $isOut ? 'released' : 'checked in' }}</span>
+        </label>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Condition</div>
+            <select name="items[{{ $slotBase }}][condition_{{ $dir }}]" style="padding:5px 9px;border:1px solid var(--border2);border-radius:6px;font-size:12px">
+              @foreach ($condOptions as $v => $l)
+              <option value="{{ $v }}" {{ $slotCond === $v ? 'selected' : '' }}>{{ $l }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div style="flex:1;min-width:160px">
+            <div style="font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Notes</div>
+            <input type="text" name="items[{{ $slotBase }}][notes]" value="{{ $slotNotes }}" placeholder="Notes…"
+                   style="width:100%;padding:5px 9px;border:1px solid var(--border2);border-radius:6px;font-size:12px">
+          </div>
+        </div>
+      </div>
+      @endforeach
+      @endforeach
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--surface);border-top:1px solid var(--border2)">
+      <button type="button" class="btn btn-outline btn-sm" onclick="stepUnit(-1)"><i data-feather="arrow-left" style="width:13px;height:13px"></i> Prev Unit</button>
+      <span id="upCount" style="font-size:11.5px;color:var(--sub);font-weight:600"></span>
+      <button type="button" class="btn btn-outline btn-sm" onclick="stepUnit(1)">Next Unit <i data-feather="arrow-right" style="width:13px;height:13px"></i></button>
+    </div>
+  </div>
+  @endif
 
   @if ($canManage)
   <div style="padding:16px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -340,15 +458,19 @@ function checkAll() {
   const anyUnchecked = Array.from(cbs).some(c => !c.checked);
   cbs.forEach(cb => {
     cb.checked = anyUnchecked;
-    cb.closest('tr').style.background = anyUnchecked ? 'var(--greenl)' : '';
+    const row = cb.closest('tr');
+    if (row) row.style.background = anyUnchecked ? 'var(--greenl)' : '';
   });
+  document.querySelectorAll('.unit-slot-group').forEach(g => refreshLineTally(g.dataset.line));
 }
 
 function releaseAll() {
   document.querySelectorAll('.checklist-cb').forEach(cb => {
     cb.checked = true;
-    cb.closest('tr').style.background = 'var(--greenl)';
+    const row = cb.closest('tr');
+    if (row) row.style.background = 'var(--greenl)';
   });
+  document.querySelectorAll('.unit-slot-group').forEach(g => refreshLineTally(g.dataset.line));
   document.getElementById('checklistForm').submit();
 }
 
@@ -360,6 +482,63 @@ function highlightDamaged(sel) {
     const cb = row.querySelector('.checklist-cb');
     row.style.background = cb?.checked ? 'var(--greenl)' : '';
   }
+}
+
+// A multi-unit line's grp-badge tally is derived straight from its own hidden checkboxes —
+// there is no separate JS state to keep in sync, so this can never drift from what will
+// actually be submitted.
+function refreshLineTally(line) {
+  const groups = document.querySelectorAll(`.unit-slot-group[data-line="${line}"]`);
+  const total = groups.length;
+  const done = Array.from(groups).filter(g => g.querySelector('.checklist-cb')?.checked).length;
+  const badge = document.querySelector(`.grp-badge[data-line="${line}"]`);
+  if (badge) {
+    badge.lastChild.textContent = done + '/' + total;
+    badge.classList.toggle('on', done >= total);
+  }
+}
+
+let currentLine = null;
+function lineGroups(line) {
+  return Array.from(document.querySelectorAll(`.unit-slot-group[data-line="${line}"]`));
+}
+function renderSlot(line, slotKey) {
+  const groups = lineGroups(line);
+  groups.forEach(g => g.style.display = 'none');
+  const active = groups.find(g => g.dataset.slot === slotKey);
+  if (! active) return;
+  active.style.display = '';
+  document.getElementById('upEyebrow').textContent = 'Checking · ' + active.dataset.name;
+  document.getElementById('upTag').textContent = active.dataset.tag;
+  document.getElementById('upSn').textContent = active.dataset.sn;
+  const idx = groups.indexOf(active);
+  document.getElementById('upCount').textContent = 'Unit ' + (idx + 1) + ' of ' + groups.length;
+  const banner = document.getElementById('upIncidentBanner');
+  if (active.dataset.incident) {
+    banner.style.display = '';
+    banner.textContent = active.dataset.incident + ' already open for this unit.';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+function pickUnit(line, slotKey, selectEl) {
+  if (! slotKey) { closeUnitPanel(); return; }
+  currentLine = line;
+  document.getElementById('unitPanel').style.display = '';
+  renderSlot(line, slotKey);
+  document.getElementById('unitPanel').scrollIntoView({behavior: 'smooth', block: 'center'});
+}
+function stepUnit(dir) {
+  if (! currentLine) return;
+  const groups = lineGroups(currentLine);
+  const visible = groups.findIndex(g => g.style.display !== 'none');
+  const next = (visible + dir + groups.length) % groups.length;
+  renderSlot(currentLine, groups[next].dataset.slot);
+}
+function closeUnitPanel() {
+  document.getElementById('unitPanel').style.display = 'none';
+  currentLine = null;
+  document.querySelectorAll('.unit-pick').forEach(s => s.value = '');
 }
 </script>
 @endpush

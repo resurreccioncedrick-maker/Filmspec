@@ -317,6 +317,7 @@
         @endif
 
       @elseif ($st === 'pending_inspection' && $isAdmin)
+        <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'in']) }}" class="btn btn-outline btn-sm"><i data-feather="log-in"></i> Checklist IN</a>
         @if ($openIncidentCount > 0)
         <button type="button" onclick="document.querySelector('[data-tab=&quot;tab-incidents&quot;]').click()" class="btn btn-danger btn-sm"><i data-feather="alert-triangle"></i> {{ $openIncidentCount }} Open Incident{{ $openIncidentCount !== 1 ? 's' : '' }}</button>
         @endif

@@ -605,7 +605,7 @@ button{font-family:var(--font-b);cursor:pointer}
   <div class="ctr">
     <div class="sec-hd">
       <div class="sec-title">Equipment Checklist</div>
-      <div class="sec-sub">Confirm equipment released to you (out) and returned to the company (in). Something actually wrong with an item? File an Incident Report instead.</div>
+      <div class="sec-sub">Confirm you've arrived on field with what was released, and check items back in once the shoot wraps. Something actually wrong with an item? File an Incident Report instead.</div>
     </div>
 
     @php
@@ -614,7 +614,7 @@ button{font-family:var(--font-b);cursor:pointer}
       $checklistSubTab = in_array($activeSubTab, ['out', 'in'], true) ? $activeSubTab : 'out';
     @endphp
     <div class="subtabs">
-      <button type="button" class="subtab-btn {{ $checklistSubTab === 'out' ? 'on' : '' }}" data-group="checklist" onclick="showSubTab('checklist','out',this)">Check-Out ({{ $outBookings->count() }})</button>
+      <button type="button" class="subtab-btn {{ $checklistSubTab === 'out' ? 'on' : '' }}" data-group="checklist" onclick="showSubTab('checklist','out',this)">Confirm Arrival ({{ $outBookings->count() }})</button>
       <button type="button" class="subtab-btn {{ $checklistSubTab === 'in' ? 'on' : '' }}" data-group="checklist" onclick="showSubTab('checklist','in',this)">Check-In ({{ $inBookings->count() }})</button>
     </div>
 
@@ -645,6 +645,7 @@ button{font-family:var(--font-b);cursor:pointer}
       @php
         $doneCount = collect($cb->items)->filter(fn ($it) => $dir === 'out' ? $it->co_checked : $it->ci_checked)->count();
         $totalCount = count($cb->items);
+        $arrivalConfirmed = ! empty($cb->booking->field_arrival_confirmed_at);
       @endphp
       <div class="card checklist-booking-panel" data-dir="{{ $dir }}" data-booking="{{ $cb->booking->booking_id }}" style="display:none">
         <div class="ch">
@@ -656,11 +657,52 @@ button{font-family:var(--font-b);cursor:pointer}
             <a href="{{ route('crew-portal.checklist-print', ['booking_id' => $cb->booking->booking_id]) }}" target="_blank" style="color:var(--muted);display:flex;align-items:center" title="Print checklist">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             </a>
-            <span class="badge {{ $dir === 'out' ? 'badge-blue' : 'badge-orange' }}">{{ $dir === 'out' ? 'Check-Out' : 'Check-In' }} {{ $doneCount }}/{{ $totalCount }}</span>
+            @if ($dir === 'out')
+            <span class="badge {{ $arrivalConfirmed ? 'badge-green' : 'badge-yellow' }}">{{ $arrivalConfirmed ? 'Arrival Confirmed' : 'Awaiting Arrival' }}</span>
+            @else
+            <span class="badge badge-orange">Check-In {{ $doneCount }}/{{ $totalCount }}</span>
+            @endif
           </div>
         </div>
         @if (empty($cb->items))
         <div class="empty">No equipment on this booking.</div>
+        @elseif ($dir === 'out')
+        {{-- Read-only: releasing equipment is Traffic/Ops/Admin's job on the main Checklist page.
+             Crew's own action here is a single, deliberate "we've got it" confirmation, not
+             re-ticking a release they never performed. --}}
+        @foreach ($cb->items as $it)
+        <div class="item">
+          <span style="flex:1">
+            <span class="it-title" style="margin-top:0">{{ $it->equipment_name }}</span>
+            <span class="it-meta">{{ $it->brand }} {{ $it->model }}</span>
+          </span>
+          <span class="it-side">
+            <span class="it-rate" style="font-family:var(--font-m);font-size:11.5px;color:var(--muted)">Qty {{ $it->quantity }}</span>
+            @if ($it->co_checked)
+            <span class="badge badge-green" style="display:block;margin-top:4px">Released</span>
+            @else
+            <span class="badge badge-gray" style="display:block;margin-top:4px">Pending</span>
+            @endif
+          </span>
+        </div>
+        @endforeach
+        <div style="padding:14px 16px">
+          @if ($arrivalConfirmed)
+          <div class="badge badge-green" style="width:100%;justify-content:center;padding:10px;font-size:13px">
+            Arrival confirmed {{ \Illuminate\Support\Carbon::parse($cb->booking->field_arrival_confirmed_at)->format('M j, g:i A') }}
+          </div>
+          @else
+          <form method="POST">
+            @csrf
+            <input type="hidden" name="action" value="crew_confirm_arrival">
+            <input type="hidden" name="return_tab" value="checklist">
+            <input type="hidden" name="return_subtab" value="out">
+            <input type="hidden" name="return_booking_id" value="{{ $cb->booking->booking_id }}">
+            <input type="hidden" name="booking_id" value="{{ $cb->booking->booking_id }}">
+            <button type="submit" class="btn btn-primary" style="width:100%">Confirm Field Arrival</button>
+          </form>
+          @endif
+        </div>
         @else
         <form method="POST">
           @csrf
@@ -671,7 +713,7 @@ button{font-family:var(--font-b);cursor:pointer}
           <input type="hidden" name="booking_id" value="{{ $cb->booking->booking_id }}">
           <input type="hidden" name="direction" value="{{ $dir }}">
           @foreach ($cb->items as $it)
-          @php $isChecked = $dir === 'out' ? $it->co_checked : $it->ci_checked; @endphp
+          @php $isChecked = $it->ci_checked; @endphp
           <label class="item" style="cursor:pointer">
             <input type="checkbox" name="items[]" value="{{ $it->equipment_id }}" {{ $isChecked ? 'checked' : '' }} style="width:22px;height:22px;accent-color:var(--blue);flex-shrink:0">
             <span style="flex:1">
@@ -682,7 +724,7 @@ button{font-family:var(--font-b);cursor:pointer}
           </label>
           @endforeach
           <div style="padding:14px 16px">
-            <button type="submit" class="btn btn-primary" style="width:100%">Save {{ $dir === 'out' ? 'Check-Out' : 'Check-In' }}</button>
+            <button type="submit" class="btn btn-primary" style="width:100%">Save Check-In</button>
           </div>
         </form>
         @endif
@@ -888,9 +930,16 @@ button{font-family:var(--font-b);cursor:pointer}
         </div>
         <div class="fg">
           <label>Equipment *</label>
-          <select name="equipment_id" id="crewIR_equipment" required disabled>
+          <select name="equipment_id" id="crewIR_equipment" required disabled onchange="filterUnitsByEquipment(this.value)">
             <option value="">— Select a booking first —</option>
           </select>
+        </div>
+        <div class="fg">
+          <label>Unit</label>
+          <select name="equipment_unit" id="crewIR_unit" disabled>
+            <option value="">— Select equipment first —</option>
+          </select>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Pick the specific one if it's tagged — otherwise use "Not sure which unit."</div>
         </div>
         <div style="display:flex;gap:10px">
           <div class="fg" style="flex:1">
@@ -1056,6 +1105,10 @@ button{font-family:var(--font-b);cursor:pointer}
 // $bookingEquipMap / incidents.blade.php's filterEquipmentByBooking().
 const BOOKING_EQUIP = {!! json_encode($bookingEquipMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 
+// Registered physical units per equipment model — powers the Incident Report modal's Unit
+// select, cascading a second level deeper than BOOKING_EQUIP (Booking -> Equipment -> Unit).
+const EQUIPMENT_UNITS = {!! json_encode($equipmentUnitMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
+
 // Field-request pickers — the OPPOSITE list from BOOKING_EQUIP above: equipment/accessories
 // NOT yet on the booking (available to request), keyed by booking_id, same shape ClientBookingDetailController
 // builds server-side for the client's own request form.
@@ -1115,6 +1168,20 @@ function filterEquipmentByBooking(bookingId) {
   sel.innerHTML = '<option value="">— Select Equipment —</option>' + equip.map(e =>
     `<option value="${e.equipment_id}">${escCrew(e.equipment_name)}${e.brand ? ' — ' + escCrew(e.brand) : ''}${e.serial_number ? ' (' + escCrew(e.serial_number) + ')' : ''}</option>`
   ).join('');
+  sel.disabled = false;
+  filterUnitsByEquipment('');
+}
+
+function filterUnitsByEquipment(equipmentId) {
+  const sel = document.getElementById('crewIR_unit');
+  const units = EQUIPMENT_UNITS[equipmentId] || [];
+  if (!equipmentId || !units.length) {
+    sel.innerHTML = '<option value="">Not sure which unit</option>';
+    sel.disabled = false;
+    return;
+  }
+  sel.innerHTML = units.map(u => `<option value="u${u.unit_id}">${escCrew(u.asset_tag)}</option>`).join('')
+    + '<option value="">Not sure which unit</option>';
   sel.disabled = false;
 }
 

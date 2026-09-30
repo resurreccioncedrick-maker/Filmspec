@@ -72,6 +72,7 @@ class CrewPortalController extends Controller
         $myMaintenances = collect();
         $myActiveBookings = collect();
         $bookingEquipMap = [];
+        $equipmentUnitMap = [];
         $myAttendance = collect();
         $myTimesheets = collect();
         $myChecklistBookings = collect();
@@ -95,6 +96,7 @@ class CrewPortalController extends Controller
                 ->orderByDesc('b.shoot_date_start')
                 ->select('b.booking_id', 'b.booking_reference', 'b.project_title', 'b.shoot_date_start',
                     'b.shoot_date_end', 'b.shoot_location', 'b.booking_status',
+                    'b.field_arrival_confirmed_at',
                     'bc.position_id', 'bc.rate_used', 'bc.hours_worked', 'cp.position_name',
                     'c.company_name', 'c.contact_person')
                 ->limit(30)
@@ -135,6 +137,17 @@ class CrewPortalController extends Controller
                     ->get();
                 foreach ($equipRows as $row) {
                     $bookingEquipMap[$row->booking_id][] = $row;
+                }
+
+                // Powers the File Incident Report modal's Unit select — cascades from whichever
+                // Equipment the crew member already picked, entirely client-side (no round trip),
+                // same idea as $bookingEquipMap cascading from Booking.
+                $equipIdsForUnits = collect($equipRows)->pluck('equipment_id')->unique()->all();
+                $equipmentUnitMap = [];
+                if ($equipIdsForUnits) {
+                    foreach (DB::table('equipment_units')->whereIn('equipment_id', $equipIdsForUnits)->orderBy('asset_tag')->get() as $u) {
+                        $equipmentUnitMap[$u->equipment_id][] = ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag];
+                    }
                 }
             }
 
@@ -277,7 +290,7 @@ class CrewPortalController extends Controller
             'msg' => $msg, 'user' => $user, 'crewMember' => $crewMember, 'activeTab' => $activeTab, 'activeSubTab' => $activeSubTab,
             'activeBookingId' => $activeBookingId, 'crewAnnouncements' => $crewAnnouncements,
             'myBookings' => $myBookings, 'myIncidents' => $myIncidents, 'myMaintenances' => $myMaintenances,
-            'myActiveBookings' => $myActiveBookings, 'bookingEquipMap' => $bookingEquipMap,
+            'myActiveBookings' => $myActiveBookings, 'bookingEquipMap' => $bookingEquipMap, 'equipmentUnitMap' => $equipmentUnitMap,
             'myAttendance' => $myAttendance, 'myTimesheets' => $myTimesheets,
             'myChecklistBookings' => $myChecklistBookings, 'myTeamBookings' => $myTeamBookings, 'allActiveCrew' => $allActiveCrew,
             'fieldEquipMap' => $fieldEquipMap, 'fieldAccMap' => $fieldAccMap, 'crewPositions' => $crewPositions,
@@ -431,6 +444,17 @@ class CrewPortalController extends Controller
         if ($action === 'crew_file_incident' && $crewMember) {
             $bid = (int) $request->input('booking_id', 0);
             $eid = (int) $request->input('equipment_id', 0);
+            // "unit" is either "u<equipment_unit_id>" (a genuinely registered physical unit) or
+            // empty/"unsure" when the crew member picks "Not sure which unit" — there's nothing
+            // to validate for that case, it just leaves the report unit-less like before.
+            $unitInput = (string) $request->input('equipment_unit', '');
+            $equipmentUnitId = null;
+            if (str_starts_with($unitInput, 'u')) {
+                $candidate = (int) substr($unitInput, 1);
+                if ($candidate && DB::table('equipment_units')->where('unit_id', $candidate)->where('equipment_id', $eid)->exists()) {
+                    $equipmentUnitId = $candidate;
+                }
+            }
             $itype = $request->input('incident_type', 'damaged');
             $idate = $request->input('incident_date', now()->toDateString());
             $itime = trim((string) $request->input('incident_time', ''));
@@ -462,7 +486,7 @@ class CrewPortalController extends Controller
             $irNum = 'IR-' . $year . '-' . str_pad((string) ($count + 1), 4, '0', STR_PAD_LEFT);
 
             DB::table('incident_reports')->insert([
-                'booking_id' => $bid, 'equipment_id' => $eid, 'reported_by' => $uid,
+                'booking_id' => $bid, 'equipment_id' => $eid, 'equipment_unit_id' => $equipmentUnitId, 'reported_by' => $uid,
                 'incident_type' => $itype, 'incident_date' => $idate,
                 'incident_time' => $itime ?: null, 'description' => $desc, 'cause' => $cause,
                 'charge_amount' => 0, 'status' => 'open', 'incident_number' => $irNum,
@@ -480,9 +504,37 @@ class CrewPortalController extends Controller
             return ['type' => 'success', 'text' => "Incident report <strong>$irNum</strong> filed. The admin will review and set any charges."];
         }
 
+        if ($action === 'crew_confirm_arrival' && $crewMember) {
+            // The crew-side counterpart to office-only release: crew can't tick items out, but
+            // they CAN tell staff "we've got it and we're on set" — surfaced on the Checklist
+            // page as a single per-booking confirmation, not a per-item one.
+            $bid = (int) $request->input('booking_id', 0);
+            $ownsBooking = DB::table('booking_crew')->where('crew_id', $crewMember->crew_id)
+                ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
+            if (! $ownsBooking) {
+                return ['type' => 'danger', 'text' => 'That booking is not assigned to you.'];
+            }
+
+            DB::table('bookings')->where('booking_id', $bid)->update([
+                'field_arrival_confirmed_at' => now(), 'field_arrival_confirmed_by' => $uid,
+            ]);
+            ActivityLog::record($uid, 'field_arrival_confirmed', 'booking', "Crew confirmed field arrival for booking #$bid", $bid);
+
+            return ['type' => 'success', 'text' => 'Field arrival confirmed — office staff can now see it on the Checklist page.'];
+        }
+
         if ($action === 'crew_save_checklist' && $crewMember) {
             $bid = (int) $request->input('booking_id', 0);
             $direction = $request->input('direction') === 'in' ? 'in' : 'out';
+
+            // Releasing equipment (Checklist Out / Release All) is an office-only action —
+            // Admin / Super Admin / Operations Manager / Traffic Staff, via the main Checklist
+            // page. Crew confirm arrival instead (crew_confirm_arrival above); this action now
+            // only ever handles checking items back IN.
+            if ($direction === 'out') {
+                return ['type' => 'danger', 'text' => 'Only office staff can release equipment. Use Confirm Field Arrival instead.'];
+            }
+
             // Simplified crew flow: a plain list of checked equipment_ids — no per-item
             // quantity/condition/notes fields. Every checked item is recorded as its full
             // expected quantity in 'good' condition; anything actually wrong with a specific
@@ -504,75 +556,46 @@ class CrewPortalController extends Controller
                 }
                 $qty = (int) $bookingEquip[$eid]->quantity;
 
-                if ($direction === 'out') {
-                    $existing = DB::table('equipment_checklist')->where('booking_id', $bid)->where('equipment_id', $eid)->where('direction', 'out')->value('checklist_id');
-                    if ($existing) {
-                        DB::table('equipment_checklist')->where('checklist_id', $existing)->update([
-                            'checked' => 1, 'quantity_actual' => $qty, 'condition_out' => 'good', 'checked_by' => $uid, 'checked_at' => now(),
-                        ]);
-                    } else {
-                        DB::table('equipment_checklist')->insert([
-                            'booking_id' => $bid, 'equipment_id' => $eid, 'direction' => 'out', 'quantity_expected' => $qty,
-                            'quantity_actual' => $qty, 'condition_out' => 'good', 'checked' => 1, 'checked_by' => $uid, 'checked_at' => now(),
-                        ]);
-                    }
-
-                    $existTx = DB::table('equipment_transactions')->where('booking_id', $bid)->where('equipment_id', $eid)->where('transaction_type', 'checkout')->value('transaction_id');
-                    if (! $existTx) {
-                        DB::table('equipment_transactions')->insert([
-                            'booking_id' => $bid, 'equipment_id' => $eid, 'transaction_type' => 'checkout',
-                            'transaction_date' => now(), 'condition_out' => 'good', 'handled_by' => $uid,
-                        ]);
-                        DB::table('equipment')->where('equipment_id', $eid)->update(['availability_status' => 'rented']);
-                    }
+                $existing = DB::table('equipment_checklist')->where('booking_id', $bid)->where('equipment_id', $eid)->where('direction', 'in')->value('checklist_id');
+                if ($existing) {
+                    DB::table('equipment_checklist')->where('checklist_id', $existing)->update([
+                        'checked' => 1, 'quantity_actual' => $qty, 'condition_in' => 'good', 'checked_by' => $uid, 'checked_at' => now(),
+                    ]);
                 } else {
-                    $existing = DB::table('equipment_checklist')->where('booking_id', $bid)->where('equipment_id', $eid)->where('direction', 'in')->value('checklist_id');
-                    if ($existing) {
-                        DB::table('equipment_checklist')->where('checklist_id', $existing)->update([
-                            'checked' => 1, 'quantity_actual' => $qty, 'condition_in' => 'good', 'checked_by' => $uid, 'checked_at' => now(),
-                        ]);
-                    } else {
-                        DB::table('equipment_checklist')->insert([
-                            'booking_id' => $bid, 'equipment_id' => $eid, 'direction' => 'in', 'quantity_expected' => $qty,
-                            'quantity_actual' => $qty, 'condition_in' => 'good', 'checked' => 1, 'checked_by' => $uid, 'checked_at' => now(),
-                        ]);
-                    }
+                    DB::table('equipment_checklist')->insert([
+                        'booking_id' => $bid, 'equipment_id' => $eid, 'direction' => 'in', 'quantity_expected' => $qty,
+                        'quantity_actual' => $qty, 'condition_in' => 'good', 'checked' => 1, 'checked_by' => $uid, 'checked_at' => now(),
+                    ]);
+                }
 
-                    $existTx = DB::table('equipment_transactions')->where('booking_id', $bid)->where('equipment_id', $eid)->where('transaction_type', 'checkin')->value('transaction_id');
-                    if (! $existTx) {
-                        DB::table('equipment_transactions')->insert([
-                            'booking_id' => $bid, 'equipment_id' => $eid, 'transaction_type' => 'checkin',
-                            'transaction_date' => now(), 'condition_in' => 'good', 'handled_by' => $uid,
-                        ]);
-                        DB::table('equipment')->where('equipment_id', $eid)->update(['availability_status' => 'available']);
-                    }
+                $existTx = DB::table('equipment_transactions')->where('booking_id', $bid)->where('equipment_id', $eid)->where('transaction_type', 'checkin')->value('transaction_id');
+                if (! $existTx) {
+                    DB::table('equipment_transactions')->insert([
+                        'booking_id' => $bid, 'equipment_id' => $eid, 'transaction_type' => 'checkin',
+                        'transaction_date' => now(), 'condition_in' => 'good', 'handled_by' => $uid,
+                    ]);
+                    DB::table('equipment')->where('equipment_id', $eid)->update(['availability_status' => 'available']);
                 }
             }
 
-            if ($direction === 'out') {
+            $totalEquip = (int) DB::table('booking_equipment')->where('booking_id', $bid)->count();
+            $returnedCount = (int) DB::table('equipment_checklist')->where('booking_id', $bid)->where('direction', 'in')->where('checked', 1)->count();
+            if ($totalEquip > 0 && $returnedCount >= $totalEquip) {
                 $curStatus = DB::table('bookings')->where('booking_id', $bid)->value('booking_status');
-                if ($curStatus === 'confirmed') {
-                    $anyReleased = (int) DB::table('equipment_transactions')->where('booking_id', $bid)->where('transaction_type', 'checkout')->count();
-                    if ($anyReleased > 0) {
-                        DB::table('bookings')->where('booking_id', $bid)->update(['booking_status' => 'ongoing', 'updated_at' => now()]);
-                        ActivityLog::record($uid, 'status_change', 'booking', "Booking #$bid moved to ongoing via crew checklist-out", $bid);
-                    }
-                }
-            } else {
-                $totalEquip = (int) DB::table('booking_equipment')->where('booking_id', $bid)->count();
-                $returnedCount = (int) DB::table('equipment_checklist')->where('booking_id', $bid)->where('direction', 'in')->where('checked', 1)->count();
-                if ($totalEquip > 0 && $returnedCount >= $totalEquip) {
-                    $curStatus = DB::table('bookings')->where('booking_id', $bid)->value('booking_status');
-                    if (in_array($curStatus, ['ongoing', 'confirmed'], true)) {
-                        DB::table('bookings')->where('booking_id', $bid)->update(['booking_status' => 'returned', 'updated_at' => now()]);
-                        ActivityLog::record($uid, 'status_change', 'booking', "Booking #$bid marked returned via crew checklist-in", $bid);
-                    }
+                if (in_array($curStatus, ['ongoing', 'confirmed'], true)) {
+                    // Matches ChecklistController/BookingDetailController's own path — all
+                    // equipment back in moves to pending_inspection, not straight to returned;
+                    // "returned" only happens once staff deliberately confirm the inspection (or
+                    // skip it via Complete Booking). This used to jump straight to 'returned',
+                    // silently bypassing that inspection gate when crew did the check-in.
+                    DB::table('bookings')->where('booking_id', $bid)->update(['booking_status' => 'pending_inspection', 'updated_at' => now()]);
+                    ActivityLog::record($uid, 'status_change', 'booking', "Booking #$bid pending inspection — all equipment checked in via crew checklist", $bid);
                 }
             }
 
-            ActivityLog::record($uid, 'checklist' . $direction, 'booking', "Crew checklist $direction saved for booking #$bid", $bid);
+            ActivityLog::record($uid, 'checklistin', 'booking', "Crew checklist in saved for booking #$bid", $bid);
 
-            return ['type' => 'success', 'text' => 'Checklist <strong>' . strtoupper($direction) . '</strong> saved successfully.'];
+            return ['type' => 'success', 'text' => 'Checklist <strong>IN</strong> saved successfully.'];
         }
 
         if ($action === 'crew_mark_attendance' && $crewMember) {

@@ -64,6 +64,11 @@ return [
 
     'manage_roles' => ['super_admin', 'operations_manager', 'admin'],
 
+    // Scoped to the Checklist page only — Traffic staff need to release/return equipment day to
+    // day, but must NOT get the sweeping app-wide 'manage_roles' grant (client management, crew
+    // management, erasing a booking's CE, etc). Keep this list separate from manage_roles.
+    'checklist_office_roles' => ['super_admin', 'operations_manager', 'admin', 'traffic'],
+
     // Optional explicit paths to the mysqldump/mysql CLI binaries, for Super Admin's
     // Database Backup/Restore. Left unset by default — DatabaseBackup looks the binaries
     // up on PATH first and only falls back to these (then to a pure-PHP dump/restore)
