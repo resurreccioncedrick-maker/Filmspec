@@ -35,10 +35,15 @@
       <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--accent);margin-bottom:3px">{{ $booking->booking_reference }}</div>
       <div style="font-size:.875rem;color:var(--sub)">{{ $booking->company_name ?: $booking->contact_person }} &nbsp;·&nbsp; {{ \Illuminate\Support\Carbon::parse($booking->shoot_date_start)->format('M j, Y') }}</div>
     </div>
+    @php $confirmedOnField = $fieldArrivalConfirmedAt ? $outChecked : 0; @endphp
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <div style="text-align:center;padding:10px 18px;background:var(--acclight);border-radius:8px;border:1px solid var(--border2)">
         <div style="font-family:var(--font-display);font-size:22px;color:var(--accent)">{{ $outChecked }}/{{ $totalItems }}</div>
         <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Checked Out</div>
+      </div>
+      <div style="text-align:center;padding:10px 18px;background:{{ $confirmedOnField > 0 ? 'var(--greenl)' : 'var(--s3)' }};border-radius:8px;border:1px solid var(--border)">
+        <div style="font-family:var(--font-display);font-size:22px;color:{{ $confirmedOnField > 0 ? 'var(--green)' : 'var(--text)' }}">{{ $confirmedOnField }}/{{ $totalItems }}</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Confirmed on Field</div>
       </div>
       <div style="text-align:center;padding:10px 18px;background:{{ $inChecked == $totalItems && $totalItems > 0 ? 'var(--greenl)' : 'var(--s3)' }};border-radius:8px;border:1px solid var(--border)">
         <div style="font-family:var(--font-display);font-size:22px;color:{{ $inChecked == $totalItems && $totalItems > 0 ? 'var(--green)' : 'var(--text)' }}">{{ $inChecked }}/{{ $totalItems }}</div>
@@ -53,19 +58,6 @@
     </div>
   </div>
 </div>
-
-@if ($fieldArrivalConfirmedAt)
-<div class="card" style="margin-bottom:20px;background:var(--acclight);border:1px solid var(--border2)">
-  <div class="card-body" style="display:flex;align-items:center;gap:10px;padding:14px 20px">
-    <i data-feather="map-pin" style="color:var(--accent);width:16px;height:16px;flex-shrink:0"></i>
-    <span style="font-size:.83rem;color:var(--sub)">
-      Crew confirmed field arrival on
-      {{ \Illuminate\Support\Carbon::parse($fieldArrivalConfirmedAt)->format('M j, Y g:i A') }}
-      @if ($fieldArrivalConfirmedByName)&middot; {{ trim($fieldArrivalConfirmedByName) }}@endif
-    </span>
-  </div>
-</div>
-@endif
 
 @if ($equipLines->isEmpty())
 <div class="card"><div class="empty-state">
@@ -134,8 +126,19 @@
       @endif
     </div>
 
-
   </div>
+  <div style="display:flex;gap:9px;padding:11px 20px;border-top:1px dashed var(--border);background:var(--s2);font-size:.78rem;color:var(--sub)">
+    <i data-feather="lock" style="width:14px;height:14px;flex-shrink:0;margin-top:1px;color:var(--muted)"></i>
+    <span>Releasing equipment (Checklist Out / Release All) is restricted to Admin, Super Admin, Operations Manager and Traffic Staff. Crew accounts never see this action — on the Crew Portal they can only confirm field arrival and check items back in.</span>
+  </div>
+</div>
+@endif
+
+@if ($fieldArrivalConfirmedAt)
+<div style="display:flex;align-items:center;gap:12px;background:var(--acclight);border:1px solid var(--border2);border-radius:12px;padding:13px 20px;margin-bottom:20px;font-size:.83rem;color:var(--sub)">
+  <i data-feather="map-pin" style="color:var(--accent);width:16px;height:16px;flex-shrink:0"></i>
+  <span><strong style="color:var(--text)">{{ $confirmedOnField }} of {{ $totalItems }} line items</strong> confirmed arrived on field by the assigned crew.</span>
+  <span style="margin-left:auto;font-size:.72rem;color:var(--muted);font-style:italic">Reported via Crew Portal &middot; updated {{ \Illuminate\Support\Carbon::parse($fieldArrivalConfirmedAt)->format('g:i A') }}</span>
 </div>
 @endif
 
@@ -193,7 +196,7 @@
           <th>Qty Returned</th>
           <th>Condition In</th>
           @endif
-          <th>Status</th>
+          <th>Field Status</th>
           <th>Notes</th>
         </tr>
       </thead>
@@ -315,14 +318,16 @@
           <td>
             @if ($eq->is_multi)
               @if ($isOut)
-                <span class="badge {{ $qActual >= $eq->quantity ? 'badge-green' : ($qActual > 0 ? 'badge-yellow' : 'badge-gray') }}">{{ $qActual }}/{{ $eq->quantity }} Released</span>
+                <span class="badge {{ $qActual >= $eq->quantity ? 'badge-green' : ($qActual > 0 ? 'badge-yellow' : 'badge-gray') }}">{{ $qActual }}/{{ $eq->quantity }} {{ ($qActual >= $eq->quantity && $fieldArrivalConfirmedAt) ? 'Arrived on Field' : 'Released' }}</span>
               @else
                 <span class="badge {{ $eq->any_damaged_in ? 'badge-red' : ($qActual >= $eq->quantity ? 'badge-green' : 'badge-gray') }}">
                   {{ $eq->any_damaged_in ? 'Damage Reported' : $qActual . '/' . $eq->quantity . ' Returned' }}
                 </span>
               @endif
             @elseif ($isOut)
-              @if ($eq->co_checked)
+              @if ($eq->co_checked && $fieldArrivalConfirmedAt)
+              <span class="badge badge-green"><i data-feather="map-pin" style="width:10px;height:10px;vertical-align:-1px"></i> Arrived on Field</span>
+              @elseif ($eq->co_checked)
               <span class="badge badge-green">Released</span>
               @else
               <span class="badge badge-gray">Pending</span>
