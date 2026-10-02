@@ -3376,5 +3376,6 @@ document.addEventListener('visibilitychange', function () { if (!document.hidden
   </div>
 </footer>
 <script src="{{ asset('assets/js/keyboard-aware.js') }}"></script>
+@include('partials.inactivity-logout')
 </body>
 </html>

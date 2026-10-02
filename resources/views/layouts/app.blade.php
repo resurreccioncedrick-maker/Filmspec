@@ -268,6 +268,7 @@
 <div class="toast-container"></div>
 <script src="{{ asset('assets/js/keyboard-aware.js') }}"></script>
 <script src="{{ asset('assets/js/app.js') }}"></script>
+@include('partials.inactivity-logout')
 @stack('scripts')
 </body>
 </html>

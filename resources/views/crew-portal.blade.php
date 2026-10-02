@@ -1306,5 +1306,6 @@ function openUpdateMaint(schedId, currentStatus) {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.mo.on').forEach(m => m.classList.remove('on')); });
 </script>
 <script src="{{ asset('assets/js/keyboard-aware.js') }}"></script>
+@include('partials.inactivity-logout')
 </body>
 </html>
