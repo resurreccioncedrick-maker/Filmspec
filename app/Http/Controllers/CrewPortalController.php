@@ -56,8 +56,14 @@ class CrewPortalController extends Controller
         // tool (config('filmspec.role_permissions') never granted crew that module) rather
         // than a separate announcements feature. Not scoped to a linked crew_members row —
         // any crew-role login sees these.
+        // Excludes reminders whose date has already passed — without this, an old to-do nobody
+        // got around to marking done stays pinned at the top forever (ascending date order
+        // surfaces the OLDEST one first) and can permanently crowd out newer announcements out
+        // of the 10-row limit, indistinguishable from a current one since the view has no
+        // "overdue" treatment for this list the way the staff Reminders page does.
         $crewAnnouncements = DB::table('reminders')
             ->where('visible_to_crew', true)->where('is_done', false)
+            ->where('reminder_date', '>=', now()->toDateString())
             ->orderBy('reminder_date')
             ->limit(10)
             ->get();

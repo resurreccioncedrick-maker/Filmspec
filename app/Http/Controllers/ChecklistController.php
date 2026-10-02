@@ -262,8 +262,18 @@ class ChecklistController extends Controller
             $aggLookup[$key] = $r;
         }
 
-        $unitRows = DB::table('equipment_units')->whereIn('equipment_id', $eqIds ?: [0])->orderBy('unit_id')->get()->groupBy('equipment_id');
-        $accUnitRows = DB::table('accessory_units')->whereIn('accessory_id', $accIds ?: [0])->orderBy('unit_id')->get()->groupBy('accessory_id');
+        // Excludes retired units (same convention EquipmentController::recalcFromUnits() already
+        // uses) and orders 'available' first — without this, a retired/under_maintenance unit
+        // could get offered as one of the N checkable slots purely because it has a lower
+        // unit_id, silently hiding an actually-available unit of the same model instead.
+        $unitRows = DB::table('equipment_units')->whereIn('equipment_id', $eqIds ?: [0])
+            ->where('status', '!=', 'retired')
+            ->orderByRaw("status = 'available' desc")->orderBy('unit_id')
+            ->get()->groupBy('equipment_id');
+        $accUnitRows = DB::table('accessory_units')->whereIn('accessory_id', $accIds ?: [0])
+            ->where('status', '!=', 'retired')
+            ->orderByRaw("status = 'available' desc")->orderBy('unit_id')
+            ->get()->groupBy('accessory_id');
 
         $unitChecklistRows = DB::table('equipment_checklist')
             ->where('booking_id', $bid)

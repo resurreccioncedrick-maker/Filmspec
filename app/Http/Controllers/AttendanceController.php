@@ -39,9 +39,16 @@ class AttendanceController extends Controller
             return $this->export($request);
         }
 
-        $filterBooking = (int) $request->query('booking_id', 0);
-        $filterCrew = (int) $request->query('crew_id', 0);
-        $filterDate = $request->query('date', '');
+        // The Log Shoot Attendance / Log Timesheet Entry forms POST booking_id/crew_id and
+        // attendance_date or timesheet_date in the request body, not the query string — reading
+        // only query() here meant a successful save re-rendered this same request with every
+        // filter reset to empty, immediately hiding the booking picker, day-strip, and
+        // timesheets table right after the save-confirmation message. Falling back to the POST
+        // body (checking both possible date field names) keeps the picked booking/date visible
+        // after a save, while GET-driven links (?booking_id=&date=) still take priority as before.
+        $filterBooking = (int) $request->query('booking_id', $request->input('booking_id', 0));
+        $filterCrew = (int) $request->query('crew_id', $request->input('crew_id', 0));
+        $filterDate = $request->query('date', $request->input('attendance_date', $request->input('timesheet_date', '')));
         $filterStatus = $request->query('status', '');
         $page = max(1, (int) $request->query('p', 1));
         $perPage = 25;
