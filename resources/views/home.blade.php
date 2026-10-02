@@ -186,6 +186,25 @@ button{font-family:var(--font-b);cursor:pointer}
 /* ─── PAGES ─── */
 .pg{display:none}.pg.on{display:block;flex:1}
 
+/* ─── SCROLL REVEAL ─── */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
+.reveal.is-visible{opacity:1;transform:translateY(0)}
+.reveal-l{opacity:0;transform:translateX(-36px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
+.reveal-l.is-visible{opacity:1;transform:translateX(0)}
+.reveal-r{opacity:0;transform:translateX(36px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
+.reveal-r.is-visible{opacity:1;transform:translateX(0)}
+.reveal-stagger>*{opacity:0;transform:translateY(24px);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1)}
+.reveal-stagger.is-visible>*{opacity:1;transform:translateY(0)}
+.reveal-stagger.is-visible>*:nth-child(1){transition-delay:.05s}
+.reveal-stagger.is-visible>*:nth-child(2){transition-delay:.14s}
+.reveal-stagger.is-visible>*:nth-child(3){transition-delay:.23s}
+.reveal-stagger.is-visible>*:nth-child(4){transition-delay:.32s}
+.reveal-stagger.is-visible>*:nth-child(5){transition-delay:.41s}
+.reveal-stagger.is-visible>*:nth-child(6){transition-delay:.5s}
+@media(prefers-reduced-motion:reduce){
+  .reveal,.reveal-l,.reveal-r,.reveal-stagger>*{opacity:1!important;transform:none!important;transition:none!important}
+}
+
 /* ─── HERO ─── */
 .hero{
   background:#0B1A33;
@@ -1575,7 +1594,7 @@ a.footer-contact-link:hover{color:#60b0ff}
       <span class="on"></span><span></span><span></span><span></span>
     </div>
     <div class="hero-inner">
-      <div class="hero-left">
+      <div class="hero-left reveal">
         <div class="hero-logo-wrap">
           <img src="{{ asset('assets/images/logo-badge.png') }}" alt="FilmSpec" class="hero-logo-img">
         </div>
@@ -1603,7 +1622,7 @@ a.footer-contact-link:hover{color:#60b0ff}
           <img class="hero-slide" src="{{ asset('assets/images/hero/hero-4.jpg') }}" alt="">
         </div>
         <div class="hero-right-scrim"></div>
-        <div class="hero-right-content">
+        <div class="hero-right-content reveal-stagger">
           <div class="hero-tag">Professional Film Production</div>
           <h1 style="font-family:var(--font-d);font-size:clamp(46px,5.5vw,78px);letter-spacing:1px;line-height:.88;color:#fff;margin-bottom:22px">Everything<span style="color:#5aa8f0;display:block">Your Production</span>Needs</h1>
           <p class="hero-sub">Access professional cameras, lighting, grip, and sound equipment — plus qualified crew — all in one platform built for Philippine film productions.</p>
@@ -1637,12 +1656,12 @@ a.footer-contact-link:hover{color:#60b0ff}
   <!-- HOW IT WORKS -->
   <div class="hiw-section">
     <div class="ccon" style="max-width:1100px">
-      <div style="text-align:center;margin-bottom:36px">
+      <div class="reveal" style="text-align:center;margin-bottom:36px">
         <div class="sec-label">Simple Process</div>
         <div class="sec-title">How It Works</div>
         <div class="sec-sub">Four steps from browsing to a confirmed shoot</div>
       </div>
-      <div class="steps-new">
+      <div class="steps-new reveal-stagger">
         @php
           $steps = [
             ['#E5F0FF','#0060C7','<rect x="2" y="7" width="20" height="15" rx="2"/><path d="M16 3l-4 4-4-4"/><circle cx="12" cy="14" r="3"/>','Browse Equipment','Browse our catalog by category. Each item shows daily rate, availability, and operator requirements.'],
@@ -1667,7 +1686,7 @@ a.footer-contact-link:hover{color:#60b0ff}
 
   <!-- FEATURED EQUIPMENT -->
   <div class="ccon" style="max-width:1220px;padding-top:48px;padding-bottom:52px">
-    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap">
+    <div class="reveal" style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap">
       <div>
         <div class="sec-label">Top Picks</div>
         <div class="sec-title">Featured Equipment</div>
@@ -1675,7 +1694,7 @@ a.footer-contact-link:hover{color:#60b0ff}
       </div>
       <button class="hbtn blue" onclick="showPage('equipment',null)" style="font-size:13px;padding:11px 22px;flex-shrink:0">Browse All &rarr;</button>
     </div>
-    <div class="eq-grid">
+    <div class="eq-grid reveal-stagger">
       @foreach ($equipment->take(6) as $eq)
       @php
         $av = $eq->availability_status === 'available';
@@ -1715,7 +1734,7 @@ a.footer-contact-link:hover{color:#60b0ff}
     <div class="sec-label">Client Feedback</div>
     <div class="sec-title">What Our Clients Say</div>
     <div class="sec-sub" style="margin-bottom:24px">Real reviews from completed productions</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+    <div class="reveal-stagger" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
       @foreach ($publicReviews as $r)
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;display:flex;flex-direction:column">
         <div style="color:#f59e0b;font-size:15px;letter-spacing:2px;margin-bottom:10px">{{ str_repeat('★', $r->rating) }}<span style="color:var(--border2)">{{ str_repeat('★', 5 - $r->rating) }}</span></div>
@@ -2057,7 +2076,7 @@ a.footer-contact-link:hover{color:#60b0ff}
       <img src="{{ asset('assets/images/about/hero-4.jpg') }}">
       <img src="{{ asset('assets/images/about/hero-5.jpg') }}">
       <div class="abt-hero-scrim"></div>
-      <div class="abt-hero-content">
+      <div class="abt-hero-content reveal-stagger">
         <div class="abt-hero-eyebrow">Makati &middot; Philippines</div>
         <div class="abt-hero-title">The crew and gear behind every <span>frame</span>.</div>
         <div class="abt-hero-sub">FilmSpec is a lighting, grip, and power equipment rental company serving the film, television, and advertising industry in the Philippines. Built and operated by active professionals in the production industry, we understand the technical and creative demands of every shoot because we experience them ourselves.</div>
@@ -2070,39 +2089,39 @@ a.footer-contact-link:hover{color:#60b0ff}
     </div>
 
     <div class="abt-split">
-      <div class="abt-collage">
+      <div class="abt-collage reveal-l">
         <div class="main"><img src="{{ asset('assets/images/about/who-we-are-main.jpg') }}" alt="FilmSpec crew"></div>
         <div class="accent"><img src="{{ asset('assets/images/about/who-we-are-accent.jpg') }}" alt="FilmSpec team on set"></div>
       </div>
-      <div>
+      <div class="reveal-r">
         <div class="sec-label">Who We Are</div>
         <div class="sec-title" style="font-size:30px">A crew-run rental house.</div>
         <div class="sec-sub" style="max-width:480px">We are a group of cinematographers, directors, and producers from the Philippines providing dependable lighting, grip, and power for film, television, and advertising. Affordable, reliable gear that lets you focus on the vision.</div>
       </div>
     </div>
 
-    <div style="background:var(--surface-hover,#f4f7fb);border:1px solid var(--border,#e2e8f0);border-radius:18px;padding:40px 44px;margin-bottom:70px;display:flex;flex-direction:column;gap:18px;text-align:center">
+    <div class="reveal" style="background:var(--surface-hover,#f4f7fb);border:1px solid var(--border,#e2e8f0);border-radius:18px;padding:40px 44px;margin-bottom:70px;display:flex;flex-direction:column;gap:18px;text-align:center">
       <div class="sec-label" style="justify-content:center;display:flex">Our Mission</div>
       <div style="font-size:14.5px;line-height:1.85;color:var(--text);max-width:720px;margin:0 auto">As a young company founded just a few years ago, our mission is to continually expand and meet the unique needs of each cinematographer we work with. We recognize that budgets for film projects are getting smaller, and our goal is to provide affordable yet reliable equipment and crew that will elevate the standards of advertising, television, and film production in our country.</div>
       <div style="font-size:14.5px;line-height:1.85;color:var(--text);max-width:720px;margin:0 auto">By offering our own top-quality equipment and an experienced team, we strive to ensure a dependable system that lets our clients focus solely on their creative vision. Our ultimate aim is to contribute to the growth of the industry we are passionate about — making it better for all of us to work in and take pride in.</div>
     </div>
 
     <div class="abt-split">
-      <div>
+      <div class="reveal-l">
         <div class="sec-label">What We Do</div>
         <div class="sec-title" style="font-size:30px">Curated by cinematographers.</div>
         <div class="sec-sub" style="max-width:480px">Every piece of equipment in our inventory is carefully selected by active cinematographers with real production experience. We curate lighting, grip, and power solutions that meet industry standards — reliable, versatile, and built to perform on professional sets.</div>
       </div>
-      <div class="abt-collage rev">
+      <div class="abt-collage rev reveal-r">
         <div class="main"><img src="{{ asset('assets/images/about/what-we-do-main.jpg') }}" alt="Rigging a diffusion frame"></div>
         <div class="accent"><img src="{{ asset('assets/images/about/what-we-do-accent.jpg') }}" alt="Unpacking equipment"></div>
       </div>
     </div>
 
-    <div style="margin-bottom:70px">
+    <div class="reveal" style="margin-bottom:70px">
       <div class="sec-label" style="text-align:center;justify-content:center;display:flex">The Showcase</div>
       <div class="sec-title" style="text-align:center;font-size:26px;margin-bottom:24px">What's in the truck.</div>
-      <div class="abt-showcase">
+      <div class="abt-showcase reveal-stagger">
         <div class="card"><img src="{{ asset('assets/images/about/showcase-crane.jpg') }}" alt="Camera crane"><div class="cap">Camera Crane</div></div>
         <div class="card"><img src="{{ asset('assets/images/about/showcase-lighting-rack.jpg') }}" alt="Lighting rack"><div class="cap">Lighting Rack</div></div>
         <div class="card"><img src="{{ asset('assets/images/about/showcase-led.jpg') }}" alt="LED fixtures"><div class="cap">LED Fixtures</div></div>
@@ -2126,6 +2145,25 @@ a.footer-contact-link:hover{color:#60b0ff}
     dots.forEach(function(d, idx){ d.classList.toggle('on', idx === i); });
     if (cap) cap.textContent = captions[i] || '';
   }, 3200);
+})();
+</script>
+
+<script>
+(function(){
+  var targets = document.querySelectorAll('.reveal, .reveal-l, .reveal-r, .reveal-stagger');
+  if (!targets.length || !('IntersectionObserver' in window)) {
+    targets.forEach(function(el){ el.classList.add('is-visible'); });
+    return;
+  }
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-visible');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15 });
+  targets.forEach(function(el){ io.observe(el); });
 })();
 </script>
 
