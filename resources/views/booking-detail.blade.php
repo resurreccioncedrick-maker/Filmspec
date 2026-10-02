@@ -304,8 +304,7 @@
         @endif
 
       @elseif ($st === 'ongoing' && $isAdmin)
-        <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'out']) }}" class="btn btn-outline btn-sm"><i data-feather="log-out"></i> Checklist OUT</a>
-        <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'in']) }}" class="btn btn-outline btn-sm"><i data-feather="log-in"></i> Checklist IN</a>
+        <a href="{{ route('checklist', ['booking_id' => $id]) }}" class="btn btn-outline btn-sm"><i data-feather="clipboard"></i> Equipment Checklist</a>
         <button onclick="openFieldAddModal()" class="btn btn-outline btn-sm" style="border-color:#d97706;color:#d97706"><i data-feather="plus-circle"></i> Field Add</button>
         <a href="{{ route('attendance', ['booking_id' => $id]) }}" class="btn btn-outline btn-sm"><i data-feather="users"></i> Attendance</a>
         <button onclick="openModal('modalExtendRental')" class="btn btn-outline btn-sm"><i data-feather="calendar"></i> Extend Rental</button>
