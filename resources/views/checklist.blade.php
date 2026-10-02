@@ -8,8 +8,8 @@
 
 @if ($canManage)
 @section('topbarActions')
-<a href="{{ route('checklist', ['booking_id' => $bid, 'dir' => 'out']) }}" class="btn {{ $dir === 'out' ? 'btn-primary' : 'btn-outline' }} btn-sm"><i data-feather="log-out"></i> Checklist Out</a>
-<a href="{{ route('checklist', ['booking_id' => $bid, 'dir' => 'in']) }}" class="btn {{ $dir === 'in' ? 'btn-primary' : 'btn-outline' }} btn-sm"><i data-feather="log-in"></i> Checklist In</a>
+{{-- The Check-Out List / Check-In List toggle lower on this same page already switches
+     direction — having Checklist Out/In buttons up here too was the same control twice. --}}
 <a href="{{ route('checklist.print', ['booking_id' => $bid]) }}" target="_blank" class="btn btn-outline btn-sm"><i data-feather="printer"></i> Print Record</a>
 <a href="{{ route('booking-detail', $bid) }}" class="btn btn-outline btn-sm"><i data-feather="arrow-left"></i> Back to Booking</a>
 @endsection
