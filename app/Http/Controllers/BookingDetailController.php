@@ -991,14 +991,25 @@ class BookingDetailController extends Controller
         $amount = (float) $request->input('amount', 0);
         $ref = $request->input('reference_number', '');
         $pdate = $request->input('payment_date', now()->toDateString());
-        $isVat = $request->boolean('is_vat') ? 1 : 0;
-        $rctype = $isVat ? 'official_receipt' : 'acknowledgement_receipt';
-        $rcPrefix = $isVat ? 'OR' : 'AR';
         $notes = $request->input('notes', '');
 
         if ($amount <= 0) {
             return ['type' => 'danger', 'text' => 'Payment amount must be greater than zero.'];
         }
+
+        if ($pdate && $pdate < now()->toDateString()) {
+            return ['type' => 'danger', 'text' => 'Payment date cannot be backdated — it must be today or later.'];
+        }
+
+        // Matches BillingController::handleAction()'s record_payment branch — document type is
+        // derived from the client's own VAT registration, never a checkbox on this form, so the
+        // same client gets the same receipt type regardless of which page recorded the payment.
+        $isVatRegistered = (int) DB::table('bookings as b')
+            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+            ->where('b.booking_id', $id)->value('c.is_vat_registered');
+        $isVat = $isVatRegistered ? 1 : 0;
+        $rctype = $isVat ? 'official_receipt' : 'acknowledgement_receipt';
+        $rcPrefix = $isVat ? 'OR' : 'AR';
 
         // The remaining-balance check and the insert both happen inside the same
         // booking-row-locked transaction — otherwise two near-simultaneous payment

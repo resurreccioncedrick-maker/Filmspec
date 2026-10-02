@@ -2056,7 +2056,7 @@
           </div>
           <div class="form-group">
             <label>Payment Date <span style="color:var(--red)">*</span></label>
-            <input type="date" name="payment_date" class="form-control" value="{{ date('Y-m-d') }}" required>
+            <input type="date" name="payment_date" class="form-control" value="{{ date('Y-m-d') }}" min="{{ date('Y-m-d') }}" required>
           </div>
           <div class="form-group" id="bdRefWrap" style="display:none">
             <label>GCash Reference / Transaction ID</label>
@@ -2068,10 +2068,10 @@
           <input type="text" name="notes" class="form-control" placeholder="Optional notes">
         </div>
         <div class="form-group" style="margin-bottom:0">
-          <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer">
-            <input type="checkbox" name="is_vat" value="1">
-            Issue as Official Receipt (VAT)
-          </label>
+          <label>Document Type</label>
+          <div style="font-size:.85rem;color:var(--sub);padding:8px 0">
+            {{ $booking->is_vat_registered ? 'Official Receipt (VAT) — this client is VAT-registered' : 'Acknowledgement Receipt — this client is not VAT-registered' }}
+          </div>
         </div>
       </div>
       <div class="modal-footer">

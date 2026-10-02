@@ -234,7 +234,12 @@ class BookingsController extends Controller
         if ($action === 'update_status') {
             $id = (int) $request->input('booking_id');
             $newStatus = $request->input('booking_status');
-            $allowed = ['pending', 'confirmed', 'ongoing', 'completed', 'cancelled'];
+            // 'ongoing' and 'completed' are deliberately NOT allowed here — reaching them skips
+            // every gate those transitions actually require (CE confirmed, client cost approval,
+            // crew/transport assigned, equipment checked out/in, incidents resolved), which only
+            // BookingDetailController::checkout()/bulkCheckout() and completeBooking() enforce.
+            // This generic action stays limited to the states that have no such prerequisites.
+            $allowed = ['pending', 'confirmed', 'cancelled'];
             if ($role === 'traffic' && $newStatus === 'confirmed') {
                 return ['type' => 'danger', 'text' => 'Bookings must be approved by the Operations Manager before they can be confirmed.'];
             }
@@ -293,12 +298,16 @@ class BookingsController extends Controller
             return ['type' => 'success', 'text' => "Booking <strong>" . e($ref) . "</strong> restored."];
         }
 
-        if ($action === 'approve_booking' && in_array($role, ['admin', 'super_admin', 'operations_manager'], true)) {
+        if ($action === 'approve_booking' && in_array($role, ['admin', 'super_admin', 'operations_manager', 'traffic'], true)) {
             $bid = (int) $request->input('booking_id', 0);
             Booking::where('booking_id', $bid)->where('approval_status', 'pending_approval')->update([
                 'approval_status' => 'approved', 'approved_by' => $uid, 'approved_at' => now(),
                 'booking_status' => 'confirmed', 'updated_at' => now(),
             ]);
+            // Matches BookingDetailController's own approve_booking branch — without this, a
+            // booking approved from this list page sits in 'confirmed' with zero cost-estimate
+            // rows until someone happens to add equipment/crew or hits Generate CE manually.
+            BookingCosting::generateCostEstimate($bid, $uid);
             DB::table('quotation_log')->insert([
                 'booking_id' => $bid, 'log_type' => 'confirmed', 'logged_by' => $uid,
                 'previous_status' => 'pending', 'new_status' => 'confirmed', 'log_date' => now(),
