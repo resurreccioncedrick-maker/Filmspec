@@ -1695,7 +1695,7 @@ a.footer-contact-link:hover{color:#60b0ff}
       <button class="hbtn blue" onclick="showPage('equipment',null)" style="font-size:13px;padding:11px 22px;flex-shrink:0">Browse All &rarr;</button>
     </div>
     <div class="eq-grid reveal-stagger">
-      @foreach ($equipment->take(6) as $eq)
+      @foreach ($equipment->take(4) as $eq)
       @php
         $av = $eq->availability_status === 'available';
         $isBooked = $eq->availability_status === 'booked';
@@ -1734,19 +1734,48 @@ a.footer-contact-link:hover{color:#60b0ff}
     <div class="sec-label">Client Feedback</div>
     <div class="sec-title">What Our Clients Say</div>
     <div class="sec-sub" style="margin-bottom:24px">Real reviews from completed productions</div>
-    <div class="reveal-stagger" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
-      @foreach ($publicReviews as $r)
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;display:flex;flex-direction:column">
-        <div style="color:#f59e0b;font-size:15px;letter-spacing:2px;margin-bottom:10px">{{ str_repeat('★', $r->rating) }}<span style="color:var(--border2)">{{ str_repeat('★', 5 - $r->rating) }}</span></div>
-        <div style="font-size:13.5px;color:var(--text);line-height:1.65;margin-bottom:16px;flex:1">&ldquo;{{ $r->comment }}&rdquo;</div>
-        <div style="font-size:12px;font-weight:700;color:var(--sub)">
-          {{ $r->first_name }} {{ $r->last_name ? strtoupper(substr($r->last_name, 0, 1)) . '.' : '' }}
-          <span style="font-weight:500;color:var(--muted)">&middot; {{ \Illuminate\Support\Carbon::parse($r->submitted_at)->format('M Y') }}</span>
-        </div>
+    <div class="reveal testi-carousel" id="testiCarousel">
+      <div class="testi-track" id="testiTrack">
+        @for ($pass = 0; $pass < 2; $pass++)
+          @foreach ($publicReviews as $r)
+          <div class="testi-card" @if($pass > 0) aria-hidden="true" @endif>
+            <div style="color:#f59e0b;font-size:15px;letter-spacing:2px;margin-bottom:10px">{{ str_repeat('★', $r->rating) }}<span style="color:var(--border2)">{{ str_repeat('★', 5 - $r->rating) }}</span></div>
+            <div style="font-size:13.5px;color:var(--text);line-height:1.65;margin-bottom:16px;flex:1">&ldquo;{{ $r->comment }}&rdquo;</div>
+            <div style="font-size:12px;font-weight:700;color:var(--sub)">
+              {{ $r->first_name }} {{ $r->last_name ? strtoupper(substr($r->last_name, 0, 1)) . '.' : '' }}
+              <span style="font-weight:500;color:var(--muted)">&middot; {{ \Illuminate\Support\Carbon::parse($r->submitted_at)->format('M Y') }}</span>
+            </div>
+          </div>
+          @endforeach
+        @endfor
       </div>
-      @endforeach
     </div>
   </div>
+  <style>
+  .testi-carousel{overflow:hidden;position:relative;-webkit-mask-image:linear-gradient(90deg,transparent,#000 32px,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(90deg,transparent,#000 32px,#000 calc(100% - 32px),transparent)}
+  .testi-track{display:flex;gap:16px;width:max-content;animation:testiScroll linear infinite;animation-duration:38s}
+  .testi-carousel:hover .testi-track,
+  .testi-carousel.testi-paused .testi-track{animation-play-state:paused}
+  .testi-card{flex:0 0 320px;width:320px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;display:flex;flex-direction:column}
+  @keyframes testiScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  @media(max-width:640px){
+    .testi-card{flex-basis:78vw;width:78vw}
+    .testi-track{animation-duration:26s}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .testi-track{animation:none}
+  }
+  </style>
+  <script>
+  (function(){
+    var wrap = document.getElementById('testiCarousel');
+    if (!wrap) return;
+    wrap.addEventListener('touchstart', function(){ wrap.classList.add('testi-paused'); }, {passive:true});
+    wrap.addEventListener('touchend', function(){
+      setTimeout(function(){ wrap.classList.remove('testi-paused'); }, 1500);
+    }, {passive:true});
+  })();
+  </script>
   @endif
 
 </div>
