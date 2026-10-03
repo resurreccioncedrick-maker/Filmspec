@@ -187,20 +187,20 @@ button{font-family:var(--font-b);cursor:pointer}
 .pg{display:none}.pg.on{display:block;flex:1}
 
 /* ─── SCROLL REVEAL ─── */
-.reveal{opacity:0;transform:translateY(28px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
+.reveal{opacity:0;transform:translateY(34px);transition:opacity 1.2s cubic-bezier(.19,1,.22,1),transform 1.2s cubic-bezier(.19,1,.22,1)}
 .reveal.is-visible{opacity:1;transform:translateY(0)}
-.reveal-l{opacity:0;transform:translateX(-36px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
+.reveal-l{opacity:0;transform:translateX(-48px);transition:opacity 1.2s cubic-bezier(.19,1,.22,1),transform 1.2s cubic-bezier(.19,1,.22,1)}
 .reveal-l.is-visible{opacity:1;transform:translateX(0)}
-.reveal-r{opacity:0;transform:translateX(36px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
+.reveal-r{opacity:0;transform:translateX(48px);transition:opacity 1.2s cubic-bezier(.19,1,.22,1),transform 1.2s cubic-bezier(.19,1,.22,1)}
 .reveal-r.is-visible{opacity:1;transform:translateX(0)}
-.reveal-stagger>*{opacity:0;transform:translateY(24px);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1)}
+.reveal-stagger>*{opacity:0;transform:translateY(30px);transition:opacity 1s cubic-bezier(.19,1,.22,1),transform 1s cubic-bezier(.19,1,.22,1)}
 .reveal-stagger.is-visible>*{opacity:1;transform:translateY(0)}
-.reveal-stagger.is-visible>*:nth-child(1){transition-delay:.05s}
-.reveal-stagger.is-visible>*:nth-child(2){transition-delay:.14s}
-.reveal-stagger.is-visible>*:nth-child(3){transition-delay:.23s}
-.reveal-stagger.is-visible>*:nth-child(4){transition-delay:.32s}
-.reveal-stagger.is-visible>*:nth-child(5){transition-delay:.41s}
-.reveal-stagger.is-visible>*:nth-child(6){transition-delay:.5s}
+.reveal-stagger.is-visible>*:nth-child(1){transition-delay:.1s}
+.reveal-stagger.is-visible>*:nth-child(2){transition-delay:.26s}
+.reveal-stagger.is-visible>*:nth-child(3){transition-delay:.42s}
+.reveal-stagger.is-visible>*:nth-child(4){transition-delay:.58s}
+.reveal-stagger.is-visible>*:nth-child(5){transition-delay:.74s}
+.reveal-stagger.is-visible>*:nth-child(6){transition-delay:.9s}
 @media(prefers-reduced-motion:reduce){
   .reveal,.reveal-l,.reveal-r,.reveal-stagger>*{opacity:1!important;transform:none!important;transition:none!important}
 }
