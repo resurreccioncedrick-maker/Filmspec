@@ -342,6 +342,19 @@ img { max-width:100%; }
 .action-menu a:hover, .action-menu button:hover { background:var(--s2); }
 .action-menu i, .action-menu svg { width:14px; height:14px; flex-shrink:0; color:var(--muted); }
 
+/* A disabled menu item previously looked pixel-identical to an enabled one (no color/cursor
+   change at all) — clicking it silently did nothing, which just looked broken, especially on
+   touch devices where the explanatory title="" tooltip can never be seen. */
+.action-menu button:disabled {
+  color:var(--muted); cursor:not-allowed; opacity:.65;
+}
+.action-menu button:disabled:hover { background:transparent; }
+.action-menu button:disabled i, .action-menu button:disabled svg { color:var(--muted); }
+.action-menu .menu-disabled-hint {
+  display:block; font-size:10.5px; font-weight:400; color:var(--muted);
+  white-space:normal; line-height:1.3; margin-top:1px;
+}
+
 .action-menu .text-danger { color:var(--red); }
 .action-menu .text-danger:hover { background:var(--redl); }
 .action-menu .text-danger i { color:var(--red); }

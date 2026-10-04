@@ -278,7 +278,10 @@
               <button type="submit"><i data-feather="send"></i> {{ $costApproval === 'pending_client' ? 'Resend Cost to Client' : 'Send Cost to Client' }}</button>
             </form>
             @else
-            <button type="button" disabled title="Confirm the cost estimate above before sending it to the client"><i data-feather="send"></i> Send Cost to Client</button>
+            <button type="button" disabled title="Confirm the cost estimate above before sending it to the client" style="align-items:flex-start">
+              <i data-feather="send" style="margin-top:2px"></i>
+              <span>Send Cost to Client<span class="menu-disabled-hint">Confirm the CE above first</span></span>
+            </button>
             @endif
             @endif
             @if ($ce)
@@ -288,7 +291,10 @@
             @if ($ce && $ce->status === 'confirmed')
             <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'out']) }}"><i data-feather="clipboard"></i> Checklist OUT</a>
             @else
-            <button type="button" disabled title="Confirm the cost estimate before equipment can be released"><i data-feather="lock"></i> Checklist OUT</button>
+            <button type="button" disabled title="Confirm the cost estimate before equipment can be released" style="align-items:flex-start">
+              <i data-feather="lock" style="margin-top:2px"></i>
+              <span>Checklist OUT<span class="menu-disabled-hint">Confirm the CE first</span></span>
+            </button>
             @endif
             <form method="POST" action="{{ $actionUrl }}">
               @csrf
@@ -391,8 +397,8 @@
   $steps = [
       ['label' => 'Equipment', 'ok' => $equipOk],
       ['label' => 'Crew', 'ok' => $crewOk],
-      ['label' => 'Cost Approval', 'ok' => $costApprovalOk],
       ['label' => 'Transport', 'ok' => $transportOk],
+      ['label' => 'Cost Approval', 'ok' => $costApprovalOk],
   ];
 
   // General term, not "Driver" — a booking's transport can be missing a driver, a vehicle, or
@@ -401,10 +407,10 @@
   $rows = [
       ['label' => 'Equipment', 'ok' => $equipOk, 'detail' => $equipOk ? "$equipCount item" . ($equipCount != 1 ? 's' : '') . ' added' : 'No equipment added'],
       ['label' => 'Crew', 'ok' => $crewOk, 'detail' => $crewOk ? "$crewCount member" . ($crewCount != 1 ? 's' : '') . ' assigned' : 'No crew assigned'],
-      ['label' => 'Cost Approval', 'ok' => $costApprovalOk, 'detail' => $costApprovalOk ? 'Approved' : 'Client has not approved yet'],
       ['label' => 'Transport', 'ok' => $transportOk, 'clickable' => true,
           'detail' => ! $transportConfirmed ? 'Not yet reviewed' : ($transportOk ? 'Confirmed' : 'Setup incomplete'),
       ],
+      ['label' => 'Cost Approval', 'ok' => $costApprovalOk, 'detail' => $costApprovalOk ? 'Approved' : 'Client has not approved yet'],
   ];
 @endphp
 <div class="card" style="margin-bottom:14px;border:1px solid {{ $allOk ? '#BBF7D0' : '#E2EAF4' }};border-radius:11px;overflow:hidden;box-shadow:0 1px 4px rgba(0,30,80,.06);padding:14px 16px 12px">
