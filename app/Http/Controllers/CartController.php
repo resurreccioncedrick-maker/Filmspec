@@ -447,6 +447,14 @@ class CartController extends Controller
                 'transport_multiplier' => 1.00,
                 'location_lat' => $latSql,
                 'location_lng' => $lngSql,
+                // approval_status defaults to 'approved' at the DB level (matches the
+                // staff-side auto-approve path) — client self-service submissions must
+                // never skip review, so this is set explicitly, same as a traffic-created
+                // booking. Without it, every client-submitted booking silently bypassed
+                // the approval queue (confirmed: defaulted to 'approved', so it never
+                // appeared under Bookings > Awaiting Review despite the confirmation
+                // screen telling the client "Pending admin approval").
+                'approval_status' => 'pending_approval',
             ]);
 
             if (! $bid) {
