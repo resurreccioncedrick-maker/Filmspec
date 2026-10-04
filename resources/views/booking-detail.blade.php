@@ -996,6 +996,7 @@
             </td>
             @if ($isAdmin)
             <td style="white-space:nowrap">
+              <a href="{{ route('incident-print', $inc->incident_id) }}" target="_blank" class="btn btn-outline btn-sm" title="View Incident Report"><i data-feather="eye"></i></a>
               @if ($inc->status !== 'closed')
               <button class="btn btn-outline btn-sm"
                       onclick="openIncidentUpdate({{ $inc->incident_id }}, '{{ addslashes($inc->equipment_name) }}', {{ $inc->charge_amount }}, '{{ addslashes($inc->resolution ?? '') }}', '{{ $inc->status }}', '{{ addslashes($inc->description ?? '') }}', '{{ addslashes($inc->cause ?? '') }}')">
