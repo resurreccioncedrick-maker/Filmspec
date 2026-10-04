@@ -248,6 +248,14 @@ button{font-family:var(--font-b);cursor:pointer}
 <div class="alert alert-{{ $msg['type'] }}">{!! $msg['text'] !!}</div>
 @endif
 
+<button type="button" id="checklistUpdateBanner" onclick="location.reload()"
+        style="display:none;width:calc(100% - 32px);margin:14px 16px 0;padding:13px 16px;border-radius:10px;
+               background:var(--bluelt);color:var(--blue);border:1px solid var(--border2);font-family:var(--font-b);
+               font-weight:700;font-size:13.5px;cursor:pointer;align-items:center;justify-content:center;gap:8px">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-2px;margin-right:4px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+  Checklist updated — tap to refresh
+</button>
+
 <!-- ═══════ DASHBOARD (Today-First) ═══════ -->
 <div id="pg-dashboard" class="pg {{ $activeTab === 'dashboard' ? 'on' : '' }}">
   <div class="ctr">
@@ -1304,6 +1312,30 @@ function openUpdateMaint(schedId, currentStatus) {
   openMo('moUpdateMaint');
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.mo.on').forEach(m => m.classList.remove('on')); });
+
+// Equipment Checklist real-time-ish refresh — a newly-released or newly-arrival-confirmed
+// booking previously only ever appeared after a manual page reload. Polls a cheap signature
+// (not the full dataset) and surfaces a tap-to-refresh banner instead of silently reloading
+// out from under someone mid-form.
+(function () {
+  let lastSignature = null;
+  function pollChecklist() {
+    fetch('{{ route('crew-portal.checklist-poll') }}', { headers: { 'Accept': 'application/json' } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d || !d.ok) return;
+        if (lastSignature === null) { lastSignature = d.signature; return; }
+        if (d.signature !== lastSignature) {
+          lastSignature = d.signature;
+          const banner = document.getElementById('checklistUpdateBanner');
+          if (banner) banner.style.display = 'flex';
+        }
+      })
+      .catch(() => {});
+  }
+  pollChecklist();
+  setInterval(pollChecklist, 25000);
+})();
 </script>
 <script src="{{ asset('assets/js/keyboard-aware.js') }}"></script>
 @include('partials.inactivity-logout')

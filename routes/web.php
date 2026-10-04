@@ -177,6 +177,10 @@ Route::match(['get', 'post'], '/crew-portal', [CrewPortalController::class, 'ind
     ->middleware(['auth'])
     ->name('crew-portal');
 
+Route::get('/crew-portal/checklist-poll', [CrewPortalController::class, 'checklistPoll'])
+    ->middleware(['auth'])
+    ->name('crew-portal.checklist-poll');
+
 Route::get('/crew-portal/checklist-print', [CrewPortalController::class, 'printChecklist'])
     ->middleware(['auth'])
     ->name('crew-portal.checklist-print');

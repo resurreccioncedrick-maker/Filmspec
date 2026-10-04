@@ -25,6 +25,39 @@ class CrewPortalController extends Controller
     // rarely-changed fixed list, not worth a shared config entry for one array.
     private array $damageTypes = ['scratches' => 'Scratches', 'cracked_broken' => 'Cracked / Broken Part', 'electronic_malfunction' => 'Electronic Malfunction', 'missing_part' => 'Missing Part', 'others' => 'Others'];
 
+    // Lightweight poll for the Equipment Checklist tab — lets the page notice a newly
+    // checklist-eligible booking (or an arrival-status change) without a manual reload.
+    // Returns a cheap signature (not the full dataset) that the frontend just compares
+    // against what it already has; a mismatch means "go reload", matching the existing
+    // /support-poll pattern elsewhere in the app rather than inventing a new one.
+    public function checklistPoll(Request $request)
+    {
+        $user = Auth::user();
+        $role = $user->role->role_name ?? null;
+        if (! $user || $role !== 'crew') {
+            return response()->json(['ok' => false], 403);
+        }
+
+        $crewMember = DB::table('crew_members')->where('user_id', $user->user_id)->first();
+        if (! $crewMember) {
+            return response()->json(['ok' => true, 'signature' => '']);
+        }
+
+        $rows = DB::table('booking_crew as bc')
+            ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
+            ->where('bc.crew_id', $crewMember->crew_id)
+            ->whereNotIn('bc.assignment_status', ['declined', 'back_out'])
+            ->whereIn('b.booking_status', ['confirmed', 'ongoing'])
+            ->orderBy('b.booking_id')
+            ->select('b.booking_id', 'b.booking_status', 'b.field_arrival_confirmed_at')
+            ->get();
+
+        $signature = $rows->map(fn ($r) => $r->booking_id . ':' . $r->booking_status . ':' . (empty($r->field_arrival_confirmed_at) ? '0' : '1'))
+            ->implode('|');
+
+        return response()->json(['ok' => true, 'signature' => md5($signature)]);
+    }
+
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -204,7 +237,14 @@ class CrewPortalController extends Controller
                 foreach ($checklistBookings as $bk) {
                     $myChecklistBookings->push((object) [
                         'booking' => $bk,
-                        'direction' => $bk->booking_status === 'confirmed' ? 'out' : 'in',
+                        // Which tab a booking shows under is about whether field arrival has
+                        // actually been confirmed (bookings.field_arrival_confirmed_at), not
+                        // booking_status — those are independent: office can release equipment
+                        // (flipping status confirmed -> ongoing) before crew ever opens the
+                        // portal, and previously that status flip alone silently moved the
+                        // booking out of "Confirm Arrival" and into "Check-In", with no way
+                        // left to confirm arrival for it at all.
+                        'direction' => empty($bk->field_arrival_confirmed_at) ? 'out' : 'in',
                         'items' => $itemsByBooking[$bk->booking_id] ?? [],
                     ]);
                 }
