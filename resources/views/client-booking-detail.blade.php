@@ -218,22 +218,12 @@ footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-al
 <div class="card" style="margin-bottom:16px;border:2px solid #f59e0b">
   <div class="card-body" style="padding:18px 20px">
     <div style="font-weight:800;font-size:15px;color:#92400e;margin-bottom:8px">&#9888; Cost Estimate Ready — Your Approval Needed</div>
-    <p style="font-size:13px;color:#78350f;margin:0 0 16px">FilmSpec has assigned crew and transport for your booking. Please review the updated cost below and approve or request adjustments.</p>
+    <p style="font-size:13px;color:#78350f;margin:0 0 16px">FilmSpec has assigned crew and transport for your booking. Please review the updated cost below and approve it.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <form method="POST" action="{{ route('client-booking-detail', $id) }}">
         @csrf
         <input type="hidden" name="action" value="client_approve_cost">
         <button type="submit" style="background:#16a34a;color:#fff;border:none;padding:9px 20px;border-radius:7px;font-weight:700;font-size:13px;cursor:pointer">&#10003; Approve Cost</button>
-      </form>
-      <button onclick="document.getElementById('rejectCostBox').style.display='block';this.style.display='none'"
-              style="background:#fee2e2;color:#b91c1c;border:1.5px solid #fca5a5;padding:9px 20px;border-radius:7px;font-weight:700;font-size:13px;cursor:pointer">Request Adjustment</button>
-    </div>
-    <div id="rejectCostBox" style="display:none;margin-top:14px">
-      <form method="POST" action="{{ route('client-booking-detail', $id) }}">
-        @csrf
-        <input type="hidden" name="action" value="client_reject_cost">
-        <textarea name="reason" rows="3" placeholder="Describe what you'd like adjusted..." style="width:100%;padding:8px 10px;border:1.5px solid #fca5a5;border-radius:6px;font-size:13px;resize:vertical;box-sizing:border-box;margin-bottom:8px"></textarea>
-        <button type="submit" style="background:#b91c1c;color:#fff;border:none;padding:8px 18px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Submit Adjustment Request</button>
       </form>
     </div>
   </div>
