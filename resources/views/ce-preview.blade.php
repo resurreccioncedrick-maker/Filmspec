@@ -36,6 +36,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 @media (max-width:820px){ .checkout-grid{grid-template-columns:1fr} .checkout-side{position:static} }
 
 @media (max-width:640px){
+  /* Top bar — was a single nowrap flex row (logo + breadcrumb on the left,
+     Print/Export/view-toggle buttons on the right) with no wrapping or size
+     reduction at all, so on a ~390px phone the buttons ran straight off the
+     right edge instead of ever reaching a second line. Stack logo above
+     actions, let actions wrap if there are several, and shrink the button/
+     logo sizing to match. */
+  .top-bar{flex-direction:column;align-items:flex-start;gap:10px;padding:12px 16px}
+  .top-bar-logo{font-size:17px}
+  .top-bar-logo img{height:22px!important}
+  .top-bar-actions{flex-wrap:wrap;width:100%}
+  .tbtn{padding:7px 12px;font-size:12px}
+  .tbtn-pdf{padding:7px 12px!important;font-size:12px!important}
+  .bcrumb{font-size:11px;overflow-x:auto;white-space:nowrap;max-width:100%}
+
   /* Booking Details form — 16px avoids Safari's auto-zoom-on-focus, 44px
      tap targets. Field ids are untouched (doSubmit() reads them by id). */
   #bf_title,#bf_type,#bf_start,#bf_end,#bf_location,#bf_notes{
@@ -328,7 +342,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       </div>
     </div>
     @else
-    <button onclick="window.print()" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#c0392b;color:white;border:none;border-radius:6px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer">
+    <button class="tbtn-pdf" onclick="window.print()" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#c0392b;color:white;border:none;border-radius:6px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer">
       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       Save as PDF
     </button>

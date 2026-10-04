@@ -1032,6 +1032,12 @@ button{font-family:var(--font-b);cursor:pointer}
 .rli-crew-est .crew-est-icon{font-size:12px;opacity:.65}
 .rli-crew-est span:nth-child(2){flex:1}
 .rli-crew-est .crew-est-amt{font-weight:600;color:var(--accent);font-size:11.5px}
+.rli-acc-remove{
+  background:none;border:none;color:var(--muted);cursor:pointer;
+  font-size:13px;line-height:1;padding:2px 4px;border-radius:4px;
+  flex-shrink:0;transition:all var(--trans);
+}
+.rli-acc-remove:hover{color:var(--red);background:var(--redlt)}
 
 .ce-sum{
   background:var(--s2);
@@ -2590,6 +2596,7 @@ function renderPanel(reqOps) {
         <span class="crew-est-icon">&#43;</span>
         <span>${acc.accessory_name}</span>
         <span class="rli-amount crew-est-amt">₱${fmt(accSub)}</span>
+        <button class="rli-acc-remove" onclick="removeAccessory(${item.cart_id},${acc.accessory_id})" title="Remove accessory">&times;</button>
       </div>`;
     });
 
@@ -2665,6 +2672,25 @@ function toggleEquipment(eid, selectedAccessories) {
     } else {
       toast(d.error || 'Failed to add equipment','red');
     }
+  });
+}
+
+function removeAccessory(cartId, accessoryId) {
+  const item = reqList.find(i => i.item_type === 'equipment' && parseInt(i.cart_id) === parseInt(cartId));
+  if (!item) return;
+  const remaining = (item.accessories || [])
+    .filter(a => parseInt(a.accessory_id) !== parseInt(accessoryId))
+    .map(a => ({ accessory_id: a.accessory_id }));
+  const fd = new FormData();
+  fd.append('_token', CSRF_TOKEN);
+  fd.append('action', 'add_equipment');
+  fd.append('equipment_id', item.equipment_id);
+  fd.append('quantity', item.quantity || 1);
+  fd.append('days', item.days || 1);
+  fd.append('accessories_json', JSON.stringify(remaining));
+  fetch('/cart', { method: 'POST', body: fd }).then(r => r.json()).then(d => {
+    if (d.ok) { loadList(); toast('Accessory removed', 'blue'); }
+    else { toast(d.error || 'Failed to remove accessory', 'red'); }
   });
 }
 
