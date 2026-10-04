@@ -34,7 +34,8 @@ class CalendarDataController extends Controller
         $clientId = (int) $request->query('client_id', 0);
 
         $projectTypeOptions = ['commercial' => 'Commercial', 'indie_film' => 'Indie Film', 'tv_network' => 'TV Network',
-            'music_video' => 'Music Video', 'interview' => 'Interview', 'other' => 'Other'];
+            'music_video' => 'Music Video', 'interview' => 'Interview', 'film' => 'Film / Movie',
+            'documentary' => 'Documentary', 'event' => 'Event Coverage', 'corporate' => 'Corporate Video', 'other' => 'Other'];
         $clientOptions = DB::table('clients')->orderBy('company_name')->get(['client_id', 'company_name', 'contact_person']);
 
         [$dayMap, $bookings] = $this->buildDayMap($from, $to, $status, $projectType, $clientId);
