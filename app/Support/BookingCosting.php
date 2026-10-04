@@ -468,6 +468,30 @@ class BookingCosting
         return ['type' => 'success', 'text' => $msg];
     }
 
+    // Reverts a confirmed CE back to an editable draft — the escape hatch for a CE that got
+    // confirmed before it was actually filled out (no real completeness check existed before
+    // confirmCe()'s grand_total guard was added, so older/mis-clicked confirms can still be
+    // sitting around). Clears the confirmation record and, since any client-facing approval
+    // tied to that confirmed version is no longer meaningful, resets cost_approval_status too -
+    // the booking goes back to "not yet sent to client" rather than keeping a stale approval on
+    // a cost estimate that's about to change.
+    public static function reopenCe(int $bookingId, int $userId): array
+    {
+        $latest = DB::table('cost_estimates')->where('booking_id', $bookingId)->orderByDesc('ce_id')->first();
+        if (! $latest || $latest->status !== 'confirmed') {
+            return ['type' => 'danger', 'text' => 'No confirmed cost estimate to reopen.'];
+        }
+
+        DB::table('cost_estimates')->where('ce_id', $latest->ce_id)->update([
+            'status' => 'draft', 'confirmed_by' => null, 'confirmed_at' => null, 'confirmation_note' => null,
+        ]);
+        DB::table('bookings')->where('booking_id', $bookingId)->update([
+            'cost_approval_status' => null, 'cost_approved_at' => null, 'updated_at' => now(),
+        ]);
+
+        return ['type' => 'warning', 'text' => 'Cost estimate <strong>' . e($latest->ce_reference) . '</strong> reopened for edits — finish it and confirm again when ready.'];
+    }
+
 
     // Applies a new pricing mode to the booking's current CE. Caller is responsible for
     // validating $pricingMode/$pricingInput first (see BookingDetailController::updateCePricing).

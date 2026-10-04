@@ -242,6 +242,14 @@
         @if ($ce)
         @if ($ce->status === 'confirmed')
         <span class="badge badge-green" style="align-self:center"><i data-feather="check" style="width:11px;height:11px"></i> Confirmed</span>
+        @if (in_array($role, ['super_admin', 'admin', 'operations_manager'], true))
+        <form method="POST" action="{{ $actionUrl }}" style="display:inline"
+              onsubmit="return confirm('Reopen this cost estimate for edits?\n\nIt will go back to draft, and any client approval on it will be cleared since the numbers are about to change.')">
+          @csrf
+          <input type="hidden" name="action" value="reopen_ce">
+          <button type="submit" class="btn btn-outline btn-sm" title="Undo the confirmation and make this cost estimate editable again"><i data-feather="rotate-ccw"></i> Reopen for Edits</button>
+        </form>
+        @endif
         @elseif (in_array($role, ['super_admin', 'admin', 'operations_manager'], true))
         {{-- 'issued' is a legacy intermediate state (historical rows may still carry it) —
              there's no way to newly set it any more (see BookingCosting::issueCe() removal),
