@@ -342,11 +342,6 @@
           <input type="hidden" name="action" value="confirm_inspection">
           <button type="submit" class="btn btn-primary btn-sm"><i data-feather="search"></i> Confirm Inspection</button>
         </form>
-        <form method="POST" action="{{ $actionUrl }}" style="display:inline" onsubmit="return confirm('Skip inspection and complete this booking?\n\nThis will generate the final billing. Open incidents will remain.')">
-          @csrf
-          <input type="hidden" name="action" value="complete_booking">
-          <button type="submit" class="btn btn-success btn-sm"><i data-feather="check-square"></i> Complete Booking</button>
-        </form>
 
       @elseif ($st === 'returned' && $isAdmin)
         <a href="{{ route('checklist', ['booking_id' => $id, 'dir' => 'in']) }}" class="btn btn-outline btn-sm"><i data-feather="log-in"></i> Checklist IN</a>

@@ -911,12 +911,14 @@ class BookingDetailController extends Controller
 
     private function completeBooking(int $id, $booking, int $uid): array
     {
-        // Only reachable from the UI at 'pending_inspection' (Skip Inspection) or 'returned'
-        // (normal path) — matches confirmInspection()'s own status guard, and prevents a
-        // direct POST from jumping a booking straight to 'completed' from an earlier stage
+        // Only reachable once a booking has actually gone through inspection (confirmInspection()
+        // -> 'returned', which itself blocks on open incidents). There used to be a "Skip
+        // Inspection" shortcut straight from 'pending_inspection' with none of those checks —
+        // removed: completion must never jump ahead of inspection/incident resolution, and
+        // this also prevents a direct POST from completing a booking at an earlier stage
         // (e.g. 'confirmed'/'ongoing') without equipment ever having been returned.
-        if (! in_array($booking->booking_status, ['pending_inspection', 'returned'], true)) {
-            return ['type' => 'danger', 'text' => 'Booking cannot be completed from its current status.'];
+        if ($booking->booking_status !== 'returned') {
+            return ['type' => 'danger', 'text' => 'Booking cannot be completed from its current status — confirm inspection first.'];
         }
 
         $prevStatus = $booking->booking_status;
