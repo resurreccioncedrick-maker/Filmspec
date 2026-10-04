@@ -243,21 +243,22 @@
         @if ($ce->status === 'confirmed')
         <span class="badge badge-green" style="align-self:center"><i data-feather="check" style="width:11px;height:11px"></i> Confirmed</span>
         @elseif (in_array($role, ['super_admin', 'admin', 'operations_manager'], true))
-        @if ($ce->status === 'draft')
-        <form method="POST" action="{{ $actionUrl }}" style="display:inline">
-          @csrf
-          <input type="hidden" name="action" value="issue_ce">
-          <button type="submit" class="btn btn-outline btn-sm" title="Mark as issued/sent to client, before final confirmation"><i data-feather="send"></i> Mark Issued</button>
-        </form>
-        @elseif ($ce->status === 'issued')
+        {{-- 'issued' is a legacy intermediate state (historical rows may still carry it) —
+             there's no way to newly set it any more (see BookingCosting::issueCe() removal),
+             but the badge is kept so an old issued-but-unconfirmed CE still reads clearly. --}}
+        @if ($ce->status === 'issued')
         <span class="badge badge-blue" style="align-self:center">Issued — Awaiting Confirmation</span>
         @endif
+        @if ((float) ($ce->grand_total ?? 0) > 0)
         <form method="POST" action="{{ $actionUrl }}" style="display:inline" onsubmit="return fillCeConfirmNote(this)">
           @csrf
           <input type="hidden" name="action" value="confirm_ce">
           <input type="hidden" name="confirmation_note" value="">
           <button type="submit" class="btn btn-success btn-sm"><i data-feather="check"></i> Confirm CE</button>
         </form>
+        @else
+        <button type="button" class="btn btn-outline btn-sm" disabled title="Add equipment, crew, or other charges before confirming — this cost estimate is still ₱0"><i data-feather="lock"></i> Confirm CE</button>
+        @endif
         @endif
         @endif
         <button onclick="openModal('modalRecordPayment')" class="btn btn-outline btn-sm" style="border-color:var(--success);color:var(--success)"><i data-feather="credit-card"></i> Record Payment</button>
@@ -672,12 +673,16 @@
         <a href="{{ route('booking-detail.ce-export', $booking->booking_id) }}"
            class="btn btn-outline btn-sm"><i data-feather="download"></i> Export CSV</a>
         @if (in_array($role, config('filmspec.all_staff'), true))
+        @if ($ce && $ce->status === 'confirmed')
         <form method="POST" action="{{ $actionUrl }}" style="display:inline"
               onsubmit="return confirm('Email this cost estimate to the client and mark it pending their approval?')">
           @csrf
           <input type="hidden" name="action" value="email_ce_to_client">
-          <button type="submit" class="btn btn-outline btn-sm"><i data-feather="mail"></i> Email to Client</button>
+          <button type="submit" class="btn btn-outline btn-sm"><i data-feather="mail"></i> {{ $costApproval === 'pending_client' ? 'Resend Cost to Client' : 'Email to Client' }}</button>
         </form>
+        @else
+        <button type="button" class="btn btn-outline btn-sm" disabled title="Confirm the cost estimate before emailing it to the client"><i data-feather="mail"></i> Email to Client</button>
+        @endif
         @endif
         @if (in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true))
         <button type="button" class="btn btn-outline btn-sm" onclick="openModal('modalCloseProject')">

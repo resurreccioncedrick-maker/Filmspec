@@ -375,10 +375,6 @@ class BookingDetailController extends Controller
             $msg = ($booking->approval_status ?? null) !== 'approved'
                 ? ['type' => 'danger', 'text' => 'Cannot confirm the cost estimate — approve the booking first.']
                 : BookingCosting::confirmCe($id, $uid, $request->input('confirmation_note'));
-        } elseif ($action === 'issue_ce' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
-            $msg = ($booking->approval_status ?? null) !== 'approved'
-                ? ['type' => 'danger', 'text' => 'Cannot mark the cost estimate as issued — approve the booking first.']
-                : BookingCosting::issueCe($id);
         } elseif ($action === 'update_ce_pricing' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
             $msg = $this->updateCePricing($request, $id, $uid);
         } elseif ($action === 'update_project_details' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {

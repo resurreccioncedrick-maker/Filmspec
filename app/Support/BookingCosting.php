@@ -442,6 +442,9 @@ class BookingCosting
         if ($latest->status === 'confirmed') {
             return ['type' => 'danger', 'text' => 'This cost estimate is already confirmed.'];
         }
+        if ((float) $latest->grand_total <= 0) {
+            return ['type' => 'danger', 'text' => 'This cost estimate has no equipment, crew, or charges on it yet — add line items before confirming.'];
+        }
 
         $now = now();
         DB::table('cost_estimates')->where('ce_id', $latest->ce_id)->update([
@@ -465,20 +468,6 @@ class BookingCosting
         return ['type' => 'success', 'text' => $msg];
     }
 
-    // Marks the latest draft as 'issued' (Issued / Awaiting Confirmation) — an optional
-    // pipeline step for when a quotation has gone out to the client but isn't confirmed yet.
-    // Purely additive: Confirm CE still works directly from 'draft', this doesn't gate it.
-    public static function issueCe(int $bookingId): array
-    {
-        $latest = DB::table('cost_estimates')->where('booking_id', $bookingId)->orderByDesc('ce_id')->first();
-        if (! $latest || $latest->status !== 'draft') {
-            return ['type' => 'danger', 'text' => 'Only a draft cost estimate can be marked as issued.'];
-        }
-
-        DB::table('cost_estimates')->where('ce_id', $latest->ce_id)->update(['status' => 'issued']);
-
-        return ['type' => 'success', 'text' => 'Cost estimate <strong>' . e($latest->ce_reference) . '</strong> marked as issued — awaiting confirmation.'];
-    }
 
     // Applies a new pricing mode to the booking's current CE. Caller is responsible for
     // validating $pricingMode/$pricingInput first (see BookingDetailController::updateCePricing).
