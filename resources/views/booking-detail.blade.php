@@ -250,7 +250,7 @@
         <span class="badge badge-blue" style="align-self:center">Issued — Awaiting Confirmation</span>
         @endif
         @if ((float) ($ce->grand_total ?? 0) > 0)
-        <form method="POST" action="{{ $actionUrl }}" style="display:inline" onsubmit="return fillCeConfirmNote(this)">
+        <form method="POST" action="{{ $actionUrl }}" style="display:inline">
           @csrf
           <input type="hidden" name="action" value="confirm_ce">
           <input type="hidden" name="confirmation_note" value="">
@@ -2385,15 +2385,6 @@
 
 @push('scripts')
 <script>
-// Optional audit note captured at CE-confirm time — e.g. "client approved via email Sep 20".
-// Cancelling the prompt still confirms the CE (note is a nice-to-have, not a gate).
-function fillCeConfirmNote(form) {
-  var note = window.prompt('Optional: how was this cost estimate confirmed/accepted? (e.g. "Client approved via email")', '');
-  if (note !== null) {
-    form.querySelector('input[name="confirmation_note"]').value = note;
-  }
-  return true;
-}
 
 function closeActionMenus() {
   document.querySelectorAll('.action-menu.show').forEach(function (m) {
