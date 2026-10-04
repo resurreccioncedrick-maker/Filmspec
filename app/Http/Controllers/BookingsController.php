@@ -73,7 +73,11 @@ class BookingsController extends Controller
             ->selectRaw('(SELECT ce_id FROM cost_estimates ce WHERE ce.booking_id = b.booking_id ORDER BY ce_id DESC LIMIT 1) AS latest_ce_id')
             ->selectRaw("(SELECT CONCAT(discount_type,':',discount_value) FROM booking_discounts bd WHERE bd.booking_id = b.booking_id AND bd.status = 'pending' LIMIT 1) AS pending_discount")
             ->selectRaw("(SELECT discount FROM cost_estimates ce WHERE ce.booking_id = b.booking_id ORDER BY ce_id DESC LIMIT 1) AS active_discount")
-            ->orderByDesc('b.created_at')
+            // booking_id, not created_at — this data has demo/seed rows whose created_at was
+            // backdated for shoot-date realism and doesn't track real insertion order, so
+            // "latest first" by created_at came out visibly scrambled (e.g. #45 above #46).
+            // booking_id is auto-increment and always matches true insertion order.
+            ->orderByDesc('b.booking_id')
             ->forPage($page, $perPage)
             ->get();
 
@@ -188,7 +192,7 @@ class BookingsController extends Controller
         $rows = $this->filteredQuery($request, $user, $role)
             ->select('b.booking_reference', 'b.project_title', 'b.shoot_date_start', 'b.shoot_date_end',
                 'b.booking_status', 'b.payment_status', 'b.final_amount', 'c.company_name', 'c.contact_person')
-            ->orderByDesc('b.created_at')
+            ->orderByDesc('b.booking_id')
             ->get()
             ->map(fn ($b) => [
                 $b->booking_reference,
