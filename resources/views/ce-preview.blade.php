@@ -364,7 +364,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <div class="checkout-grid no-print">
 <div>
 <!-- Step 1: Booking Details — inline form, replaces old modal -->
-<div class="no-print" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px 24px;margin-bottom:0;box-shadow:0 2px 8px rgba(0,0,0,.06)">
+<div class="no-print" id="bf_form" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px 24px;margin-bottom:0;box-shadow:0 2px 8px rgba(0,0,0,.06)">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap">
     <div>
       <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:#003D80">Step 1 — Booking Details</div>
@@ -1680,6 +1680,82 @@ function ceOpenTransport() {
 @endif
 
 @if ($mode === 'cart')
+// ── Step 1 draft persistence ──────────────────────────────────────────────────
+// "Edit List" (and any other way of leaving this page) is a full navigation
+// away from ce-preview.blade.php, which wipes every in-memory JS value —
+// so whatever the client had typed/pinned reappeared as empty on return.
+// Everything entered in Step 1 is mirrored to localStorage and restored on
+// load instead, scoped to this cart (so a different cart never pre-fills a
+// stale draft) and expiring after 24h.
+const BF_DRAFT_KEY = 'fs_booking_draft_v1';
+
+function bfSaveDraft() {
+    try {
+        localStorage.setItem(BF_DRAFT_KEY, JSON.stringify({
+            savedAt: Date.now(),
+            title:   document.getElementById('bf_title').value,
+            type:    document.getElementById('bf_type').value,
+            start:   document.getElementById('bf_start').value,
+            end:     document.getElementById('bf_end').value,
+            location:document.getElementById('bf_location').value,
+            notes:   document.getElementById('bf_notes').value,
+            lat:     document.getElementById('bf_lat').value,
+            lng:     document.getElementById('bf_lng').value,
+            zone:    document.getElementById('bf_zone').value,
+            mult:    document.getElementById('bf_transport_multiplier').value,
+        }));
+    } catch (e) { /* storage unavailable (private mode, quota, etc.) — draft just won't persist */ }
+}
+
+let _bfSaveTimer = null;
+function bfSaveDraftDebounced() {
+    clearTimeout(_bfSaveTimer);
+    _bfSaveTimer = setTimeout(bfSaveDraft, 250);
+}
+
+function bfClearDraft() {
+    try { localStorage.removeItem(BF_DRAFT_KEY); } catch (e) {}
+}
+
+function bfRestoreDraft() {
+    let draft = null;
+    try {
+        const raw = localStorage.getItem(BF_DRAFT_KEY);
+        if (raw) draft = JSON.parse(raw);
+    } catch (e) { return; }
+    if (!draft || !draft.savedAt || (Date.now() - draft.savedAt) > 24 * 3600 * 1000) { bfClearDraft(); return; }
+
+    if (draft.title) document.getElementById('bf_title').value = draft.title;
+    if (draft.type) document.getElementById('bf_type').value = draft.type;
+    if (draft.start) document.getElementById('bf_start').value = draft.start;
+    if (draft.end) document.getElementById('bf_end').value = draft.end;
+    if (draft.location) document.getElementById('bf_location').value = draft.location;
+    if (draft.notes) document.getElementById('bf_notes').value = draft.notes;
+
+    if (draft.start && draft.end && draft.end >= draft.start) {
+        _shootDays = Math.round((new Date(draft.end) - new Date(draft.start)) / 86400000) + 1;
+    }
+
+    if (draft.lat && draft.lng && draft.zone && _SUBMIT_ZONE_CFG[draft.zone]) {
+        document.getElementById('bf_lat').value = draft.lat;
+        document.getElementById('bf_lng').value = draft.lng;
+        document.getElementById('bf_zone').value = draft.zone;
+        document.getElementById('bf_transport_multiplier').value = draft.mult || '1';
+        const lat = parseFloat(draft.lat), lng = parseFloat(draft.lng);
+        if (_submitMap) { _submitPlaceMarker(lat, lng); _submitMap.setView([lat, lng], 13); }
+        _submitLastValidLatLng = L.latLng(lat, lng);
+        const cfg = _SUBMIT_ZONE_CFG[draft.zone];
+        const zoneEl = document.getElementById('submitZoneInfo');
+        const km = Math.round(_haversineKm(lat, lng, _MANILA_LAT, _MANILA_LNG));
+        zoneEl.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;background:' + cfg.bg + ';border:1px solid ' + cfg.border + ';font-size:12px;margin-top:6px';
+        zoneEl.innerHTML = '<span style="background:' + cfg.bg + ';border:1px solid ' + cfg.border + ';color:' + cfg.color + ';padding:2px 10px;border-radius:10px;font-weight:700">' + cfg.label + '</span>'
+            + '<span style="color:#64748b">~' + km + ' km &middot; ' + cfg.multiplier + '&times; applies to transport</span>';
+        updateLiveCost(parseFloat(draft.mult || '1'), draft.zone, cfg.label);
+    } else if (draft.start && draft.end) {
+        updateLiveCost(_currentMult, _currentZone, _currentZoneLabel);
+    }
+}
+
 // ── Base costs for live preview ───────────────────────────────────────────────
 const VAT_RATE = {{ $vatRate }};
 const _BASE_EQUIP = {{ $equipTotal }};   // per-day equipment total (cart days = 1)
@@ -1905,6 +1981,7 @@ async function _submitReverseGeocode(lat, lng, updateName = true) {
         zoneEl.innerHTML = '<span style="background:' + cfg.bg + ';border:1px solid ' + cfg.border + ';color:' + cfg.color + ';padding:2px 10px;border-radius:10px;font-weight:700">' + cfg.label + '</span>'
             + '<span style="color:#64748b">~' + km + ' km &middot; ' + cfg.multiplier + '&times; applies to transport</span>';
         updateLiveCost(cfg.multiplier, zone, cfg.label);
+        bfSaveDraft();
     } catch (e) {
         zoneEl.style.cssText = 'display:block;padding:8px 12px;border-radius:6px;background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;font-size:12px;margin-top:6px';
         zoneEl.textContent = 'Could not detect location — please check your connection.';
@@ -2105,7 +2182,15 @@ function bfSyncEndMin() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', initSubmitMap);
+document.addEventListener('DOMContentLoaded', () => {
+    initSubmitMap();
+    bfRestoreDraft();
+    const form = document.getElementById('bf_form');
+    if (form) {
+        form.addEventListener('input', bfSaveDraftDebounced);
+        form.addEventListener('change', bfSaveDraftDebounced);
+    }
+});
 // Mobile CSS shrinks #submitBookingMap's height at narrow widths — Leaflet
 // needs invalidateSize() after any container resize (orientation change,
 // browser chrome show/hide) or it redraws misaligned/partially blank.
@@ -2149,6 +2234,7 @@ function doSubmit() {
         .then(r => r.json())
         .then(d => {
             if (d.ok) {
+                bfClearDraft();
                 const m = document.createElement('div');
                 m.style.cssText = 'position:fixed;inset:0;background:rgba(0,30,80,.5);backdrop-filter:blur(4px);z-index:999;display:flex;align-items:center;justify-content:center';
                 m.innerHTML = `<div style="background:#fff;border-radius:14px;width:400px;max-width:94vw;text-align:center;padding:30px;box-shadow:0 20px 60px rgba(0,0,0,.2)">
