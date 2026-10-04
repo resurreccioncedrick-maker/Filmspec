@@ -220,6 +220,7 @@ class CartController extends Controller
 
         $copied = 0;
         $skipped = [];
+        $firstCartId = null;
         foreach ($lines as $line) {
             if ($line->availability_status !== 'available') {
                 $skipped[] = $line->equipment_name;
@@ -229,17 +230,34 @@ class CartController extends Controller
             $exists = DB::table('booking_cart')->where('user_id', $uid)->where('equipment_id', $line->equipment_id)->value('cart_id');
             if ($exists) {
                 DB::table('booking_cart')->where('cart_id', $exists)->update(['quantity' => $line->quantity]);
+                $cartId = $exists;
             } else {
-                DB::table('booking_cart')->insert([
+                $cartId = DB::table('booking_cart')->insertGetId([
                     'user_id' => $uid, 'item_type' => 'equipment', 'equipment_id' => $line->equipment_id,
                     'quantity' => $line->quantity, 'days' => 1,
                 ]);
             }
+            $firstCartId ??= $cartId;
             $copied++;
         }
 
         if (! $copied && ! $skipped) {
             return response()->json(['error' => 'This booking had no equipment to copy.']);
+        }
+
+        // The original booking's accessory add-ons (booking_accessories) are never tied back
+        // to a specific equipment line once a booking is submitted — only to the booking as a
+        // whole — so there's no equipment line to faithfully re-attach each one to. Re-cart
+        // them all against the first copied line so they actually reappear in the Request
+        // List instead of being silently dropped, which is what made "Book Again" look like
+        // it wasn't reproducing the same list.
+        if ($copied && $firstCartId) {
+            $accIds = DB::table('booking_accessories')->where('booking_id', $bookingId)->pluck('accessory_id')->unique();
+            if ($accIds->isNotEmpty()) {
+                DB::table('booking_cart_accessories')->insertOrIgnore(
+                    $accIds->map(fn ($accId) => ['cart_id' => $firstCartId, 'accessory_id' => $accId])->all()
+                );
+            }
         }
 
         return response()->json(['ok' => true, 'copied' => $copied, 'skipped' => $skipped]);
