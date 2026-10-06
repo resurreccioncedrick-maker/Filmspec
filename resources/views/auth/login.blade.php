@@ -262,9 +262,9 @@ body{
         <div class="dpa-row">
           <input type="checkbox" name="dpa_consent" id="dpaConsent" value="1" required onchange="updateSignupBtn()">
           <span>
-            I have read and understood FilmSpec's
-            <strong class="link" onclick="openDpaModal(event)">Privacy Notice</strong>
-            and consent to processing my personal information per <strong style="color:#94a3b8">R.A. 10173</strong>.
+            I have read and agree to FilmSpec's
+            <strong class="link" onclick="openDpaModal(event)">Terms &amp; Conditions</strong>
+            and acknowledge the <strong class="link" onclick="openDpaModal(event)">Privacy Notice</strong>.
           </span>
         </div>
         <button type="submit" class="sbtn" id="createAcctBtn" disabled>Create Account &rarr; Verify Email</button>
@@ -346,11 +346,13 @@ function updateSignupBtn(){
 <div id="dpaMo" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)">
   <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 12px 48px rgba(15,23,42,.18)">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid #e8eef6">
-      <div style="font-size:15px;font-weight:700;color:#1e293b">Data Privacy Policy</div>
+      <div style="font-size:15px;font-weight:700;color:#1e293b">Terms &amp; Conditions &amp; Privacy Notice</div>
       <button onclick="closeDpaModal()" style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1;transition:color .15s" onmouseover="this.style.color='#1e293b'" onmouseout="this.style.color='#94a3b8'">&times;</button>
     </div>
     <div style="overflow-y:auto;padding:20px 24px;font-size:13px;color:#64748b;line-height:1.85;flex:1">
-      <p style="color:#1e293b;font-weight:600;margin-bottom:12px">FilmSpec — Data Privacy Act Consent (R.A. 10173)</p>
+      <p style="color:#1e293b;font-weight:600;margin-bottom:12px">FilmSpec — Terms &amp; Conditions</p>
+      <p style="margin-bottom:14px">By creating a FilmSpec account, you agree to use the system only for legitimate film equipment and crew booking purposes, to provide accurate account and booking information, and to comply with FilmSpec's booking, payment, and equipment-handling policies shown at the time of each booking. FilmSpec reserves the right to suspend or close accounts found to be fraudulent, abusive, or in violation of these terms.</p>
+      <p style="color:#1e293b;font-weight:700;margin:18px 0 12px;border-top:1px solid #e8eef6;padding-top:16px">FilmSpec — Data Privacy Act Consent (R.A. 10173)</p>
       <p style="margin-bottom:14px">FilmSpec collects and processes the personal information you provide during account creation and booking to deliver its film equipment rental and crew management services.</p>
       <p style="color:#1e293b;font-weight:600;margin-bottom:7px">Information We Collect</p>
       <ul style="margin:0 0 14px 18px">

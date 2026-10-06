@@ -388,20 +388,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
     <div style="display:flex;flex-direction:column;gap:4px">
+      <label style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:600;letter-spacing:.5px">Booking Type *</label>
+      <select id="bf_booking_type" onchange="bfOnBookingTypeChange()" style="background:#f8fafc;border:1.5px solid #e2e8f0;color:#0f172a;padding:9px 12px;border-radius:7px;font-size:13px;outline:none;width:100%;font-family:'DM Sans',sans-serif">
+        <option value="package">Equipment + Crew</option>
+        <option value="equipment_only">Equipment Only</option>
+        <option value="crew_only">Crew Only</option>
+      </select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px">
       <label style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:600;letter-spacing:.5px">Project Title *</label>
       <input type="text" id="bf_title" placeholder="e.g. TV Commercial — Brand Name"
              style="background:#f8fafc;border:1.5px solid #e2e8f0;color:#0f172a;padding:9px 12px;border-radius:7px;font-size:13px;outline:none;width:100%;font-family:'DM Sans',sans-serif">
     </div>
-    <div style="display:flex;flex-direction:column;gap:4px">
+    <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:4px">
       <label style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:600;letter-spacing:.5px">Project Type</label>
       <select id="bf_type" style="background:#f8fafc;border:1.5px solid #e2e8f0;color:#0f172a;padding:9px 12px;border-radius:7px;font-size:13px;outline:none;width:100%;font-family:'DM Sans',sans-serif">
-        <option value="commercial">Commercial / TVC</option>
-        <option value="film">Film / Movie</option>
-        <option value="documentary">Documentary</option>
-        <option value="event">Event Coverage</option>
-        <option value="corporate">Corporate Video</option>
-        <option value="music_video">Music Video</option>
-        <option value="other">Other</option>
+        @include('partials.project-type-options')
       </select>
     </div>
     <div style="display:flex;flex-direction:column;gap:4px">
@@ -459,14 +461,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <!-- Step 2: Live Cost Preview — updates as location zone is detected -->
 <div class="no-print" style="background:#fff;border:2px solid #003D80;border-radius:10px;padding:20px 22px;margin-bottom:0;box-shadow:0 2px 10px rgba(0,61,128,.1)">
   <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:#003D80;margin-bottom:12px">Step 2 — Cost Preview</div>
-  <div style="display:flex;flex-direction:column;gap:5px">
+  <div id="cp-crew-only-note" style="display:none;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:7px;padding:10px 12px;font-size:12px;color:var(--muted);margin-bottom:8px">
+    Crew-only booking — no equipment charges apply. Crew cost will be quoted by FilmSpec after review.
+  </div>
+  <div id="cp-equip-rows" style="display:flex;flex-direction:column;gap:5px">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9">
       <span style="font-size:13px;font-weight:600;color:var(--sub)">Equipment <span id="live-eq-note" style="font-size:11px;color:var(--muted);font-weight:400"></span></span>
       <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#003D80" id="live-eq-val">₱{{ number_format($equipTotal, 2) }}</span>
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9">
+    <div id="cp-personnel-row" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9">
       <span style="font-size:13px;font-weight:600;color:var(--sub)">Personnel / Crew TF <span style="font-size:11px;font-weight:400;color:var(--muted)">(assigned after booking)</span></span>
-      <span style="font-size:13px;font-weight:700;color:var(--muted)">TBD</span>
+      <span style="font-size:13px;font-weight:700;color:var(--muted)" id="cp-personnel-val">TBD</span>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9">
       <span style="font-size:13px;font-weight:600;color:var(--sub)">Transportation <span id="live-trans-note" style="font-size:11px;color:var(--muted);font-weight:400">— pin location above to calculate</span></span>
@@ -481,24 +486,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <span style="font-family:'JetBrains Mono',monospace;font-size:12px" id="live-vat">₱{{ number_format($vat, 2) }}</span>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 4px;border-top:2px solid #003D80;margin-top:6px">
-      <span style="font-size:16px;font-weight:800;color:#003D80">Equipment Total</span>
+      <span style="font-size:16px;font-weight:800;color:#003D80" id="cp-grand-label">Equipment Total</span>
       <span style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:800;color:#003D80" id="live-grand">₱{{ number_format($grand, 2) }}</span>
     </div>
   </div>
   <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-    <div style="font-size:11.5px;color:var(--muted);margin-bottom:12px">Equipment cost only — crew TF and transportation will be determined by admin after booking confirmation.</div>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:12px" id="cp-footnote">Equipment cost only — crew TF and transportation will be determined by admin after booking confirmation.</div>
     <div class="agree-wrap">
       <label class="agree-row">
-        <input type="checkbox" id="chkTc" onchange="updateSubmitBtn()">
-        <span>I have read and agree to the <button class="agree-link" onclick="openDocMo('tcMo')">Terms and Conditions</button></span>
-      </label>
-      <label class="agree-row">
-        <input type="checkbox" id="chkPp" onchange="updateSubmitBtn()">
-        <span>I have read and agree to the <button class="agree-link" onclick="openDocMo('ppMo')">Privacy Policy</button></span>
+        <input type="checkbox" id="chkBookingTerms" onchange="updateSubmitBtn()">
+        <span>I have reviewed and agree to FilmSpec's <button class="agree-link" onclick="openDocMo('tcMo')">Booking Terms &amp; Conditions</button> <span style="font-size:11px;color:var(--muted);font-weight:400">(includes the <button class="agree-link" onclick="openDocMo('ppMo')" style="font-size:inherit;font-weight:400;color:var(--muted);text-decoration:underline">Privacy Policy</button>)</span></span>
       </label>
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:12px">
-      <div style="font-size:11px;color:var(--muted)">Both agreements must be accepted before submitting.</div>
+      <div style="font-size:11px;color:var(--muted)">This must be accepted before submitting.</div>
       <button id="submitBtn" onclick="doSubmit()" class="abtn primary" disabled style="opacity:.45;cursor:not-allowed;transition:all .2s">Submit Booking Request</button>
     </div>
   </div>
@@ -1418,7 +1419,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <div class="doc-mo" id="tcMo">
   <div class="doc-box">
     <div class="doc-head">
-      <h3>Terms and Conditions</h3>
+      <h3>Booking Terms &amp; Conditions</h3>
       <button class="doc-close" onclick="closeDocMo('tcMo')">&times;</button>
     </div>
     <div class="doc-body">
@@ -1475,7 +1476,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <p>FilmSpec reserves the right to update these Terms and Conditions at any time. Clients will be notified of material changes. Continued use of FilmSpec services following notification constitutes acceptance of the updated terms.</p>
     </div>
     <div class="doc-foot">
-      <button class="doc-accept-btn" onclick="acceptDoc('tcMo','chkTc')">I Agree &amp; Close</button>
+      <button class="doc-accept-btn" onclick="acceptDoc('tcMo','chkBookingTerms')">I Agree &amp; Close</button>
     </div>
   </div>
 </div>
@@ -1548,7 +1549,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       Tel: +632 70004683 · Cel: +63927 5056461</p>
     </div>
     <div class="doc-foot">
-      <button class="doc-accept-btn" onclick="acceptDoc('ppMo','chkPp')">I Agree &amp; Close</button>
+      <button class="doc-accept-btn" onclick="acceptDoc('ppMo','chkBookingTerms')">I Agree &amp; Close</button>
     </div>
   </div>
 </div>
@@ -1585,11 +1586,9 @@ function acceptDoc(moId, chkId) {
     updateSubmitBtn();
 }
 function updateSubmitBtn() {
-    const tc  = document.getElementById('chkTc')?.checked;
-    const pp  = document.getElementById('chkPp')?.checked;
+    const ok  = document.getElementById('chkBookingTerms')?.checked;
     const btn = document.getElementById('submitBtn');
     if (!btn) return;
-    const ok  = tc && pp;
     btn.disabled       = !ok;
     btn.style.opacity  = ok ? '1' : '.45';
     btn.style.cursor   = ok ? 'pointer' : 'not-allowed';
@@ -1709,6 +1708,7 @@ function bfSaveDraft() {
             savedAt: Date.now(),
             title:   document.getElementById('bf_title').value,
             type:    document.getElementById('bf_type').value,
+            booking_type: document.getElementById('bf_booking_type').value,
             start:   document.getElementById('bf_start').value,
             end:     document.getElementById('bf_end').value,
             location:document.getElementById('bf_location').value,
@@ -1741,6 +1741,8 @@ function bfRestoreDraft() {
 
     if (draft.title) document.getElementById('bf_title').value = draft.title;
     if (draft.type) document.getElementById('bf_type').value = draft.type;
+    if (draft.booking_type) document.getElementById('bf_booking_type').value = draft.booking_type;
+    bfOnBookingTypeChange();
     if (draft.start) document.getElementById('bf_start').value = draft.start;
     if (draft.end) document.getElementById('bf_end').value = draft.end;
     if (draft.location) document.getElementById('bf_location').value = draft.location;
@@ -1802,6 +1804,35 @@ function _numToWords(n) {
     if (n >= 1000)    { parts.push(three(Math.floor(n/1000)) + ' THOUSAND'); n %= 1000; }
     if (n > 0)        { parts.push(three(n)); }
     return parts.join(' ');
+}
+
+function bfOnBookingTypeChange() {
+    const bt = document.getElementById('bf_booking_type').value;
+    const crewOnly = bt === 'crew_only';
+    const equipOnly = bt === 'equipment_only';
+
+    document.getElementById('cp-crew-only-note').style.display = crewOnly ? 'block' : 'none';
+    document.getElementById('cp-equip-rows').style.display = crewOnly ? 'none' : 'flex';
+    document.getElementById('cp-grand-label').textContent = crewOnly ? 'Total' : 'Equipment Total';
+
+    const personnelRow = document.getElementById('cp-personnel-row');
+    const personnelVal = document.getElementById('cp-personnel-val');
+    if (equipOnly) {
+        personnelRow.style.display = 'flex';
+        personnelVal.textContent = 'N/A — Equipment Only';
+    } else {
+        personnelRow.style.display = 'flex';
+        personnelVal.textContent = 'TBD';
+    }
+
+    const footnote = document.getElementById('cp-footnote');
+    if (crewOnly) {
+        footnote.textContent = 'Crew-only booking — no equipment cost preview. Crew TF and transportation will be determined by admin after booking confirmation.';
+    } else if (equipOnly) {
+        footnote.textContent = 'Equipment cost only — no crew will be assigned to this booking. Transportation will be determined by admin after booking confirmation.';
+    } else {
+        footnote.textContent = 'Equipment cost only — crew TF and transportation will be determined by admin after booking confirmation.';
+    }
 }
 
 function updateLiveCost(multiplier, zone, label) {
@@ -2199,6 +2230,7 @@ function bfSyncEndMin() {
 document.addEventListener('DOMContentLoaded', () => {
     initSubmitMap();
     bfRestoreDraft();
+    if (document.getElementById('bf_booking_type')) bfOnBookingTypeChange();
     const form = document.getElementById('bf_form');
     if (form) {
         form.addEventListener('input', bfSaveDraftDebounced);
@@ -2214,8 +2246,8 @@ window.addEventListener('orientationchange', () => { if (_submitMap) setTimeout(
 let _submitInFlight = false;
 function doSubmit() {
     if (_submitInFlight) return;
-    if (!document.getElementById('chkTc')?.checked || !document.getElementById('chkPp')?.checked) {
-        alert('Please read and agree to both the Terms and Conditions and Privacy Policy before submitting.');
+    if (!document.getElementById('chkBookingTerms')?.checked) {
+        alert('Please review and agree to FilmSpec\'s Booking Terms and Conditions before submitting.');
         return;
     }
     const title = document.getElementById('bf_title').value.trim();
@@ -2233,6 +2265,7 @@ function doSubmit() {
     fd.append('action',               'submit_booking');
     fd.append('project_title',        title);
     fd.append('project_type',         document.getElementById('bf_type').value);
+    fd.append('booking_type',         document.getElementById('bf_booking_type').value);
     fd.append('shoot_date_start',     start);
     fd.append('shoot_date_end',       end);
     fd.append('shoot_location',       document.getElementById('bf_location').value);

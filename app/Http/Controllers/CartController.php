@@ -396,6 +396,10 @@ class CartController extends Controller
 
             $projTitle = $request->input('project_title', '');
             $projType = $request->input('project_type', 'commercial');
+            $bookingType = $request->input('booking_type', 'package');
+            if (! in_array($bookingType, ['package', 'equipment_only', 'crew_only'], true)) {
+                $bookingType = 'package';
+            }
             $dateStart = $request->input('shoot_date_start', now()->toDateString());
             $dateEnd = $request->input('shoot_date_end', now()->toDateString());
             $location = $request->input('shoot_location', '');
@@ -451,7 +455,7 @@ class CartController extends Controller
             $bid = DB::table('bookings')->insertGetId([
                 'booking_reference' => $ref,
                 'client_id' => $cid,
-                'booking_type' => 'package',
+                'booking_type' => $bookingType,
                 'project_title' => $projTitle,
                 'project_type' => $projType,
                 'shoot_date_start' => $dateStart,

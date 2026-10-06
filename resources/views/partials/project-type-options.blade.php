@@ -1,0 +1,10 @@
+<option value="commercial">Commercial / Advertisement</option>
+<option value="indie_film">Indie Film</option>
+<option value="tv_network">TV Network</option>
+<option value="music_video">Music Video</option>
+<option value="interview">Interview</option>
+<option value="film">Film / Movie</option>
+<option value="documentary">Documentary</option>
+<option value="event">Event Coverage</option>
+<option value="corporate">Corporate Video</option>
+<option value="other">Other</option>

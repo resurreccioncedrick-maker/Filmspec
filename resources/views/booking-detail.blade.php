@@ -2029,7 +2029,7 @@
       <h3><i data-feather="credit-card" style="width:16px;height:16px;margin-right:6px;vertical-align:middle"></i>Record Payment</h3>
       <button class="modal-close" onclick="closeModal('modalRecordPayment')">&times;</button>
     </div>
-    <form method="POST" action="{{ $actionUrl }}">
+    <form method="POST" action="{{ $actionUrl }}" enctype="multipart/form-data">
       @csrf
       <input type="hidden" name="action" value="record_payment">
       <div class="modal-body">
@@ -2060,23 +2060,32 @@
           </div>
           <div class="form-group">
             <label>Payment Method <span style="color:var(--red)">*</span></label>
-            <select name="payment_method" id="bdPayMethod" class="form-control" required onchange="toggleBdRefField()">
+            <select name="payment_method" id="bdPayMethod" class="form-control" required onchange="toggleBdPaymentFields()">
               <option value="cash" selected>Cash</option>
               <option value="gcash">GCash</option>
+              <option value="bank_transfer">Bank Transfer</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Amount <span style="color:var(--red)">*</span></label>
+            <label>Amount Received (₱) <span style="color:var(--red)">*</span></label>
             <input type="number" name="amount" class="form-control" step="0.01" min="0.01" value="{{ $remaining ?: '' }}" required>
           </div>
           <div class="form-group">
             <label>Payment Date <span style="color:var(--red)">*</span></label>
             <input type="date" name="payment_date" class="form-control" value="{{ date('Y-m-d') }}" min="{{ date('Y-m-d') }}" required>
           </div>
-          <div class="form-group" id="bdRefWrap" style="display:none">
-            <label>GCash Reference / Transaction ID</label>
-            <input type="text" name="reference_number" class="form-control" placeholder="GCash transaction ID">
+          <div class="form-group" id="bdBankWrap" style="display:none">
+            <label>Bank / Financial Institution <span style="color:var(--red)">*</span></label>
+            <input type="text" name="bank_name" id="bdBankName" class="form-control" placeholder="e.g. BDO, BPI, Metrobank">
           </div>
+          <div class="form-group" id="bdRefWrap" style="display:none">
+            <label id="bdRefLabel">Transaction / Reference No. <span style="color:var(--red)">*</span></label>
+            <input type="text" name="reference_number" id="bdRefInput" class="form-control" placeholder="Reference number">
+          </div>
+        </div>
+        <div class="form-group" id="bdProofWrap" style="display:none">
+          <label>Proof of Payment</label>
+          <input type="file" name="proof_of_payment" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
         </div>
         <div class="form-group">
           <label>Notes</label>
@@ -2464,9 +2473,19 @@ function openIncidentUpdate(iid, ename, charge, resolution, status, description,
   openModal('modalIncident');
 }
 
-function toggleBdRefField() {
-  const isGcash = document.getElementById('bdPayMethod')?.value === 'gcash';
-  document.getElementById('bdRefWrap').style.display = isGcash ? '' : 'none';
+function toggleBdPaymentFields() {
+  const method = document.getElementById('bdPayMethod')?.value;
+  const isGcash = method === 'gcash';
+  const isBank  = method === 'bank_transfer';
+
+  document.getElementById('bdBankWrap').style.display = isBank ? '' : 'none';
+  document.getElementById('bdBankName').required = isBank;
+
+  document.getElementById('bdRefWrap').style.display = (isGcash || isBank) ? '' : 'none';
+  document.getElementById('bdRefInput').required = isGcash || isBank;
+  document.getElementById('bdRefLabel').textContent = isGcash ? 'GCash Reference No.' : 'Transaction / Reference No.';
+
+  document.getElementById('bdProofWrap').style.display = (isGcash || isBank) ? '' : 'none';
 }
 
 function openRelease(eid, ename) {

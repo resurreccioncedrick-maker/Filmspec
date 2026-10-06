@@ -33,6 +33,25 @@ class EquipmentAvailability
         }
         $stock = max(1, (int) $equip->stock_quantity);
 
+        // Equipment with physical units tracked (equipment_units) must exclude any unit
+        // currently marked under_maintenance from available capacity — previously, marking a
+        // unit for maintenance had zero effect here, so a unit could still be allocated to a
+        // new booking while physically out of service. stock_quantity (recalcFromUnits()) counts
+        // every non-retired unit including under_maintenance ones, so subtract those out.
+        $underMaintenance = (int) DB::table('equipment_units')
+            ->where('equipment_id', $equipmentId)
+            ->where('status', 'under_maintenance')
+            ->count();
+        if ($underMaintenance > 0) {
+            $stock = max(0, $stock - $underMaintenance);
+            if ($stock === 0) {
+                return ['type' => 'error', 'text' => 'All units of this equipment are currently under maintenance.'];
+            }
+            if ($qty > $stock) {
+                return ['type' => 'error', 'text' => "Only <strong>$stock</strong> unit(s) of this equipment are free right now ($underMaintenance under maintenance)."];
+            }
+        }
+
         if ($stock === 1) {
             if ($equip->availability_status !== 'available') {
                 return ['type' => 'error', 'text' => 'This equipment is not available. Current status: ' . ucfirst($equip->availability_status ?? 'unknown')];

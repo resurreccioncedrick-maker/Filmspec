@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 
@@ -989,7 +991,8 @@ class BookingDetailController extends Controller
         $ptype = $request->input('payment_type', 'final');
         $pmethod = $request->input('payment_method', 'cash');
         $amount = (float) $request->input('amount', 0);
-        $ref = $request->input('reference_number', '');
+        $ref = trim($request->input('reference_number', ''));
+        $bankName = trim($request->input('bank_name', ''));
         $pdate = $request->input('payment_date', now()->toDateString());
         $notes = $request->input('notes', '');
 
@@ -999,6 +1002,31 @@ class BookingDetailController extends Controller
 
         if ($pdate && $pdate < now()->toDateString()) {
             return ['type' => 'danger', 'text' => 'Payment date cannot be backdated — it must be today or later.'];
+        }
+
+        if (in_array($pmethod, ['gcash', 'bank_transfer'], true) && $ref === '') {
+            return ['type' => 'danger', 'text' => 'Reference No. is required for GCash and Bank Transfer payments.'];
+        }
+        if ($pmethod === 'bank_transfer' && $bankName === '') {
+            return ['type' => 'danger', 'text' => 'Bank / Financial Institution is required for Bank Transfer payments.'];
+        }
+
+        $proofPath = null;
+        if ($request->hasFile('proof_of_payment')) {
+            $file = $request->file('proof_of_payment');
+            $allowedMimes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+            if ($file->isValid()) {
+                if ($file->getSize() > 10240 * 1024) {
+                    return ['type' => 'danger', 'text' => 'Proof of Payment file is too large. Max 10MB.'];
+                }
+                if (! in_array($file->getMimeType(), $allowedMimes, true)) {
+                    return ['type' => 'danger', 'text' => 'Proof of Payment must be a JPG, PNG, or PDF file.'];
+                }
+                $ext = strtolower($file->getClientOriginalExtension()) ?: 'bin';
+                $storedName = Str::random(40) . '.' . $ext;
+                Storage::disk('local')->putFileAs('payment_proofs', $file, $storedName);
+                $proofPath = 'payment_proofs/' . $storedName;
+            }
         }
 
         // Matches BillingController::handleAction()'s record_payment branch — document type is
@@ -1017,7 +1045,7 @@ class BookingDetailController extends Controller
         // so far", both pass the "doesn't exceed the balance" check, and both insert,
         // together overpaying the booking. Locking the bookings row for this id
         // serializes any concurrent recordPayment() calls for the same booking.
-        $error = DB::transaction(function () use ($rctype, $rcPrefix, $id, $ptype, $pmethod, $amount, $ref, $pdate, $uid, $isVat, $notes) {
+        $error = DB::transaction(function () use ($rctype, $rcPrefix, $id, $ptype, $pmethod, $amount, $ref, $bankName, $proofPath, $pdate, $uid, $isVat, $notes) {
             $bkTotal = (float) (DB::table('bookings')->where('booking_id', $id)->lockForUpdate()->value('final_amount') ?? 0);
             $bkPaid = (float) DB::table('payments')->where('booking_id', $id)->sum('amount');
             $remaining = round($bkTotal - $bkPaid, 2);
@@ -1030,7 +1058,8 @@ class BookingDetailController extends Controller
 
             DB::table('payments')->insert([
                 'booking_id' => $id, 'payment_type' => $ptype, 'payment_method' => $pmethod, 'amount' => $amount,
-                'reference_number' => $ref, 'payment_date' => $pdate, 'received_by' => $uid, 'is_vat' => $isVat,
+                'reference_number' => $ref, 'bank_name' => $bankName ?: null, 'proof_of_payment_path' => $proofPath,
+                'payment_date' => $pdate, 'received_by' => $uid, 'is_vat' => $isVat,
                 'receipt_number' => $rcnum, 'receipt_type' => $rctype, 'notes' => $notes,
             ]);
 

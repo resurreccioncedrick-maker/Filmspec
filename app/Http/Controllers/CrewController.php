@@ -370,6 +370,40 @@ class CrewController extends Controller
         return response()->json(['success' => false, 'error' => 'Unknown action']);
     }
 
+    /**
+     * Enforces the Employment Type -> compensation-field rule that the Add/Edit Crew JS toggle
+     * (toggleRates()) only ever showed visually: staff rows must have a real monthly salary,
+     * freelance/on_call rows must have a real base rate. Also zeroes whichever block's inputs
+     * are hidden client-side, since the hidden inputs still POST their stale values (they are
+     * not `disabled`, only visually hidden).
+     */
+    private function validatedCompensation(string $employmentType, Request $request): array
+    {
+        $baseRate = (float) $request->input('base_rate_12hr', 0);
+        $overtime = (float) $request->input('overtime_rate', 0);
+        $doublePay = (float) $request->input('double_pay_rate', 0);
+        $monthlySalary = (float) $request->input('monthly_salary', 0);
+
+        if ($employmentType === 'staff') {
+            if ($monthlySalary <= 0) {
+                return ['error' => 'Monthly Salary is required for Staff crew members.'];
+            }
+            return [
+                'base_rate_12hr' => 0, 'overtime_rate' => 0, 'double_pay_rate' => 0,
+                'monthly_salary' => $monthlySalary,
+            ];
+        }
+
+        if ($baseRate <= 0) {
+            return ['error' => 'Base Rate (₱/12hr) is required for Freelance/On Call crew members.'];
+        }
+
+        return [
+            'base_rate_12hr' => $baseRate, 'overtime_rate' => $overtime, 'double_pay_rate' => $doublePay,
+            'monthly_salary' => 0,
+        ];
+    }
+
     private function handleAction(Request $request): ?array
     {
         $action = $request->input('action', '');
@@ -377,8 +411,23 @@ class CrewController extends Controller
 
         if ($action === 'add_crew') {
             $phone = trim($request->input('phone', ''));
-            if ($phone !== '' && ! preg_match('/^09\d{9}$/', $phone)) {
-                return ['type' => 'danger', 'text' => 'Phone must be 11 digits starting with 09 (e.g. 09171234567).'];
+            if ($phone === '' || ! preg_match('/^09\d{9}$/', $phone)) {
+                return ['type' => 'danger', 'text' => 'Phone is required and must be 11 digits starting with 09 (e.g. 09171234567).'];
+            }
+            $gcash = trim($request->input('gcash_number', ''));
+            if ($gcash !== '' && ! preg_match('/^09\d{9}$/', $gcash)) {
+                return ['type' => 'danger', 'text' => 'GCash Number must be 11 digits starting with 09 (e.g. 09171234567).'];
+            }
+
+            $pos = (int) $request->input('primary_position_id', 0);
+            if ($pos <= 0) {
+                return ['type' => 'danger', 'text' => 'Primary Position is required.'];
+            }
+
+            $empType = $request->input('employment_type', 'freelance');
+            $comp = $this->validatedCompensation($empType, $request);
+            if (isset($comp['error'])) {
+                return ['type' => 'danger', 'text' => $comp['error']];
             }
 
             $photoPath = '';
@@ -389,18 +438,18 @@ class CrewController extends Controller
 
             $fn = strtoupper(trim($request->input('first_name', '')));
             $ln = strtoupper(trim($request->input('last_name', '')));
-            $pos = (int) $request->input('primary_position_id', 0);
 
             $cid = DB::table('crew_members')->insertGetId([
                 'first_name' => $fn, 'last_name' => $ln,
                 'email' => trim($request->input('email', '')), 'phone' => $phone,
+                'gcash_number' => $gcash ?: null,
                 'address' => trim($request->input('address', '')),
-                'primary_position_id' => $pos ?: null,
-                'employment_type' => $request->input('employment_type', 'freelance'),
-                'base_rate_12hr' => (float) $request->input('base_rate_12hr', 0),
-                'overtime_rate' => (float) $request->input('overtime_rate', 0),
-                'double_pay_rate' => (float) $request->input('double_pay_rate', 0),
-                'monthly_salary' => (float) $request->input('monthly_salary', 0),
+                'primary_position_id' => $pos,
+                'employment_type' => $empType,
+                'base_rate_12hr' => $comp['base_rate_12hr'],
+                'overtime_rate' => $comp['overtime_rate'],
+                'double_pay_rate' => $comp['double_pay_rate'],
+                'monthly_salary' => $comp['monthly_salary'],
                 'date_joined' => $request->input('date_joined') ?: now()->toDateString(),
                 'profile_notes' => $request->input('profile_notes', ''),
                 'photo_path' => $photoPath,
@@ -412,8 +461,23 @@ class CrewController extends Controller
 
         if ($action === 'edit_crew') {
             $phone = trim($request->input('phone', ''));
-            if ($phone !== '' && ! preg_match('/^09\d{9}$/', $phone)) {
-                return ['type' => 'danger', 'text' => 'Phone must be 11 digits starting with 09 (e.g. 09171234567).'];
+            if ($phone === '' || ! preg_match('/^09\d{9}$/', $phone)) {
+                return ['type' => 'danger', 'text' => 'Phone is required and must be 11 digits starting with 09 (e.g. 09171234567).'];
+            }
+            $gcash = trim($request->input('gcash_number', ''));
+            if ($gcash !== '' && ! preg_match('/^09\d{9}$/', $gcash)) {
+                return ['type' => 'danger', 'text' => 'GCash Number must be 11 digits starting with 09 (e.g. 09171234567).'];
+            }
+
+            $pos = (int) $request->input('primary_position_id', 0);
+            if ($pos <= 0) {
+                return ['type' => 'danger', 'text' => 'Primary Position is required.'];
+            }
+
+            $empType = $request->input('employment_type', 'freelance');
+            $comp = $this->validatedCompensation($empType, $request);
+            if (isset($comp['error'])) {
+                return ['type' => 'danger', 'text' => $comp['error']];
             }
 
             $cid = (int) $request->input('crew_id');
@@ -429,18 +493,18 @@ class CrewController extends Controller
 
             $fn = strtoupper(trim($request->input('first_name', '')));
             $ln = strtoupper(trim($request->input('last_name', '')));
-            $pos = (int) $request->input('primary_position_id', 0);
 
             DB::table('crew_members')->where('crew_id', $cid)->update([
                 'first_name' => $fn, 'last_name' => $ln,
                 'email' => trim($request->input('email', '')), 'phone' => $phone,
+                'gcash_number' => $gcash ?: null,
                 'address' => trim($request->input('address', '')),
-                'primary_position_id' => $pos ?: null,
-                'employment_type' => $request->input('employment_type', 'freelance'),
-                'base_rate_12hr' => (float) $request->input('base_rate_12hr', 0),
-                'overtime_rate' => (float) $request->input('overtime_rate', 0),
-                'double_pay_rate' => (float) $request->input('double_pay_rate', 0),
-                'monthly_salary' => (float) $request->input('monthly_salary', 0),
+                'primary_position_id' => $pos,
+                'employment_type' => $empType,
+                'base_rate_12hr' => $comp['base_rate_12hr'],
+                'overtime_rate' => $comp['overtime_rate'],
+                'double_pay_rate' => $comp['double_pay_rate'],
+                'monthly_salary' => $comp['monthly_salary'],
                 'profile_notes' => $request->input('profile_notes', ''),
                 'status' => $request->input('status', 'active'),
                 'photo_path' => $photoPath,

@@ -664,7 +664,7 @@
       <h3 class="modal-title"><i data-feather="credit-card" style="width:18px;height:18px;margin-right:8px;vertical-align:middle"></i>Record Payment</h3>
       <button class="modal-close" data-modal-close><i data-feather="x"></i></button>
     </div>
-    <form method="POST" action="{{ $billingBase }}" onsubmit="return prepPayment()">
+    <form method="POST" action="{{ $billingBase }}" onsubmit="return prepPayment()" enctype="multipart/form-data">
       @csrf
       <input type="hidden" name="action" value="record_payment">
       <input type="hidden" name="payment_type" id="payType" value="downpayment">
@@ -709,14 +709,23 @@
             </div>
             <div class="form-group">
               <label>Payment Method *</label>
-              <select name="payment_method" id="billingPayMethod" class="form-control" required onchange="toggleBillingRefField()">
+              <select name="payment_method" id="billingPayMethod" class="form-control" required onchange="toggleBillingPaymentFields()">
                 <option value="cash" selected>Cash</option>
                 <option value="gcash">GCash</option>
+                <option value="bank_transfer">Bank Transfer</option>
               </select>
             </div>
+            <div class="form-group" id="billingBankWrap" style="display:none">
+              <label>Bank / Financial Institution *</label>
+              <input type="text" name="bank_name" id="billingBankName" class="form-control" placeholder="e.g. BDO, BPI, Metrobank">
+            </div>
             <div class="form-group" id="billingRefWrap" style="display:none">
-              <label>GCash Reference / Transaction ID</label>
-              <input type="text" name="reference_number" class="form-control" placeholder="GCash transaction ID">
+              <label id="billingRefLabel">Transaction / Reference No. *</label>
+              <input type="text" name="reference_number" id="billingRefInput" class="form-control" placeholder="Reference number">
+            </div>
+            <div class="form-group" id="billingProofWrap" style="display:none">
+              <label>Proof of Payment</label>
+              <input type="file" name="proof_of_payment" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
             </div>
             <div class="form-group">
               <label>Payment Date *</label>
@@ -850,9 +859,19 @@ function openRejectDiscountModal(discountId, bookingId) {
   openModal('modalRejectDiscount');
 }
 
-function toggleBillingRefField() {
-  const isGcash = document.getElementById('billingPayMethod')?.value === 'gcash';
-  document.getElementById('billingRefWrap').style.display = isGcash ? '' : 'none';
+function toggleBillingPaymentFields() {
+  const method = document.getElementById('billingPayMethod')?.value;
+  const isGcash = method === 'gcash';
+  const isBank  = method === 'bank_transfer';
+
+  document.getElementById('billingBankWrap').style.display = isBank ? '' : 'none';
+  document.getElementById('billingBankName').required = isBank;
+
+  document.getElementById('billingRefWrap').style.display = (isGcash || isBank) ? '' : 'none';
+  document.getElementById('billingRefInput').required = isGcash || isBank;
+  document.getElementById('billingRefLabel').textContent = isGcash ? 'GCash Reference No. *' : 'Transaction / Reference No. *';
+
+  document.getElementById('billingProofWrap').style.display = (isGcash || isBank) ? '' : 'none';
 }
 
 // ── Record Payment: searchable booking picker ───────────────────────────────

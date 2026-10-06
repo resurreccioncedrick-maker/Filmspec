@@ -89,6 +89,18 @@ class EquipmentController extends Controller
             return response()->json($rows);
         }
 
+        if ($request->has('get_unit_maintenance_history')) {
+            $unitId = (int) $request->query('get_unit_maintenance_history');
+            $rows = DB::table('equipment_unit_maintenance_log as l')
+                ->leftJoin('users as u', 'l.performed_by', '=', 'u.user_id')
+                ->where('l.unit_id', $unitId)
+                ->orderByDesc('l.performed_at')
+                ->select('l.*', 'u.first_name', 'u.last_name')
+                ->get();
+
+            return response()->json($rows);
+        }
+
         if ($request->isMethod('post') && $canManage && $request->filled('ajax_action')) {
             return $this->handleAjaxAction($request);
         }
@@ -135,27 +147,87 @@ class EquipmentController extends Controller
             ->forPage($page, $perPage)
             ->get();
 
+        // Per-row unit-status breakdown ("2 Available · 2 Allocated") for equipment with
+        // physical units defined — mirrors the breakdown Accessories already shows per card.
+        // Equipment with no units yet keeps the single catalog-wide badge (handled in the view).
+        $pageIds = $equipment->pluck('equipment_id');
+        $unitBreakdown = DB::table('equipment_units')
+            ->whereIn('equipment_id', $pageIds)
+            ->where('status', '!=', 'retired')
+            ->select('equipment_id', 'status', DB::raw('COUNT(*) as cnt'))
+            ->groupBy('equipment_id', 'status')
+            ->get()
+            ->groupBy('equipment_id');
+        $unitConditions = DB::table('equipment_units')
+            ->whereIn('equipment_id', $pageIds)
+            ->where('status', '!=', 'retired')
+            ->select('equipment_id', 'condition')
+            ->get()
+            ->groupBy('equipment_id');
+        $condRank = ['excellent' => 0, 'good' => 1, 'serviceable' => 2, 'damaged' => 3];
+        foreach ($equipment as $eq) {
+            if ($eq->unit_count > 0) {
+                $counts = $unitBreakdown->get($eq->equipment_id, collect())->pluck('cnt', 'status');
+                $eq->unit_status_counts = $counts;
+                $eq->unit_breakdown_text = $counts->map(fn ($c, $s) => $c . ' ' . ($this->unitStatusLabel[$s] ?? ucfirst($s)))->implode(' · ');
+
+                $conds = $unitConditions->get($eq->equipment_id, collect())->pluck('condition')->unique();
+                $eq->condition_mixed = $conds->count() > 1;
+                $eq->condition_display = $eq->condition_mixed
+                    ? 'Mixed'
+                    : ($this->unitCondLabel[$conds->first()] ?? ucfirst((string) $conds->first()));
+            } else {
+                $eq->unit_status_counts = collect();
+                $eq->unit_breakdown_text = null;
+                $eq->condition_mixed = false;
+                $eq->condition_display = $this->condLabel[$eq->condition_status] ?? ucfirst(str_replace('_', ' ', $eq->condition_status));
+            }
+        }
+
         $categories = DB::table('equipment_categories')->orderBy('category_name')->get();
 
-        $allocatedCount = (int) DB::table('equipment as e')
+        // Equipment with physical units defined (equipment_units) counts stats at the unit
+        // level (available/allocated/in_field/under_maintenance units); equipment that has no
+        // units yet still counts at the model/row level via availability_status, exactly as
+        // before — a hybrid so stats stay accurate for both tracked and not-yet-tracked gear.
+        $modelIdsWithUnits = DB::table('equipment_units')
+            ->where('status', '!=', 'retired')
+            ->distinct()->pluck('equipment_id');
+
+        $unitStatusCounts = DB::table('equipment_units')
+            ->where('status', '!=', 'retired')
+            ->selectRaw('status, COUNT(*) as c')
+            ->groupBy('status')
+            ->pluck('c', 'status');
+
+        $legacyAvailable = (int) DB::table('equipment')
+            ->where('availability_status', 'available')
+            ->whereNotIn('equipment_id', $modelIdsWithUnits)->count();
+        $legacyAllocated = (int) DB::table('equipment as e')
             ->join('booking_equipment as be', 'be.equipment_id', '=', 'e.equipment_id')
             ->join('bookings as b', 'be.booking_id', '=', 'b.booking_id')
             ->where('e.availability_status', 'available')
+            ->whereNotIn('e.equipment_id', $modelIdsWithUnits)
             ->whereIn('b.booking_status', ['confirmed', 'pending'])
             ->where('b.shoot_date_end', '>=', DB::raw('CURDATE()'))
             ->whereRaw('(SELECT COUNT(*) FROM equipment_transactions et
                 WHERE et.booking_id = b.booking_id AND et.equipment_id = e.equipment_id
                 AND et.transaction_type = \'checkout\') = 0')
-            ->distinct()
-            ->count('e.equipment_id');
+            ->distinct()->count('e.equipment_id');
+        $legacyInField = (int) DB::table('equipment')
+            ->where('availability_status', 'rented')
+            ->whereNotIn('equipment_id', $modelIdsWithUnits)->count();
+        $legacyMaintenance = (int) DB::table('equipment')
+            ->where('availability_status', 'under_repair')
+            ->whereNotIn('equipment_id', $modelIdsWithUnits)->count();
 
         $stats = [
             'total' => (int) DB::table('equipment')->where('availability_status', '!=', 'retired')->count(),
-            'available' => (int) DB::table('equipment')->where('availability_status', 'available')->count(),
-            'allocated' => $allocatedCount,
+            'available' => (int) ($unitStatusCounts['available'] ?? 0) + $legacyAvailable,
+            'allocated' => (int) ($unitStatusCounts['allocated'] ?? 0) + $legacyAllocated,
             'booked' => (int) DB::table('equipment')->where('availability_status', 'booked')->count(),
-            'rented' => (int) DB::table('equipment')->where('availability_status', 'rented')->count(),
-            'repair' => (int) DB::table('equipment')->where('availability_status', 'under_repair')->count(),
+            'rented' => (int) ($unitStatusCounts['in_field'] ?? 0) + $legacyInField,
+            'repair' => (int) ($unitStatusCounts['under_maintenance'] ?? 0) + $legacyMaintenance,
         ];
 
         return view('equipment', [
@@ -303,6 +375,59 @@ class EquipmentController extends Controller
                 'updated_at' => now(),
             ]);
             ActivityLog::record($request->user()->user_id, 'update', 'equipment', "Updated physical unit {$unit->asset_tag}", $unit->equipment_id);
+            $this->recalcFromUnits($unit->equipment_id);
+
+            return response()->json(['success' => true]);
+        }
+
+        if ($action === 'mark_unit_maintenance') {
+            $unitId = (int) $request->input('unit_id');
+            $unit = DB::table('equipment_units')->where('unit_id', $unitId)->first();
+            if (! $unit) {
+                return response()->json(['success' => false, 'error' => 'Unit not found.']);
+            }
+            $reason = trim($request->input('reason', ''));
+            if ($reason === '') {
+                return response()->json(['success' => false, 'error' => 'A maintenance reason is required.']);
+            }
+            $notes = trim($request->input('notes', ''));
+            $expectedReturn = $request->input('expected_return_date') ?: null;
+
+            DB::table('equipment_units')->where('unit_id', $unitId)->update([
+                'status' => 'under_maintenance',
+                'maintenance_reason' => $reason,
+                'maintenance_date' => now()->toDateString(),
+                'maintenance_notes' => $notes ?: null,
+                'expected_return_date' => $expectedReturn,
+                'updated_at' => now(),
+            ]);
+            DB::table('equipment_unit_maintenance_log')->insert([
+                'unit_id' => $unitId, 'action' => 'mark', 'reason' => $reason, 'notes' => $notes ?: null,
+                'performed_by' => $request->user()->user_id, 'performed_at' => now(),
+            ]);
+            ActivityLog::record($request->user()->user_id, 'update', 'equipment', "Marked unit {$unit->asset_tag} for maintenance: $reason", $unit->equipment_id);
+            $this->recalcFromUnits($unit->equipment_id);
+
+            return response()->json(['success' => true]);
+        }
+
+        if ($action === 'return_unit_service') {
+            $unitId = (int) $request->input('unit_id');
+            $unit = DB::table('equipment_units')->where('unit_id', $unitId)->first();
+            if (! $unit) {
+                return response()->json(['success' => false, 'error' => 'Unit not found.']);
+            }
+            DB::table('equipment_units')->where('unit_id', $unitId)->update([
+                'status' => 'available',
+                'maintenance_reason' => null, 'maintenance_date' => null,
+                'maintenance_notes' => null, 'expected_return_date' => null,
+                'updated_at' => now(),
+            ]);
+            DB::table('equipment_unit_maintenance_log')->insert([
+                'unit_id' => $unitId, 'action' => 'return', 'reason' => null, 'notes' => null,
+                'performed_by' => $request->user()->user_id, 'performed_at' => now(),
+            ]);
+            ActivityLog::record($request->user()->user_id, 'update', 'equipment', "Returned unit {$unit->asset_tag} to service", $unit->equipment_id);
             $this->recalcFromUnits($unit->equipment_id);
 
             return response()->json(['success' => true]);

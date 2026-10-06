@@ -96,7 +96,13 @@
     <div class="meta-block"><label>Project</label><value>{{ $pay->project_title ?: '—' }}</value></div>
     <div class="meta-block"><label>Payment Method</label><value>{{ ucwords(str_replace('_',' ',$pay->payment_method)) }}</value></div>
     <div class="meta-block"><label>Reference No.</label><value>{{ $pay->reference_number ?: '—' }}</value></div>
+    @if (! empty($pay->bank_name))
+    <div class="meta-block"><label>Bank</label><value>{{ $pay->bank_name }}</value></div>
+    @endif
     <div class="meta-block"><label>Payment Type</label><value>{{ ucfirst($pay->payment_type) }}</value></div>
+    @if (! empty($pay->proof_of_payment_path))
+    <div class="meta-block no-print"><label>Proof of Payment</label><value><a href="{{ route('payment-proof', $pay->payment_id) }}" target="_blank">View file</a></value></div>
+    @endif
   </div>
 
   <div class="total-row">

@@ -77,9 +77,15 @@
     <div class="meta-block"><label>Project</label><value>{{ $payment->project_title ?: '—' }}</value></div>
     <div class="meta-block"><label>Payment Method</label><value>{{ $methodLabel[$payment->payment_method] ?? ($payment->payment_method ? ucwords(str_replace('_',' ',$payment->payment_method)) : '—') }}</value></div>
     <div class="meta-block"><label>Reference No.</label><value>{{ $payment->reference_number ?: '—' }}</value></div>
+    @if (! empty($payment->bank_name))
+    <div class="meta-block"><label>Bank</label><value>{{ $payment->bank_name }}</value></div>
+    @endif
     <div class="meta-block"><label>Payment Type</label><value>{{ $typeLabel[$payment->payment_type] ?? ($payment->payment_type ? ucfirst($payment->payment_type) : '—') }}</value></div>
     @if ($payment->received_by_name && trim($payment->received_by_name) !== '')
     <div class="meta-block"><label>Received By</label><value>{{ $payment->received_by_name }}</value></div>
+    @endif
+    @if (! empty($payment->proof_of_payment_path))
+    <div class="meta-block"><label>Proof of Payment</label><value><a href="{{ route('payment-proof', $payment->payment_id) }}" target="_blank">View file</a></value></div>
     @endif
   </div>
 

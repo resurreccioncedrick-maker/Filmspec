@@ -276,6 +276,11 @@ Route::get('/payments/{id}/receipt', [PaymentReceiptController::class, 'show'])
     ->whereNumber('id')
     ->name('payment-receipt');
 
+Route::get('/payments/{id}/proof', [PaymentReceiptController::class, 'proof'])
+    ->middleware(['auth'])
+    ->whereNumber('id')
+    ->name('payment-proof');
+
 Route::match(['get', 'post'], '/billing', [BillingController::class, 'index'])
     ->middleware(['auth', 'can_access:billing'])
     ->name('billing');

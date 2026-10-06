@@ -454,18 +454,24 @@
             <input type="email" name="email" class="form-control" placeholder="crew@email.com">
           </div>
           <div class="form-group">
-            <label>Phone / GCash</label>
-            <input type="text" name="phone" class="form-control" placeholder="+63 9XX XXX XXXX">
+            <label>Phone Number *</label>
+            <input type="text" name="phone" class="form-control" placeholder="09XXXXXXXXX" required>
           </div>
-        </div>
-        <div class="form-group">
-          <label>Address</label>
-          <input type="text" name="address" class="form-control" placeholder="Home address">
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Primary Position</label>
-            <select name="primary_position_id" class="form-control">
+            <label>GCash Number <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+            <input type="text" name="gcash_number" class="form-control" placeholder="09XXXXXXXXX">
+          </div>
+          <div class="form-group">
+            <label>Address</label>
+            <input type="text" name="address" class="form-control" placeholder="Home address">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Primary Position *</label>
+            <select name="primary_position_id" class="form-control" required>
               <option value="">— Select position —</option>
               @foreach ($positions as $p)
               <option value="{{ $p->position_id }}">
@@ -482,6 +488,9 @@
               <option value="staff">Staff (Monthly Salary)</option>
               <option value="on_call">On Call</option>
             </select>
+            <div style="font-size:.7rem;color:var(--muted);margin-top:4px;line-height:1.4">
+              Staff = fixed monthly salary. Freelance = project-based day rate. On Call = day rate, engaged ad hoc.
+            </div>
           </div>
         </div>
 
@@ -525,7 +534,7 @@
         <div class="form-group">
           <label>Skills / Notes</label>
           <textarea name="profile_notes" class="form-control" rows="2"
-                    placeholder="Skills, specializations, previous productions, GCash number…"></textarea>
+                    placeholder="Skills, specializations, previous productions…"></textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -582,18 +591,24 @@
             <input type="email" name="email" id="edit_cem" class="form-control">
           </div>
           <div class="form-group">
-            <label>Phone / GCash</label>
-            <input type="text" name="phone" id="edit_cph" class="form-control">
+            <label>Phone Number *</label>
+            <input type="text" name="phone" id="edit_cph" class="form-control" required>
           </div>
-        </div>
-        <div class="form-group">
-          <label>Address</label>
-          <input type="text" name="address" id="edit_caddr" class="form-control">
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Primary Position</label>
-            <select name="primary_position_id" id="edit_cpos" class="form-control">
+            <label>GCash Number <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+            <input type="text" name="gcash_number" id="edit_cgcash" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Address</label>
+            <input type="text" name="address" id="edit_caddr" class="form-control">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Primary Position *</label>
+            <select name="primary_position_id" id="edit_cpos" class="form-control" required>
               <option value="">— Select —</option>
               @foreach ($positions as $p)
               <option value="{{ $p->position_id }}">{{ $p->position_name }}</option>
@@ -608,6 +623,9 @@
               <option value="staff">Staff (Monthly Salary)</option>
               <option value="on_call">On Call</option>
             </select>
+            <div style="font-size:.7rem;color:var(--muted);margin-top:4px;line-height:1.4">
+              Staff = fixed monthly salary. Freelance = project-based day rate. On Call = day rate, engaged ad hoc.
+            </div>
           </div>
         </div>
         <div id="edit_freelance_rates">
@@ -956,6 +974,7 @@ function editCrew(cm) {
   document.getElementById('edit_cln').value    = cm.last_name;
   document.getElementById('edit_cem').value    = cm.email          || '';
   document.getElementById('edit_cph').value    = cm.phone          || '';
+  document.getElementById('edit_cgcash').value = cm.gcash_number   || '';
   document.getElementById('edit_caddr').value  = cm.address        || '';
   document.getElementById('edit_cpos').value   = cm.primary_position_id || '';
   document.getElementById('edit_cet').value    = cm.employment_type;
@@ -1124,6 +1143,7 @@ function renderCrewDetail(data) {
     <div style="font-size:.8rem;line-height:1.9;margin-bottom:14px">
       <div>Email: <strong>${escHtmlCd(cm.email || '—')}</strong></div>
       <div>Phone: <strong>${escHtmlCd(cm.phone || '—')}</strong></div>
+      <div>GCash Number: <strong>${escHtmlCd(cm.gcash_number || '—')}</strong></div>
       <div>Address: <strong>${escHtmlCd(cm.address || '—')}</strong></div>
       <div>Joined: <strong>${escHtmlCd(cm.date_joined || '—')}</strong></div>
     </div>
@@ -1136,8 +1156,11 @@ function renderCrewDetail(data) {
     <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px">Access Account</div>
     <div style="font-size:.8rem">
       ${cm.linked_email
-        ? '<span class="badge badge-green" style="margin-bottom:4px;display:inline-block"><i data-feather="check" style="width:10px;height:10px;vertical-align:middle"></i> Active</span><div>' + escHtmlCd(cm.linked_email) + '</div>'
-        : '<span class="badge badge-gray">No login linked</span>'}
+        ? '<span class="badge badge-green" style="margin-bottom:4px;display:inline-block"><i data-feather="check" style="width:10px;height:10px;vertical-align:middle"></i> Active</span><div style="margin-bottom:8px">' + escHtmlCd(cm.linked_email) + '</div>'
+        : '<span class="badge badge-gray" style="margin-bottom:8px;display:inline-block">No login linked</span>'}
+      ${@json($canManage) ? (cm.linked_email
+        ? '<button type="button" class="btn btn-outline btn-sm" onclick="openUnlinkModal(' + cm.crew_id + ',' + jsAttrArg(cm.first_name + ' ' + cm.last_name) + ',' + jsAttrArg(cm.linked_email) + ')">Manage Account</button>'
+        : '<button type="button" class="btn btn-primary btn-sm" onclick="openLinkModal(' + cm.crew_id + ',' + jsAttrArg(cm.first_name + ' ' + cm.last_name) + ')">Create Login</button>') : ''}
     </div>
     ${cm.profile_notes ? '<div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:14px 0 6px">Notes</div><div style="font-size:.8rem;color:var(--sub)">' + escHtmlCd(cm.profile_notes) + '</div>' : ''}
   `;
@@ -1275,6 +1298,14 @@ function submitMarkWithdrawn(bkCrewId) {
 
 function escHtmlCd(s) {
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// For passing a JS string literal as an inline onclick="..." argument from a template-literal-
+// built button (JSON.stringify's own double quotes would otherwise terminate the double-quoted
+// HTML attribute early, silently breaking the button — HTML-escaping the stringified output
+// lets the browser decode it back to valid JS before the handler runs).
+function jsAttrArg(v) {
+  return JSON.stringify(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 </script>
 @endpush

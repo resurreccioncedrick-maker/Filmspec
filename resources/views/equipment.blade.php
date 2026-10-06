@@ -32,22 +32,22 @@
   <div class="stat-card">
     <div class="stat-icon"><i data-feather="package"></i></div>
     <div class="stat-value">{{ $stats['total'] }}</div>
-    <div class="stat-label">Total Items</div>
+    <div class="stat-label">Equipment Models</div>
   </div>
   <div class="stat-card green">
     <div class="stat-icon" style="background:rgba(74,222,128,.12);color:var(--green)"><i data-feather="check-circle"></i></div>
     <div class="stat-value">{{ $stats['available'] }}</div>
-    <div class="stat-label">Available</div>
+    <div class="stat-label">Available Units</div>
   </div>
   <div class="stat-card" style="--sb:#f59e0b">
     <div class="stat-icon" style="background:rgba(245,158,11,.12);color:#f59e0b"><i data-feather="clock"></i></div>
     <div class="stat-value">{{ $stats['allocated'] }}</div>
-    <div class="stat-label">Allocated</div>
+    <div class="stat-label">Allocated Units</div>
   </div>
   <div class="stat-card" style="--sb:var(--accent)">
     <div class="stat-icon" style="background:rgba(232,197,71,.12);color:var(--accent)"><i data-feather="truck"></i></div>
     <div class="stat-value">{{ $stats['rented'] }}</div>
-    <div class="stat-label">In Field</div>
+    <div class="stat-label">In Field Units</div>
   </div>
   <div class="stat-card red">
     <div class="stat-icon" style="background:rgba(248,113,113,.12);color:var(--red)"><i data-feather="tool"></i></div>
@@ -141,7 +141,9 @@
           <div class="equip-card-cat">{{ $eq->category_name }} {{ $eq->brand ? '· ' . $eq->brand : '' }}</div>
           <div class="equip-card-foot">
             <span class="equip-card-rate">₱{{ number_format($eq->daily_rate, 2) }}<span style="font-size:.7rem;color:var(--muted);font-family:var(--font-body)">/day</span></span>
-            @if (! empty($eq->allocated_to) && $eq->availability_status === 'available')
+            @if ($eq->unit_count > 0)
+            <span class="badge badge-blue" title="Per-unit breakdown">{{ $eq->unit_breakdown_text ?: '—' }}</span>
+            @elseif (! empty($eq->allocated_to) && $eq->availability_status === 'available')
             <span class="badge badge-orange" title="Allocated to {{ $eq->allocated_to }}">Allocated</span>
             @else
             <span class="badge {{ $availBadge[$eq->availability_status] ?? 'badge-gray' }}">{{ $availLabel[$eq->availability_status] ?? '—' }}</span>
@@ -231,9 +233,11 @@
           <td style="font-family:var(--font-mono);font-size:.75rem;color:var(--muted)">{{ $eq->serial_number ?? '—' }}</td>
           <td style="font-family:var(--font-mono);font-size:.85rem;color:var(--accent);font-weight:600">₱{{ number_format($eq->daily_rate, 2) }}</td>
           <td style="font-family:var(--font-mono);font-size:.83rem;text-align:center">{{ (int) ($eq->stock_quantity ?? 1) }}</td>
-          <td><span class="badge {{ $condBadge[$eq->condition_status] ?? 'badge-gray' }}">{{ $condLabel[$eq->condition_status] ?? ucfirst(str_replace('_', ' ', $eq->condition_status)) }}</span></td>
+          <td><span class="badge {{ $eq->condition_mixed ? 'badge-purple' : ($condBadge[$eq->condition_status] ?? 'badge-gray') }}" @if($eq->condition_mixed) title="Units have differing conditions — see Physical Units" @endif>{{ $eq->condition_display }}</span></td>
           <td>
-            @if (! empty($eq->allocated_to) && $eq->availability_status === 'available')
+            @if ($eq->unit_count > 0)
+            <span class="badge badge-blue" title="Per-unit breakdown">{{ $eq->unit_breakdown_text ?: '—' }}</span>
+            @elseif (! empty($eq->allocated_to) && $eq->availability_status === 'available')
             <span class="status-dot dot-yellow"></span>
             <span class="badge badge-orange" title="Allocated to {{ $eq->allocated_to }}">Allocated · {{ $eq->allocated_to }}</span>
             @else
@@ -618,6 +622,48 @@
     </div>
   </div>
 </div>
+
+<!-- MARK FOR MAINTENANCE MODAL -->
+<div class="modal-overlay" id="modalMarkMaintenance">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title"><i data-feather="tool"></i> Mark for Maintenance — <span id="maintUnitAssetTag" style="color:var(--accent)"></span></div>
+      <button class="modal-close" data-modal-close>&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Reason *</label>
+        <input type="text" id="maintReason" class="form-control" placeholder="e.g. Lens mount loose, needs calibration">
+      </div>
+      <div class="form-group">
+        <label>Expected Return Date <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+        <input type="date" id="maintExpectedReturn" class="form-control">
+      </div>
+      <div class="form-group">
+        <label>Notes <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+        <textarea id="maintNotes" class="form-control" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" data-modal-close>Cancel</button>
+      <button type="button" class="btn btn-warning" onclick="submitMarkMaintenance()">Mark for Maintenance</button>
+    </div>
+  </div>
+</div>
+
+<!-- UNIT MAINTENANCE HISTORY MODAL -->
+<div class="modal-overlay" id="modalUnitHistory">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title"><i data-feather="clock"></i> Maintenance History — <span id="unitHistoryAssetTag" style="color:var(--accent)"></span></div>
+      <button class="modal-close" data-modal-close>&times;</button>
+    </div>
+    <div class="modal-body" id="unitHistoryBody"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" data-modal-close>Close</button>
+    </div>
+  </div>
+</div>
 @endif
 
 @push('scripts')
@@ -844,6 +890,10 @@ function loadUnits() {
           <td style="font-size:.78rem;color:var(--muted);white-space:nowrap">${u.date_acquired ? escHtml(u.date_acquired) : '—'}</td>
           <td style="white-space:nowrap">
             <button class="btn btn-outline btn-sm" onclick="saveUnit(${u.unit_id}, this)" title="Save"><i data-feather="save" style="width:12px;height:12px"></i></button>
+            ${u.status === 'under_maintenance'
+              ? `<button class="btn btn-success btn-sm" onclick="returnUnitService(${u.unit_id})" title="Return to Service"><i data-feather="check-circle" style="width:12px;height:12px"></i></button>`
+              : `<button class="btn btn-warning btn-sm" onclick="openMarkMaintenance(${u.unit_id}, ${jsAttrArg(u.asset_tag)})" title="Mark for Maintenance"><i data-feather="tool" style="width:12px;height:12px"></i></button>`}
+            <button class="btn btn-outline btn-sm" onclick="openUnitHistory(${u.unit_id}, ${jsAttrArg(u.asset_tag)})" title="Maintenance History"><i data-feather="clock" style="width:12px;height:12px"></i></button>
             <button class="btn btn-danger btn-sm" onclick="retireUnit(${u.unit_id})" title="Retire Unit"><i data-feather="archive" style="width:12px;height:12px"></i></button>
           </td>
         </tr>`;
@@ -907,10 +957,84 @@ function retireUnit(unitId) {
     .then(r => r.json())
     .then(data => { if (data.success) loadUnits(); });
 }
+
+let currentMaintUnitId = null;
+function openMarkMaintenance(unitId, assetTag) {
+  currentMaintUnitId = unitId;
+  document.getElementById('maintUnitAssetTag').textContent = assetTag;
+  document.getElementById('maintReason').value = '';
+  document.getElementById('maintExpectedReturn').value = '';
+  document.getElementById('maintNotes').value = '';
+  openModal('modalMarkMaintenance');
+}
+
+function submitMarkMaintenance() {
+  const reason = document.getElementById('maintReason').value.trim();
+  if (!reason) { alert('A maintenance reason is required.'); return; }
+  const fd = new FormData();
+  fd.append('ajax_action', 'mark_unit_maintenance');
+  fd.append('unit_id', currentMaintUnitId);
+  fd.append('reason', reason);
+  fd.append('expected_return_date', document.getElementById('maintExpectedReturn').value);
+  fd.append('notes', document.getElementById('maintNotes').value.trim());
+  fd.append('_token', document.querySelector('meta[name="csrf-token"]').content);
+
+  fetch(EQUIP_BASE_URL, { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) { closeModal('modalMarkMaintenance'); loadUnits(); }
+      else alert(data.error || 'Could not mark unit for maintenance.');
+    });
+}
+
+function returnUnitService(unitId) {
+  if (!confirm('Return this unit to service? Its status will be set back to Available.')) return;
+  const fd = new FormData();
+  fd.append('ajax_action', 'return_unit_service');
+  fd.append('unit_id', unitId);
+  fd.append('_token', document.querySelector('meta[name="csrf-token"]').content);
+
+  fetch(EQUIP_BASE_URL, { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => { if (data.success) loadUnits(); else alert(data.error || 'Could not return unit to service.'); });
+}
+
+function openUnitHistory(unitId, assetTag) {
+  document.getElementById('unitHistoryAssetTag').textContent = assetTag;
+  const body = document.getElementById('unitHistoryBody');
+  body.innerHTML = '<div style="text-align:center;color:var(--muted);padding:12px;font-size:.85rem">Loading…</div>';
+  openModal('modalUnitHistory');
+  fetch(EQUIP_BASE_URL + '?get_unit_maintenance_history=' + unitId)
+    .then(r => r.json())
+    .then(rows => {
+      if (!rows.length) {
+        body.innerHTML = '<div style="text-align:center;color:var(--muted);padding:12px;font-size:.85rem">No maintenance history yet.</div>';
+        return;
+      }
+      body.innerHTML = rows.map(r => {
+        const who = (r.first_name || r.last_name) ? escHtml(((r.first_name || '') + ' ' + (r.last_name || '')).trim()) : '—';
+        const label = r.action === 'mark' ? 'Marked for maintenance' : 'Returned to service';
+        return `<div style="border-bottom:1px solid var(--border);padding:8px 0;font-size:.8rem">
+          <div style="font-weight:700">${label} <span style="color:var(--muted);font-weight:400">— ${escHtml(r.performed_at)}</span></div>
+          ${r.reason ? '<div style="color:var(--sub)">Reason: ' + escHtml(r.reason) + '</div>' : ''}
+          ${r.notes ? '<div style="color:var(--muted);font-size:.75rem">' + escHtml(r.notes) + '</div>' : ''}
+          <div style="color:var(--muted);font-size:.72rem">By: ${who}</div>
+        </div>`;
+      }).join('');
+    });
+}
 @endif
 
 function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// For passing a JS string literal as an inline onclick="..." argument from a template-literal-
+// built row (JSON.stringify's own double quotes would otherwise terminate the double-quoted
+// HTML attribute early, silently breaking the button — HTML-escaping the stringified output
+// lets the browser decode it back to valid JS before the handler runs).
+function jsAttrArg(v) {
+  return JSON.stringify(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
 document.addEventListener('DOMContentLoaded', function() {

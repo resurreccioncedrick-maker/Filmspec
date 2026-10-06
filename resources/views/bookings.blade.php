@@ -360,21 +360,14 @@
             <label>Booking Type *</label>
             <select name="booking_type" class="form-control" required>
               <option value="package">Equipment + Crew</option>
+              <option value="equipment_only">Equipment Only</option>
+              <option value="crew_only">Crew Only</option>
             </select>
           </div>
           <div class="form-group">
             <label>Project Type *</label>
             <select name="project_type" class="form-control" required>
-              <option value="commercial">Commercial / Advertisement</option>
-              <option value="indie_film">Indie Film</option>
-              <option value="tv_network">TV Network</option>
-              <option value="music_video">Music Video</option>
-              <option value="interview">Interview</option>
-              <option value="film">Film / Movie</option>
-              <option value="documentary">Documentary</option>
-              <option value="event">Event Coverage</option>
-              <option value="corporate">Corporate Video</option>
-              <option value="other">Other</option>
+              @include('partials.project-type-options')
             </select>
           </div>
         </div>
@@ -880,21 +873,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <label>Booking Type *</label>
             <select name="booking_type" id="edit_btype" class="form-control" required>
               <option value="package">Equipment + Crew</option>
+              <option value="equipment_only">Equipment Only</option>
+              <option value="crew_only">Crew Only</option>
             </select>
           </div>
           <div class="form-group">
             <label>Project Type *</label>
             <select name="project_type" id="edit_ptype" class="form-control" required>
-              <option value="commercial">Commercial / Advertisement</option>
-              <option value="indie_film">Indie Film</option>
-              <option value="tv_network">TV Network</option>
-              <option value="music_video">Music Video</option>
-              <option value="interview">Interview</option>
-              <option value="film">Film / Movie</option>
-              <option value="documentary">Documentary</option>
-              <option value="event">Event Coverage</option>
-              <option value="corporate">Corporate Video</option>
-              <option value="other">Other</option>
+              @include('partials.project-type-options')
             </select>
           </div>
         </div>
