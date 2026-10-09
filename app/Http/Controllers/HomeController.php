@@ -176,6 +176,11 @@ class HomeController extends Controller
                 : ($eq->availability_status === 'available' ? max(1, (int) ($eq->stock_quantity ?? 1)) : 0);
         }
 
+        // Available items first, unavailable last — a stable sort, so within each group the
+        // original category/name order is kept. Both the Featured picks (take(4) below) and the
+        // full catalog (ALL_EQ, fed from this same collection) inherit this ordering.
+        $equipment = $equipment->sortBy(fn ($eq) => $eq->available_units > 0 ? 0 : 1)->values();
+
         $clientBookings = [];
         if ($isLoggedIn) {
             $clientBookings = DB::table('bookings as b')
