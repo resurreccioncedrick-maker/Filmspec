@@ -2252,7 +2252,11 @@ function doSubmit() {
             } else {
                 _submitInFlight = false;
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Booking'; }
-                alert(d.error || 'Error submitting booking. Please try again.');
+                // Server-side conflict messages (e.g. EquipmentAvailability::check()) include
+                // <strong> markup meant for an HTML-rendered banner — alert() shows raw text, so
+                // the tags would otherwise appear literally instead of being stripped/styled.
+                const rawMsg = d.error || 'Error submitting booking. Please try again.';
+                alert(rawMsg.replace(/<[^>]*>/g, ''));
             }
         })
         .catch(() => {
