@@ -1703,9 +1703,19 @@ a.footer-contact-link:hover{color:#60b0ff}
     <div class="eq-grid reveal-stagger">
       @foreach ($equipment->take(4) as $eq)
       @php
-        $av = $eq->available_units > 0;
-        $availClass = $av ? 'av' : 'busy';
-        $availText  = $av ? $eq->available_units . ' Available' : 'Unavailable';
+        $av = $eq->avail_state === 'available';
+        $availClass = match ($eq->avail_state) {
+            'available' => 'av',
+            'in_use' => 'inuse',
+            default => 'busy',
+        };
+        $availText = match ($eq->avail_state) {
+            'available' => $eq->available_units . ' Available',
+            'in_use' => 'In Use',
+            'booked' => 'Fully Booked',
+            'maintenance' => 'Under Maintenance',
+            default => 'Unavailable',
+        };
       @endphp
       <div class="eq-card">
         <div class="eq-img" onclick="openEqDetail({{ $eq->equipment_id }})" style="cursor:pointer" title="View details">
@@ -2462,6 +2472,7 @@ const ALL_EQ = {!! $equipment->map(fn ($e) => [
     'rate' => (float) $e->daily_rate,
     'avail' => $e->availability_status,
     'avail_units' => (int) $e->available_units,
+    'avail_state' => $e->avail_state,
     'img' => $e->image_path ?? '',
     'req_op' => (int) ($e->requires_operator ?? 0),
     'op_pos' => $e->operator_positions ?? '',
@@ -2983,16 +2994,17 @@ function renderGrid() {
   if (!f.length){grid.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:72px 24px;color:var(--muted);font-size:14px"><div style="font-family:var(--font-d);font-size:22px;letter-spacing:.5px;margin-bottom:10px;color:var(--border2)">NO RESULTS</div>${showFavsOnly?'No favorited equipment yet.':'No equipment found matching your search.'}</div>`;return;}
   const eqIds=reqList.filter(i=>i.item_type==='equipment').map(i=>parseInt(i.equipment_id));
   grid.innerHTML=f.map(eq=>{
-    const av=eq.avail_units>0;
+    const av=eq.avail_state==='available';
     const inList=eqIds.includes(eq.id);
     const isFav=favIds.includes(eq.id);
-    const statusText = av ? (eq.avail_units + ' Available') : 'Unavailable';
-    const availClass = av ? 'av' : 'busy';
+    const statusTextMap = { available: eq.avail_units + ' Available', in_use: 'In Use', booked: 'Fully Booked', maintenance: 'Under Maintenance' };
+    const statusText = statusTextMap[eq.avail_state] || 'Unavailable';
+    const availClass = eq.avail_state === 'available' ? 'av' : (eq.avail_state === 'in_use' ? 'inuse' : 'busy');
     const catAb=escHtml((eq.cat||'').substring(0,2).toUpperCase());
     const imgHtml=eq.img?`<img src="${ASSET_BASE}/${escAttr(eq.img)}" alt="">`:(`<span class="eq-cat-icon">${catAb}</span>`);
     const opHtml=eq.req_op?`<div class="eq-op" title="Requires a certified operator — may include an additional service fee">Operator req'd</div>`:'';
     const btnHtml=`<button class="req-btn${inList?' selected':''}" data-eid="${eq.id}" onclick="${inList?`removeByEqId(${eq.id})`:`toggleEquipment(${eq.id})`}" ${!av&&!inList?'disabled':''}>
-          ${inList?'In List — Remove':(!av?'Unavailable':'+ Add to Request List')}
+          ${inList?'In List — Remove':(!av?statusText:'+ Add to Request List')}
         </button>`;
     const favBtnHtml=`<button class="fav-star${isFav?' on':''}" onclick="event.stopPropagation();toggleFavorite(${eq.id})" title="${isFav?'Remove from favorites':'Add to favorites'}">
         <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
@@ -3048,10 +3060,16 @@ function openEqDetail(eid) {
   document.getElementById('edCatPill').textContent = eq.cat;
 
   const ap = document.getElementById('edAvailPill');
-  const av = eq.avail_units > 0;
-  ap.textContent      = av ? (eq.avail_units + ' Available') : 'Unavailable';
-  ap.style.background = av ? 'rgba(21,128,61,.28)' : 'rgba(185,28,28,.28)';
-  ap.style.color      = av ? '#bbf7d0' : '#fca5a5';
+  const edStatusMap = {
+    available:   { text: eq.avail_units + ' Available', bg: 'rgba(21,128,61,.28)',  fg: '#bbf7d0' },
+    in_use:      { text: 'In Use',                      bg: 'rgba(194,65,12,.28)',  fg: '#fed7aa' },
+    booked:      { text: 'Fully Booked',                 bg: 'rgba(185,28,28,.28)', fg: '#fca5a5' },
+    maintenance: { text: 'Under Maintenance',            bg: 'rgba(185,28,28,.28)', fg: '#fca5a5' },
+  };
+  const edStatus = edStatusMap[eq.avail_state] || { text: 'Unavailable', bg: 'rgba(185,28,28,.28)', fg: '#fca5a5' };
+  ap.textContent      = edStatus.text;
+  ap.style.background = edStatus.bg;
+  ap.style.color      = edStatus.fg;
 
   document.getElementById('edRate').textContent = '₱' + edBaseRate.toLocaleString('en-PH');
 
@@ -3184,8 +3202,9 @@ function refreshEdActionBtn() {
   const btn = document.getElementById('edActionBtn');
   const eq  = ALL_EQ.find(e => e.id === edCurrentEqId);
   if (!eq || !btn) return;
-  const av     = eq.avail_units > 0;
+  const av     = eq.avail_state === 'available';
   const inList = reqList.some(i => i.item_type === 'equipment' && parseInt(i.equipment_id) === edCurrentEqId);
+  const unavailLabelMap = { in_use: 'Currently In Use', booked: 'Fully Booked', maintenance: 'Under Maintenance' };
 
   if (inList) {
     btn.textContent      = 'In List — Remove';
@@ -3195,7 +3214,7 @@ function refreshEdActionBtn() {
     btn.disabled         = false;
     btn.onclick          = () => { removeByEqId(edCurrentEqId); toast('Removed from request list','red'); };
   } else if (!av) {
-    btn.textContent      = 'Currently Unavailable';
+    btn.textContent      = unavailLabelMap[eq.avail_state] || 'Currently Unavailable';
     btn.style.background = 'var(--surface)';
     btn.style.color      = 'var(--muted)';
     btn.style.outline    = '1.5px solid var(--border)';

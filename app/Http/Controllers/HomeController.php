@@ -170,10 +170,40 @@ class HomeController extends Controller
         // otherwise). Drives the catalog badge off real data instead of the single
         // availability_status flag, which can be stale for multi-unit gear (e.g. still reads
         // "available" even when every unit is actually already committed).
+        //
+        // avail_state also says *why* something isn't available (in_use / booked /
+        // maintenance), not just a flat "Unavailable" — computed from the real per-unit status
+        // breakdown for unit-tracked gear, or the legacy flag for everything else.
+        $pageIds = $equipment->pluck('equipment_id');
+        $unitStatusBreakdown = DB::table('equipment_units')
+            ->whereIn('equipment_id', $pageIds)
+            ->where('status', '!=', 'retired')
+            ->select('equipment_id', 'status', DB::raw('COUNT(*) as cnt'))
+            ->groupBy('equipment_id', 'status')
+            ->get()
+            ->groupBy('equipment_id');
+
         foreach ($equipment as $eq) {
-            $eq->available_units = $eq->unit_count > 0
-                ? (int) $eq->units_available
-                : ($eq->availability_status === 'available' ? max(1, (int) ($eq->stock_quantity ?? 1)) : 0);
+            if ($eq->unit_count > 0) {
+                $eq->available_units = (int) $eq->units_available;
+                $counts = $unitStatusBreakdown->get($eq->equipment_id, collect())->pluck('cnt', 'status');
+                $eq->avail_state = match (true) {
+                    $eq->available_units > 0 => 'available',
+                    ($counts['in_field'] ?? 0) > 0 => 'in_use',
+                    ($counts['under_maintenance'] ?? 0) > 0 => 'maintenance',
+                    ($counts['allocated'] ?? 0) > 0 => 'booked',
+                    default => 'unavailable',
+                };
+            } else {
+                $eq->available_units = $eq->availability_status === 'available' ? max(1, (int) ($eq->stock_quantity ?? 1)) : 0;
+                $eq->avail_state = match ($eq->availability_status) {
+                    'available' => 'available',
+                    'rented' => 'in_use',
+                    'booked' => 'booked',
+                    'under_repair' => 'maintenance',
+                    default => 'unavailable',
+                };
+            }
         }
 
         // Available items first, unavailable last — a stable sort, so within each group the
