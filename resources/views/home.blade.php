@@ -3132,19 +3132,27 @@ function openEqDetail(eid) {
       if (optional.length) {
         document.getElementById('edOptionalList').innerHTML = optional.map(a => {
           const rate = Math.round(parseFloat(a.daily_rate));
+          const avail = parseInt(a.available_units ?? 0);
+          const isAvail = avail > 0;
+          const alreadyChecked = existingAccIds.includes(parseInt(a.accessory_id));
+          const canCheck = isAvail || alreadyChecked;
+          const availBadge = isAvail
+            ? `<span style="font-size:.66rem;font-weight:700;color:#15803d;background:#dcfce7;padding:2px 7px;border-radius:20px;white-space:nowrap">${avail} available</span>`
+            : `<span style="font-size:.66rem;font-weight:700;color:#dc2626;background:#fee2e2;padding:2px 7px;border-radius:20px;white-space:nowrap">Unavailable</span>`;
           return `
-            <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border-radius:8px;border:1.5px solid var(--border);cursor:pointer;transition:border-color .15s"
-                   onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor=this.querySelector('input').checked?'var(--blue)':'var(--border)'">
+            <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border-radius:8px;border:1.5px solid var(--border);cursor:${canCheck ? 'pointer' : 'not-allowed'};transition:border-color .15s;${isAvail ? '' : 'opacity:.65'}"
+                   ${canCheck ? `onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor=this.querySelector('input').checked?'var(--blue)':'var(--border)'"` : ''}>
               ${accThumb(a)}
               <div style="flex:1;min-width:0">
                 <div style="font-size:.82rem;font-weight:600;color:var(--text)">${escHtml(a.accessory_name)}</div>
                 ${a.description?`<div style="font-size:.72rem;color:var(--sub);margin-top:2px">${escHtml(a.description)}</div>`:''}
+                <div style="margin-top:4px">${availBadge}</div>
               </div>
               <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
                 <span style="font-size:.78rem;font-weight:700;color:var(--blue);white-space:nowrap">+₱${rate.toLocaleString('en-PH')}/day</span>
                 <input type="checkbox" class="ed-opt-cb" data-id="${a.accessory_id}" data-rate="${rate}" data-name="${escAttr(a.accessory_name)}"
-                       ${existingAccIds.includes(parseInt(a.accessory_id)) ? 'checked' : ''}
-                       style="width:16px;height:16px;cursor:pointer;accent-color:var(--blue)"
+                       ${alreadyChecked ? 'checked' : ''} ${canCheck ? '' : 'disabled'}
+                       style="width:16px;height:16px;cursor:${canCheck ? 'pointer' : 'not-allowed'};accent-color:var(--blue)"
                        onchange="updateEdPricing();this.closest('label').style.borderColor=this.checked?'var(--blue)':'var(--border)';syncAccessoriesIfInList()">
               </div>
             </label>`;
