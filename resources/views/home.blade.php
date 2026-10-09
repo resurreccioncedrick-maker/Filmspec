@@ -1703,10 +1703,9 @@ a.footer-contact-link:hover{color:#60b0ff}
     <div class="eq-grid reveal-stagger">
       @foreach ($equipment->take(4) as $eq)
       @php
-        $av = $eq->availability_status === 'available';
-        $isBooked = $eq->availability_status === 'booked';
-        $availClass = $av ? 'av' : ($isBooked ? 'busy' : 'inuse');
-        $availText  = $av ? 'Available Now' : ($isBooked ? 'Currently Booked' : 'Currently In Use');
+        $av = $eq->available_units > 0;
+        $availClass = $av ? 'av' : 'busy';
+        $availText  = $av ? $eq->available_units . ' Available' : 'Unavailable';
       @endphp
       <div class="eq-card">
         <div class="eq-img" onclick="openEqDetail({{ $eq->equipment_id }})" style="cursor:pointer" title="View details">
@@ -2462,6 +2461,7 @@ const ALL_EQ = {!! $equipment->map(fn ($e) => [
     'cat' => $e->category_name,
     'rate' => (float) $e->daily_rate,
     'avail' => $e->availability_status,
+    'avail_units' => (int) $e->available_units,
     'img' => $e->image_path ?? '',
     'req_op' => (int) ($e->requires_operator ?? 0),
     'op_pos' => $e->operator_positions ?? '',
@@ -2983,12 +2983,11 @@ function renderGrid() {
   if (!f.length){grid.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:72px 24px;color:var(--muted);font-size:14px"><div style="font-family:var(--font-d);font-size:22px;letter-spacing:.5px;margin-bottom:10px;color:var(--border2)">NO RESULTS</div>${showFavsOnly?'No favorited equipment yet.':'No equipment found matching your search.'}</div>`;return;}
   const eqIds=reqList.filter(i=>i.item_type==='equipment').map(i=>parseInt(i.equipment_id));
   grid.innerHTML=f.map(eq=>{
-    const av=eq.avail==='available';
-    const isBooked=eq.avail==='booked';
+    const av=eq.avail_units>0;
     const inList=eqIds.includes(eq.id);
     const isFav=favIds.includes(eq.id);
-    const statusText = av ? 'Available Now' : (isBooked ? 'Currently Booked' : 'Currently In Use');
-    const availClass = av ? 'av' : (isBooked ? 'busy' : 'inuse');
+    const statusText = av ? (eq.avail_units + ' Available') : 'Unavailable';
+    const availClass = av ? 'av' : 'busy';
     const catAb=escHtml((eq.cat||'').substring(0,2).toUpperCase());
     const imgHtml=eq.img?`<img src="${ASSET_BASE}/${escAttr(eq.img)}" alt="">`:(`<span class="eq-cat-icon">${catAb}</span>`);
     const opHtml=eq.req_op?`<div class="eq-op" title="Requires a certified operator — may include an additional service fee">Operator req'd</div>`:'';
@@ -3049,9 +3048,8 @@ function openEqDetail(eid) {
   document.getElementById('edCatPill').textContent = eq.cat;
 
   const ap = document.getElementById('edAvailPill');
-  const av = eq.avail === 'available';
-  const isBooked = eq.avail === 'booked';
-  ap.textContent      = av ? 'Available Now' : (isBooked ? 'Currently Booked' : 'Currently In Use');
+  const av = eq.avail_units > 0;
+  ap.textContent      = av ? (eq.avail_units + ' Available') : 'Unavailable';
   ap.style.background = av ? 'rgba(21,128,61,.28)' : 'rgba(185,28,28,.28)';
   ap.style.color      = av ? '#bbf7d0' : '#fca5a5';
 
@@ -3186,7 +3184,7 @@ function refreshEdActionBtn() {
   const btn = document.getElementById('edActionBtn');
   const eq  = ALL_EQ.find(e => e.id === edCurrentEqId);
   if (!eq || !btn) return;
-  const av     = eq.avail === 'available';
+  const av     = eq.avail_units > 0;
   const inList = reqList.some(i => i.item_type === 'equipment' && parseInt(i.equipment_id) === edCurrentEqId);
 
   if (inList) {

@@ -159,7 +159,22 @@ class HomeController extends Controller
                           FROM equipment_operators eo
                           JOIN crew_positions cp ON eo.position_id = cp.position_id
                           WHERE eo.equipment_id = e.equipment_id) AS operator_positions")
+            ->selectRaw("(SELECT COUNT(*) FROM equipment_units eu WHERE eu.equipment_id = e.equipment_id AND eu.status != 'retired') AS unit_count")
+            ->selectRaw("(SELECT COUNT(*) FROM equipment_units eu WHERE eu.equipment_id = e.equipment_id AND eu.status = 'available') AS units_available")
             ->get();
+
+        // "Available units right now" — for equipment with physical units tracked, the real
+        // count of units sitting at status=available (not a date-specific count, since the
+        // client hasn't picked shoot dates yet at this stage); for equipment with no units
+        // tracked, fall back to the legacy whole-row flag (stock_quantity when available, 0
+        // otherwise). Drives the catalog badge off real data instead of the single
+        // availability_status flag, which can be stale for multi-unit gear (e.g. still reads
+        // "available" even when every unit is actually already committed).
+        foreach ($equipment as $eq) {
+            $eq->available_units = $eq->unit_count > 0
+                ? (int) $eq->units_available
+                : ($eq->availability_status === 'available' ? max(1, (int) ($eq->stock_quantity ?? 1)) : 0);
+        }
 
         $clientBookings = [];
         if ($isLoggedIn) {
