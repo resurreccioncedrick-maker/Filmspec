@@ -360,8 +360,6 @@
             <label>Booking Type *</label>
             <select name="booking_type" class="form-control" required>
               <option value="package">Equipment + Crew</option>
-              <option value="equipment_only">Equipment Only</option>
-              <option value="crew_only">Crew Only</option>
             </select>
           </div>
           <div class="form-group">
@@ -873,8 +871,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <label>Booking Type *</label>
             <select name="booking_type" id="edit_btype" class="form-control" required>
               <option value="package">Equipment + Crew</option>
-              <option value="equipment_only">Equipment Only</option>
-              <option value="crew_only">Crew Only</option>
             </select>
           </div>
           <div class="form-group">
