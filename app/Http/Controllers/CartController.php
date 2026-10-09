@@ -31,9 +31,46 @@ class CartController extends Controller
             'clear' => $this->clear($uid),
             'copy_from_booking' => $this->copyFromBooking($request, $uid),
             'bulk_add' => $this->bulkAdd($request, $uid),
+            'check_dates' => $this->checkDates($request, $uid),
             'submit_booking' => $this->submitBooking($request, $user),
             default => response()->json(['error' => 'Unknown action']),
         };
+    }
+
+    /**
+     * Lets the client find out a cart item is unavailable for their chosen shoot dates as soon
+     * as they pick those dates (Step 1), instead of only at final submission — reuses the exact
+     * same EquipmentAvailability::check() the server-side submit already enforces, so the two
+     * can never disagree.
+     */
+    private function checkDates(Request $request, int $uid): JsonResponse
+    {
+        $start = $request->input('shoot_date_start', '');
+        $end = $request->input('shoot_date_end', '');
+        if (! $start || ! $end || $end < $start) {
+            return response()->json(['conflicts' => []]);
+        }
+
+        $booking = (object) ['shoot_date_start' => $start, 'shoot_date_end' => $end];
+        $items = DB::table('booking_cart')
+            ->where('user_id', $uid)
+            ->where('item_type', 'equipment')
+            ->get();
+
+        $conflicts = [];
+        foreach ($items as $it) {
+            $conflict = \App\Support\EquipmentAvailability::check((int) $it->equipment_id, (int) $it->quantity, 0, $booking);
+            if ($conflict) {
+                $conflicts[] = [
+                    'cart_id' => $it->cart_id,
+                    'equipment_id' => $it->equipment_id,
+                    'equipment_name' => DB::table('equipment')->where('equipment_id', $it->equipment_id)->value('equipment_name'),
+                    'message' => strip_tags($conflict['text']),
+                ];
+            }
+        }
+
+        return response()->json(['conflicts' => $conflicts]);
     }
 
     private function get(int $uid): JsonResponse

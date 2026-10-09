@@ -453,6 +453,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <!-- Step 2: Live Cost Preview — updates as location zone is detected -->
 <div class="no-print" style="background:#fff;border:2px solid #003D80;border-radius:10px;padding:20px 22px;margin-bottom:0;box-shadow:0 2px 10px rgba(0,61,128,.1)">
   <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:#003D80;margin-bottom:12px">Step 2 — Cost Preview</div>
+  <div id="cp-date-conflicts" style="display:none;background:#fdecea;border:1px solid #f5b7b1;border-radius:7px;padding:10px 12px;font-size:12px;color:#c0392b;margin-bottom:12px"></div>
   <div style="display:flex;flex-direction:column;gap:5px">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9">
       <span style="font-size:13px;font-weight:600;color:var(--sub)">Equipment <span id="live-eq-note" style="font-size:11px;color:var(--muted);font-weight:400"></span></span>
@@ -1575,7 +1576,7 @@ function acceptDoc(moId, chkId) {
     updateSubmitBtn();
 }
 function updateSubmitBtn() {
-    const ok  = document.getElementById('chkBookingTerms')?.checked;
+    const ok  = document.getElementById('chkBookingTerms')?.checked && (typeof _dateConflicts === 'undefined' || _dateConflicts.length === 0);
     const btn = document.getElementById('submitBtn');
     if (!btn) return;
     btn.disabled       = !ok;
@@ -1756,6 +1757,8 @@ function bfRestoreDraft() {
     } else if (draft.start && draft.end) {
         updateLiveCost(_currentMult, _currentZone, _currentZoneLabel);
     }
+
+    if (draft.start && draft.end) checkDateConflicts();
 }
 
 // ── Base costs for live preview ───────────────────────────────────────────────
@@ -2182,6 +2185,44 @@ function bfSyncEndMin() {
         _shootDays = Math.round((new Date(end) - new Date(start)) / 86400000) + 1;
         updateLiveCost(_currentMult, _currentZone, _currentZoneLabel);
     }
+    checkDateConflictsDebounced();
+}
+
+// Catches an equipment-availability conflict as soon as the client picks their shoot dates,
+// instead of only at final submission — reuses the server's EquipmentAvailability::check() via
+// the cart's check_dates action, so this can never disagree with what submit actually enforces.
+let _dateConflicts = [];
+let _dcTimer = null;
+function checkDateConflictsDebounced() {
+    clearTimeout(_dcTimer);
+    _dcTimer = setTimeout(checkDateConflicts, 300);
+}
+function checkDateConflicts() {
+    const start = document.getElementById('bf_start').value;
+    const end   = document.getElementById('bf_end').value;
+    const box = document.getElementById('cp-date-conflicts');
+    if (!start || !end || end < start) {
+        _dateConflicts = [];
+        box.style.display = 'none';
+        updateSubmitBtn();
+        return;
+    }
+    fetch('/cart?action=check_dates&shoot_date_start=' + encodeURIComponent(start) + '&shoot_date_end=' + encodeURIComponent(end))
+        .then(r => r.json())
+        .then(d => {
+            _dateConflicts = d.conflicts || [];
+            if (_dateConflicts.length) {
+                const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                box.innerHTML = '<strong>Not available for these dates:</strong><br>' + _dateConflicts.map(c =>
+                    '&bull; ' + esc(c.equipment_name) + ' — ' + esc(c.message)).join('<br>') +
+                    '<br>Remove or swap these items, or adjust your dates, before submitting.';
+                box.style.display = 'block';
+            } else {
+                box.style.display = 'none';
+            }
+            updateSubmitBtn();
+        })
+        .catch(() => { /* non-blocking — final submit still re-validates server-side */ });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2204,6 +2245,10 @@ function doSubmit() {
     if (_submitInFlight) return;
     if (!document.getElementById('chkBookingTerms')?.checked) {
         alert('Please review and agree to FilmSpec\'s Booking Terms and Conditions before submitting.');
+        return;
+    }
+    if (_dateConflicts.length) {
+        alert('Some items in your request list are not available for your chosen dates. Please remove or swap them, or adjust your dates, before submitting.');
         return;
     }
     const title = document.getElementById('bf_title').value.trim();
