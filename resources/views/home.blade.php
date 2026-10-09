@@ -1736,7 +1736,7 @@ a.footer-contact-link:hover{color:#60b0ff}
             <div class="eq-rate">₱{{ number_format($eq->daily_rate, 0) }}</div>
             <div class="eq-rate-sub">/day &middot; VAT included</div>
           </div>
-          <button class="req-btn" id="rb_{{ $eq->equipment_id }}" data-eid="{{ $eq->equipment_id }}" onclick="toggleEquipment({{ $eq->equipment_id }})">+ Add to Request List</button>
+          <button class="req-btn" id="rb_{{ $eq->equipment_id }}" data-eid="{{ $eq->equipment_id }}" onclick="openEqDetail({{ $eq->equipment_id }})">View Details</button>
         </div>
       </div>
       @endforeach
@@ -2414,6 +2414,18 @@ a.footer-contact-link:hover{color:#60b0ff}
           <p id="edDesc" style="font-size:.875rem;color:var(--text);line-height:1.65;margin:0"></p>
         </div>
 
+        <div id="edQtyWrap" style="display:none;margin-bottom:18px">
+          <div style="font-size:.63rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);margin-bottom:8px">Quantity</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden">
+              <button type="button" onclick="edChangeQty(-1)" style="width:34px;height:34px;border:none;background:var(--surface);color:var(--text);font-size:1rem;font-weight:700;cursor:pointer">&minus;</button>
+              <span id="edQtyVal" style="width:38px;text-align:center;font-size:.9rem;font-weight:700">1</span>
+              <button type="button" onclick="edChangeQty(1)" style="width:34px;height:34px;border:none;background:var(--surface);color:var(--text);font-size:1rem;font-weight:700;cursor:pointer">+</button>
+            </div>
+            <span id="edQtyHint" style="font-size:.74rem;color:var(--muted)"></span>
+          </div>
+        </div>
+
         <div style="font-size:.63rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);margin-bottom:10px">Accessories</div>
         <div id="edAccLoading" style="padding:14px 0;color:var(--sub);font-size:.83rem">Loading…</div>
         <div id="edAccContent" style="display:none">
@@ -2600,12 +2612,13 @@ function renderPanel(reqOps) {
 
     let accHtml = '';
     (item.accessories||[]).forEach(acc=>{
+      const accQty  = parseInt(acc.quantity||1);
       const accRate = parseFloat(acc.daily_rate||0);
-      const accSub  = accRate*days;
+      const accSub  = accRate*days*accQty;
       equipSubtotal += accSub;
       accHtml += `<div class="rli-crew-est">
         <span class="crew-est-icon">&#43;</span>
-        <span>${acc.accessory_name}</span>
+        <span>${acc.accessory_name}${accQty>1?' ×'+accQty:''}</span>
         <span class="rli-amount crew-est-amt">₱${fmt(accSub)}</span>
         <button class="rli-acc-remove" onclick="removeAccessory(${item.cart_id},${acc.accessory_id})" title="Remove accessory">&times;</button>
       </div>`;
@@ -2616,8 +2629,12 @@ function renderPanel(reqOps) {
       <div class="rli-info">
         <div class="rli-name">${name}</div>
         <div class="rli-sub">${sub2}</div>
-        <div class="rli-calc">
-          ${qty>1?`<span style="font-size:11px;color:var(--muted)">×${qty}</span>`:''}
+        <div class="rli-calc" style="align-items:center;gap:8px">
+          <div style="display:flex;align-items:center;gap:2px;border:1px solid var(--border);border-radius:6px">
+            <button type="button" onclick="rlChangeQty(${item.cart_id},-1)" title="Decrease quantity" style="width:19px;height:19px;border:none;background:transparent;font-size:.72rem;cursor:pointer;line-height:1;color:var(--sub)">&minus;</button>
+            <span style="font-size:11px;font-weight:700;min-width:14px;text-align:center">${qty}</span>
+            <button type="button" onclick="rlChangeQty(${item.cart_id},1)" title="Increase quantity" style="width:19px;height:19px;border:none;background:transparent;font-size:.72rem;cursor:pointer;line-height:1;color:var(--sub)">+</button>
+          </div>
           <span class="rli-amount">₱${fmt(sub)}</span>
         </div>
         ${accHtml}
@@ -2647,20 +2664,50 @@ function updateBtns() {
   const eqIds   = reqList.filter(i=>i.item_type==='equipment').map(i=>parseInt(i.equipment_id));
   document.querySelectorAll('[data-eid]').forEach(b=>{
     const inList = eqIds.includes(parseInt(b.dataset.eid));
-    b.textContent = inList ? 'In List — Remove' : '+ Add to Request List';
+    b.textContent = inList ? 'In List — Remove' : 'View Details';
     b.classList.toggle('selected', inList);
     if (inList) b.onclick = ()=>removeByEqId(parseInt(b.dataset.eid));
-    else b.onclick = ()=>toggleEquipment(parseInt(b.dataset.eid));
+    else b.onclick = ()=>openEqDetail(parseInt(b.dataset.eid));
   });
   if (document.getElementById('eqDetailMo')?.classList.contains('on')) refreshEdActionBtn();
 }
 
-function toggleEquipment(eid, selectedAccessories) {
+function rlChangeQty(cartId, delta) {
+  const item = reqList.find(i => i.item_type === 'equipment' && String(i.cart_id) === String(cartId));
+  if (!item) return;
+  const eq = ALL_EQ.find(e => e.id === parseInt(item.equipment_id));
+  const max = eq ? Math.max(1, parseInt(eq.avail_units) || 1) : 99;
+  const current = parseInt(item.quantity || 1);
+  const next = Math.max(1, Math.min(max, current + delta));
+  if (next === current) return;
+
+  if (!IS_LOGIN) {
+    const cart = loadGuestCart();
+    const idx = cart.findIndex(i => i.equipment_id === item.equipment_id);
+    if (idx > -1) { cart[idx].quantity = next; saveGuestCart(cart); loadList(); }
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append('_token', CSRF_TOKEN);
+  fd.append('action', 'add_equipment');
+  fd.append('equipment_id', item.equipment_id);
+  fd.append('quantity', next);
+  fd.append('days', item.days || 1);
+  fd.append('accessories_json', JSON.stringify((item.accessories||[]).map(a => ({ accessory_id: a.accessory_id, quantity: a.quantity || 1 }))));
+  fetch('/cart', { method: 'POST', body: fd }).then(r => r.json()).then(d => {
+    if (d.ok) loadList();
+    else toast(d.error || 'Could not update quantity', 'red');
+  });
+}
+
+function toggleEquipment(eid, qty, selectedAccessories) {
+  qty = Math.max(1, parseInt(qty) || 1);
   if (!IS_LOGIN) {
     const cart = loadGuestCart();
     const idx = cart.findIndex(i => i.equipment_id === eid);
     if (idx > -1) { cart.splice(idx, 1); toast('Removed from request list', 'blue'); }
-    else { cart.push({ equipment_id: eid, quantity: 1, days: 1 }); toast('Added to request list', 'blue'); }
+    else { cart.push({ equipment_id: eid, quantity: qty, days: 1 }); toast('Added to request list', 'blue'); }
     saveGuestCart(cart);
     loadList();
     return;
@@ -2671,7 +2718,7 @@ function toggleEquipment(eid, selectedAccessories) {
   fd.append('_token', CSRF_TOKEN);
   fd.append('action','add_equipment');
   fd.append('equipment_id',eid);
-  fd.append('quantity',1);
+  fd.append('quantity',qty);
   fd.append('days',1);
   if (selectedAccessories && selectedAccessories.length > 0) {
     fd.append('accessories_json', JSON.stringify(selectedAccessories));
@@ -2691,7 +2738,7 @@ function removeAccessory(cartId, accessoryId) {
   if (!item) return;
   const remaining = (item.accessories || [])
     .filter(a => parseInt(a.accessory_id) !== parseInt(accessoryId))
-    .map(a => ({ accessory_id: a.accessory_id }));
+    .map(a => ({ accessory_id: a.accessory_id, quantity: a.quantity || 1 }));
   const fd = new FormData();
   fd.append('_token', CSRF_TOKEN);
   fd.append('action', 'add_equipment');
@@ -2708,10 +2755,13 @@ function removeAccessory(cartId, accessoryId) {
 function getSelectedAccessories() {
   const accessories = [];
   document.querySelectorAll('.ed-opt-cb:checked').forEach(cb => {
+    const qtyInput = document.querySelector('.ed-opt-qty[data-id="' + cb.dataset.id + '"]');
+    const qty = qtyInput ? Math.max(1, parseInt(qtyInput.value) || 1) : 1;
     accessories.push({
       accessory_id: parseInt(cb.dataset.id),
       accessory_name: cb.dataset.name,
-      daily_rate: parseFloat(cb.dataset.rate)
+      daily_rate: parseFloat(cb.dataset.rate),
+      quantity: qty
     });
   });
   return accessories;
@@ -3003,8 +3053,8 @@ function renderGrid() {
     const catAb=escHtml((eq.cat||'').substring(0,2).toUpperCase());
     const imgHtml=eq.img?`<img src="${ASSET_BASE}/${escAttr(eq.img)}" alt="">`:(`<span class="eq-cat-icon">${catAb}</span>`);
     const opHtml=eq.req_op?`<div class="eq-op" title="Requires a certified operator — may include an additional service fee">Operator req'd</div>`:'';
-    const btnHtml=`<button class="req-btn${inList?' selected':''}" data-eid="${eq.id}" onclick="${inList?`removeByEqId(${eq.id})`:`toggleEquipment(${eq.id})`}" ${!av&&!inList?'disabled':''}>
-          ${inList?'In List — Remove':(!av?statusText:'+ Add to Request List')}
+    const btnHtml=`<button class="req-btn${inList?' selected':''}" data-eid="${eq.id}" onclick="${inList?`removeByEqId(${eq.id})`:`openEqDetail(${eq.id})`}">
+          ${inList?'In List — Remove':'View Details'}
         </button>`;
     const favBtnHtml=`<button class="fav-star${isFav?' on':''}" onclick="event.stopPropagation();toggleFavorite(${eq.id})" title="${isFav?'Remove from favorites':'Add to favorites'}">
         <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
@@ -3034,6 +3084,52 @@ function renderGrid() {
 
 let edCurrentEqId = null;
 let edBaseRate    = 0;
+let edQty         = 1;
+let edMaxQty      = 1;
+
+function edRenderQty() {
+  document.getElementById('edQtyVal').textContent = edQty;
+  document.getElementById('edQtyHint').textContent = edMaxQty + ' available';
+}
+
+function edChangeQty(delta) {
+  const next = edQty + delta;
+  if (next < 1 || next > edMaxQty) return;
+  edQty = next;
+  edRenderQty();
+  updateEdPricing();
+  edSyncCart();
+}
+
+// Pushes the current quantity + selected accessories to the cart — only meaningful once the
+// equipment is already in the Request List (adding fresh goes through edActionBtn instead).
+function edSyncCart() {
+  if (!IS_LOGIN) return;
+  const item = reqList.find(i => i.item_type === 'equipment' && parseInt(i.equipment_id) === edCurrentEqId);
+  if (!item) return;
+  const fd = new FormData();
+  fd.append('_token', CSRF_TOKEN);
+  fd.append('action', 'add_equipment');
+  fd.append('equipment_id', edCurrentEqId);
+  fd.append('quantity', edQty);
+  fd.append('days', item.days || 1);
+  fd.append('accessories_json', JSON.stringify(getSelectedAccessories()));
+  fetch('/cart', { method: 'POST', body: fd }).then(r => r.json()).then(d => {
+    if (d.ok) loadList();
+    else toast(d.error || 'Could not update request list', 'red');
+  });
+}
+
+function edAccQtyChange(accId, delta) {
+  const input = document.querySelector('.ed-opt-qty[data-id="' + accId + '"]');
+  if (!input) return;
+  const max = parseInt(input.dataset.max) || 1;
+  let v = parseInt(input.value) || 1;
+  v = Math.max(1, Math.min(max, v + delta));
+  input.value = v;
+  updateEdPricing();
+  edSyncCart();
+}
 
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function escAttr(s){return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
@@ -3073,6 +3169,17 @@ function openEqDetail(eid) {
 
   document.getElementById('edRate').textContent = '₱' + edBaseRate.toLocaleString('en-PH');
 
+  const existingItem = reqList.find(i => i.item_type === 'equipment' && parseInt(i.equipment_id) === eid);
+  edMaxQty = Math.max(1, parseInt(eq.avail_units) || 0);
+  edQty = Math.min(edMaxQty, existingItem ? (parseInt(existingItem.quantity) || 1) : 1);
+  const qtyWrap = document.getElementById('edQtyWrap');
+  if (eq.avail_state === 'available') {
+    qtyWrap.style.display = '';
+    edRenderQty();
+  } else {
+    qtyWrap.style.display = 'none';
+  }
+
   const opEl = document.getElementById('edOpNote');
   if (eq.req_op) {
     opEl.textContent = 'Operator req\'d' + (eq.op_pos ? ' · ' + eq.op_pos : '') + ' · TF: TBD';
@@ -3109,6 +3216,8 @@ function openEqDetail(eid) {
       const optional = accs.filter(a => !parseInt(a.is_included));
       const cartItem = reqList.find(i => i.item_type === 'equipment' && parseInt(i.equipment_id) === eid);
       const existingAccIds = (cartItem?.accessories || []).map(a => parseInt(a.accessory_id));
+      const existingAccQty = {};
+      (cartItem?.accessories || []).forEach(a => { existingAccQty[parseInt(a.accessory_id)] = parseInt(a.quantity || 1); });
 
       const accThumb = (a) => a.image_path
         ? `<img src="${ASSET_BASE}/${escAttr(a.image_path)}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:6px;flex-shrink:0;border:1px solid var(--border)">`
@@ -3136,24 +3245,35 @@ function openEqDetail(eid) {
           const isAvail = avail > 0;
           const alreadyChecked = existingAccIds.includes(parseInt(a.accessory_id));
           const canCheck = isAvail || alreadyChecked;
+          const qtyMax = Math.max(1, avail);
+          const qtyVal = Math.min(qtyMax, existingAccQty[parseInt(a.accessory_id)] || 1);
           const availBadge = isAvail
             ? `<span style="font-size:.66rem;font-weight:700;color:#15803d;background:#dcfce7;padding:2px 7px;border-radius:20px;white-space:nowrap">${avail} available</span>`
             : `<span style="font-size:.66rem;font-weight:700;color:#dc2626;background:#fee2e2;padding:2px 7px;border-radius:20px;white-space:nowrap">Unavailable</span>`;
+          const qtyStepperHtml = `
+            <div class="ed-opt-qty-wrap" data-id="${a.accessory_id}" style="display:${alreadyChecked?'flex':'none'};align-items:center;gap:5px;margin-top:6px">
+              <button type="button" onclick="event.preventDefault();edAccQtyChange(${a.accessory_id},-1)" style="width:22px;height:22px;border:1px solid var(--border);background:var(--surface);border-radius:5px;font-size:.75rem;cursor:pointer;line-height:1">&minus;</button>
+              <input type="text" class="ed-opt-qty" data-id="${a.accessory_id}" data-max="${qtyMax}" value="${qtyVal}" readonly
+                     style="width:26px;text-align:center;font-size:.76rem;font-weight:700;border:none;background:transparent;pointer-events:none">
+              <button type="button" onclick="event.preventDefault();edAccQtyChange(${a.accessory_id},1)" style="width:22px;height:22px;border:1px solid var(--border);background:var(--surface);border-radius:5px;font-size:.75rem;cursor:pointer;line-height:1">+</button>
+              <span style="font-size:.66rem;color:var(--muted)">of ${qtyMax}</span>
+            </div>`;
           return `
             <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border-radius:8px;border:1.5px solid var(--border);cursor:${canCheck ? 'pointer' : 'not-allowed'};transition:border-color .15s;${isAvail ? '' : 'opacity:.65'}"
-                   ${canCheck ? `onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor=this.querySelector('input').checked?'var(--blue)':'var(--border)'"` : ''}>
+                   ${canCheck ? `onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor=this.querySelector('input[type=checkbox]').checked?'var(--blue)':'var(--border)'"` : ''}>
               ${accThumb(a)}
               <div style="flex:1;min-width:0">
                 <div style="font-size:.82rem;font-weight:600;color:var(--text)">${escHtml(a.accessory_name)}</div>
                 ${a.description?`<div style="font-size:.72rem;color:var(--sub);margin-top:2px">${escHtml(a.description)}</div>`:''}
                 <div style="margin-top:4px">${availBadge}</div>
+                ${isAvail ? qtyStepperHtml : ''}
               </div>
               <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
                 <span style="font-size:.78rem;font-weight:700;color:var(--blue);white-space:nowrap">+₱${rate.toLocaleString('en-PH')}/day</span>
                 <input type="checkbox" class="ed-opt-cb" data-id="${a.accessory_id}" data-rate="${rate}" data-name="${escAttr(a.accessory_name)}"
                        ${alreadyChecked ? 'checked' : ''} ${canCheck ? '' : 'disabled'}
                        style="width:16px;height:16px;cursor:${canCheck ? 'pointer' : 'not-allowed'};accent-color:var(--blue)"
-                       onchange="updateEdPricing();this.closest('label').style.borderColor=this.checked?'var(--blue)':'var(--border)';syncAccessoriesIfInList()">
+                       onchange="updateEdPricing();this.closest('label').style.borderColor=this.checked?'var(--blue)':'var(--border)';const w=this.closest('label').querySelector('.ed-opt-qty-wrap');if(w)w.style.display=this.checked?'flex':'none';edSyncCart()">
               </div>
             </label>`;
         }).join('');
@@ -3170,40 +3290,25 @@ function openEqDetail(eid) {
     });
 }
 
-// Checking/unchecking an accessory while its equipment is already in the request list has
-// nowhere else to go — the modal's main button is just "In List — Remove" at that point, so
-// without this the selection was silently lost (accessories only ever got attached at the
-// moment the equipment itself was first added).
-function syncAccessoriesIfInList() {
-  if (!IS_LOGIN) return;
-  const item = reqList.find(i => i.item_type === 'equipment' && parseInt(i.equipment_id) === edCurrentEqId);
-  if (!item) return;
-  const fd = new FormData();
-  fd.append('_token', CSRF_TOKEN);
-  fd.append('action', 'add_equipment');
-  fd.append('equipment_id', edCurrentEqId);
-  fd.append('quantity', item.quantity || 1);
-  fd.append('days', item.days || 1);
-  fd.append('accessories_json', JSON.stringify(getSelectedAccessories()));
-  fetch('/cart', { method: 'POST', body: fd }).then(r => r.json()).then(d => {
-    if (d.ok) { loadList(); toast('Request list updated', 'blue'); }
-  });
-}
 
 function updateEdPricing() {
   const fmt = n => n.toLocaleString('en-PH');
-  document.getElementById('edPriceEq').textContent = '₱' + fmt(edBaseRate);
+  const eqLineTotal = edBaseRate * edQty;
+  document.getElementById('edPriceLabelEq').textContent = edQty > 1 ? 'Equipment ×' + edQty : 'Equipment';
+  document.getElementById('edPriceEq').textContent = '₱' + fmt(eqLineTotal);
   let optTotal = 0;
   let rowsHtml = '';
   document.querySelectorAll('.ed-opt-cb:checked').forEach(cb => {
-    const r = parseInt(cb.dataset.rate);
+    const qtyInput = document.querySelector('.ed-opt-qty[data-id="' + cb.dataset.id + '"]');
+    const qty = qtyInput ? Math.max(1, parseInt(qtyInput.value) || 1) : 1;
+    const r = parseInt(cb.dataset.rate) * qty;
     optTotal += r;
     rowsHtml += `<div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:6px">
-      <span style="color:var(--sub)">${escHtml(cb.dataset.name)}</span>
+      <span style="color:var(--sub)">${escHtml(cb.dataset.name)}${qty>1?' ×'+qty:''}</span>
       <span style="font-weight:600">+₱${fmt(r)}</span></div>`;
   });
   document.getElementById('edPriceOptRows').innerHTML = rowsHtml;
-  document.getElementById('edPriceTotal').textContent = '₱' + fmt(edBaseRate + optTotal);
+  document.getElementById('edPriceTotal').textContent = '₱' + fmt(eqLineTotal + optTotal);
 }
 
 function refreshEdActionBtn() {
@@ -3229,14 +3334,14 @@ function refreshEdActionBtn() {
     btn.disabled         = true;
     btn.onclick          = null;
   } else {
-    btn.textContent      = '+ Add to Request List';
+    btn.textContent      = edQty > 1 ? ('+ Add ' + edQty + ' to Request List') : '+ Add to Request List';
     btn.style.background = 'var(--blue)';
     btn.style.color      = '#fff';
     btn.style.outline    = 'none';
     btn.disabled         = false;
     // Accessory selection only sticks server-side once there's a real cart row to attach it to —
     // guests get the base equipment added now and can pick accessories again after signing in.
-    btn.onclick          = () => { toggleEquipment(edCurrentEqId, IS_LOGIN ? getSelectedAccessories() : undefined); setTimeout(refreshEdActionBtn, 450); };
+    btn.onclick          = () => { toggleEquipment(edCurrentEqId, edQty, IS_LOGIN ? getSelectedAccessories() : undefined); setTimeout(refreshEdActionBtn, 450); };
   }
 }
 

@@ -42,30 +42,13 @@ class HomeController extends Controller
                 ->select('a.accessory_id', 'a.accessory_name', 'a.description', 'a.daily_rate', 'a.is_included', 'a.image_path', 'a.tracking_method', 'a.quantity')
                 ->get();
 
-            // Same availability math AccessoriesController uses for the admin page: individually
-            // tracked accessories count their real accessory_units at status=available; quantity-
-            // tracked ones subtract what's already committed to other active bookings from the
-            // plain quantity column. Nothing in the client-facing Optional Add-Ons list showed
-            // this before, so a client could check out an accessory with zero left.
-            $accIds = $accs->pluck('accessory_id');
-            $unitAvailCounts = DB::table('accessory_units')
-                ->whereIn('accessory_id', $accIds)
-                ->where('status', 'available')
-                ->select('accessory_id', DB::raw('COUNT(*) as c'))
-                ->groupBy('accessory_id')
-                ->pluck('c', 'accessory_id');
-            $inUseByAcc = DB::table('booking_accessories as ba')
-                ->join('bookings as b', 'ba.booking_id', '=', 'b.booking_id')
-                ->whereIn('ba.accessory_id', $accIds)
-                ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
-                ->select('ba.accessory_id', DB::raw('SUM(ba.quantity) as q'))
-                ->groupBy('ba.accessory_id')
-                ->pluck('q', 'accessory_id');
-
+            // Nothing in the client-facing Optional Add-Ons list showed real availability before,
+            // so a client could check out an accessory with zero left — see AccessoryAvailability
+            // for the shared math (also used by CartController's add-to-cart validation, so the
+            // two can never disagree).
+            $availByAcc = \App\Support\AccessoryAvailability::bulkAvailable($accs->pluck('accessory_id')->all());
             foreach ($accs as $acc) {
-                $acc->available_units = ($acc->tracking_method ?? 'quantity') === 'individual'
-                    ? (int) ($unitAvailCounts[$acc->accessory_id] ?? 0)
-                    : max(0, (int) ($acc->quantity ?? 1) - (int) ($inUseByAcc[$acc->accessory_id] ?? 0));
+                $acc->available_units = $availByAcc[$acc->accessory_id] ?? 0;
             }
 
             return response()->json($accs);

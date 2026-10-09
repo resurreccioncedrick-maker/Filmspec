@@ -116,7 +116,7 @@ class CartController extends Controller
             $accRows = DB::table('booking_cart_accessories as bca')
                 ->join('accessories as a', 'bca.accessory_id', '=', 'a.accessory_id')
                 ->whereIn('bca.cart_id', $cartIds)
-                ->select('bca.cart_id', 'a.accessory_id', 'a.accessory_name', 'a.daily_rate')
+                ->select('bca.cart_id', 'a.accessory_id', 'a.accessory_name', 'a.daily_rate', 'bca.quantity')
                 ->get();
             foreach ($accRows as $row) {
                 $accByCart[$row->cart_id][] = $row;
@@ -146,19 +146,46 @@ class CartController extends Controller
             return response()->json(['error' => 'Equipment is not available for booking']);
         }
 
-        // Only accessory_id is ever trusted from the client — name/price are client-supplied
-        // in the raw payload but must never be persisted from here; submitBooking() re-derives
-        // both from the accessories table at insert time, so storing them here would be pointless
-        // (and previously let a tampered daily_rate ride all the way into the final cost estimate).
+        // Right-now available units (not date-specific — EquipmentAvailability::check() at
+        // final submit is the date-aware authority) — same hybrid used on the catalog/detail
+        // badges, so the cap shown to the client can never disagree with what's enforced here.
+        $unitCount = (int) DB::table('equipment_units')->where('equipment_id', $eid)->where('status', '!=', 'retired')->count();
+        $availableUnits = $unitCount > 0
+            ? (int) DB::table('equipment_units')->where('equipment_id', $eid)->where('status', 'available')->count()
+            : max(1, (int) $equipment->stock_quantity);
+        if ($qty > $availableUnits) {
+            return response()->json(['error' => "Only $availableUnits unit(s) of this equipment are available right now."]);
+        }
+
+        // Only accessory_id/quantity are ever trusted from the client — name/price are
+        // client-supplied in the raw payload but must never be persisted from here;
+        // submitBooking() re-derives both from the accessories table at insert time, so storing
+        // them here would be pointless (and previously let a tampered daily_rate ride all the
+        // way into the final cost estimate). Each accessory's quantity is clamped to what's
+        // actually available right now, same math the Optional Add-Ons list itself shows.
         $accRaw = trim($request->input('accessories_json', ''));
-        $validIds = [];
+        $validAcc = [];
         if ($accRaw) {
             $decoded = json_decode($accRaw, true);
             if (is_array($decoded) && ! empty($decoded)) {
-                $accIds = array_values(array_unique(array_filter(array_map(
-                    fn ($a) => (int) ($a['accessory_id'] ?? 0), $decoded
-                ))));
-                $validIds = $accIds ? DB::table('accessories')->whereIn('accessory_id', $accIds)->pluck('accessory_id')->all() : [];
+                $reqByAccId = [];
+                foreach ($decoded as $a) {
+                    $accId = (int) ($a['accessory_id'] ?? 0);
+                    if ($accId) {
+                        $reqByAccId[$accId] = max(1, (int) ($a['quantity'] ?? 1));
+                    }
+                }
+                if ($reqByAccId) {
+                    $existingIds = DB::table('accessories')->whereIn('accessory_id', array_keys($reqByAccId))->pluck('accessory_id')->all();
+                    $availByAcc = \App\Support\AccessoryAvailability::bulkAvailable($existingIds);
+                    foreach ($existingIds as $accId) {
+                        $cap = $availByAcc[$accId] ?? 0;
+                        if ($cap <= 0) {
+                            continue; // nothing left — silently dropped, same as an unselected checkbox
+                        }
+                        $validAcc[$accId] = min($reqByAccId[$accId], $cap);
+                    }
+                }
             }
         }
 
@@ -174,9 +201,10 @@ class CartController extends Controller
         // Always replace with the server-validated set for this cart row, same as the old
         // accessories_json column did on every add/update.
         DB::table('booking_cart_accessories')->where('cart_id', $cartId)->delete();
-        if ($validIds) {
+        if ($validAcc) {
             DB::table('booking_cart_accessories')->insert(array_map(
-                fn ($accId) => ['cart_id' => $cartId, 'accessory_id' => $accId], $validIds
+                fn ($accId, $accQty) => ['cart_id' => $cartId, 'accessory_id' => $accId, 'quantity' => $accQty],
+                array_keys($validAcc), array_values($validAcc)
             ));
         }
 
@@ -289,11 +317,20 @@ class CartController extends Controller
         // List instead of being silently dropped, which is what made "Book Again" look like
         // it wasn't reproducing the same list.
         if ($copied && $firstCartId) {
-            $accIds = DB::table('booking_accessories')->where('booking_id', $bookingId)->pluck('accessory_id')->unique();
-            if ($accIds->isNotEmpty()) {
-                DB::table('booking_cart_accessories')->insertOrIgnore(
-                    $accIds->map(fn ($accId) => ['cart_id' => $firstCartId, 'accessory_id' => $accId])->all()
-                );
+            $origAccRows = DB::table('booking_accessories')->where('booking_id', $bookingId)
+                ->select('accessory_id', 'quantity')->get()->unique('accessory_id');
+            if ($origAccRows->isNotEmpty()) {
+                $availByAcc = \App\Support\AccessoryAvailability::bulkAvailable($origAccRows->pluck('accessory_id')->all());
+                $rows = $origAccRows
+                    ->map(fn ($r) => [
+                        'cart_id' => $firstCartId, 'accessory_id' => $r->accessory_id,
+                        'quantity' => min(max(1, (int) $r->quantity), max(1, $availByAcc[$r->accessory_id] ?? 1)),
+                    ])
+                    ->filter(fn ($r) => ($availByAcc[$r['accessory_id']] ?? 0) > 0)
+                    ->values()->all();
+                if ($rows) {
+                    DB::table('booking_cart_accessories')->insertOrIgnore($rows);
+                }
             }
         }
 
@@ -535,21 +572,23 @@ class CartController extends Controller
                         'days' => $numDays, 'daily_rate' => $rate,
                     ]);
 
-                    $accIds = DB::table('booking_cart_accessories')->where('cart_id', $it->cart_id)->pluck('accessory_id')->all();
-                    if ($accIds) {
+                    $cartAccRows = DB::table('booking_cart_accessories')->where('cart_id', $it->cart_id)->get();
+                    if ($cartAccRows->isNotEmpty()) {
                         // Price and name always come from the accessories table, never from
-                        // the client-supplied JSON — see addEquipment()'s comment.
-                        $realAccessories = DB::table('accessories')->whereIn('accessory_id', $accIds)->get()->keyBy('accessory_id');
-                        foreach ($accIds as $accId) {
-                            $real = $realAccessories->get($accId);
+                        // the client-supplied JSON — see addEquipment()'s comment. Quantity comes
+                        // from the cart row, already clamped to availability at add-to-cart time.
+                        $realAccessories = DB::table('accessories')->whereIn('accessory_id', $cartAccRows->pluck('accessory_id'))->get()->keyBy('accessory_id');
+                        foreach ($cartAccRows as $cartAcc) {
+                            $real = $realAccessories->get($cartAcc->accessory_id);
                             if (! $real) {
                                 continue;
                             }
+                            $accQty = max(1, (int) $cartAcc->quantity);
                             $accRate = (float) $real->daily_rate;
-                            $accSub = $numDays * $accRate;
+                            $accSub = $numDays * $accRate * $accQty;
                             $accTotal += $accSub;
                             DB::table('booking_accessories')->insertOrIgnore([
-                                'booking_id' => $bid, 'accessory_id' => $accId, 'quantity' => 1, 'days' => $numDays,
+                                'booking_id' => $bid, 'accessory_id' => $cartAcc->accessory_id, 'quantity' => $accQty, 'days' => $numDays,
                                 'daily_rate' => $accRate, 'is_included' => 0, 'subtotal' => $accSub,
                                 'notes' => 'Added with equipment: ' . $real->accessory_name,
                             ]);
