@@ -2618,7 +2618,12 @@ function renderPanel(reqOps) {
       equipSubtotal += accSub;
       accHtml += `<div class="rli-crew-est">
         <span class="crew-est-icon">&#43;</span>
-        <span>${acc.accessory_name}${accQty>1?' ×'+accQty:''}</span>
+        <span>${acc.accessory_name}</span>
+        <div style="display:flex;align-items:center;gap:1px;border:1px solid var(--border);border-radius:5px;background:var(--surface);flex-shrink:0">
+          <button type="button" onclick="rlChangeAccQty(${item.cart_id},${acc.accessory_id},-1)" title="Decrease quantity" style="width:16px;height:16px;border:none;background:transparent;font-size:.68rem;cursor:pointer;line-height:1;color:var(--sub)">&minus;</button>
+          <span style="font-size:10px;font-weight:700;min-width:11px;text-align:center">${accQty}</span>
+          <button type="button" onclick="rlChangeAccQty(${item.cart_id},${acc.accessory_id},1)" title="Increase quantity" style="width:16px;height:16px;border:none;background:transparent;font-size:.68rem;cursor:pointer;line-height:1;color:var(--sub)">+</button>
+        </div>
         <span class="rli-amount crew-est-amt">₱${fmt(accSub)}</span>
         <button class="rli-acc-remove" onclick="removeAccessory(${item.cart_id},${acc.accessory_id})" title="Remove accessory">&times;</button>
       </div>`;
@@ -2695,6 +2700,30 @@ function rlChangeQty(cartId, delta) {
   fd.append('quantity', next);
   fd.append('days', item.days || 1);
   fd.append('accessories_json', JSON.stringify((item.accessories||[]).map(a => ({ accessory_id: a.accessory_id, quantity: a.quantity || 1 }))));
+  fetch('/cart', { method: 'POST', body: fd }).then(r => r.json()).then(d => {
+    if (d.ok) loadList();
+    else toast(d.error || 'Could not update quantity', 'red');
+  });
+}
+
+function rlChangeAccQty(cartId, accessoryId, delta) {
+  if (!IS_LOGIN) return; // accessories aren't tracked in the guest-mode local cart at all
+  const item = reqList.find(i => i.item_type === 'equipment' && String(i.cart_id) === String(cartId));
+  if (!item) return;
+  const accessories = (item.accessories || []).map(a => {
+    const qty = parseInt(a.quantity || 1);
+    return {
+      accessory_id: a.accessory_id,
+      quantity: parseInt(a.accessory_id) === parseInt(accessoryId) ? Math.max(1, qty + delta) : qty,
+    };
+  });
+  const fd = new FormData();
+  fd.append('_token', CSRF_TOKEN);
+  fd.append('action', 'add_equipment');
+  fd.append('equipment_id', item.equipment_id);
+  fd.append('quantity', item.quantity || 1);
+  fd.append('days', item.days || 1);
+  fd.append('accessories_json', JSON.stringify(accessories));
   fetch('/cart', { method: 'POST', body: fd }).then(r => r.json()).then(d => {
     if (d.ok) loadList();
     else toast(d.error || 'Could not update quantity', 'red');
