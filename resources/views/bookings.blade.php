@@ -355,21 +355,11 @@
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label>Booking Type *</label>
-            <select name="booking_type" class="form-control" required>
-              <option value="package">Equipment + Crew</option>
-              <option value="equipment_only">Equipment Only</option>
-              <option value="crew_only">Crew Only</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Project Type *</label>
-            <select name="project_type" class="form-control" required>
-              @include('partials.project-type-options')
-            </select>
-          </div>
+        <div class="form-group">
+          <label>Project Type *</label>
+          <select name="project_type" class="form-control" required>
+            @include('partials.project-type-options')
+          </select>
         </div>
 
         <div class="form-group">
@@ -488,7 +478,6 @@ document.addEventListener('DOMContentLoaded', () => checkDateRange('shoot_start'
 
 function openEditBooking(bk) {
   document.getElementById('edit_bid').value             = bk.booking_id;
-  document.getElementById('edit_btype').value           = bk.booking_type;
   document.getElementById('edit_ptype').value           = bk.project_type;
   document.getElementById('edit_ptitle').value          = bk.project_title      || '';
   document.getElementById('edit_bstart').value          = bk.shoot_date_start   || '';
@@ -868,21 +857,11 @@ document.addEventListener('DOMContentLoaded', () => {
       <input type="hidden" name="action" value="edit_booking">
       <input type="hidden" name="booking_id" id="edit_bid">
       <div class="modal-body">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Booking Type *</label>
-            <select name="booking_type" id="edit_btype" class="form-control" required>
-              <option value="package">Equipment + Crew</option>
-              <option value="equipment_only">Equipment Only</option>
-              <option value="crew_only">Crew Only</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Project Type *</label>
-            <select name="project_type" id="edit_ptype" class="form-control" required>
-              @include('partials.project-type-options')
-            </select>
-          </div>
+        <div class="form-group">
+          <label>Project Type *</label>
+          <select name="project_type" id="edit_ptype" class="form-control" required>
+            @include('partials.project-type-options')
+          </select>
         </div>
         <div class="form-group">
           <label>Project Title</label>

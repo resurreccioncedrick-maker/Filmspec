@@ -366,7 +366,6 @@ class BookingsController extends Controller
 
         if ($bid && $ds && $de) {
             Booking::where('booking_id', $bid)->update([
-                'booking_type' => $request->input('booking_type', ''),
                 'project_title' => $request->input('project_title', ''),
                 'project_type' => $request->input('project_type', ''),
                 'shoot_date_start' => $ds,
@@ -489,7 +488,7 @@ class BookingsController extends Controller
             $booking = Booking::create([
                 'booking_reference' => $ref,
                 'client_id' => $clientId,
-                'booking_type' => $request->input('booking_type'),
+                'booking_type' => 'package',
                 'project_title' => $request->input('project_title', ''),
                 'project_type' => $request->input('project_type'),
                 'shoot_date_start' => $ds,
