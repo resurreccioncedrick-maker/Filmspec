@@ -813,7 +813,12 @@
                     <option value="final">Final Balance</option>
                   </select>
                 </div>
-                <div class="rp-row"><span>Document Type</span><strong id="bkDocType">—</strong></div>
+                <div class="rp-row"><span>Document Type</span>
+                  <select name="receipt_type" id="bkDocType" class="rp-purpose-select">
+                    <option value="official_receipt">Official Receipt (VAT)</option>
+                    <option value="acknowledgement_receipt">Acknowledgement Receipt</option>
+                  </select>
+                </div>
                 <div class="rp-row rp-row-suggest"><span>Suggested Amount Due</span><strong id="bkSuggested">—</strong></div>
               </div>
             </div>
@@ -1130,7 +1135,7 @@ function fillPaymentInfoFromData(total, paid, isVat) {
   document.getElementById('bkTotal').textContent = fmt(total);
   document.getElementById('bkPaid').textContent = fmt(paid);
   document.getElementById('bkBalance').textContent = fmt(_rpBalance);
-  document.getElementById('bkDocType').textContent = isVat ? 'Official Receipt (VAT)' : 'Acknowledgement Receipt';
+  document.getElementById('bkDocType').value = isVat ? 'official_receipt' : 'acknowledgement_receipt';
   document.getElementById('bkSuggested').textContent = _rpBalance > 0 ? fmt(_rpBalance) : '—';
   document.getElementById('payAmountMax').textContent = _rpBalance > 0 ? 'Max: ' + fmt(_rpBalance) : '';
 
@@ -1171,6 +1176,7 @@ function resetPaymentModal() {
   document.getElementById('payAmountMax').textContent = '';
   document.getElementById('payFullSettleNote').style.display = 'none';
   document.getElementById('payType').value = 'downpayment';
+  document.getElementById('bkDocType').value = 'official_receipt';
   _rpTotal = 0; _rpPaid = 0; _rpBalance = 0; _rpPurposeManual = false;
 }
 

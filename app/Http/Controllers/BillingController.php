@@ -487,10 +487,14 @@ class BillingController extends Controller
             if (! $bookingClient) {
                 return ['type' => 'danger', 'text' => 'Booking not found.'];
             }
-            // Document type is derived from the client's own VAT registration, not a checkbox
-            // the person recording the payment could pick either way for the same client.
-            $isVat = (int) $bookingClient->is_vat_registered ? 1 : 0;
-            $rctype = $isVat ? 'official_receipt' : 'acknowledgement_receipt';
+            // Document type defaults to the client's own VAT registration, but the Billing
+            // modal's dropdown lets staff override it per payment for the rare exception
+            // (e.g. the client record's VAT flag is wrong or stale) — never silently ignored.
+            $rctypeInput = $request->input('receipt_type', '');
+            $rctype = in_array($rctypeInput, ['official_receipt', 'acknowledgement_receipt'], true)
+                ? $rctypeInput
+                : ((int) $bookingClient->is_vat_registered ? 'official_receipt' : 'acknowledgement_receipt');
+            $isVat = $rctype === 'official_receipt' ? 1 : 0;
             $rcPrefix = $isVat ? 'OR' : 'AR';
 
             // The remaining-balance check and the insert both happen inside the same

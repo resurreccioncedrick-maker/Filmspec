@@ -2093,8 +2093,12 @@
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label>Document Type</label>
-          <div style="font-size:.85rem;color:var(--sub);padding:8px 0">
-            {{ $booking->is_vat_registered ? 'Official Receipt (VAT) — this client is VAT-registered' : 'Acknowledgement Receipt — this client is not VAT-registered' }}
+          <select name="receipt_type" class="form-control">
+            <option value="official_receipt" {{ $booking->is_vat_registered ? 'selected' : '' }}>Official Receipt (VAT)</option>
+            <option value="acknowledgement_receipt" {{ ! $booking->is_vat_registered ? 'selected' : '' }}>Acknowledgement Receipt</option>
+          </select>
+          <div style="font-size:.78rem;color:var(--sub);padding-top:4px">
+            Defaults to {{ $booking->is_vat_registered ? 'Official Receipt since this client is VAT-registered' : 'Acknowledgement Receipt since this client is not VAT-registered' }} — override only if that's wrong for this payment.
           </div>
         </div>
       </div>

@@ -1032,14 +1032,17 @@ class BookingDetailController extends Controller
             }
         }
 
-        // Matches BillingController::handleAction()'s record_payment branch — document type is
-        // derived from the client's own VAT registration, never a checkbox on this form, so the
-        // same client gets the same receipt type regardless of which page recorded the payment.
+        // Matches BillingController::handleAction()'s record_payment branch — document type
+        // defaults to the client's own VAT registration but can be overridden per payment via
+        // the form's dropdown, for the rare case the client record's VAT flag is wrong or stale.
         $isVatRegistered = (int) DB::table('bookings as b')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
             ->where('b.booking_id', $id)->value('c.is_vat_registered');
-        $isVat = $isVatRegistered ? 1 : 0;
-        $rctype = $isVat ? 'official_receipt' : 'acknowledgement_receipt';
+        $rctypeInput = $request->input('receipt_type', '');
+        $rctype = in_array($rctypeInput, ['official_receipt', 'acknowledgement_receipt'], true)
+            ? $rctypeInput
+            : ($isVatRegistered ? 'official_receipt' : 'acknowledgement_receipt');
+        $isVat = $rctype === 'official_receipt' ? 1 : 0;
         $rcPrefix = $isVat ? 'OR' : 'AR';
 
         // The remaining-balance check and the insert both happen inside the same
