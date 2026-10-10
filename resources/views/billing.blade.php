@@ -765,6 +765,7 @@
 .rp-row:last-child{border-bottom:none}
 .rp-row strong{color:var(--text);font-weight:700}
 .rp-row-suggest strong{color:var(--accent)}
+.rp-purpose-select{font:inherit;font-weight:700;color:var(--text);background:var(--surface);border:1px solid var(--border2);border-radius:5px;padding:3px 7px;cursor:pointer}
 .rp-found{display:none;align-items:center;gap:5px;font-size:.74rem;color:var(--green);font-weight:600;margin-top:5px}
 .rp-found.show{display:flex}
 .rp-2col{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
@@ -783,7 +784,6 @@
     <form method="POST" action="{{ $billingBase }}" onsubmit="return prepPayment()" enctype="multipart/form-data">
       @csrf
       <input type="hidden" name="action" value="record_payment">
-      <input type="hidden" name="payment_type" id="payType" value="downpayment">
       <div class="modal-body">
         <div class="rp-2col">
 
@@ -806,7 +806,13 @@
                 <div class="rp-row"><span>Billing Total</span><strong id="bkTotal">—</strong></div>
                 <div class="rp-row"><span>Total Paid to Date</span><strong id="bkPaid" style="color:var(--green)">—</strong></div>
                 <div class="rp-row"><span>Outstanding Balance</span><strong id="bkBalance" style="color:var(--red)">—</strong></div>
-                <div class="rp-row"><span>Payment Purpose</span><strong id="bkPurpose">—</strong></div>
+                <div class="rp-row"><span>Payment Purpose</span>
+                  <select name="payment_type" id="payType" class="rp-purpose-select" onchange="onPayPurposeChange()">
+                    <option value="downpayment">Downpayment</option>
+                    <option value="progress">Progress Payment</option>
+                    <option value="final">Final Balance</option>
+                  </select>
+                </div>
                 <div class="rp-row"><span>Document Type</span><strong id="bkDocType">—</strong></div>
                 <div class="rp-row rp-row-suggest"><span>Suggested Amount Due</span><strong id="bkSuggested">—</strong></div>
               </div>
@@ -1112,10 +1118,11 @@ function prepPayment() {
 
 // Module-level state for the currently-selected booking, so the amount field can be edited
 // after selection and everything downstream (purpose, full-settle note) stays in sync.
-let _rpTotal = 0, _rpPaid = 0, _rpBalance = 0;
+let _rpTotal = 0, _rpPaid = 0, _rpBalance = 0, _rpPurposeManual = false;
 
 function fillPaymentInfoFromData(total, paid, isVat) {
   _rpTotal = total; _rpPaid = paid; _rpBalance = Math.max(0, total - paid);
+  _rpPurposeManual = false; // new booking selected — go back to auto-suggesting a purpose
   const fmt = (n) => '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2 });
 
   document.getElementById('bkgFoundNote').classList.add('show');
@@ -1132,24 +1139,27 @@ function fillPaymentInfoFromData(total, paid, isVat) {
   onPayAmountChange();
 }
 
-// Payment Type/Purpose auto-derive from where this payment lands relative to the booking's
+// Payment Type/Purpose auto-derives from where this payment lands relative to the booking's
 // billing state — first payment is a Downpayment, a payment that fully settles what's left is
-// the Final Payment, anything else in between is a Progress Payment. Still just a *default*:
-// the dropdown stays editable for the rare case staff need to override it.
+// the Final Balance, anything else in between is a Progress Payment. Still just a *default*:
+// the dropdown stays editable, and once staff pick a purpose themselves we stop overriding it
+// on every amount keystroke (onPayPurposeChange sets _rpPurposeManual).
 function onPayAmountChange() {
   const amt = parseFloat(document.getElementById('payAmount').value) || 0;
-  let purpose = 'Downpayment', type = 'downpayment';
-  if (_rpPaid > 0) {
-    if (amt >= _rpBalance - 0.005 && _rpBalance > 0) { purpose = 'Final Balance'; type = 'final'; }
-    else { purpose = 'Progress Payment'; type = 'progress'; }
+
+  if (!_rpPurposeManual) {
+    let type = 'downpayment';
+    if (_rpPaid > 0) { type = (amt >= _rpBalance - 0.005 && _rpBalance > 0) ? 'final' : 'progress'; }
+    const typeSel = document.getElementById('payType');
+    if (typeSel) typeSel.value = type;
   }
-  const purposeEl = document.getElementById('bkPurpose');
-  if (purposeEl) purposeEl.textContent = purpose;
-  const typeSel = document.getElementById('payType');
-  if (typeSel) typeSel.value = type;
 
   const settleNote = document.getElementById('payFullSettleNote');
   if (settleNote) settleNote.style.display = (_rpBalance > 0 && amt >= _rpBalance - 0.005) ? 'block' : 'none';
+}
+
+function onPayPurposeChange() {
+  _rpPurposeManual = true;
 }
 
 function resetPaymentModal() {
@@ -1161,7 +1171,7 @@ function resetPaymentModal() {
   document.getElementById('payAmountMax').textContent = '';
   document.getElementById('payFullSettleNote').style.display = 'none';
   document.getElementById('payType').value = 'downpayment';
-  _rpTotal = 0; _rpPaid = 0; _rpBalance = 0;
+  _rpTotal = 0; _rpPaid = 0; _rpBalance = 0; _rpPurposeManual = false;
 }
 
 function openPayForBooking(bookingId) {
