@@ -1481,37 +1481,46 @@ a.footer-contact-link:hover{color:#60b0ff}
 }
 
 /* Support chat (client-only, sticky bottom-right) */
-.sup-fab{position:fixed;bottom:22px;right:22px;width:44px;height:44px;border-radius:12px;background:var(--surface);border:1.5px solid var(--border2);box-shadow:0 2px 8px rgba(0,30,80,.08);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:900}
+.sup-fab{position:fixed;bottom:22px;right:22px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--blue2));border:none;box-shadow:0 6px 20px rgba(0,96,199,.35),0 2px 6px rgba(0,30,80,.15);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:900;transition:transform .2s,box-shadow .2s}
+.sup-fab:hover{transform:translateY(-2px) scale(1.04);box-shadow:0 10px 26px rgba(0,96,199,.4),0 2px 8px rgba(0,30,80,.18)}
 .sup-fab.rl-hide{display:none}
-.sup-fab svg{width:19px;height:19px;color:var(--blue)}
-.sup-fab-badge{position:absolute;top:-3px;right:-3px;width:17px;height:17px;border-radius:50%;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
+.sup-fab svg{width:22px;height:22px;color:#fff}
+.sup-fab-badge{position:absolute;top:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2.5px solid var(--bg)}
 .sup-overlay{display:none;position:fixed;inset:0;backdrop-filter:blur(6px) saturate(1.05);-webkit-backdrop-filter:blur(6px) saturate(1.05);background:rgba(11,26,51,.14);z-index:950}
 .sup-overlay.open{display:block}
-.sup-panel{position:fixed;bottom:22px;right:22px;width:320px;max-height:min(70vh,520px);background:var(--surface);border-radius:8px;box-shadow:0 4px 20px rgba(0,30,80,.10);border:1px solid var(--border);display:none;flex-direction:column;overflow:hidden;z-index:960}
+.sup-panel{position:fixed;bottom:22px;right:22px;width:328px;max-height:min(70vh,540px);background:var(--surface);border-radius:18px;box-shadow:0 16px 48px rgba(0,30,80,.18),0 2px 10px rgba(0,30,80,.08);border:1px solid var(--border);display:none;flex-direction:column;overflow:hidden;z-index:960}
 .sup-panel.open{display:flex}
-.sup-h{padding:11px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--border)}
-.sup-h .t{font-weight:700;font-size:12.5px;color:var(--text)}
-.sup-h .s{font-size:10.5px;color:var(--muted)}
-.sup-close{margin-left:auto;width:22px;height:22px;border:none;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
-.sup-close svg{width:13px;height:13px}
-.sup-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;background:var(--surface)}
+.sup-h{padding:16px 18px;display:flex;align-items:center;gap:11px;flex-shrink:0;background:linear-gradient(135deg,var(--blue),var(--blue2))}
+.sup-h-avatar{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+.sup-h-avatar svg{width:18px;height:18px;color:#fff}
+.sup-h-dot{position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-radius:50%;background:#22c55e;border:2px solid var(--blue)}
+.sup-h .t{font-weight:700;font-size:13.5px;color:#fff}
+.sup-h .s{font-size:10.5px;color:rgba(255,255,255,.75);margin-top:1px}
+.sup-close{margin-left:auto;width:26px;height:26px;border:none;background:rgba(255,255,255,.14);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;flex-shrink:0;transition:background .15s}
+.sup-close:hover{background:rgba(255,255,255,.26)}
+.sup-close svg{width:12px;height:12px}
+.sup-body{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;background:var(--s2)}
 .sup-cluster{display:flex;flex-direction:column;gap:3px;margin-bottom:3px}
 .sup-cluster.me{align-items:flex-end}
 .sup-cluster.them{align-items:flex-start}
-.sup-bubble{max-width:74%;padding:8px 12px;border-radius:14px;font-size:12.5px;line-height:1.45;white-space:pre-wrap}
-.sup-cluster.me .sup-bubble{background:var(--blue);color:#fff;border-bottom-right-radius:4px}
-.sup-cluster.them .sup-bubble{background:var(--surface);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:4px}
-.sup-meta{font-family:var(--font-m);font-size:9.5px;color:var(--muted);margin:2px 3px 10px}
-.sup-empty{text-align:center;color:var(--muted);font-size:12.5px;padding:28px 10px}
-.sup-input{display:flex;flex-direction:column;gap:6px;padding:10px 12px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
-.sup-input-row{display:flex;gap:8px;align-items:flex-end}
-.sup-input textarea{flex:1;border:none;border-bottom:1.5px solid var(--border2);border-radius:0;padding:5px 2px;font-size:12.5px;font-family:var(--font-b);outline:none;background:none;resize:none;max-height:80px}
-.sup-input textarea:focus{border-color:var(--blue)}
-.sup-send{width:28px;height:28px;border:none;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--blue)}
-.sup-send svg{width:16px;height:16px}
-.sup-attach-btn{width:28px;height:28px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--muted)}
+.sup-bubble{max-width:76%;padding:9px 13px;border-radius:16px;font-size:12.5px;line-height:1.48;white-space:pre-wrap}
+.sup-cluster.me .sup-bubble{background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;border-bottom-right-radius:4px;box-shadow:0 2px 8px rgba(0,96,199,.25)}
+.sup-cluster.them .sup-bubble{background:var(--surface);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(13,31,60,.04)}
+.sup-meta{font-family:var(--font-m);font-size:9.5px;color:var(--muted);margin:3px 4px 12px}
+.sup-seen{display:flex;align-items:center;gap:3px;justify-content:flex-end;font-size:9.5px;color:var(--blue);font-weight:600;margin:-8px 4px 10px}
+.sup-seen svg{width:11px;height:11px}
+.sup-empty{text-align:center;color:var(--muted);font-size:12.5px;padding:40px 16px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.sup-empty svg{width:34px;height:34px;color:var(--bluemid)}
+.sup-input{display:flex;flex-direction:column;gap:7px;padding:11px 12px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
+.sup-input-row{display:flex;gap:4px;align-items:flex-end;background:var(--s2);border:1.5px solid var(--border);border-radius:22px;padding:4px 5px 4px 12px;transition:border-color .15s}
+.sup-input-row:focus-within{border-color:var(--bluemid)}
+.sup-input textarea{flex:1;border:none;padding:7px 2px;font-size:12.5px;font-family:var(--font-b);outline:none;background:none;resize:none;max-height:80px;color:var(--text)}
+.sup-send{width:30px;height:30px;border:none;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:#fff;transition:background .15s}
+.sup-send:hover{background:var(--blue2)}
+.sup-send svg{width:14px;height:14px}
+.sup-attach-btn{width:28px;height:28px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--muted);border-radius:50%;transition:background .15s,color .15s}
 .sup-attach-btn svg{width:16px;height:16px}
-.sup-attach-btn:hover{color:var(--blue)}
+.sup-attach-btn:hover{color:var(--blue);background:var(--bluelt)}
 .sup-file-chip{display:none;align-items:center;gap:6px;background:var(--bluelt);color:var(--blue);border-radius:8px;padding:5px 9px;font-size:11.5px;font-weight:600;max-width:100%}
 .sup-file-chip.show{display:flex}
 .sup-file-chip svg{width:12px;height:12px;flex-shrink:0}
@@ -2061,7 +2070,7 @@ a.footer-contact-link:hover{color:#60b0ff}
         <div style="font-size:12.5px;color:var(--text-muted,#64748b)">Message our team directly and we'll get back to you.</div>
       </div>
       @if ($isLoggedIn)
-      <button class="hbtn blue" style="font-size:13px;padding:10px 18px" onclick="showPage('account',null)">Contact FilmSpec &rarr;</button>
+      <button class="hbtn blue" style="font-size:13px;padding:10px 18px" onclick="toggleSupportChat()">Contact FilmSpec &rarr;</button>
       @else
       <button class="hbtn blue" style="font-size:13px;padding:10px 18px" onclick="requireAuth()">Sign In to Contact FilmSpec</button>
       @endif
@@ -3412,6 +3421,10 @@ document.addEventListener('DOMContentLoaded',()=>{
 <div class="sup-overlay" id="supOverlay" onclick="closeSupportChat()"></div>
 <div class="sup-panel" id="supPanel">
   <div class="sup-h">
+    <div class="sup-h-avatar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
+      <span class="sup-h-dot"></span>
+    </div>
     <div>
       <div class="t">FilmSpec Team</div>
       <div class="s">Usually replies within a few hours</div>
@@ -3420,7 +3433,15 @@ document.addEventListener('DOMContentLoaded',()=>{
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>
   </div>
-  <div class="sup-body" id="supBody" data-last-id="{{ $supportMessages->last()->message_id ?? 0 }}">
+  @php
+    $supLastMsg = $supportMessages->last();
+    $supSeen = $supLastMsg && $supLastMsg->author_role === 'client' && $staffLastRead
+      && \Carbon\Carbon::parse($supLastMsg->created_at)->lte(\Carbon\Carbon::parse($staffLastRead));
+  @endphp
+  <div class="sup-body" id="supBody"
+       data-last-id="{{ $supLastMsg->message_id ?? 0 }}"
+       data-last-role="{{ $supLastMsg->author_role ?? '' }}"
+       data-last-at="{{ $supLastMsg->created_at ?? '' }}">
     @if ($supportMsg)
     <div style="padding:9px 12px;border-radius:7px;font-size:12px;font-weight:600;
                 background:{{ $supportMsg['type'] === 'success' ? 'var(--greenlt)' : 'var(--redlt)' }};
@@ -3430,7 +3451,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     @endif
 
     @if ($supportMessages->isEmpty())
-    <div class="sup-empty">No messages yet. Have a general question about FilmSpec? Send us a message below — for questions about a specific booking, open that booking and use the chat bubble there instead, so your staff contact sees it in the right place.</div>
+    <div class="sup-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
+      No messages yet. Have a general question about FilmSpec? Send us a message below — for questions about a specific booking, open that booking and use the chat bubble there instead, so your staff contact sees it in the right place.
+    </div>
     @else
     @php
       $supClusters = [];
@@ -3465,8 +3489,12 @@ document.addEventListener('DOMContentLoaded',()=>{
         @endforeach
       </div>
       @php $supLastItem = end($supCluster['items']); @endphp
-      <div class="sup-meta">{{ $supCluster['role'] === 'them' ? 'FilmSpec Support · ' : '' }}{{ \Carbon\Carbon::parse($supLastItem->created_at)->format('M j, g:i A') }}</div>
+      <div class="sup-meta">{{ $supCluster['role'] === 'them' ? 'FilmSpec ('.$supLastItem->author_label.') · ' : '' }}{{ \Carbon\Carbon::parse($supLastItem->created_at)->format('M j, g:i A') }}</div>
     @endforeach
+    <div class="sup-seen" id="supSeenLine" style="{{ $supSeen ? '' : 'display:none' }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 7 17l-5-5"/><path d="m22 10-9 9-3-3"/></svg>
+      Seen
+    </div>
     @endif
   </div>
   <form method="POST" action="{{ route('home') }}" class="sup-input" enctype="multipart/form-data">
@@ -3539,9 +3567,18 @@ function supBubbleHtml(m) {
   }
   var when = new Date(m.created_at);
   var timeStr = when.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  var metaPrefix = side === 'them' ? 'FilmSpec Support · ' : '';
+  var metaPrefix = side === 'them' ? ('FilmSpec (' + escapeHtml(m.author_label || 'Team') + ') · ') : '';
   return '<div class="sup-cluster ' + side + '"><div class="sup-bubble">' + body + attach + '</div></div>'
     + '<div class="sup-meta">' + metaPrefix + timeStr + '</div>';
+}
+
+function updateSeenIndicator(staffLastRead) {
+  var seenLine = document.getElementById('supSeenLine');
+  var body = document.getElementById('supBody');
+  if (!seenLine || !body) return;
+  var seen = body.dataset.lastRole === 'client' && staffLastRead && body.dataset.lastAt
+    && new Date(body.dataset.lastAt) <= new Date(staffLastRead);
+  seenLine.style.display = seen ? 'flex' : 'none';
 }
 
 function pollSupportChat() {
@@ -3552,24 +3589,30 @@ function pollSupportChat() {
   fetch('{{ route('support-poll') }}?after=' + lastId)
     .then(r => r.json())
     .then(d => {
-      if (!d.messages || !d.messages.length) return;
-      var empty = body.querySelector('.sup-empty');
-      if (empty) empty.remove();
-      var atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 30;
-      var html = '';
-      d.messages.forEach(m => { html += supBubbleHtml(m); });
-      body.insertAdjacentHTML('beforeend', html);
-      body.dataset.lastId = d.messages[d.messages.length - 1].message_id;
-      if (atBottom) body.scrollTop = body.scrollHeight;
+      if (d.messages && d.messages.length) {
+        var empty = body.querySelector('.sup-empty');
+        if (empty) empty.remove();
+        var atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 30;
+        var html = '';
+        d.messages.forEach(m => { html += supBubbleHtml(m); });
+        var seenLine = document.getElementById('supSeenLine');
+        if (seenLine) { seenLine.insertAdjacentHTML('beforebegin', html); } else { body.insertAdjacentHTML('beforeend', html); }
+        var last = d.messages[d.messages.length - 1];
+        body.dataset.lastId = last.message_id;
+        body.dataset.lastRole = last.author_role;
+        body.dataset.lastAt = last.created_at;
+        if (atBottom) body.scrollTop = body.scrollHeight;
 
-      var fab = document.querySelector('.sup-fab');
-      var badge = document.querySelector('.sup-fab-badge');
-      if (fab && !document.getElementById('supPanel').classList.contains('open')) {
-        var n = (badge ? parseInt(badge.textContent) : 0) + d.messages.length;
-        if (badge) { badge.textContent = n; } else {
-          fab.insertAdjacentHTML('beforeend', '<span class="sup-fab-badge">' + n + '</span>');
+        var fab = document.querySelector('.sup-fab');
+        var badge = document.querySelector('.sup-fab-badge');
+        if (fab && !document.getElementById('supPanel').classList.contains('open')) {
+          var n = (badge ? parseInt(badge.textContent) : 0) + d.messages.length;
+          if (badge) { badge.textContent = n; } else {
+            fab.insertAdjacentHTML('beforeend', '<span class="sup-fab-badge">' + n + '</span>');
+          }
         }
       }
+      updateSeenIndicator(d.staff_last_read);
     })
     .catch(() => {});
 }

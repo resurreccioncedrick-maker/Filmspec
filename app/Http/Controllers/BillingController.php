@@ -159,9 +159,36 @@ class BillingController extends Controller
             ->limit(25)
             ->get();
 
+        // Client-submitted payment claims (ClientBookingDetailController::handleSubmitPayment())
+        // — a client's own "Pay" submission never touches `payments` directly; it sits here
+        // until accounting/admin approves it, which is the only thing that actually creates the
+        // real payments row.
+        $pendingPaymentSubmissions = DB::table('client_payment_submissions as cps')
+            ->join('bookings as b', 'cps.booking_id', '=', 'b.booking_id')
+            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+            ->leftJoin('users as u', 'cps.submitted_by', '=', 'u.user_id')
+            ->where('cps.status', 'pending')
+            ->orderByDesc('cps.submission_id')
+            ->select('cps.*', 'b.booking_reference', 'b.project_title', 'b.final_amount', 'c.contact_person', 'c.company_name')
+            ->selectRaw("CONCAT(u.first_name,' ',u.last_name) AS submitted_by_name")
+            ->get();
+        $paymentSubmissionHistory = DB::table('client_payment_submissions as cps')
+            ->join('bookings as b', 'cps.booking_id', '=', 'b.booking_id')
+            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+            ->leftJoin('users as u', 'cps.submitted_by', '=', 'u.user_id')
+            ->leftJoin('users as u2', 'cps.reviewed_by', '=', 'u2.user_id')
+            ->where('cps.status', '!=', 'pending')
+            ->orderByDesc('cps.reviewed_at')
+            ->select('cps.*', 'b.booking_reference', 'b.project_title', 'c.contact_person', 'c.company_name')
+            ->selectRaw("CONCAT(u.first_name,' ',u.last_name) AS submitted_by_name")
+            ->selectRaw("CONCAT(u2.first_name,' ',u2.last_name) AS reviewed_by_name")
+            ->limit(25)
+            ->get();
+
         return view('billing', [
             'msg' => $msg, 'canRecord' => $canRecord, 'tab' => $tab,
             'pendingDiscounts' => $pendingDiscounts, 'discountHistory' => $discountHistory,
+            'pendingPaymentSubmissions' => $pendingPaymentSubmissions, 'paymentSubmissionHistory' => $paymentSubmissionHistory,
             'payments' => $payments, 'totalPay' => $totalPay, 'payPages' => $payPages, 'page' => $page,
             'search' => $search, 'payTypeFilter' => $payTypeFilter, 'payMethFilter' => $payMethFilter, 'rcTypeFilter' => $rcTypeFilter,
             'soaList' => $soaList, 'soaSearch' => $soaSearch, 'soaStatus' => $soaStatus,
@@ -561,7 +588,136 @@ class BillingController extends Controller
             return $this->voidPayment($request, $uid);
         }
 
+        if ($action === 'approve_payment_submission') {
+            return $this->approvePaymentSubmission($request, $uid);
+        }
+
+        if ($action === 'reject_payment_submission') {
+            return $this->rejectPaymentSubmission($request, $uid);
+        }
+
         return null;
+    }
+
+    /**
+     * Approving a client-submitted payment claim is the ONLY thing that turns it into a real
+     * `payments` row — mirrors record_payment's receipt-numbering/VAT-derivation/balance-check/
+     * SOA-update logic exactly (kept as its own copy rather than a shared extraction, so this
+     * new path can't accidentally change behavior for the already-shipped direct-record flow).
+     */
+    private function approvePaymentSubmission(Request $request, int $uid): array
+    {
+        $subId = (int) $request->input('submission_id');
+        $submission = DB::table('client_payment_submissions')->where('submission_id', $subId)->first();
+        if (! $submission) {
+            return ['type' => 'danger', 'text' => 'Payment submission not found.'];
+        }
+        if ($submission->status !== 'pending') {
+            return ['type' => 'danger', 'text' => 'This submission has already been reviewed.'];
+        }
+
+        $bid = (int) $submission->booking_id;
+        $bookingClient = DB::table('bookings as b')
+            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+            ->where('b.booking_id', $bid)
+            ->select('c.is_vat_registered')
+            ->first();
+        if (! $bookingClient) {
+            return ['type' => 'danger', 'text' => 'Booking not found.'];
+        }
+        $isVat = (int) $bookingClient->is_vat_registered ? 1 : 0;
+        $rctype = $isVat ? 'official_receipt' : 'acknowledgement_receipt';
+        $rcPrefix = $isVat ? 'OR' : 'AR';
+        $pdate = Carbon::parse($submission->created_at)->toDateString();
+
+        $result = DB::transaction(function () use ($rctype, $rcPrefix, $bid, $submission, $pdate, $uid, $isVat, $subId) {
+            $bkTotal = (float) (DB::table('bookings')->where('booking_id', $bid)->lockForUpdate()->value('final_amount') ?? 0);
+            $bkPaid = (float) DB::table('payments')->where('booking_id', $bid)->sum('amount');
+            $remaining = round($bkTotal - $bkPaid, 2);
+            $amount = (float) $submission->amount;
+            if ($bkTotal > 0 && $amount > $remaining + 0.005) {
+                return ['error' => ['type' => 'danger', 'text' => 'This submission of <strong>₱' . number_format($amount, 2) . '</strong> now exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong> — the balance may have changed since it was submitted. Reject it and ask the client to resubmit the correct amount.']];
+            }
+
+            $rcSeq = (int) DB::table('payments')->where('receipt_type', $rctype)->lockForUpdate()->count() + 1;
+            $rcnum = $rcPrefix . '-' . str_pad((string) $rcSeq, 5, '0', STR_PAD_LEFT);
+
+            $paymentId = DB::table('payments')->insertGetId([
+                'booking_id' => $bid, 'payment_type' => $submission->payment_type, 'payment_method' => $submission->payment_method,
+                'amount' => $amount, 'reference_number' => $submission->reference_number, 'bank_name' => $submission->bank_name,
+                'proof_of_payment_path' => $submission->proof_of_payment_path,
+                'payment_date' => $pdate, 'received_by' => $uid, 'is_vat' => $isVat,
+                'receipt_number' => $rcnum, 'receipt_type' => $rctype,
+                'notes' => trim('Client-submitted payment, approved. ' . ($submission->notes ?? '')),
+            ]);
+
+            DB::table('client_payment_submissions')->where('submission_id', $subId)->update([
+                'status' => 'approved', 'reviewed_by' => $uid, 'reviewed_at' => now(), 'resulting_payment_id' => $paymentId,
+            ]);
+
+            return ['payment_id' => $paymentId, 'amount' => $amount];
+        });
+
+        if (isset($result['error'])) {
+            return $result['error'];
+        }
+
+        $paid = (float) DB::table('payments')->where('booking_id', $bid)->sum('amount');
+        $total = (float) DB::table('bookings')->where('booking_id', $bid)->value('final_amount');
+        $currentStatus = (string) DB::table('bookings')->where('booking_id', $bid)->value('payment_status');
+        if (! in_array($currentStatus, ['refunded', 'cancelled'], true)) {
+            $payStatus = $paid <= 0 ? 'unpaid' : ($total > 0 && $paid >= $total ? 'paid' : 'partial');
+            DB::table('bookings')->where('booking_id', $bid)->update(['payment_status' => $payStatus, 'updated_at' => now()]);
+        }
+
+        $soaExists = DB::table('statement_of_accounts')->where('booking_id', $bid)->value('soa_id');
+        $balance = max(0, $total - $paid);
+        $soaStatus = $balance <= 0 ? 'paid' : ($paid > 0 ? 'issued' : 'draft');
+        if ($soaExists) {
+            DB::table('statement_of_accounts')->where('booking_id', $bid)->update([
+                'total_payments' => $paid, 'balance' => $balance, 'status' => $soaStatus,
+            ]);
+        } else {
+            $soaRef = 'FB-' . date('Y') . '-' . str_pad((string) $bid, 4, '0', STR_PAD_LEFT);
+            $payTerms2 = (string) DB::table('bookings as b')
+                ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+                ->where('b.booking_id', $bid)->value('c.payment_terms');
+            $dueDays2 = $payTerms2 === '90_days' ? 90 : 7;
+            DB::table('statement_of_accounts')->insert([
+                'booking_id' => $bid, 'soa_reference' => $soaRef, 'prepared_by' => $uid,
+                'total_charges' => $total, 'total_payments' => $paid, 'balance' => $balance,
+                'soa_date' => now()->toDateString(), 'due_date' => now()->addDays($dueDays2)->toDateString(), 'status' => $soaStatus,
+            ]);
+        }
+
+        ActivityLog::record($uid, 'payment', 'billing', 'Approved client-submitted payment ₱' . number_format($result['amount'], 2) . " for booking #$bid", $bid);
+
+        return ['type' => 'success', 'text' => 'Client payment of <strong>₱' . number_format($result['amount'], 2) . '</strong> approved and recorded.'];
+    }
+
+    private function rejectPaymentSubmission(Request $request, int $uid): array
+    {
+        $subId = (int) $request->input('submission_id');
+        $reason = trim($request->input('rejection_reason', ''));
+        if ($reason === '') {
+            return ['type' => 'danger', 'text' => 'A reason is required to reject a payment submission.'];
+        }
+
+        $submission = DB::table('client_payment_submissions')->where('submission_id', $subId)->first();
+        if (! $submission) {
+            return ['type' => 'danger', 'text' => 'Payment submission not found.'];
+        }
+        if ($submission->status !== 'pending') {
+            return ['type' => 'danger', 'text' => 'This submission has already been reviewed.'];
+        }
+
+        DB::table('client_payment_submissions')->where('submission_id', $subId)->update([
+            'status' => 'rejected', 'reviewed_by' => $uid, 'reviewed_at' => now(), 'rejection_reason' => $reason,
+        ]);
+
+        ActivityLog::record($uid, 'payment', 'billing', "Rejected client-submitted payment #$subId for booking #{$submission->booking_id}: $reason", (int) $submission->booking_id);
+
+        return ['type' => 'success', 'text' => 'Payment submission rejected.'];
     }
 
     /**

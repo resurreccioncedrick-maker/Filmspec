@@ -74,4 +74,23 @@ class PaymentReceiptController extends Controller
 
         return Storage::disk('local')->response($payment->proof_of_payment_path);
     }
+
+    /**
+     * A client_payment_submissions row isn't a payment yet — staff reviewing it for
+     * approve/reject need to see the uploaded proof before deciding, so this is gated to
+     * billing-access staff only (the client already has their own copy; no client branch).
+     */
+    public function submissionProof(Request $request, int $id): StreamedResponse
+    {
+        $user = $request->user();
+        $role = $user->role->role_name ?? '';
+        abort_unless(in_array('billing', config("filmspec.role_permissions.$role", []), true), 404);
+
+        $path = DB::table('client_payment_submissions')->where('submission_id', $id)->value('proof_of_payment_path');
+
+        abort_unless($path, 404);
+        abort_unless(Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path);
+    }
 }

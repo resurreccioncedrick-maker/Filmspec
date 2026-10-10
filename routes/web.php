@@ -281,6 +281,13 @@ Route::get('/payments/{id}/proof', [PaymentReceiptController::class, 'proof'])
     ->whereNumber('id')
     ->name('payment-proof');
 
+// Staff-only view of a still-pending client payment submission's uploaded proof — reviewed
+// before approve/reject in Billing > Client Payment Requests.
+Route::get('/payment-submissions/{id}/proof', [PaymentReceiptController::class, 'submissionProof'])
+    ->middleware(['auth'])
+    ->whereNumber('id')
+    ->name('payment-submission-proof');
+
 Route::match(['get', 'post'], '/billing', [BillingController::class, 'index'])
     ->middleware(['auth', 'can_access:billing'])
     ->name('billing');

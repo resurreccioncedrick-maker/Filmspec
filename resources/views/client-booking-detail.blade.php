@@ -498,8 +498,32 @@ footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-al
 <div class="card">
   <div class="card-header">
     <div class="card-title">Payment History</div>
+    @if (! in_array($booking->booking_status, ['cancelled'], true) && ! $booking->is_archived && $remainingBalance > 0)
+    <button onclick="document.getElementById('modalPayNow').style.display='flex'" class="side-btn green" style="width:auto;padding:7px 16px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Pay
+    </button>
+    @endif
   </div>
-  @if ($payments->isEmpty())
+  @if ($paymentMsg)
+  <div style="padding:10px 14px;margin:14px 16px 0;border-radius:8px;font-size:13px;font-weight:600;
+              background:{{ $paymentMsg['type'] === 'success' ? '#dcfce7' : '#fee2e2' }};
+              color:{{ $paymentMsg['type'] === 'success' ? '#15803d' : '#b91c1c' }}">
+    {!! $paymentMsg['text'] !!}
+  </div>
+  @endif
+  @php
+    $historyRows = $payments->map(fn ($p) => (object) [
+      'kind' => 'payment', 'sort_key' => $p->payment_date . ' ' . $p->payment_id,
+      'date' => $p->payment_date, 'type' => $p->payment_type, 'method' => $p->payment_method,
+      'amount' => $p->amount, 'payment_id' => $p->payment_id, 'receipt_number' => $p->receipt_number,
+    ])->concat($paymentSubmissions->map(fn ($s) => (object) [
+      'kind' => 'submission', 'sort_key' => $s->created_at . ' ' . $s->submission_id,
+      'date' => $s->created_at, 'type' => $s->payment_type, 'method' => $s->payment_method,
+      'amount' => $s->amount, 'status' => $s->status, 'rejection_reason' => $s->rejection_reason,
+    ]))->sortByDesc('sort_key')->values();
+  @endphp
+  @if ($historyRows->isEmpty())
   <div class="empty-msg">No payments recorded yet.</div>
   @else
   <div class="table-wrap">
@@ -508,16 +532,22 @@ footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-al
       <tr><th>Date</th><th>Type</th><th>Method</th><th>Amount</th><th>Receipt</th></tr>
     </thead>
     <tbody>
-      @foreach ($payments as $pay)
+      @foreach ($historyRows as $row)
       <tr>
-        <td>{{ \Illuminate\Support\Carbon::parse($pay->payment_date)->format('M j, Y') }}</td>
-        <td><span class="badge badge-blue">{{ ucfirst($pay->payment_type) }}</span></td>
-        <td>{{ ucwords(str_replace('_', ' ', $pay->payment_method)) }}</td>
-        <td style="font-weight:700;color:var(--blue)">₱{{ number_format($pay->amount, 2) }}</td>
+        <td>{{ \Illuminate\Support\Carbon::parse($row->date)->format('M j, Y') }}</td>
+        <td><span class="badge badge-blue">{{ ucfirst($row->type) }}</span></td>
+        <td>{{ ucwords(str_replace('_', ' ', $row->method)) }}</td>
+        <td style="font-weight:700;color:var(--blue)">₱{{ number_format($row->amount, 2) }}</td>
         <td>
-          <a href="{{ route('payment-receipt', $pay->payment_id) }}" target="_blank" style="font-size:.8rem;color:var(--blue);font-weight:600;text-decoration:none">
-            {{ $pay->receipt_number ?: 'View' }} &rarr;
+          @if ($row->kind === 'payment')
+          <a href="{{ route('payment-receipt', $row->payment_id) }}" target="_blank" style="font-size:.8rem;color:var(--blue);font-weight:600;text-decoration:none">
+            {{ $row->receipt_number ?: 'View' }} &rarr;
           </a>
+          @elseif ($row->status === 'pending')
+          <span class="badge badge-yellow">Awaiting Review</span>
+          @else
+          <span class="badge badge-red" title="{{ $row->rejection_reason }}">Rejected</span>
+          @endif
         </td>
       </tr>
       @endforeach
@@ -532,6 +562,77 @@ footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-al
   </table>
   </div>
   @endif
+</div>
+
+<!-- Pay Now Modal -->
+<div id="modalPayNow" class="modal-overlay" onclick="if(event.target===this)closePayModal()">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-head">
+      <h3>Submit a Payment</h3>
+      <button class="modal-close" onclick="closePayModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px;padding:10px 13px;margin-bottom:16px;font-size:12.5px;color:#1e40af;line-height:1.5">
+        Remaining balance: <strong>₱{{ number_format($remainingBalance, 2) }}</strong>. Upload proof of payment — our team will review and confirm it before it's counted.
+      </div>
+      <form method="POST" action="{{ route('client-booking-detail', $id) }}" enctype="multipart/form-data">
+        @csrf
+        <input type="hidden" name="action" value="submit_payment">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div>
+            <label class="form-label">Payment Type *</label>
+            <select name="payment_type" required style="width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);outline:none;box-sizing:border-box">
+              <option value="downpayment">Downpayment</option>
+              <option value="progress">Progress Payment</option>
+              <option value="final" selected>Final Payment</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Amount Received (₱) *</label>
+            <input type="number" name="amount" step="0.01" min="0.01" max="{{ $remainingBalance }}" value="{{ $remainingBalance > 0 ? number_format($remainingBalance, 2, '.', '') : '' }}" required
+                   style="width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <label class="form-label">Payment Method *</label>
+            <select name="payment_method" id="payNowMethod" onchange="togglePayNowFields()" required style="width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);outline:none;box-sizing:border-box">
+              <option value="cash">Cash</option>
+              <option value="gcash" selected>GCash</option>
+              <option value="bank_transfer">Bank Transfer</option>
+            </select>
+          </div>
+          <div id="payNowBankWrap" style="display:none">
+            <label class="form-label">Bank / Financial Institution *</label>
+            <input type="text" name="bank_name" id="payNowBankName" placeholder="e.g. BDO, BPI, Metrobank"
+                   style="width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);outline:none;box-sizing:border-box">
+          </div>
+          <div id="payNowRefWrap">
+            <label class="form-label" id="payNowRefLabel">GCash Reference No. *</label>
+            <input type="text" name="reference_number" id="payNowRefInput" placeholder="Reference number"
+                   style="width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);outline:none;box-sizing:border-box">
+          </div>
+        </div>
+        <div style="margin-bottom:14px">
+          <label class="form-label">Proof of Payment *</label>
+          <input type="file" name="proof_of_payment" accept=".jpg,.jpeg,.png,.pdf" required
+                 style="width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);outline:none;box-sizing:border-box">
+        </div>
+        <div style="margin-bottom:16px">
+          <label class="form-label">Notes (optional)</label>
+          <textarea name="notes" class="form-textarea" style="min-height:60px" placeholder="Anything our team should know about this payment"></textarea>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button type="button" onclick="closePayModal()"
+                  style="background:var(--s2);color:var(--sub);border:1.5px solid var(--border);padding:9px 18px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-b)">
+            Cancel
+          </button>
+          <button type="submit"
+                  style="background:var(--green);color:#fff;border:none;padding:9px 20px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font-b)">
+            Submit Payment
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 @if ($booking->booking_status === 'completed')
@@ -1159,6 +1260,28 @@ function closeRequestModals() {
   document.getElementById('modalExtendRequest').style.display = 'none';
   document.getElementById('modalEquipRequest').style.display  = 'none';
 }
+
+function closePayModal() {
+  document.getElementById('modalPayNow').style.display = 'none';
+}
+
+function togglePayNowFields() {
+  const method = document.getElementById('payNowMethod').value;
+  const isGcash = method === 'gcash';
+  const isBank  = method === 'bank_transfer';
+
+  const bankWrap = document.getElementById('payNowBankWrap');
+  bankWrap.style.display = isBank ? '' : 'none';
+  document.getElementById('payNowBankName').required = isBank;
+
+  const refWrap = document.getElementById('payNowRefWrap');
+  refWrap.style.display = (isGcash || isBank) ? '' : 'none';
+  document.getElementById('payNowRefInput').required = isGcash || isBank;
+  document.getElementById('payNowRefLabel').textContent = isGcash ? 'GCash Reference No. *' : 'Transaction / Reference No. *';
+}
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.getElementById('payNowMethod')) togglePayNowFields();
+});
 
 // ── Request Discount: only the field for the selected type is ever shown ───
 function toggleDiscReqInput() {

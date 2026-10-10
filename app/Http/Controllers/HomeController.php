@@ -131,6 +131,7 @@ class HomeController extends Controller
         }
 
         $supportMessages = collect();
+        $staffLastRead = null;
         if ($isLoggedIn && $clientId) {
             $supportMessages = DB::table('client_support_messages as m')
                 ->join('users as u', 'm.user_id', '=', 'u.user_id')
@@ -138,7 +139,17 @@ class HomeController extends Controller
                 ->where('m.client_id', $clientId)->where('m.is_internal', false)
                 ->orderBy('m.created_at')
                 ->select('m.*', 'r.role_name as author_role')
-                ->get();
+                ->get()
+                ->each(function ($m) {
+                    $m->author_label = $m->author_role === 'client' ? null : \App\Support\StaffTeamLabel::forRole($m->author_role);
+                });
+
+            // Newest time ANY staff member opened this client's thread — used for a client-side
+            // "Seen" receipt under the client's own last message, same semantics as
+            // MessageReadTracker but aggregated across staff rather than scoped to one user_id.
+            $staffLastRead = DB::table('staff_message_reads')
+                ->where('thread_type', 'support')->where('thread_id', $clientId)
+                ->max('last_read_at');
         }
 
         $publicReviews = DB::table('booking_feedback as bf')
@@ -250,7 +261,7 @@ class HomeController extends Controller
         $erasurePending = $clientId && DB::table('data_erasure_requests')
             ->where('client_id', $clientId)->where('status', 'pending')->exists();
 
-        return view('home', compact('isLoggedIn', 'user', 'categories', 'equipment', 'clientBookings', 'stats', 'statusMap', 'supportMessages', 'supportMsg', 'faqs', 'publicReviews', 'accountMsg', 'erasurePending'));
+        return view('home', compact('isLoggedIn', 'user', 'categories', 'equipment', 'clientBookings', 'stats', 'statusMap', 'supportMessages', 'supportMsg', 'staffLastRead', 'faqs', 'publicReviews', 'accountMsg', 'erasurePending'));
     }
 
     /**
@@ -274,9 +285,16 @@ class HomeController extends Controller
             ->where('m.message_id', '>', $after)
             ->orderBy('m.created_at')
             ->select('m.*', 'r.role_name as author_role')
-            ->get();
+            ->get()
+            ->each(function ($m) {
+                $m->author_label = $m->author_role === 'client' ? null : \App\Support\StaffTeamLabel::forRole($m->author_role);
+            });
 
-        return response()->json(['messages' => $messages]);
+        $staffLastRead = DB::table('staff_message_reads')
+            ->where('thread_type', 'support')->where('thread_id', $clientId)
+            ->max('last_read_at');
+
+        return response()->json(['messages' => $messages, 'staff_last_read' => $staffLastRead]);
     }
 
     /** Streams a general-support-chat attachment — 404 unless it belongs to this client. */

@@ -38,6 +38,7 @@ class ClientBookingDetailController extends Controller
         $requestMsg = null;
         $chatMsg = null;
         $discountMsg = null;
+        $paymentMsg = null;
 
         $pendingCancel = DB::table('booking_cancellations')
             ->where('booking_id', $id)->where('status', 'pending')
@@ -196,6 +197,10 @@ class ClientBookingDetailController extends Controller
                     }
                 }
             }
+
+            if ($act === 'submit_payment') {
+                $paymentMsg = $this->handleSubmitPayment($request, $id, $uid, $booking);
+            }
         }
 
         $feedback = DB::table('booking_feedback')->where('booking_id', $id)->first();
@@ -259,6 +264,27 @@ class ClientBookingDetailController extends Controller
 
         $payments = DB::table('payments')->where('booking_id', $id)->orderByDesc('payment_date')->get();
 
+        $paidSoFar = (float) $payments->sum('amount');
+        $pendingSubmitted = (float) DB::table('client_payment_submissions')
+            ->where('booking_id', $id)->where('status', 'pending')->sum('amount');
+        $remainingBalance = max(0, (float) $booking->final_amount - $paidSoFar - $pendingSubmitted);
+
+        // Client-submitted payment claims — shown as "Awaiting Review" until staff/accounting
+        // approve them from Billing > Client Payment Requests. An approved submission is
+        // excluded here since it already has a real row in $payments above (would otherwise
+        // look like a duplicate entry); a rejected one stays visible briefly so the client sees
+        // the outcome instead of their submission just vanishing.
+        $paymentSubmissions = DB::table('client_payment_submissions')
+            ->where('booking_id', $id)
+            ->where(function ($w) {
+                $w->where('status', 'pending')
+                    ->orWhere(function ($w2) {
+                        $w2->where('status', 'rejected')->where('reviewed_at', '>=', now()->subDays(14));
+                    });
+            })
+            ->orderByDesc('submission_id')
+            ->get();
+
         $discounts = DB::table('booking_discounts')->where('booking_id', $id)->orderByDesc('discount_id')->get();
 
         $comments = DB::table('booking_comments as bc')
@@ -276,7 +302,7 @@ class ClientBookingDetailController extends Controller
         return view('client-booking-detail', [
             'booking' => $booking, 'id' => $id,
             'feedbackMsg' => $feedbackMsg, 'cancelMsg' => $cancelMsg, 'costApprovalMsg' => $costApprovalMsg, 'requestMsg' => $requestMsg,
-            'chatMsg' => $chatMsg, 'discountMsg' => $discountMsg,
+            'chatMsg' => $chatMsg, 'discountMsg' => $discountMsg, 'paymentMsg' => $paymentMsg,
             'pendingCancel' => $pendingCancel, 'feedback' => $feedback, 'feedbackDeadline' => $feedbackDeadline,
             'extensionRequests' => $extensionRequests, 'pendingExtension' => $pendingExtension,
             'equipRequests' => $equipRequests, 'availEquipForRequest' => $availEquipForRequest,
@@ -284,7 +310,81 @@ class ClientBookingDetailController extends Controller
             'equipmentLines' => $equipmentLines, 'crewLines' => $crewLines, 'payments' => $payments, 'comments' => $comments,
             'discounts' => $discounts, 'canRequestDiscount' => $canRequestDiscount,
             'statusBadge' => $statusBadge, 'payBadge' => $payBadge, 'payLabel' => $payLabel,
+            'paidSoFar' => $paidSoFar, 'remainingBalance' => $remainingBalance, 'paymentSubmissions' => $paymentSubmissions,
         ]);
+    }
+
+    /**
+     * A client-submitted payment is a CLAIM, not a confirmed payment — it never touches the
+     * `payments` table directly. Staff/accounting approve it from Billing > Client Payment
+     * Requests, which is what actually inserts the real payments row (same receipt-numbering
+     * and balance-check discipline BookingDetailController::recordPayment() uses). This keeps
+     * every "amount paid so far" calculation elsewhere in the app exactly as trustworthy as it
+     * is today — a pending claim can never be mistaken for real money received.
+     */
+    private function handleSubmitPayment(Request $request, int $id, int $uid, object $booking): array
+    {
+        $ptype = $request->input('payment_type', 'final');
+        if (! in_array($ptype, ['downpayment', 'progress', 'final'], true)) {
+            $ptype = 'final';
+        }
+        $pmethod = $request->input('payment_method', 'cash');
+        if (! in_array($pmethod, ['cash', 'gcash', 'bank_transfer'], true)) {
+            $pmethod = 'cash';
+        }
+        $amount = (float) $request->input('amount', 0);
+        $ref = trim($request->input('reference_number', ''));
+        $bankName = trim($request->input('bank_name', ''));
+        $notes = trim($request->input('notes', ''));
+
+        if ($amount <= 0) {
+            return ['type' => 'danger', 'text' => 'Payment amount must be greater than zero.'];
+        }
+
+        $paidSoFar = (float) DB::table('payments')->where('booking_id', $id)->sum('amount');
+        $pendingSubmitted = (float) DB::table('client_payment_submissions')
+            ->where('booking_id', $id)->where('status', 'pending')->sum('amount');
+        $remaining = round((float) $booking->final_amount - $paidSoFar - $pendingSubmitted, 2);
+        if ((float) $booking->final_amount > 0 && $amount > $remaining + 0.005) {
+            return ['type' => 'danger', 'text' => 'That amount exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong> (after your other pending submissions).'];
+        }
+
+        if (in_array($pmethod, ['gcash', 'bank_transfer'], true) && $ref === '') {
+            return ['type' => 'danger', 'text' => 'Reference No. is required for GCash and Bank Transfer payments.'];
+        }
+        if ($pmethod === 'bank_transfer' && $bankName === '') {
+            return ['type' => 'danger', 'text' => 'Bank / Financial Institution is required for Bank Transfer payments.'];
+        }
+
+        $proofPath = null;
+        if ($request->hasFile('proof_of_payment')) {
+            $file = $request->file('proof_of_payment');
+            $allowedMimes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+            if (! $file->isValid()) {
+                return ['type' => 'danger', 'text' => 'Proof of payment file failed to upload. Please try again.'];
+            }
+            if ($file->getSize() > 10240 * 1024) {
+                return ['type' => 'danger', 'text' => 'Proof of Payment file is too large. Max 10MB.'];
+            }
+            if (! in_array($file->getMimeType(), $allowedMimes, true)) {
+                return ['type' => 'danger', 'text' => 'Proof of Payment must be a JPG, PNG, or PDF file.'];
+            }
+            $ext = strtolower($file->getClientOriginalExtension()) ?: 'bin';
+            $storedName = \Illuminate\Support\Str::random(40) . '.' . $ext;
+            Storage::disk('local')->putFileAs('payment_proofs', $file, $storedName);
+            $proofPath = 'payment_proofs/' . $storedName;
+        } else {
+            return ['type' => 'danger', 'text' => 'Proof of Payment is required when submitting a payment yourself.'];
+        }
+
+        DB::table('client_payment_submissions')->insert([
+            'booking_id' => $id, 'submitted_by' => $uid, 'payment_type' => $ptype, 'payment_method' => $pmethod,
+            'amount' => $amount, 'reference_number' => $ref ?: null, 'bank_name' => $bankName ?: null,
+            'proof_of_payment_path' => $proofPath, 'notes' => $notes ?: null, 'status' => 'pending',
+            'created_at' => now(),
+        ]);
+
+        return ['type' => 'success', 'text' => 'Your payment of <strong>₱' . number_format($amount, 2) . '</strong> has been submitted and is awaiting review by our team.'];
     }
 
     /**
