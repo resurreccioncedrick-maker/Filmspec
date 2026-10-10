@@ -144,37 +144,55 @@ footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-al
 
 /* Support chat — same component/classes as home.blade.php, for a consistent look
    everywhere. Here it's scoped to this booking's own thread instead of the general one. */
-.sup-fab{position:fixed;bottom:22px;right:22px;width:44px;height:44px;border-radius:12px;background:var(--surface);border:1.5px solid var(--border2);box-shadow:0 2px 8px rgba(0,30,80,.08);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:900}
-.sup-fab svg{width:19px;height:19px;color:var(--blue)}
-.sup-fab-badge{position:absolute;top:-3px;right:-3px;width:17px;height:17px;border-radius:50%;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
+.sup-fab{position:fixed;bottom:22px;right:22px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--blue2));border:none;box-shadow:0 6px 20px rgba(0,96,199,.35),0 2px 6px rgba(0,30,80,.15);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:900;transition:transform .2s,box-shadow .2s}
+.sup-fab:hover{transform:translateY(-2px) scale(1.04);box-shadow:0 10px 26px rgba(0,96,199,.4),0 2px 8px rgba(0,30,80,.18)}
+.sup-fab svg{width:22px;height:22px;color:#fff}
+.sup-fab-badge{position:absolute;top:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2.5px solid var(--bg)}
 .sup-overlay{display:none;position:fixed;inset:0;backdrop-filter:blur(6px) saturate(1.05);-webkit-backdrop-filter:blur(6px) saturate(1.05);background:rgba(11,26,51,.14);z-index:950}
 .sup-overlay.open{display:block}
-.sup-panel{position:fixed;bottom:22px;right:22px;width:320px;max-height:min(70vh,520px);background:var(--surface);border-radius:8px;box-shadow:0 4px 20px rgba(0,30,80,.10);border:1px solid var(--border);display:none;flex-direction:column;overflow:hidden;z-index:960}
+.sup-panel{position:fixed;bottom:22px;right:22px;width:328px;max-height:min(70vh,540px);background:var(--surface);border-radius:18px;box-shadow:0 16px 48px rgba(0,30,80,.18),0 2px 10px rgba(0,30,80,.08);border:1px solid var(--border);display:none;flex-direction:column;overflow:hidden;z-index:960}
 .sup-panel.open{display:flex}
-.sup-h{padding:11px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid var(--border)}
-.sup-h .t{font-weight:700;font-size:12.5px;color:var(--text)}
-.sup-h .s{font-size:10.5px;color:var(--muted)}
-.sup-close{margin-left:auto;width:22px;height:22px;border:none;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
-.sup-close svg{width:13px;height:13px}
-.sup-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;background:var(--surface)}
+.sup-h{padding:16px 18px;display:flex;align-items:center;gap:11px;flex-shrink:0;background:linear-gradient(135deg,var(--blue),var(--blue2))}
+.sup-h-avatar{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+.sup-h-avatar svg{width:18px;height:18px;color:#fff}
+.sup-h-dot{position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-radius:50%;background:#22c55e;border:2px solid var(--blue)}
+.sup-h .t{font-weight:700;font-size:13.5px;color:#fff}
+.sup-h .s{font-size:10.5px;color:rgba(255,255,255,.75);margin-top:1px}
+.sup-close{margin-left:auto;width:26px;height:26px;border:none;background:rgba(255,255,255,.14);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;flex-shrink:0;transition:background .15s}
+.sup-close:hover{background:rgba(255,255,255,.26)}
+.sup-close svg{width:12px;height:12px}
+.sup-body{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;background:var(--s2)}
 .sup-cluster{display:flex;flex-direction:column;gap:3px;margin-bottom:3px}
 .sup-cluster.me{align-items:flex-end}
 .sup-cluster.them{align-items:flex-start}
-.sup-bubble{max-width:74%;padding:8px 12px;border-radius:14px;font-size:12.5px;line-height:1.45;white-space:pre-wrap}
-.sup-cluster.me .sup-bubble{background:var(--blue);color:#fff;border-bottom-right-radius:4px}
-.sup-cluster.them .sup-bubble{background:var(--surface);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:4px}
+.sup-bubble{max-width:76%;padding:9px 13px;border-radius:16px;font-size:12.5px;line-height:1.48;white-space:pre-wrap}
+.sup-cluster.me .sup-bubble{background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;border-bottom-right-radius:4px;box-shadow:0 2px 8px rgba(0,96,199,.25)}
+.sup-cluster.them .sup-bubble{background:var(--surface);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(13,31,60,.04)}
 .sup-cluster+.sup-meta{margin-bottom:10px}
-.sup-meta{font-family:var(--font-m);font-size:9.5px;color:var(--muted);margin:2px 3px 10px}
-.sup-empty{text-align:center;color:var(--muted);font-size:12.5px;padding:28px 10px}
-.sup-input{display:flex;flex-direction:column;gap:6px;padding:10px 12px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
-.sup-input-row{display:flex;gap:8px;align-items:flex-end}
-.sup-input textarea{flex:1;border:none;border-bottom:1.5px solid var(--border2);border-radius:0;padding:5px 2px;font-size:12.5px;font-family:var(--font-b);outline:none;background:none;resize:none;max-height:80px}
-.sup-input textarea:focus{border-color:var(--blue)}
-.sup-send{width:28px;height:28px;border:none;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--blue)}
-.sup-send svg{width:16px;height:16px}
-.sup-attach-btn{width:28px;height:28px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--muted)}
+.sup-meta{font-family:var(--font-m);font-size:9.5px;color:var(--muted);margin:3px 4px 12px}
+.sup-empty{text-align:center;color:var(--muted);font-size:12.5px;padding:40px 16px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.sup-empty svg{width:34px;height:34px;color:var(--bluemid,#A8D0FF)}
+.sup-input{display:flex;flex-direction:column;gap:7px;padding:11px 12px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
+.sup-input-row{display:flex;gap:4px;align-items:flex-end;background:var(--s2);border:1.5px solid var(--border);border-radius:22px;padding:4px 5px 4px 12px;transition:border-color .15s}
+.sup-input-row:focus-within{border-color:var(--bluemid,#A8D0FF)}
+.sup-input textarea{flex:1;border:none;padding:7px 2px;font-size:12.5px;font-family:var(--font-b);outline:none;background:none;resize:none;max-height:80px;color:var(--text)}
+.sup-send{width:30px;height:30px;border:none;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:#fff;transition:background .15s}
+.sup-send:hover{background:var(--blue2)}
+.sup-send svg{width:14px;height:14px}
+.sup-attach-btn{width:28px;height:28px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--muted);border-radius:50%;transition:background .15s,color .15s}
 .sup-attach-btn svg{width:16px;height:16px}
-.sup-attach-btn:hover{color:var(--blue)}
+.sup-attach-btn:hover{color:var(--blue);background:var(--bluelt)}
+.sup-back{width:26px;height:26px;border:none;background:rgba(255,255,255,.14);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;flex-shrink:0;transition:background .15s}
+.sup-back:hover{background:rgba(255,255,255,.26)}
+.sup-back svg{width:13px;height:13px}
+.sup-dept-list{gap:3px}
+.dept-row{display:flex;align-items:center;gap:11px;width:100%;padding:10px 8px;background:none;border:none;border-radius:10px;cursor:pointer;text-align:left;font-family:inherit;transition:background .15s}
+.dept-row:hover{background:var(--surface)}
+.dept-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12.5px;font-weight:700;flex-shrink:0}
+.dept-info{flex:1;min-width:0}
+.dept-name{display:block;font-size:12.5px;font-weight:700;color:var(--text)}
+.dept-preview{display:block;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.dept-time{font-size:9.5px;color:var(--muted);flex-shrink:0;align-self:flex-start;margin-top:2px}
 .sup-file-chip{display:none;align-items:center;gap:6px;background:var(--bluelt);color:var(--blue);border-radius:8px;padding:5px 9px;font-size:11.5px;font-weight:600;max-width:100%}
 .sup-file-chip.show{display:flex}
 .sup-file-chip svg{width:12px;height:12px;flex-shrink:0}
@@ -872,29 +890,68 @@ footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-al
 <div class="sup-overlay" id="supOverlay" onclick="closeSupportChat()"></div>
 <div class="sup-panel" id="supPanel">
   <div class="sup-h">
+    <button class="sup-back" id="supBackBtn" onclick="showDeptPicker()" style="display:none" title="Back to departments">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="sup-h-avatar" id="supHAvatar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
+      <span class="sup-h-dot"></span>
+    </div>
     <div>
-      <div class="t">Booking {{ $booking->booking_reference }}</div>
-      <div class="s">Message FilmSpec about this booking</div>
+      <div class="t" id="supHTitle">Booking {{ $booking->booking_reference }}</div>
+      <div class="s" id="supHSub">Who do you want to message?</div>
     </div>
     <button class="sup-close" onclick="closeSupportChat()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>
   </div>
-  <div class="sup-body" id="supBody">
-    @if ($chatMsg)
-    <div style="padding:9px 12px;border-radius:7px;font-size:12px;font-weight:600;
-                background:{{ $chatMsg['type'] === 'success' ? '#dcfce7' : '#fee2e2' }};
-                color:{{ $chatMsg['type'] === 'success' ? '#15803d' : '#b91c1c' }}">
-      {{ $chatMsg['text'] }}
-    </div>
-    @endif
 
-    @if ($comments->isEmpty())
-    <div class="sup-empty">No messages yet about this booking. Send one below — your staff contact will reply here. For general questions not about this booking, use the chat bubble on the Home page instead.</div>
+  @if ($chatMsg)
+  <div style="padding:9px 12px;margin:10px 14px 0;border-radius:7px;font-size:12px;font-weight:600;
+              background:{{ $chatMsg['type'] === 'success' ? '#dcfce7' : '#fee2e2' }};
+              color:{{ $chatMsg['type'] === 'success' ? '#15803d' : '#b91c1c' }}">
+    {{ $chatMsg['text'] }}
+  </div>
+  @endif
+
+  @php
+    $deptColors = ['staff' => '#0060C7', 'accounting' => '#16A34A', 'operations_manager' => '#7C3AED'];
+    $deptInitials = ['staff' => 'FS', 'accounting' => 'AC', 'operations_manager' => 'OM'];
+  @endphp
+
+  <!-- DEPARTMENT PICKER -->
+  <div class="sup-body sup-dept-list" id="deptPicker">
+    @foreach ($chatDepartments as $deptKey => $deptLabel)
+    @php
+      $deptMsgs = $comments->where('department', $deptKey)->values();
+      $deptLastMsg = $deptMsgs->last();
+    @endphp
+    <button type="button" class="dept-row" onclick="openDeptThread('{{ $deptKey }}')">
+      <span class="dept-avatar" style="background:{{ $deptColors[$deptKey] }}">{{ $deptInitials[$deptKey] }}</span>
+      <span class="dept-info">
+        <span class="dept-name">{{ $deptLabel }}</span>
+        <span class="dept-preview">{{ $deptLastMsg ? \Illuminate\Support\Str::limit($deptLastMsg->body, 42) : 'No messages yet — tap to start' }}</span>
+      </span>
+      @if ($deptLastMsg)
+      <span class="dept-time">{{ \Illuminate\Support\Carbon::parse($deptLastMsg->created_at)->diffForHumans(null, true) }}</span>
+      @endif
+    </button>
+    @endforeach
+  </div>
+
+  <!-- ONE THREAD + FORM PER DEPARTMENT -->
+  @foreach ($chatDepartments as $deptKey => $deptLabel)
+  @php $deptMsgs = $comments->where('department', $deptKey)->values(); @endphp
+  <div class="sup-body" id="thread-{{ $deptKey }}" style="display:none">
+    @if ($deptMsgs->isEmpty())
+    <div class="sup-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
+      No messages yet with {{ $deptLabel }}. Send one below to start the conversation.
+    </div>
     @else
     @php
       $clusters = [];
-      foreach ($comments as $c) {
+      foreach ($deptMsgs as $c) {
           $role = $c->author_role === 'client' ? 'me' : 'them';
           if ($clusters && end($clusters)['role'] === $role) {
               $clusters[array_key_last($clusters)]['items'][] = $c;
@@ -925,35 +982,39 @@ footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-al
         @endforeach
       </div>
       @php $lastItem = end($cluster['items']); @endphp
-      <div class="sup-meta">{{ $cluster['role'] === 'them' ? 'FilmSpec Support · ' : '' }}{{ \Illuminate\Support\Carbon::parse($lastItem->created_at)->format('M j, g:i A') }}</div>
+      <div class="sup-meta">{{ $cluster['role'] === 'them' ? $lastItem->author_label.' ('.$lastItem->author_name.') · ' : '' }}{{ \Illuminate\Support\Carbon::parse($lastItem->created_at)->format('M j, g:i A') }}</div>
     @endforeach
     @endif
   </div>
-  <form method="POST" action="{{ route('client-booking-detail', $id) }}" class="sup-input" enctype="multipart/form-data">
+  <form method="POST" action="{{ route('client-booking-detail', $id) }}" class="sup-input" id="form-{{ $deptKey }}" style="display:none" enctype="multipart/form-data">
     @csrf
     <input type="hidden" name="action" value="post_comment">
-    <div class="sup-file-chip" id="supFileChip">
+    <input type="hidden" name="department" value="{{ $deptKey }}">
+    <div class="sup-file-chip" id="supFileChip-{{ $deptKey }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M21.44 11.05 12.25 20.24a5 5 0 0 1-7.07-7.07l9.19-9.19a3.33 3.33 0 0 1 4.71 4.71l-9.2 9.19a1.67 1.67 0 0 1-2.36-2.36l8.49-8.48"/></svg>
       <span class="name"></span>
-      <span class="rm" onclick="clearSupFile()" title="Remove">
+      <span class="rm" onclick="clearSupFile('{{ $deptKey }}')" title="Remove">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10" height="10"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </span>
     </div>
     <div class="sup-input-row">
-      <button type="button" class="sup-attach-btn" onclick="document.getElementById('supFile').click()" title="Attach file">
+      <button type="button" class="sup-attach-btn" onclick="document.getElementById('supFile-{{ $deptKey }}').click()" title="Attach file">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.44 11.05 12.25 20.24a5 5 0 0 1-7.07-7.07l9.19-9.19a3.33 3.33 0 0 1 4.71 4.71l-9.2 9.19a1.67 1.67 0 0 1-2.36-2.36l8.49-8.48"/></svg>
       </button>
-      <input type="file" id="supFile" name="attachment" accept="image/*,.pdf,.doc,.docx" style="display:none" onchange="showSupFilePreview(this)">
-      <textarea name="body" rows="1" placeholder="Message the FilmSpec team…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.form.submit()}"></textarea>
+      <input type="file" id="supFile-{{ $deptKey }}" name="attachment" accept="image/*,.pdf,.doc,.docx" style="display:none" onchange="showSupFilePreview(this,'{{ $deptKey }}')">
+      <textarea name="body" rows="1" placeholder="Message {{ $deptLabel }}…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.form.submit()}"></textarea>
       <button type="submit" class="sup-send" title="Send">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg>
       </button>
     </div>
   </form>
+  @endforeach
 </div>
 <script>
-function showSupFilePreview(input){
-  var chip = document.getElementById('supFileChip');
+var CHAT_DEPT_LABELS = {!! json_encode($chatDepartments) !!};
+
+function showSupFilePreview(input, dept){
+  var chip = document.getElementById('supFileChip-' + dept);
   if (input.files && input.files[0]) {
     chip.querySelector('.name').textContent = input.files[0].name;
     chip.classList.add('show');
@@ -961,22 +1022,52 @@ function showSupFilePreview(input){
     chip.classList.remove('show');
   }
 }
-function clearSupFile(){
-  document.getElementById('supFile').value = '';
-  document.getElementById('supFileChip').classList.remove('show');
+function clearSupFile(dept){
+  document.getElementById('supFile-' + dept).value = '';
+  document.getElementById('supFileChip-' + dept).classList.remove('show');
 }
+
+function showDeptPicker(){
+  document.getElementById('deptPicker').style.display = 'flex';
+  Object.keys(CHAT_DEPT_LABELS).forEach(function (d) {
+    var t = document.getElementById('thread-' + d), f = document.getElementById('form-' + d);
+    if (t) t.style.display = 'none';
+    if (f) f.style.display = 'none';
+  });
+  document.getElementById('supBackBtn').style.display = 'none';
+  document.getElementById('supHTitle').textContent = 'Booking {{ $booking->booking_reference }}';
+  document.getElementById('supHSub').textContent = 'Who do you want to message?';
+}
+
+function openDeptThread(dept){
+  document.getElementById('deptPicker').style.display = 'none';
+  Object.keys(CHAT_DEPT_LABELS).forEach(function (d) {
+    var t = document.getElementById('thread-' + d), f = document.getElementById('form-' + d);
+    if (t) t.style.display = (d === dept) ? 'flex' : 'none';
+    if (f) f.style.display = (d === dept) ? 'flex' : 'none';
+  });
+  document.getElementById('supBackBtn').style.display = 'flex';
+  document.getElementById('supHTitle').textContent = CHAT_DEPT_LABELS[dept] || dept;
+  document.getElementById('supHSub').textContent = 'Booking {{ $booking->booking_reference }}';
+  var thread = document.getElementById('thread-' + dept);
+  if (thread) thread.scrollTop = thread.scrollHeight;
+}
+
 function toggleSupportChat(){
   var p = document.getElementById('supPanel'), o = document.getElementById('supOverlay');
   var open = p.classList.toggle('open');
   o.classList.toggle('open', open);
-  if (open) { var b = document.getElementById('supBody'); b.scrollTop = b.scrollHeight; }
 }
 function closeSupportChat(){
   document.getElementById('supPanel').classList.remove('open');
   document.getElementById('supOverlay').classList.remove('open');
+  showDeptPicker();
 }
 @if (request('action') === 'post_comment')
-document.addEventListener('DOMContentLoaded', toggleSupportChat);
+document.addEventListener('DOMContentLoaded', function () {
+  toggleSupportChat();
+  openDeptThread('{{ in_array(request('department'), array_keys($chatDepartments), true) ? request('department') : 'staff' }}');
+});
 @endif
 </script>
 

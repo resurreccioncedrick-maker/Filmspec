@@ -394,7 +394,7 @@ class BookingDetailController extends Controller
         } elseif ($action === 'close_project' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->closeProject($request, $id, $uid);
         } elseif ($action === 'post_comment' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic', 'accounting'], true)) {
-            $msg = $this->postComment($request, $id, $uid);
+            $msg = $this->postComment($request, $id, $uid, $role);
         } elseif ($action === 'duplicate_booking' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
             return $this->duplicateBooking($request, $id, $booking, $user, $role);
         } elseif ($action === 'checkout' && in_array($role, ['operations_manager', 'admin', 'super_admin'], true)) {
@@ -1364,15 +1364,19 @@ class BookingDetailController extends Controller
         return ['type' => 'success', 'text' => 'Cancellation request rejected. Booking remains active.'];
     }
 
-    private function postComment(Request $request, int $id, int $uid): array
+    private function postComment(Request $request, int $id, int $uid, string $role): array
     {
         $body = trim((string) $request->input('body', ''));
         if ($body === '') {
             return ['type' => 'danger', 'text' => 'Comment cannot be empty.'];
         }
 
+        // Which client-facing department this reply counts under is derived from the replying
+        // staff member's own role, not picked manually — see BookingChatDepartment. Internal
+        // notes never reach a client, so the bucket is irrelevant for them, but we still set it
+        // for consistency/debugging rather than leaving it null.
         DB::table('booking_comments')->insert([
-            'booking_id' => $id, 'user_id' => $uid, 'body' => $body,
+            'booking_id' => $id, 'user_id' => $uid, 'department' => \App\Support\BookingChatDepartment::bucketForRole($role), 'body' => $body,
             'is_internal' => $request->boolean('is_internal'), 'created_at' => now(),
         ]);
 

@@ -123,12 +123,14 @@ class ClientBookingDetailController extends Controller
 
             if ($act === 'post_comment') {
                 $body = trim($request->input('body', ''));
+                $dept = $request->input('department', '');
+                $dept = \App\Support\BookingChatDepartment::isValid($dept) ? $dept : 'staff';
                 $attach = ChatAttachmentUpload::handle($request->file('attachment'));
                 if ($attach['error']) {
                     $chatMsg = ['type' => 'error', 'text' => $attach['error']];
                 } elseif ($body !== '' || $attach['success']) {
                     DB::table('booking_comments')->insert([
-                        'booking_id' => $id, 'user_id' => $uid, 'body' => $body,
+                        'booking_id' => $id, 'user_id' => $uid, 'department' => $dept, 'body' => $body,
                         'attachment_path' => $attach['success'] ? $attach['path'] : null,
                         'attachment_name' => $attach['success'] ? $attach['name'] : null,
                         'attachment_mime' => $attach['success'] ? $attach['mime'] : null,
@@ -293,7 +295,13 @@ class ClientBookingDetailController extends Controller
             ->where('bc.booking_id', $id)->where('bc.is_internal', false)
             ->orderBy('bc.created_at')
             ->select('bc.*', DB::raw("CONCAT(u.first_name,' ',u.last_name) AS author_name"), 'r.role_name as author_role')
-            ->get();
+            ->get()
+            ->each(function ($c) {
+                $c->author_label = $c->author_role === 'client' ? null : \App\Support\StaffTeamLabel::forRole($c->author_role);
+                // Pre-department-routing rows have no department — treated as the 'staff'
+                // bucket (not backfilled in the DB; see the add_department migration).
+                $c->department = $c->department ?: 'staff';
+            });
 
         $statusBadge = ['pending' => 'badge-yellow', 'confirmed' => 'badge-blue', 'ongoing' => 'badge-green', 'completed' => 'badge-gray', 'cancelled' => 'badge-red'];
         $payBadge = ['unpaid' => 'badge-yellow', 'partial' => 'badge-orange', 'paid' => 'badge-green', 'overdue' => 'badge-red', 'refunded' => 'badge-purple', 'cancelled' => 'badge-gray'];
@@ -311,6 +319,7 @@ class ClientBookingDetailController extends Controller
             'discounts' => $discounts, 'canRequestDiscount' => $canRequestDiscount,
             'statusBadge' => $statusBadge, 'payBadge' => $payBadge, 'payLabel' => $payLabel,
             'paidSoFar' => $paidSoFar, 'remainingBalance' => $remainingBalance, 'paymentSubmissions' => $paymentSubmissions,
+            'chatDepartments' => \App\Support\BookingChatDepartment::LABELS,
         ]);
     }
 

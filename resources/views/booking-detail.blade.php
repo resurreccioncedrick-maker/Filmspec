@@ -1108,6 +1108,7 @@
             <div style="font-weight:600;font-size:13px">
               {{ $c->author_name }}
               <span class="badge {{ $c->author_role === 'client' ? 'badge-purple' : 'badge-blue' }}" style="margin-left:6px;font-size:.65rem">{{ ucfirst(str_replace('_',' ',$c->author_role)) }}</span>
+              <span class="badge badge-gray" style="margin-left:4px;font-size:.65rem">{{ \App\Support\BookingChatDepartment::label($c->department ?? null) }}</span>
               @if ($c->is_internal)
               <span class="badge badge-orange" style="margin-left:4px;font-size:.65rem">Internal Only</span>
               @endif
