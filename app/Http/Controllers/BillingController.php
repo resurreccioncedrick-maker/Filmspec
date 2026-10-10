@@ -68,7 +68,11 @@ class BillingController extends Controller
         $payPages = max(1, (int) ceil($totalPay / $perPage));
 
         $payments = (clone $pQuery)
-            ->orderByDesc('p.created_at')
+            // payment_id, not created_at — demo/seed data backdates created_at to line up with
+            // payment_date rather than real insertion order (same issue the Bookings list had),
+            // so a freshly recorded payment could sort below older seeded rows with a fabricated
+            // later timestamp. payment_id always reflects true insertion order.
+            ->orderByDesc('p.payment_id')
             ->select('p.*', 'b.booking_reference', 'b.project_title', 'b.final_amount', 'c.contact_person', 'c.company_name')
             ->forPage($page, $perPage)
             ->get();
@@ -383,7 +387,7 @@ class BillingController extends Controller
 
         // Default: payments
         $headers = ['Receipt #', 'Booking', 'Client', 'Type', 'Method', 'Amount', 'Date'];
-        $rows = $this->filteredPaymentsQuery($request)->orderByDesc('p.created_at')
+        $rows = $this->filteredPaymentsQuery($request)->orderByDesc('p.payment_id')
             ->select('p.receipt_number', 'b.booking_reference', 'c.company_name', 'c.contact_person',
                 'p.payment_type', 'p.payment_method', 'p.amount', 'p.payment_date')
             ->get()
