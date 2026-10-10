@@ -840,8 +840,8 @@
               <input type="text" name="reference_number" id="billingRefInput" class="form-control" placeholder="Reference number">
             </div>
             <div class="form-group" id="billingProofWrap" style="display:none">
-              <label>Proof of Payment</label>
-              <input type="file" name="proof_of_payment" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
+              <label id="billingProofLabel">Proof of Payment *</label>
+              <input type="file" name="proof_of_payment" id="billingProofInput" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
             </div>
             <div class="form-group">
               <label>Payment Date *</label>
@@ -1050,6 +1050,7 @@ function toggleBillingPaymentFields() {
   document.getElementById('billingRefLabel').textContent = isGcash ? 'GCash Reference No. *' : 'Transaction / Reference No. *';
 
   document.getElementById('billingProofWrap').style.display = (isGcash || isBank) ? '' : 'none';
+  document.getElementById('billingProofInput').required = isGcash || isBank;
 }
 
 // ── Record Payment: searchable booking picker ───────────────────────────────

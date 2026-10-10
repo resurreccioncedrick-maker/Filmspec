@@ -2084,8 +2084,8 @@
           </div>
         </div>
         <div class="form-group" id="bdProofWrap" style="display:none">
-          <label>Proof of Payment</label>
-          <input type="file" name="proof_of_payment" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
+          <label id="bdProofLabel">Proof of Payment <span style="color:var(--red)">*</span></label>
+          <input type="file" name="proof_of_payment" id="bdProofInput" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
         </div>
         <div class="form-group">
           <label>Notes</label>
@@ -2486,6 +2486,7 @@ function toggleBdPaymentFields() {
   document.getElementById('bdRefLabel').textContent = isGcash ? 'GCash Reference No.' : 'Transaction / Reference No.';
 
   document.getElementById('bdProofWrap').style.display = (isGcash || isBank) ? '' : 'none';
+  document.getElementById('bdProofInput').required = isGcash || isBank;
 }
 
 function openRelease(eid, ename) {

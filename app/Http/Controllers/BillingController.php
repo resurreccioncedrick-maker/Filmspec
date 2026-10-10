@@ -457,6 +457,9 @@ class BillingController extends Controller
             if ($pmethod === 'bank_transfer' && $bankName === '') {
                 return ['type' => 'danger', 'text' => 'Bank / Financial Institution is required for Bank Transfer payments.'];
             }
+            if (in_array($pmethod, ['gcash', 'bank_transfer'], true) && ! $request->hasFile('proof_of_payment')) {
+                return ['type' => 'danger', 'text' => 'Proof of Payment is required for GCash and Bank Transfer payments.'];
+            }
 
             $proofPath = null;
             if ($request->hasFile('proof_of_payment')) {
