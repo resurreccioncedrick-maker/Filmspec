@@ -575,7 +575,7 @@ footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-al
       <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px;padding:10px 13px;margin-bottom:16px;font-size:12.5px;color:#1e40af;line-height:1.5">
         Remaining balance: <strong>₱{{ number_format($remainingBalance, 2) }}</strong>. Upload proof of payment — our team will review and confirm it before it's counted.
       </div>
-      <form method="POST" action="{{ route('client-booking-detail', $id) }}" enctype="multipart/form-data">
+      <form method="POST" action="{{ route('client-booking-detail', $id) }}" enctype="multipart/form-data" onsubmit="return guardPayNowSubmit()">
         @csrf
         <input type="hidden" name="action" value="submit_payment">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
@@ -625,7 +625,7 @@ footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-al
                   style="background:var(--s2);color:var(--sub);border:1.5px solid var(--border);padding:9px 18px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-b)">
             Cancel
           </button>
-          <button type="submit"
+          <button type="submit" id="payNowSubmitBtn"
                   style="background:var(--green);color:#fff;border:none;padding:9px 20px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font-b)">
             Submit Payment
           </button>
@@ -1263,6 +1263,17 @@ function closeRequestModals() {
 
 function closePayModal() {
   document.getElementById('modalPayNow').style.display = 'none';
+}
+
+// Blocks a second click (or a stale reopened modal) from firing another POST before the page
+// reloads with the real remaining balance — without this, a double-click could submit the same
+// full-balance amount twice and the second one would correctly, but confusingly, get rejected.
+function guardPayNowSubmit() {
+  const btn = document.getElementById('payNowSubmitBtn');
+  if (btn.disabled) return false;
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  return true;
 }
 
 function togglePayNowFields() {
