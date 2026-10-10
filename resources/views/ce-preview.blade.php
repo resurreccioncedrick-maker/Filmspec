@@ -464,8 +464,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <span style="font-size:13px;font-weight:700;color:var(--muted)">TBD</span>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9">
-      <span style="font-size:13px;font-weight:600;color:var(--sub)">Transportation <span id="live-trans-note" style="font-size:11px;color:var(--muted);font-weight:400">— pin location above to calculate</span></span>
-      <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--muted)" id="live-trans-val">—</span>
+      <span style="font-size:13px;font-weight:600;color:var(--sub)">Transportation <span id="live-trans-note" style="font-size:11px;color:var(--muted);font-weight:400">(assigned after booking)</span></span>
+      <span style="font-size:13px;font-weight:700;color:var(--muted)" id="live-trans-val">TBD</span>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 8px;border-radius:6px;background:#f8fafc;margin-top:2px">
       <span style="font-size:13px;font-weight:700;color:var(--text)">Equipment Subtotal</span>
@@ -904,14 +904,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="ce-summary-lbl">
         Transportation
         @if ($mode === 'cart')
-        <span id="sum-trans-note" style="font-size:10px;color:var(--muted);font-weight:400;margin-left:6px">based on shoot location</span>
+        <span id="sum-trans-note" style="font-size:10px;color:var(--muted);font-weight:400;margin-left:6px">(assigned after booking)</span>
         @elseif ($transZone)
         <span style="font-size:10px;color:var(--muted);font-weight:400;margin-left:6px">
           {{ $zoneLabels[$transZone] ?? $transZone }} &nbsp;·&nbsp; {{ $transMult }}×
         </span>
         @endif
       </div>
-      <div class="ce-summary-val" id="sum-trans-val">{{ $mode === 'cart' ? '—' : ('₱' . number_format($ceBd ? $ceBd['transportation'] : $transCost, 2)) }}</div>
+      <div class="ce-summary-val" id="sum-trans-val">{{ $mode === 'cart' ? 'TBD' : ('₱' . number_format($ceBd ? $ceBd['transportation'] : $transCost, 2)) }}</div>
     </div>
     @if ($mode === 'booking' && $cePricingMode !== 'no_discount' && $cePricingInput !== null)
     @php
@@ -1765,7 +1765,6 @@ function bfRestoreDraft() {
 const VAT_RATE = {{ $vatRate }};
 const _BASE_EQUIP = {{ $equipTotal }};   // per-day equipment total (cart days = 1)
 const _BASE_CREW  = 0;
-const _BASE_TRANS = {{ $baseTransRate }};
 
 let _shootDays    = 1;
 let _currentMult  = 1;
@@ -1801,27 +1800,23 @@ function updateLiveCost(multiplier, zone, label) {
     _currentZoneLabel = label;
 
     const eqAdj    = _BASE_EQUIP * _shootDays * multiplier;
-    const transAdj = _BASE_TRANS * multiplier;
     // Transportation is never actually charged at booking-submission time — CartController::
     // submitBooking() always stores transportation_cost=0/transport_multiplier=1.00 and staff
-    // assign the real transport cost later, matching this page's own "Crew TF and
-    // transportation costs will be added after booking confirmation" note. The totals driving
-    // every on-screen figure here must match what the booking actually gets created with, so
-    // transAdj is shown as its own line (an estimate, for the client's reference) but excluded
-    // from grand/sub/vat — it used to be folded in here, silently overstating the total the
-    // client saw versus the equipment-only total the booking was actually created with.
+    // assign the real transport cost later. It's not a date/quantity-driven line the way
+    // equipment is, so showing a computed peso estimate here was misleading — like Personnel/
+    // Crew TF, it's shown as TBD and excluded from grand/sub/vat, which already only ever
+    // summed eqAdj + _BASE_CREW (_BASE_CREW is always 0 too, for the same reason).
     const grand    = eqAdj + _BASE_CREW;
     const vat      = grand * VAT_RATE / (1 + VAT_RATE);
     const sub      = grand - vat;
 
     const multNote = multiplier !== 1 ? '× ' + multiplier + ' (' + label + ')' : '';
-    const transNote = multiplier + '× rate · ' + label + ' (est., billed after confirmation)';
+    const transNote = '(assigned after booking)';
 
     document.getElementById('live-eq-val').textContent    = _pesoFmt(eqAdj);
     document.getElementById('live-eq-note').textContent   = multNote;
-    document.getElementById('live-trans-val').textContent  = _pesoFmt(transAdj);
+    document.getElementById('live-trans-val').textContent  = 'TBD';
     document.getElementById('live-trans-note').textContent = transNote;
-    document.getElementById('live-trans-val').style.color  = '#003D80';
     document.getElementById('live-sub').textContent        = _pesoFmt(sub);
     document.getElementById('live-vat').textContent        = _pesoFmt(vat);
     document.getElementById('live-grand').textContent      = _pesoFmt(grand);
@@ -1833,7 +1828,7 @@ function updateLiveCost(multiplier, zone, label) {
     const tN = document.getElementById('sum-trans-note');
     if (tN) tN.textContent = transNote;
     const tV = document.getElementById('sum-trans-val');
-    if (tV) tV.textContent = _pesoFmt(transAdj);
+    if (tV) tV.textContent = 'TBD';
     const sv = document.getElementById('sum-subtotal');
     if (sv) sv.textContent = _pesoFmt(sub);
     const vv = document.getElementById('sum-vat');
@@ -1860,7 +1855,10 @@ function updateLiveCost(multiplier, zone, label) {
     const el_w = document.getElementById('eq-words');
     if (el_w) el_w.textContent = 'Amount in Words: ' + _numToWords(eqAdj) + ' PESOS ONLY';
 
-    document.getElementById('bf_transport_cost').value = transAdj.toFixed(2);
+    // CartController::submitBooking() always hardcodes transportation_cost to 0 regardless of
+    // this field's value (transport is assigned by staff after booking) — kept at 0 here too so
+    // the hidden field never implies a figure the booking won't actually be created with.
+    document.getElementById('bf_transport_cost').value = '0.00';
 }
 
 const _SUBMIT_ZONE_CFG = {
