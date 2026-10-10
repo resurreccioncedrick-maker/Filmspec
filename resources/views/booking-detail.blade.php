@@ -409,8 +409,10 @@
   // out the driver as if that's always the specific thing missing.
   $rows = [
       ['label' => 'Equipment', 'ok' => $equipOk, 'detail' => $equipOk ? "$equipCount item" . ($equipCount != 1 ? 's' : '') . ' added' : 'No equipment added'],
-      ['label' => 'Crew', 'ok' => $crewOk, 'detail' => $crewOk ? "$crewCount member" . ($crewCount != 1 ? 's' : '') . ' assigned' : 'No crew assigned'],
-      ['label' => 'Transport', 'ok' => $transportOk, 'clickable' => true,
+      ['label' => 'Crew', 'ok' => $crewOk, 'clickable' => true, 'onclick' => 'openAddCrewModal()', 'title' => 'Open Add Crew',
+          'detail' => $crewOk ? "$crewCount member" . ($crewCount != 1 ? 's' : '') . ' assigned' : 'No crew assigned',
+      ],
+      ['label' => 'Transport', 'ok' => $transportOk, 'clickable' => true, 'onclick' => "openModal('modalAssignTransport')", 'title' => 'Open Add/Edit Transport',
           'detail' => ! $transportConfirmed ? 'Not yet reviewed' : ($transportOk ? 'Confirmed' : 'Setup incomplete'),
       ],
       ['label' => 'Cost Approval', 'ok' => $costApprovalOk, 'detail' => $costApprovalOk ? 'Approved' : 'Client has not approved yet'],
@@ -432,7 +434,7 @@
     @foreach ($rows as $row)
     @php $clickable = ! empty($row['clickable']); @endphp
     <{{ $clickable ? 'button' : 'div' }}
-      @if ($clickable) type="button" onclick="openModal('modalAssignTransport')" title="Open Add/Edit Transport" @endif
+      @if ($clickable) type="button" onclick="{{ $row['onclick'] }}" title="{{ $row['title'] }}" @endif
       style="width:100%;display:flex;align-items:center;gap:9px;padding:6px 2px;background:none;border:none;font-family:inherit;text-align:left;{{ $clickable ? 'cursor:pointer' : '' }}">
       <div style="width:18px;height:18px;border-radius:999px;background:{{ $row['ok'] ? '#DCFCE7' : '#FEE2E2' }};display:flex;align-items:center;justify-content:center;flex-shrink:0">
         <i data-feather="{{ $row['ok'] ? 'check' : 'x' }}" style="width:9px;height:9px;color:{{ $row['ok'] ? '#16A34A' : '#DC2626' }};stroke-width:3.5"></i>
