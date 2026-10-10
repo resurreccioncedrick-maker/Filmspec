@@ -50,7 +50,6 @@
   <a href="{{ $clientsBase }}" class="tab-btn {{ ! $typeFilter && ! $statusFilter ? 'active' : '' }}">All <span class="badge badge-gray" style="margin-left:4px">{{ $total }}</span></a>
   <a href="{{ $clientsBase }}?type=regular" class="tab-btn {{ $typeFilter === 'regular' ? 'active' : '' }}">Regular <span class="badge badge-green" style="margin-left:4px">{{ $stats['regular'] }}</span></a>
   <a href="{{ $clientsBase }}?type=first_time" class="tab-btn {{ $typeFilter === 'first_time' ? 'active' : '' }}">New Customers <span class="badge badge-blue" style="margin-left:4px">{{ $stats['first_time'] }}</span></a>
-  <a href="{{ $clientsBase }}?status=pending" class="tab-btn {{ $statusFilter === 'pending' ? 'active' : '' }}">Pending Approval <span class="badge badge-yellow" style="margin-left:4px">{{ $stats['pending'] }}</span></a>
 </div>
 
 <div class="card">
@@ -117,9 +116,7 @@
             @if ($c->is_vat_registered)
             <span class="badge badge-purple" style="font-size:10px;margin-top:2px">VAT</span>
             @endif
-            @if (($c->status ?? 'approved') === 'pending')
-            <span class="badge badge-yellow" style="font-size:10px;margin-top:2px">Pending Approval</span>
-            @elseif (($c->status ?? 'approved') === 'rejected')
+            @if (($c->status ?? 'approved') === 'rejected')
             <span class="badge badge-red" style="font-size:10px;margin-top:2px" title="{{ $c->rejection_reason }}">Rejected</span>
             @endif
           </td>
@@ -174,20 +171,6 @@
                   <i data-feather="more-vertical"></i>
                 </button>
                 <div class="action-menu align-right">
-                  @if ($canManage && ($c->status ?? 'approved') === 'pending')
-                  <form method="POST" action="{{ $clientsBase }}">
-                    @csrf
-                    <input type="hidden" name="action" value="approve_client">
-                    <input type="hidden" name="client_id" value="{{ $c->client_id }}">
-                    <button type="submit" class="text-success" onclick="return confirm('Approve {{ addslashes($displayName) }}\'s account?')">
-                      <i data-feather="check"></i> Approve Account
-                    </button>
-                  </form>
-                  <button type="button" class="text-danger" onclick="closeActionMenus(); openRejectClient({{ $c->client_id }}, {{ json_encode($displayName) }})">
-                    <i data-feather="x"></i> Reject Account
-                  </button>
-                  <div class="action-menu-divider"></div>
-                  @endif
                   <button type="button" onclick="closeActionMenus(); editClient(@json($c))">
                     <i data-feather="edit-2"></i> Edit
                   </button>
@@ -374,34 +357,6 @@
     </form>
   </div>
 </div>
-
-<!-- Reject Client Modal -->
-<div id="modalRejectClient" class="modal-overlay">
-  <div class="modal" style="max-width:460px">
-    <div class="modal-header">
-      <h3><i data-feather="x-circle" style="width:16px;height:16px;margin-right:6px;vertical-align:middle;color:var(--red)"></i>Reject Client</h3>
-      <button class="modal-close" onclick="closeModal('modalRejectClient')">&times;</button>
-    </div>
-    <form method="POST" action="{{ $clientsBase }}">
-      @csrf
-      <input type="hidden" name="action" value="reject_client">
-      <input type="hidden" name="client_id" id="reject_cid">
-      <div class="modal-body">
-        <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:12px">
-          Rejecting <strong id="reject_cname"></strong>'s account application. This reason will be emailed to them.
-        </p>
-        <div class="form-group">
-          <label>Reason *</label>
-          <textarea name="reason" class="form-control" rows="3" required placeholder="Why is this application being rejected?"></textarea>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('modalRejectClient')">Cancel</button>
-        <button type="submit" class="btn btn-danger"><i data-feather="x" style="width:14px;height:14px;margin-right:4px;vertical-align:middle"></i>Reject Account</button>
-      </div>
-    </form>
-  </div>
-</div>
 @endif
 
 @push('scripts')
@@ -452,12 +407,6 @@ function resetAddClientForm() {
 
 function onEditEntityTypeChange(val) {
   document.getElementById('edit_vat_notice').style.display = val === 'company' ? 'block' : 'none';
-}
-
-function openRejectClient(cid, name) {
-  document.getElementById('reject_cid').value = cid;
-  document.getElementById('reject_cname').textContent = name;
-  openModal('modalRejectClient');
 }
 
 function closeActionMenus() {

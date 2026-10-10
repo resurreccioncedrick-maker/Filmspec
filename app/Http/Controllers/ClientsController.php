@@ -92,7 +92,6 @@ class ClientsController extends Controller
             'total' => (int) DB::table('clients')->count(),
             'regular' => (int) DB::table('clients')->where('client_type', 'regular')->count(),
             'first_time' => (int) DB::table('clients')->where('client_type', 'first_time')->count(),
-            'pending' => (int) DB::table('clients')->where('status', 'pending')->count(),
             'new_month' => (int) DB::table('clients')
                 ->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year)
                 ->count(),
@@ -233,46 +232,9 @@ class ClientsController extends Controller
             return ['type' => 'success', 'text' => 'Client updated.'];
         }
 
-        if ($action === 'approve_client') {
-            $cid = (int) $request->input('client_id');
-            $client = DB::table('clients')->where('client_id', $cid)->first();
-            if (! $client) {
-                return ['type' => 'danger', 'text' => 'Client not found.'];
-            }
-
-            DB::table('clients')->where('client_id', $cid)->update(['status' => 'approved', 'rejection_reason' => null]);
-            $name = $client->contact_person ?: $client->company_name;
-            ActivityLog::record($uid, 'update', 'clients', "Approved client: $name", $cid);
-
-            if ($client->email) {
-                $this->sendMail($client->email, 'Your FilmSpec Account is Approved', OtpMailTemplates::clientApproved($name));
-            }
-
-            return ['type' => 'success', 'text' => 'Client <strong>' . e($name) . '</strong> approved.'];
-        }
-
-        if ($action === 'reject_client') {
-            $cid = (int) $request->input('client_id');
-            $reason = trim($request->input('reason', ''));
-            if ($reason === '') {
-                return ['type' => 'danger', 'text' => 'A reason is required to reject a client.'];
-            }
-
-            $client = DB::table('clients')->where('client_id', $cid)->first();
-            if (! $client) {
-                return ['type' => 'danger', 'text' => 'Client not found.'];
-            }
-
-            DB::table('clients')->where('client_id', $cid)->update(['status' => 'rejected', 'rejection_reason' => $reason]);
-            $name = $client->contact_person ?: $client->company_name;
-            ActivityLog::record($uid, 'update', 'clients', "Rejected client: $name", $cid);
-
-            if ($client->email) {
-                $this->sendMail($client->email, 'FilmSpec Account Application Update', OtpMailTemplates::clientRejected($name, $reason));
-            }
-
-            return ['type' => 'success', 'text' => 'Client <strong>' . e($name) . '</strong> rejected.'];
-        }
+        // approve_client / reject_client were removed along with the admin approval UI —
+        // self-registered clients are now auto-approved at email verification (AuthController::
+        // verifySignup()), so there's no pending queue left to act on.
 
         // mark_regular_client / deactivate_client / reactivate_client live in
         // ClientDetailController::action() instead — they're triggered from the Client Detail
