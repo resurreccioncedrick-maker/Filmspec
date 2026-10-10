@@ -317,19 +317,22 @@ class AuthController extends Controller
             'client_type' => 'first_time',
             'is_vat_registered' => $pending['entity_type'] === 'company' ? 1 : 0,
         ]);
+        // Email verification (the OTP just checked above) is the only gate self-registered
+        // client accounts need — approved immediately here instead of landing in the admin's
+        // pending-applications queue, so a verified client can log in right away.
         \DB::table('clients')->where('user_id', $user->user_id)->update([
             'entity_type' => $pending['entity_type'],
-            'status' => 'pending',
+            'status' => 'approved',
         ]);
 
-        ActivityLog::record($user->user_id, 'create', 'auth', 'Client account registered — pending approval');
+        ActivityLog::record($user->user_id, 'create', 'auth', 'Client account registered and auto-approved (email verified)');
 
         $request->session()->forget(['signup_pending', 'signup_otp_attempts']);
         $request->session()->regenerate();
 
         return redirect()->route('login')->withInput(['form' => 'login'])->with(
             'signup_success',
-            'Thanks for signing up! Your account is awaiting admin approval — we\'ll email you once it\'s been reviewed.'
+            'Thanks for signing up! Your email is verified and your account is ready — you can log in now.'
         );
     }
 
