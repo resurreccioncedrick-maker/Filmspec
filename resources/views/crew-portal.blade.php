@@ -670,6 +670,19 @@ button{font-family:var(--font-b);cursor:pointer}
             <div style="font-size:10.5px;color:var(--muted);font-weight:400;margin-top:2px">{{ $cb->booking->project_title ?: '—' }}</div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
+            @if ($dir === 'out' && $arrivalConfirmed)
+            <form method="POST" onsubmit="return confirm('Undo arrival confirmation for this booking?')" style="display:contents">
+              @csrf
+              <input type="hidden" name="action" value="crew_undo_arrival">
+              <input type="hidden" name="return_tab" value="checklist">
+              <input type="hidden" name="return_subtab" value="out">
+              <input type="hidden" name="return_booking_id" value="{{ $cb->booking->booking_id }}">
+              <input type="hidden" name="booking_id" value="{{ $cb->booking->booking_id }}">
+              <button type="submit" style="color:var(--muted);display:flex;align-items:center;background:none;border:none;padding:0;cursor:pointer" title="Undo arrival confirmation — confirmed by mistake?">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 7"/></svg>
+              </button>
+            </form>
+            @endif
             <a href="{{ route('crew-portal.checklist-print', ['booking_id' => $cb->booking->booking_id]) }}" target="_blank" style="color:var(--muted);display:flex;align-items:center" title="Print checklist">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             </a>
@@ -707,15 +720,6 @@ button{font-family:var(--font-b);cursor:pointer}
           <div class="badge badge-green" style="width:100%;justify-content:center;padding:10px;font-size:13px">
             Arrival confirmed {{ \Illuminate\Support\Carbon::parse($cb->booking->field_arrival_confirmed_at)->format('M j, g:i A') }}
           </div>
-          <form method="POST" onsubmit="return confirm('Undo arrival confirmation for this booking?')" style="margin-top:8px">
-            @csrf
-            <input type="hidden" name="action" value="crew_undo_arrival">
-            <input type="hidden" name="return_tab" value="checklist">
-            <input type="hidden" name="return_subtab" value="out">
-            <input type="hidden" name="return_booking_id" value="{{ $cb->booking->booking_id }}">
-            <input type="hidden" name="booking_id" value="{{ $cb->booking->booking_id }}">
-            <button type="submit" class="btn btn-secondary" style="width:100%;font-size:12px">Undo — confirmed by mistake?</button>
-          </form>
           @else
           <form method="POST">
             @csrf
