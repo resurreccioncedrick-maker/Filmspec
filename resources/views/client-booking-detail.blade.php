@@ -27,8 +27,9 @@ a{text-decoration:none;color:inherit}
 /* Nav */
 .nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px;height:58px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 6px rgba(0,30,80,.06)}
 .nav-logo{font-family:var(--font-d);font-size:22px;letter-spacing:2px;color:var(--blue)}
-.nav-back{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;color:var(--sub);border:1.5px solid var(--border2);background:var(--surface);cursor:pointer;transition:all .15s;margin-left:auto}
+.nav-back{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;color:var(--sub);border:1.5px solid var(--border2);background:var(--surface);cursor:pointer;transition:all .15s;margin-left:auto;white-space:nowrap}
 .nav-back:hover{border-color:var(--blue);color:var(--blue)}
+.nav-back-short{display:none}
 
 /* Layout */
 .container{max-width:1180px;margin:0 auto;padding:28px 20px;flex:1;width:100%}
@@ -36,7 +37,11 @@ a{text-decoration:none;color:inherit}
 @media (max-width:860px){ .layout-grid{grid-template-columns:1fr} .sidebar-col{position:static !important} }
 
 @media (max-width:640px){
-  .nav{padding:0 16px}
+  .nav{padding:0 14px;height:auto;min-height:58px;flex-wrap:wrap;row-gap:6px}
+  .nav img{height:26px}
+  .nav-back{font-size:12px;padding:6px 10px}
+  .nav-back-full{display:none}
+  .nav-back-short{display:inline}
   .side-btn{min-height:44px;padding:10px 14px;font-size:13.5px}
 
   /* Progress tracker — 4 nowrap labels + fixed dots had no responsive
@@ -140,7 +145,14 @@ a{text-decoration:none;color:inherit}
 .form-textarea:focus{border-color:var(--blue)}
 
 /* Footer */
-footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-align:center;color:#5a7299;font-size:12px}
+footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-align:center;color:#5a7299;font-size:12px;line-height:1.7}
+footer .footer-brand{font-family:var(--font-d);color:var(--blue);font-size:14px;letter-spacing:2px}
+footer .footer-sep{margin:0 8px}
+@media(max-width:640px){
+  footer{padding:16px 20px;font-size:10.5px}
+  footer .footer-sep{display:none}
+  footer .footer-line{display:block}
+}
 
 /* Support chat — same component/classes as home.blade.php, for a consistent look
    everywhere. Here it's scoped to this booking's own thread instead of the general one. */
@@ -217,7 +229,10 @@ footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-al
 
 <nav class="nav">
   <img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec" style="height:32px;object-fit:contain">
-  <a href="{{ route('home') }}" class="nav-back">&larr; Back to My Bookings</a>
+  <a href="{{ route('home') }}" class="nav-back">
+    <span class="nav-back-full">&larr; Back to My Bookings</span>
+    <span class="nav-back-short">&larr; Back</span>
+  </a>
 </nav>
 
 <div class="container">
@@ -1072,8 +1087,9 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <footer>
-  <span style="font-family:var(--font-d);color:var(--blue);font-size:14px;letter-spacing:2px">FilmSpec</span>
-  &nbsp;|&nbsp; &copy; {{ date('Y') }} FilmSpec. All rights reserved. &nbsp;|&nbsp; Integrated Film Operations Platform
+  <span class="footer-line"><span class="footer-brand">FilmSpec</span><span class="footer-sep">|</span></span>
+  <span class="footer-line">&copy; {{ date('Y') }} FilmSpec. All rights reserved.<span class="footer-sep">|</span></span>
+  <span class="footer-line">Integrated Film Operations Platform</span>
 </footer>
 <!-- Cancellation Request Modal — Step 1: Policy -->
 <div id="modalCancelPolicy" class="modal-overlay" onclick="if(event.target===this)closeCancelModals()" style="align-items:flex-start;padding:30px 20px;overflow-y:auto">
