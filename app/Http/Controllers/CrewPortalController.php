@@ -224,14 +224,35 @@ class CrewPortalController extends Controller
                     })
                     ->whereIn('be.booking_id', $checklistBookingIds)
                     ->orderBy('e.equipment_name')
-                    ->select('be.booking_id', 'be.equipment_id', 'be.quantity',
-                        'e.equipment_name', 'e.brand', 'e.model',
+                    ->select('be.booking_id', DB::raw("'equipment' as item_type"), 'be.equipment_id as ref_id', 'be.quantity',
+                        'e.equipment_name as item_name', 'e.brand', 'e.model',
+                        'co.checked as co_checked', 'co.quantity_actual as co_qty', 'co.condition_out', 'co.notes as co_notes',
+                        'ci.checked as ci_checked', 'ci.quantity_actual as ci_qty', 'ci.condition_in', 'ci.notes as ci_notes')
+                    ->get();
+
+                // Accessories dispatched alongside equipment share the same equipment_checklist
+                // table (accessory_id column, equipment_id left null) — mirrors
+                // ChecklistController's own equipment/accessory union so crew can actually check
+                // accessories in too, not just the main equipment line (they were previously
+                // missing from this screen entirely).
+                $accRows = DB::table('booking_accessories as ba')
+                    ->join('accessories as a', 'ba.accessory_id', '=', 'a.accessory_id')
+                    ->leftJoin('equipment_checklist as co', function ($j) {
+                        $j->on('co.accessory_id', '=', 'ba.accessory_id')->on('co.booking_id', '=', 'ba.booking_id')->where('co.direction', 'out');
+                    })
+                    ->leftJoin('equipment_checklist as ci', function ($j) {
+                        $j->on('ci.accessory_id', '=', 'ba.accessory_id')->on('ci.booking_id', '=', 'ba.booking_id')->where('ci.direction', 'in');
+                    })
+                    ->whereIn('ba.booking_id', $checklistBookingIds)
+                    ->orderBy('a.accessory_name')
+                    ->select('ba.booking_id', DB::raw("'accessory' as item_type"), 'ba.accessory_id as ref_id', 'ba.quantity',
+                        'a.accessory_name as item_name', DB::raw("'' as brand"), DB::raw("'' as model"),
                         'co.checked as co_checked', 'co.quantity_actual as co_qty', 'co.condition_out', 'co.notes as co_notes',
                         'ci.checked as ci_checked', 'ci.quantity_actual as ci_qty', 'ci.condition_in', 'ci.notes as ci_notes')
                     ->get();
 
                 $itemsByBooking = [];
-                foreach ($equipRows as $row) {
+                foreach ($equipRows->concat($accRows) as $row) {
                     $itemsByBooking[$row->booking_id][] = $row;
                 }
                 foreach ($checklistBookings as $bk) {
@@ -383,7 +404,7 @@ class CrewPortalController extends Controller
             return redirect()->route('crew-portal');
         }
 
-        $equipLines = DB::table('booking_equipment as be')
+        $equipQuery = DB::table('booking_equipment as be')
             ->join('equipment as e', 'be.equipment_id', '=', 'e.equipment_id')
             ->join('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
             ->leftJoin('equipment_checklist as co', function ($j) use ($bid) {
@@ -395,18 +416,42 @@ class CrewPortalController extends Controller
             ->leftJoin('users as uo', 'co.checked_by', '=', 'uo.user_id')
             ->leftJoin('users as ui', 'ci.checked_by', '=', 'ui.user_id')
             ->where('be.booking_id', $bid)
-            ->orderBy('ec.category_name')->orderBy('e.equipment_name')
             ->select(
-                'be.equipment_id', 'be.quantity',
-                'e.equipment_name', 'e.brand', 'e.model', 'ec.category_name',
+                DB::raw("'equipment' as item_type"), 'be.equipment_id as ref_id', 'be.quantity',
+                'e.equipment_name as item_name', 'e.brand', 'ec.category_name',
                 'co.quantity_actual as co_qty', 'co.condition_out', 'co.checked as co_checked',
                 'co.notes as co_notes', 'co.checked_at as co_at',
                 DB::raw("CONCAT(uo.first_name,' ',uo.last_name) as co_by_name"),
                 'ci.quantity_actual as ci_qty', 'ci.condition_in', 'ci.checked as ci_checked',
                 'ci.notes as ci_notes', 'ci.checked_at as ci_at',
                 DB::raw("CONCAT(ui.first_name,' ',ui.last_name) as ci_by_name")
-            )
-            ->get();
+            );
+
+        // Same equipment/accessory union as ChecklistController::print() — this reuses that
+        // same checklist-print view, which expects item_type/item_name/ref_id either way.
+        $accQuery = DB::table('booking_accessories as ba')
+            ->join('accessories as a', 'ba.accessory_id', '=', 'a.accessory_id')
+            ->leftJoin('equipment_checklist as co', function ($j) use ($bid) {
+                $j->on('co.accessory_id', '=', 'ba.accessory_id')->where('co.booking_id', $bid)->where('co.direction', 'out');
+            })
+            ->leftJoin('equipment_checklist as ci', function ($j) use ($bid) {
+                $j->on('ci.accessory_id', '=', 'ba.accessory_id')->where('ci.booking_id', $bid)->where('ci.direction', 'in');
+            })
+            ->leftJoin('users as uo', 'co.checked_by', '=', 'uo.user_id')
+            ->leftJoin('users as ui', 'ci.checked_by', '=', 'ui.user_id')
+            ->where('ba.booking_id', $bid)
+            ->select(
+                DB::raw("'accessory' as item_type"), 'ba.accessory_id as ref_id', 'ba.quantity',
+                'a.accessory_name as item_name', DB::raw("'' as brand"), DB::raw("'Accessory' as category_name"),
+                'co.quantity_actual as co_qty', 'co.condition_out', 'co.checked as co_checked',
+                'co.notes as co_notes', 'co.checked_at as co_at',
+                DB::raw("CONCAT(uo.first_name,' ',uo.last_name) as co_by_name"),
+                'ci.quantity_actual as ci_qty', 'ci.condition_in', 'ci.checked as ci_checked',
+                'ci.notes as ci_notes', 'ci.checked_at as ci_at',
+                DB::raw("CONCAT(ui.first_name,' ',ui.last_name) as ci_by_name")
+            );
+
+        $equipLines = $equipQuery->unionAll($accQuery)->orderBy('category_name')->orderBy('item_name')->get();
 
         $totalItems = $equipLines->count();
         $outDone = $equipLines->filter(fn ($e) => $e->co_checked)->count();
@@ -581,12 +626,25 @@ class CrewPortalController extends Controller
                 return ['type' => 'danger', 'text' => 'Only office staff can release equipment. Use Confirm Field Arrival instead.'];
             }
 
-            // Simplified crew flow: a plain list of checked equipment_ids — no per-item
-            // quantity/condition/notes fields. Every checked item is recorded as its full
-            // expected quantity in 'good' condition; anything actually wrong with a specific
-            // item is reported through the separate File Incident Report action instead,
-            // which already exists and already handles condition/damage detail properly.
-            $checkedIds = array_map('intval', (array) $request->input('items', []));
+            // Simplified crew flow: a plain list of checked "eq_<id>" / "acc_<id>" tokens — no
+            // per-item quantity/condition/notes fields. Every checked item is recorded as its
+            // full expected quantity in 'good' condition; anything actually wrong with a
+            // specific item is reported through the separate File Incident Report action
+            // instead, which already exists and already handles condition/damage detail
+            // properly. Plain numeric values (no prefix) are treated as equipment_id, for any
+            // stale cached form from before accessories were added to this screen.
+            $rawChecked = (array) $request->input('items', []);
+            $checkedEquipIds = [];
+            $checkedAccIds = [];
+            foreach ($rawChecked as $token) {
+                if (preg_match('/^acc_(\d+)$/', (string) $token, $m)) {
+                    $checkedAccIds[] = (int) $m[1];
+                } elseif (preg_match('/^eq_(\d+)$/', (string) $token, $m)) {
+                    $checkedEquipIds[] = (int) $m[1];
+                } elseif (ctype_digit((string) $token)) {
+                    $checkedEquipIds[] = (int) $token;
+                }
+            }
 
             $ownsBooking = DB::table('booking_crew')->where('crew_id', $crewMember->crew_id)
                 ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
@@ -596,7 +654,7 @@ class CrewPortalController extends Controller
 
             $bookingEquip = DB::table('booking_equipment')->where('booking_id', $bid)->get()->keyBy('equipment_id');
 
-            foreach ($checkedIds as $eid) {
+            foreach ($checkedEquipIds as $eid) {
                 if (! $bookingEquip->has($eid)) {
                     continue;
                 }
@@ -621,6 +679,28 @@ class CrewPortalController extends Controller
                         'transaction_date' => now(), 'condition_in' => 'good', 'handled_by' => $uid,
                     ]);
                     DB::table('equipment')->where('equipment_id', $eid)->update(['availability_status' => 'available']);
+                }
+            }
+
+            // Accessories skip equipment_transactions/availability_status — same as
+            // ChecklistController::saveChecklist() — they aren't serialized/tracked there.
+            $bookingAcc = DB::table('booking_accessories')->where('booking_id', $bid)->get()->keyBy('accessory_id');
+            foreach ($checkedAccIds as $aid) {
+                if (! $bookingAcc->has($aid)) {
+                    continue;
+                }
+                $qty = (int) $bookingAcc[$aid]->quantity;
+
+                $existing = DB::table('equipment_checklist')->where('booking_id', $bid)->where('accessory_id', $aid)->where('direction', 'in')->value('checklist_id');
+                if ($existing) {
+                    DB::table('equipment_checklist')->where('checklist_id', $existing)->update([
+                        'checked' => 1, 'quantity_actual' => $qty, 'condition_in' => 'good', 'checked_by' => $uid, 'checked_at' => now(),
+                    ]);
+                } else {
+                    DB::table('equipment_checklist')->insert([
+                        'booking_id' => $bid, 'accessory_id' => $aid, 'direction' => 'in', 'quantity_expected' => $qty,
+                        'quantity_actual' => $qty, 'condition_in' => 'good', 'checked' => 1, 'checked_by' => $uid, 'checked_at' => now(),
+                    ]);
                 }
             }
 

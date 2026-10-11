@@ -617,12 +617,20 @@ button{font-family:var(--font-b);cursor:pointer}
     </div>
 
     @php
-      $outBookings = $myChecklistBookings->where('direction', 'out')->values();
+      // Confirm Arrival lists every checklist-eligible booking, not just ones still awaiting
+      // confirmation — a booking whose arrival is already confirmed still shows here (read-only,
+      // via the $arrivalConfirmed branch below) so crew can always find and review any of their
+      // bookings instead of the tab going to a dead end once nothing is left to act on. The tab
+      // badge still counts only what's actually awaiting action, so it stays a useful signal.
+      $outBookings = $myChecklistBookings->values();
+      $outPendingCount = $myChecklistBookings->where('direction', 'out')->count();
+      // Check-In stays gated to arrival-confirmed bookings only — checking equipment back in
+      // before confirming arrival doesn't make operational sense.
       $inBookings = $myChecklistBookings->where('direction', 'in')->values();
       $checklistSubTab = in_array($activeSubTab, ['out', 'in'], true) ? $activeSubTab : 'out';
     @endphp
     <div class="subtabs">
-      <button type="button" class="subtab-btn {{ $checklistSubTab === 'out' ? 'on' : '' }}" data-group="checklist" onclick="showSubTab('checklist','out',this)">Confirm Arrival ({{ $outBookings->count() }})</button>
+      <button type="button" class="subtab-btn {{ $checklistSubTab === 'out' ? 'on' : '' }}" data-group="checklist" onclick="showSubTab('checklist','out',this)">Confirm Arrival ({{ $outPendingCount }})</button>
       <button type="button" class="subtab-btn {{ $checklistSubTab === 'in' ? 'on' : '' }}" data-group="checklist" onclick="showSubTab('checklist','in',this)">Check-In ({{ $inBookings->count() }})</button>
     </div>
 
@@ -681,8 +689,8 @@ button{font-family:var(--font-b);cursor:pointer}
         @foreach ($cb->items as $it)
         <div class="item">
           <span style="flex:1">
-            <span class="it-title" style="margin-top:0">{{ $it->equipment_name }}</span>
-            <span class="it-meta">{{ $it->brand }} {{ $it->model }}</span>
+            <span class="it-title" style="margin-top:0">{{ $it->item_name }}{{ $it->item_type === 'accessory' ? ' (Accessory)' : '' }}</span>
+            <span class="it-meta">{{ trim($it->brand.' '.$it->model) ?: '—' }}</span>
           </span>
           <span class="it-side">
             <span class="it-rate" style="font-family:var(--font-m);font-size:11.5px;color:var(--muted)">Qty {{ $it->quantity }}</span>
@@ -721,12 +729,12 @@ button{font-family:var(--font-b);cursor:pointer}
           <input type="hidden" name="booking_id" value="{{ $cb->booking->booking_id }}">
           <input type="hidden" name="direction" value="{{ $dir }}">
           @foreach ($cb->items as $it)
-          @php $isChecked = $it->ci_checked; @endphp
+          @php $isChecked = $it->ci_checked; $refKey = ($it->item_type === 'accessory' ? 'acc_' : 'eq_') . $it->ref_id; @endphp
           <label class="item" style="cursor:pointer">
-            <input type="checkbox" name="items[]" value="{{ $it->equipment_id }}" {{ $isChecked ? 'checked' : '' }} style="width:22px;height:22px;accent-color:var(--blue);flex-shrink:0">
+            <input type="checkbox" name="items[]" value="{{ $refKey }}" {{ $isChecked ? 'checked' : '' }} style="width:22px;height:22px;accent-color:var(--blue);flex-shrink:0">
             <span style="flex:1">
-              <span class="it-title" style="margin-top:0">{{ $it->equipment_name }}</span>
-              <span class="it-meta">{{ $it->brand }} {{ $it->model }}</span>
+              <span class="it-title" style="margin-top:0">{{ $it->item_name }}{{ $it->item_type === 'accessory' ? ' (Accessory)' : '' }}</span>
+              <span class="it-meta">{{ trim($it->brand.' '.$it->model) ?: '—' }}</span>
             </span>
             <span class="it-side" style="font-family:var(--font-m);font-size:11.5px;color:var(--muted)">Qty {{ $it->quantity }}</span>
           </label>
