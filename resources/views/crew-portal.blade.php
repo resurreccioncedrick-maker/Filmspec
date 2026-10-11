@@ -696,15 +696,23 @@ button{font-family:var(--font-b);cursor:pointer}
         @if (empty($cb->items))
         <div class="empty">No equipment on this booking.</div>
         @elseif ($dir === 'out')
-        {{-- Read-only: releasing equipment is Traffic/Ops/Admin's job on the main Checklist page.
-             Crew's own action here is a single, deliberate "we've got it" confirmation, not
-             re-ticking a release they never performed. --}}
+        {{-- A checkbox per item, so crew physically verify each piece of equipment they've
+             received before the Confirm Field Arrival button unlocks (updateArrivalConfirmBtn
+             below) — this is crew's own "we've got it" verification, separate from and never
+             touching the office's own release/"Released" status (co_checked), which stays
+             read-only here and is still shown as its own badge. Releasing equipment is still
+             Traffic/Ops/Admin's job on the main Checklist page. --}}
         @foreach ($cb->items as $it)
         <div class="item">
-          <span style="flex:1">
-            <span class="it-title" style="margin-top:0">{{ $it->item_name }}{{ $it->item_type === 'accessory' ? ' (Accessory)' : '' }}</span>
-            <span class="it-meta">{{ trim($it->brand.' '.$it->model) ?: '—' }}</span>
-          </span>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1">
+            <input type="checkbox" class="arrival-item-check" data-panel="{{ $cb->booking->booking_id }}"
+                   {{ $arrivalConfirmed ? 'checked disabled' : '' }} onchange="updateArrivalConfirmBtn({{ $cb->booking->booking_id }})"
+                   style="width:22px;height:22px;accent-color:var(--blue);flex-shrink:0">
+            <span style="flex:1">
+              <span class="it-title" style="margin-top:0">{{ $it->item_name }}{{ $it->item_type === 'accessory' ? ' (Accessory)' : '' }}</span>
+              <span class="it-meta">{{ trim($it->brand.' '.$it->model) ?: '—' }}</span>
+            </span>
+          </label>
           <span class="it-side">
             <span class="it-rate" style="font-family:var(--font-m);font-size:11.5px;color:var(--muted)">Qty {{ $it->quantity }}</span>
             @if ($it->co_checked)
@@ -728,7 +736,8 @@ button{font-family:var(--font-b);cursor:pointer}
             <input type="hidden" name="return_subtab" value="out">
             <input type="hidden" name="return_booking_id" value="{{ $cb->booking->booking_id }}">
             <input type="hidden" name="booking_id" value="{{ $cb->booking->booking_id }}">
-            <button type="submit" class="btn btn-primary" style="width:100%">Confirm Field Arrival</button>
+            <button type="submit" class="btn btn-primary" id="arrivalConfirmBtn-{{ $cb->booking->booking_id }}" style="width:100%" disabled>Confirm Field Arrival</button>
+            <div style="font-size:10.5px;color:var(--muted);text-align:center;margin-top:6px">Check off every item above to unlock</div>
           </form>
           @endif
         </div>
@@ -1257,6 +1266,12 @@ function selectBooking(kind, bookingId, el) {
   } else {
     showChecklistBooking(kind.replace('checklist-', ''), bookingId);
   }
+}
+function updateArrivalConfirmBtn(bookingId) {
+  const boxes = document.querySelectorAll(`.arrival-item-check[data-panel="${bookingId}"]`);
+  const btn = document.getElementById('arrivalConfirmBtn-' + bookingId);
+  if (!btn || !boxes.length) return;
+  btn.disabled = ! Array.from(boxes).every(b => b.checked);
 }
 function filterBookingList(kind, query) {
   const q = query.trim().toLowerCase();
