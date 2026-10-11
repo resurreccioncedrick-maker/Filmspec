@@ -2619,19 +2619,25 @@ function renderPanel(reqOps) {
       });
     }
 
+    const eqForMax = ALL_EQ.find(e => e.id === parseInt(item.equipment_id));
+    const eqMax = eqForMax ? Math.max(1, parseInt(eqForMax.avail_units) || 1) : 99;
+    const eqAtMax = qty >= eqMax;
+
     let accHtml = '';
     (item.accessories||[]).forEach(acc=>{
       const accQty  = parseInt(acc.quantity||1);
       const accRate = parseFloat(acc.daily_rate||0);
       const accSub  = accRate*days*accQty;
       equipSubtotal += accSub;
+      const accMax = Math.max(1, parseInt(acc.available_units ?? accQty) || 1);
+      const accAtMax = accQty >= accMax;
       accHtml += `<div class="rli-crew-est">
         <span class="crew-est-icon">&#43;</span>
         <span>${acc.accessory_name}</span>
         <div style="display:flex;align-items:center;gap:1px;border:1px solid var(--border);border-radius:5px;background:var(--surface);flex-shrink:0">
           <button type="button" onclick="rlChangeAccQty(${item.cart_id},${acc.accessory_id},-1)" title="Decrease quantity" style="width:16px;height:16px;border:none;background:transparent;font-size:.68rem;cursor:pointer;line-height:1;color:var(--sub)">&minus;</button>
           <span style="font-size:10px;font-weight:700;min-width:11px;text-align:center">${accQty}</span>
-          <button type="button" onclick="rlChangeAccQty(${item.cart_id},${acc.accessory_id},1)" title="Increase quantity" style="width:16px;height:16px;border:none;background:transparent;font-size:.68rem;cursor:pointer;line-height:1;color:var(--sub)">+</button>
+          <button type="button" onclick="rlChangeAccQty(${item.cart_id},${acc.accessory_id},1)" title="${accAtMax?`Only ${accMax} available`:'Increase quantity'}" ${accAtMax?'disabled':''} style="width:16px;height:16px;border:none;background:transparent;font-size:.68rem;line-height:1;color:${accAtMax?'var(--border2)':'var(--sub)'};cursor:${accAtMax?'not-allowed':'pointer'}">+</button>
         </div>
         <span class="rli-amount crew-est-amt">₱${fmt(accSub)}</span>
         <button class="rli-acc-remove" onclick="removeAccessory(${item.cart_id},${acc.accessory_id})" title="Remove accessory">&times;</button>
@@ -2647,10 +2653,11 @@ function renderPanel(reqOps) {
           <div style="display:flex;align-items:center;gap:2px;border:1px solid var(--border);border-radius:6px">
             <button type="button" onclick="rlChangeQty(${item.cart_id},-1)" title="Decrease quantity" style="width:19px;height:19px;border:none;background:transparent;font-size:.72rem;cursor:pointer;line-height:1;color:var(--sub)">&minus;</button>
             <span style="font-size:11px;font-weight:700;min-width:14px;text-align:center">${qty}</span>
-            <button type="button" onclick="rlChangeQty(${item.cart_id},1)" title="Increase quantity" style="width:19px;height:19px;border:none;background:transparent;font-size:.72rem;cursor:pointer;line-height:1;color:var(--sub)">+</button>
+            <button type="button" onclick="rlChangeQty(${item.cart_id},1)" title="${eqAtMax?`Only ${eqMax} available`:'Increase quantity'}" ${eqAtMax?'disabled':''} style="width:19px;height:19px;border:none;background:transparent;font-size:.72rem;line-height:1;color:${eqAtMax?'var(--border2)':'var(--sub)'};cursor:${eqAtMax?'not-allowed':'pointer'}">+</button>
           </div>
           <span class="rli-amount">₱${fmt(sub)}</span>
         </div>
+        ${eqAtMax?`<div style="font-size:9.5px;color:var(--muted);margin-top:-2px">Only ${eqMax} unit${eqMax!==1?'s':''} available</div>`:''}
         ${accHtml}
         ${crewEstHtml}
       </div>
@@ -2719,11 +2726,18 @@ function rlChangeAccQty(cartId, accessoryId, delta) {
   if (!IS_LOGIN) return; // accessories aren't tracked in the guest-mode local cart at all
   const item = reqList.find(i => i.item_type === 'equipment' && String(i.cart_id) === String(cartId));
   if (!item) return;
+  const target = (item.accessories || []).find(a => parseInt(a.accessory_id) === parseInt(accessoryId));
+  if (target) {
+    const max = Math.max(1, parseInt(target.available_units ?? target.quantity) || 1);
+    const current = parseInt(target.quantity || 1);
+    if (Math.max(1, Math.min(max, current + delta)) === current) return; // already at the cap
+  }
   const accessories = (item.accessories || []).map(a => {
     const qty = parseInt(a.quantity || 1);
+    const max = Math.max(1, parseInt(a.available_units ?? qty) || 1);
     return {
       accessory_id: a.accessory_id,
-      quantity: parseInt(a.accessory_id) === parseInt(accessoryId) ? Math.max(1, qty + delta) : qty,
+      quantity: parseInt(a.accessory_id) === parseInt(accessoryId) ? Math.max(1, Math.min(max, qty + delta)) : qty,
     };
   });
   const fd = new FormData();

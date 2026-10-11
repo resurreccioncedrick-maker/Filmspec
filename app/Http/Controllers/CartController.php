@@ -118,7 +118,12 @@ class CartController extends Controller
                 ->whereIn('bca.cart_id', $cartIds)
                 ->select('bca.cart_id', 'a.accessory_id', 'a.accessory_name', 'a.daily_rate', 'bca.quantity')
                 ->get();
+            // The request list's quantity stepper needs this to cap itself client-side — same
+            // math CartController's add validation and HomeController's eq_detail branch use,
+            // so the three can never disagree on how many are actually available right now.
+            $availByAcc = \App\Support\AccessoryAvailability::bulkAvailable($accRows->pluck('accessory_id')->all());
             foreach ($accRows as $row) {
+                $row->available_units = $availByAcc[$row->accessory_id] ?? 0;
                 $accByCart[$row->cart_id][] = $row;
             }
         }
