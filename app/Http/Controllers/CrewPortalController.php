@@ -211,7 +211,11 @@ class CrewPortalController extends Controller
             // accounts are provisioned) can check equipment OUT while a booking is 'confirmed'
             // and back IN while it's 'ongoing', mirroring ChecklistController's own direction
             // logic 1:1 so the auto status-transition rules stay consistent either way it's done.
-            $checklistBookings = $myBookings->whereIn('booking_status', ['confirmed', 'ongoing']);
+            // 'pending_inspection' is included too — crew_save_checklist auto-flips a booking
+            // there the moment every item is checked in, and without this the booking would
+            // vanish from the crew's own checklist the instant they finished, with no way left
+            // to reopen it and fix a mistake (an item wrongly checked, or one missed entirely).
+            $checklistBookings = $myBookings->whereIn('booking_status', ['confirmed', 'ongoing', 'pending_inspection']);
             $checklistBookingIds = $checklistBookings->pluck('booking_id')->all();
             if ($checklistBookingIds) {
                 $equipRows = DB::table('booking_equipment as be')
@@ -614,6 +618,25 @@ class CrewPortalController extends Controller
             return ['type' => 'success', 'text' => 'Field arrival confirmed — office staff can now see it on the Checklist page.'];
         }
 
+        if ($action === 'crew_undo_arrival' && $crewMember) {
+            // Lets crew immediately walk back a mis-tap (wrong booking, or confirmed before
+            // actually arriving) — clears the same two columns crew_confirm_arrival set, with no
+            // other side effects. Doesn't touch anything already saved on the Check-In tab.
+            $bid = (int) $request->input('booking_id', 0);
+            $ownsBooking = DB::table('booking_crew')->where('crew_id', $crewMember->crew_id)
+                ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
+            if (! $ownsBooking) {
+                return ['type' => 'danger', 'text' => 'That booking is not assigned to you.'];
+            }
+
+            DB::table('bookings')->where('booking_id', $bid)->update([
+                'field_arrival_confirmed_at' => null, 'field_arrival_confirmed_by' => null,
+            ]);
+            ActivityLog::record($uid, 'field_arrival_confirmed', 'booking', "Crew undid field arrival confirmation for booking #$bid", $bid);
+
+            return ['type' => 'success', 'text' => 'Arrival confirmation undone.'];
+        }
+
         if ($action === 'crew_save_checklist' && $crewMember) {
             $bid = (int) $request->input('booking_id', 0);
             $direction = $request->input('direction') === 'in' ? 'in' : 'out';
@@ -652,51 +675,58 @@ class CrewPortalController extends Controller
                 return ['type' => 'danger', 'text' => 'That booking is not assigned to you.'];
             }
 
+            // Every item on the booking is processed, not just the checked ones — reopening this
+            // form and unchecking something a crew member ticked by mistake must actually clear
+            // it, not just leave the stale "checked" row in place because it was never
+            // resubmitted. Matches ChecklistController::saveChecklist(), which already does this.
             $bookingEquip = DB::table('booking_equipment')->where('booking_id', $bid)->get()->keyBy('equipment_id');
 
-            foreach ($checkedEquipIds as $eid) {
-                if (! $bookingEquip->has($eid)) {
-                    continue;
-                }
-                $qty = (int) $bookingEquip[$eid]->quantity;
+            foreach ($bookingEquip as $eid => $line) {
+                $checked = in_array($eid, $checkedEquipIds, true) ? 1 : 0;
+                $qty = (int) $line->quantity;
 
                 $existing = DB::table('equipment_checklist')->where('booking_id', $bid)->where('equipment_id', $eid)->where('direction', 'in')->value('checklist_id');
                 if ($existing) {
                     DB::table('equipment_checklist')->where('checklist_id', $existing)->update([
-                        'checked' => 1, 'quantity_actual' => $qty, 'condition_in' => 'good', 'checked_by' => $uid, 'checked_at' => now(),
+                        'checked' => $checked, 'quantity_actual' => $checked ? $qty : 0, 'condition_in' => 'good', 'checked_by' => $uid, 'checked_at' => now(),
                     ]);
-                } else {
+                } elseif ($checked) {
                     DB::table('equipment_checklist')->insert([
                         'booking_id' => $bid, 'equipment_id' => $eid, 'direction' => 'in', 'quantity_expected' => $qty,
                         'quantity_actual' => $qty, 'condition_in' => 'good', 'checked' => 1, 'checked_by' => $uid, 'checked_at' => now(),
                     ]);
                 }
 
-                $existTx = DB::table('equipment_transactions')->where('booking_id', $bid)->where('equipment_id', $eid)->where('transaction_type', 'checkin')->value('transaction_id');
-                if (! $existTx) {
-                    DB::table('equipment_transactions')->insert([
-                        'booking_id' => $bid, 'equipment_id' => $eid, 'transaction_type' => 'checkin',
-                        'transaction_date' => now(), 'condition_in' => 'good', 'handled_by' => $uid,
-                    ]);
-                    DB::table('equipment')->where('equipment_id', $eid)->update(['availability_status' => 'available']);
+                // Unchecking deliberately does NOT reverse the equipment_transactions /
+                // availability_status side effect below — same one-way convention
+                // ChecklistController::saveChecklist() already follows, since another booking
+                // may have already been allocated this unit on the strength of it being
+                // "available" again; silently pulling it back could double-book it.
+                if ($checked) {
+                    $existTx = DB::table('equipment_transactions')->where('booking_id', $bid)->where('equipment_id', $eid)->where('transaction_type', 'checkin')->value('transaction_id');
+                    if (! $existTx) {
+                        DB::table('equipment_transactions')->insert([
+                            'booking_id' => $bid, 'equipment_id' => $eid, 'transaction_type' => 'checkin',
+                            'transaction_date' => now(), 'condition_in' => 'good', 'handled_by' => $uid,
+                        ]);
+                        DB::table('equipment')->where('equipment_id', $eid)->update(['availability_status' => 'available']);
+                    }
                 }
             }
 
             // Accessories skip equipment_transactions/availability_status — same as
             // ChecklistController::saveChecklist() — they aren't serialized/tracked there.
             $bookingAcc = DB::table('booking_accessories')->where('booking_id', $bid)->get()->keyBy('accessory_id');
-            foreach ($checkedAccIds as $aid) {
-                if (! $bookingAcc->has($aid)) {
-                    continue;
-                }
-                $qty = (int) $bookingAcc[$aid]->quantity;
+            foreach ($bookingAcc as $aid => $line) {
+                $checked = in_array($aid, $checkedAccIds, true) ? 1 : 0;
+                $qty = (int) $line->quantity;
 
                 $existing = DB::table('equipment_checklist')->where('booking_id', $bid)->where('accessory_id', $aid)->where('direction', 'in')->value('checklist_id');
                 if ($existing) {
                     DB::table('equipment_checklist')->where('checklist_id', $existing)->update([
-                        'checked' => 1, 'quantity_actual' => $qty, 'condition_in' => 'good', 'checked_by' => $uid, 'checked_at' => now(),
+                        'checked' => $checked, 'quantity_actual' => $checked ? $qty : 0, 'condition_in' => 'good', 'checked_by' => $uid, 'checked_at' => now(),
                     ]);
-                } else {
+                } elseif ($checked) {
                     DB::table('equipment_checklist')->insert([
                         'booking_id' => $bid, 'accessory_id' => $aid, 'direction' => 'in', 'quantity_expected' => $qty,
                         'quantity_actual' => $qty, 'condition_in' => 'good', 'checked' => 1, 'checked_by' => $uid, 'checked_at' => now(),
@@ -706,8 +736,8 @@ class CrewPortalController extends Controller
 
             $totalEquip = (int) DB::table('booking_equipment')->where('booking_id', $bid)->count();
             $returnedCount = (int) DB::table('equipment_checklist')->where('booking_id', $bid)->where('direction', 'in')->where('checked', 1)->count();
+            $curStatus = DB::table('bookings')->where('booking_id', $bid)->value('booking_status');
             if ($totalEquip > 0 && $returnedCount >= $totalEquip) {
-                $curStatus = DB::table('bookings')->where('booking_id', $bid)->value('booking_status');
                 if (in_array($curStatus, ['ongoing', 'confirmed'], true)) {
                     // Matches ChecklistController/BookingDetailController's own path — all
                     // equipment back in moves to pending_inspection, not straight to returned;
@@ -717,6 +747,13 @@ class CrewPortalController extends Controller
                     DB::table('bookings')->where('booking_id', $bid)->update(['booking_status' => 'pending_inspection', 'updated_at' => now()]);
                     ActivityLog::record($uid, 'status_change', 'booking', "Booking #$bid pending inspection — all equipment checked in via crew checklist", $bid);
                 }
+            } elseif ($curStatus === 'pending_inspection') {
+                // Crew reopened an already-fully-checked-in booking and unchecked something —
+                // it's no longer actually all back, so undo the auto-transition too. Staff
+                // haven't started the inspection yet at this stage (that only happens from the
+                // main Checklist page), so stepping back to 'ongoing' is always safe here.
+                DB::table('bookings')->where('booking_id', $bid)->update(['booking_status' => 'ongoing', 'updated_at' => now()]);
+                ActivityLog::record($uid, 'status_change', 'booking', "Booking #$bid reopened to ongoing — crew edited checklist after it was pending inspection", $bid);
             }
 
             ActivityLog::record($uid, 'checklistin', 'booking', "Crew checklist in saved for booking #$bid", $bid);

@@ -707,6 +707,15 @@ button{font-family:var(--font-b);cursor:pointer}
           <div class="badge badge-green" style="width:100%;justify-content:center;padding:10px;font-size:13px">
             Arrival confirmed {{ \Illuminate\Support\Carbon::parse($cb->booking->field_arrival_confirmed_at)->format('M j, g:i A') }}
           </div>
+          <form method="POST" onsubmit="return confirm('Undo arrival confirmation for this booking?')" style="margin-top:8px">
+            @csrf
+            <input type="hidden" name="action" value="crew_undo_arrival">
+            <input type="hidden" name="return_tab" value="checklist">
+            <input type="hidden" name="return_subtab" value="out">
+            <input type="hidden" name="return_booking_id" value="{{ $cb->booking->booking_id }}">
+            <input type="hidden" name="booking_id" value="{{ $cb->booking->booking_id }}">
+            <button type="submit" class="btn btn-secondary" style="width:100%;font-size:12px">Undo — confirmed by mistake?</button>
+          </form>
           @else
           <form method="POST">
             @csrf
