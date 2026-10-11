@@ -186,7 +186,11 @@
           <td><span class="badge {{ $statusBadge[$bk->booking_status] }}">{{ $statusTabLabel[$bk->booking_status] ?? ucfirst($bk->booking_status) }}</span></td>
           <td>@if ($bk->booking_status === 'cancelled') — @else <span class="badge {{ $payBadge[$bk->payment_status] ?? 'badge-gray' }}">{{ $payLabel[$bk->payment_status] ?? ucfirst($bk->payment_status) }}</span> @endif</td>
           <td style="font-weight:600;color:var(--accent)">
-            {{ $bk->final_amount > 0 ? '₱' . number_format($bk->final_amount, 2) : '—' }}
+            @if ($bk->final_amount > 0)
+            ₱{{ number_format($bk->final_amount, 2) }}
+            @elseif (! $bk->pending_discount && ! ($bk->active_discount > 0))
+            —
+            @endif
             @if ($bk->pending_discount)
             <div><span class="badge badge-yellow" style="font-size:.65rem" title="Awaiting approval on the Billing page">Discount pending</span></div>
             @elseif ($bk->active_discount > 0)
