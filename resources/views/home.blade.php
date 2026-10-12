@@ -1488,38 +1488,43 @@ a.footer-contact-link:hover{color:#60b0ff}
 .sup-fab-badge{position:absolute;top:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2.5px solid var(--bg)}
 .sup-overlay{display:none;position:fixed;inset:0;backdrop-filter:blur(6px) saturate(1.05);-webkit-backdrop-filter:blur(6px) saturate(1.05);background:rgba(11,26,51,.14);z-index:950}
 .sup-overlay.open{display:block}
-.sup-panel{position:fixed;bottom:22px;right:22px;width:328px;max-height:min(70vh,540px);background:var(--surface);border-radius:18px;box-shadow:0 16px 48px rgba(0,30,80,.18),0 2px 10px rgba(0,30,80,.08);border:1px solid var(--border);display:none;flex-direction:column;overflow:hidden;z-index:960}
+.sup-panel{position:fixed;bottom:22px;right:22px;width:440px;max-height:min(78vh,660px);background:var(--surface);border-radius:22px;box-shadow:0 24px 64px rgba(2,12,34,.24),0 2px 10px rgba(2,12,34,.08);border:1px solid var(--border);display:none;flex-direction:column;overflow:hidden;z-index:960}
 .sup-panel.open{display:flex}
-.sup-h{padding:16px 18px;display:flex;align-items:center;gap:11px;flex-shrink:0;background:linear-gradient(135deg,var(--blue),var(--blue2))}
-.sup-h-avatar{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
-.sup-h-avatar svg{width:18px;height:18px;color:#fff}
-.sup-h-dot{position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;border-radius:50%;background:#22c55e;border:2px solid var(--blue)}
-.sup-h .t{font-weight:700;font-size:13.5px;color:#fff}
-.sup-h .s{font-size:10.5px;color:rgba(255,255,255,.75);margin-top:1px}
-.sup-close{margin-left:auto;width:26px;height:26px;border:none;background:rgba(255,255,255,.14);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;flex-shrink:0;transition:background .15s}
+.sup-h{position:relative;padding:20px 22px 18px;flex-shrink:0;background:radial-gradient(520px 160px at 85% -40%,rgba(255,255,255,.16),transparent 60%),linear-gradient(135deg,var(--blue),var(--blue2))}
+.sup-h-top{display:flex;align-items:flex-start;gap:12px}
+.sup-h-avatar{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+.sup-h-avatar svg{width:20px;height:20px;color:#fff}
+.sup-h-dot{position:absolute;bottom:0;right:0;width:11px;height:11px;border-radius:50%;background:#39d98a;border:2.5px solid var(--blue2)}
+.sup-h-text{flex:1;min-width:0;padding-top:2px}
+.sup-h-text .t{font-weight:700;font-size:15.5px;color:#fff;letter-spacing:-.01em}
+.sup-h-text .s{font-size:11.5px;color:rgba(255,255,255,.78);margin-top:2px}
+.sup-close{flex-shrink:0;width:30px;height:30px;border:none;background:rgba(255,255,255,.14);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;transition:background .15s}
 .sup-close:hover{background:rgba(255,255,255,.26)}
-.sup-close svg{width:12px;height:12px}
-.sup-body{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;background:var(--s2)}
-.sup-cluster{display:flex;flex-direction:column;gap:3px;margin-bottom:3px}
+.sup-close svg{width:14px;height:14px}
+.sup-body{flex:1;overflow-y:auto;padding:18px 18px 4px;display:flex;flex-direction:column;background:var(--s2)}
+.sup-day{align-self:center;font-family:var(--font-m);font-size:10px;font-weight:600;letter-spacing:.03em;color:var(--sub);background:var(--surface);border:1px solid var(--border);padding:5px 13px;border-radius:20px;margin:2px 0 16px}
+.sup-cluster{display:flex;flex-direction:column;gap:4px;margin-bottom:4px}
 .sup-cluster.me{align-items:flex-end}
-.sup-cluster.them{align-items:flex-start}
-.sup-bubble{max-width:76%;padding:9px 13px;border-radius:16px;font-size:12.5px;line-height:1.48;white-space:pre-wrap}
-.sup-cluster.me .sup-bubble{background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;border-bottom-right-radius:4px;box-shadow:0 2px 8px rgba(0,96,199,.25)}
-.sup-cluster.them .sup-bubble{background:var(--surface);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(13,31,60,.04)}
-.sup-meta{font-family:var(--font-m);font-size:9.5px;color:var(--muted);margin:3px 4px 12px;text-align:left}
+.sup-cluster.them{flex-direction:row;align-items:flex-end;gap:8px}
+.sup-them-avatar{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-bottom:1px}
+.sup-them-col{display:flex;flex-direction:column;gap:4px;min-width:0}
+.sup-bubble{max-width:100%;padding:10px 14px;border-radius:17px;font-size:13px;line-height:1.52;white-space:pre-wrap}
+.sup-cluster.me .sup-bubble{max-width:320px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;border-bottom-right-radius:5px;box-shadow:0 2px 8px rgba(0,96,199,.25)}
+.sup-cluster.them .sup-bubble{background:var(--surface);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:5px;box-shadow:0 1px 3px rgba(13,31,60,.04)}
+.sup-meta{font-family:var(--font-m);font-size:10px;color:var(--muted);margin:3px 4px 14px;text-align:left}
 .sup-meta.me{text-align:right}
-.sup-seen{display:flex;align-items:center;gap:3px;justify-content:flex-end;font-size:9.5px;color:var(--blue);font-weight:600;margin:-8px 4px 10px}
+.sup-meta.them{padding-left:34px}
+.sup-seen{display:flex;align-items:center;gap:3px;justify-content:flex-end;font-size:10px;color:var(--blue);font-weight:600;margin:-10px 4px 12px}
 .sup-seen svg{width:11px;height:11px}
-.sup-empty{text-align:center;color:var(--muted);font-size:12.5px;padding:40px 16px;display:flex;flex-direction:column;align-items:center;gap:10px}
-.sup-empty svg{width:34px;height:34px;color:var(--bluemid)}
-.sup-input{display:flex;flex-direction:column;gap:7px;padding:11px 12px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
-.sup-input-row{display:flex;gap:4px;align-items:flex-end;background:var(--s2);border:1.5px solid var(--border);border-radius:22px;padding:4px 5px 4px 12px;transition:border-color .15s}
-.sup-input-row:focus-within{border-color:var(--bluemid)}
-.sup-input textarea{flex:1;border:none;padding:7px 2px;font-size:12.5px;font-family:var(--font-b);outline:none;background:none;resize:none;max-height:80px;color:var(--text)}
-.sup-send{width:30px;height:30px;border:none;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:#fff;transition:background .15s}
-.sup-send:hover{background:var(--blue2)}
-.sup-send svg{width:14px;height:14px}
-.sup-attach-btn{width:28px;height:28px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--muted);border-radius:50%;transition:background .15s,color .15s}
+.sup-empty{text-align:center;color:var(--muted);font-size:13px;padding:50px 20px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.sup-empty svg{width:36px;height:36px;color:var(--bluemid)}
+.sup-input{display:flex;flex-direction:column;gap:7px;padding:13px 16px 16px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
+.sup-input-row{display:flex;gap:4px;align-items:flex-end;background:var(--s2);border:1.5px solid var(--border);border-radius:24px;padding:5px 6px 5px 14px;transition:border-color .15s,box-shadow .15s}
+.sup-input-row:focus-within{border-color:var(--bluemid);box-shadow:0 0 0 3px var(--bluelt)}
+.sup-input textarea{flex:1;border:none;padding:8px 2px;font-size:13px;font-family:var(--font-b);outline:none;background:none;resize:none;max-height:90px;color:var(--text)}
+.sup-send{width:34px;height:34px;border:none;background:linear-gradient(135deg,var(--blue),var(--blue2));border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:#fff;box-shadow:0 3px 10px rgba(0,96,199,.3);transition:transform .15s}
+.sup-send:hover{transform:scale(1.06)}
+.sup-attach-btn{width:30px;height:30px;background:none;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--muted);border-radius:50%;transition:background .15s,color .15s}
 .sup-attach-btn svg{width:16px;height:16px}
 .sup-attach-btn:hover{color:var(--blue);background:var(--bluelt)}
 .sup-file-chip{display:none;align-items:center;gap:6px;background:var(--bluelt);color:var(--blue);border-radius:8px;padding:5px 9px;font-size:11.5px;font-weight:600;max-width:100%}
@@ -1536,9 +1541,10 @@ a.footer-contact-link:hover{color:#60b0ff}
 .sup-attach-file .meta{overflow:hidden}
 .sup-attach-file .fname{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sup-attach-file .fsize{font-size:10px;opacity:.75}
-@media(max-width:420px){
-  .sup-panel{right:10px;left:10px;width:auto;bottom:86px}
+@media(max-width:860px){
+  .sup-panel{right:10px;left:10px;width:auto;bottom:86px;max-height:min(80vh,640px)}
   .sup-fab{right:16px;bottom:16px}
+  .sup-cluster.me .sup-bubble{max-width:82%}
 }
 </style>
 </head>
@@ -3436,17 +3442,19 @@ document.addEventListener('DOMContentLoaded',()=>{
 <div class="sup-overlay" id="supOverlay" onclick="closeSupportChat()"></div>
 <div class="sup-panel" id="supPanel">
   <div class="sup-h">
+   <div class="sup-h-top">
     <div class="sup-h-avatar">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
       <span class="sup-h-dot"></span>
     </div>
-    <div>
+    <div class="sup-h-text">
       <div class="t">FilmSpec Team</div>
       <div class="s">Usually replies within a few hours</div>
     </div>
     <button class="sup-close" onclick="closeSupportChat()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>
+   </div>
   </div>
   @php
     $supLastMsg = $supportMessages->last();
@@ -3456,7 +3464,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   <div class="sup-body" id="supBody"
        data-last-id="{{ $supLastMsg->message_id ?? 0 }}"
        data-last-role="{{ $supLastMsg->author_role ?? '' }}"
-       data-last-at="{{ $supLastMsg->created_at ?? '' }}">
+       data-last-at="{{ $supLastMsg->created_at ?? '' }}"
+       data-last-date="{{ $supLastMsg ? \Carbon\Carbon::parse($supLastMsg->created_at)->toDateString() : '' }}">
     @if ($supportMsg)
     <div style="padding:9px 12px;border-radius:7px;font-size:12px;font-weight:600;
                 background:{{ $supportMsg['type'] === 'success' ? 'var(--greenlt)' : 'var(--redlt)' }};
@@ -3472,19 +3481,46 @@ document.addEventListener('DOMContentLoaded',()=>{
     </div>
     @else
     @php
-      $supClusters = [];
+      $supBlocks = [];
+      $supPrevDate = null;
       foreach ($supportMessages as $m) {
+          $mDate = \Carbon\Carbon::parse($m->created_at)->toDateString();
+          if ($mDate !== $supPrevDate) {
+              $supBlocks[] = ['type' => 'day', 'date' => $mDate];
+              $supPrevDate = $mDate;
+          }
           $supRole = $m->author_role === 'client' ? 'me' : 'them';
-          if ($supClusters && end($supClusters)['role'] === $supRole) {
-              $supClusters[array_key_last($supClusters)]['items'][] = $m;
+          $supLast = end($supBlocks);
+          if ($supLast && $supLast['type'] === 'cluster' && $supLast['role'] === $supRole) {
+              $supBlocks[array_key_last($supBlocks)]['items'][] = $m;
           } else {
-              $supClusters[] = ['role' => $supRole, 'items' => [$m]];
+              $supBlocks[] = ['type' => 'cluster', 'role' => $supRole, 'items' => [$m]];
           }
       }
+      $supToday = now()->toDateString();
+      $supYesterday = now()->subDay()->toDateString();
     @endphp
-    @foreach ($supClusters as $supCluster)
-      <div class="sup-cluster {{ $supCluster['role'] }}">
-        @foreach ($supCluster['items'] as $m)
+    @foreach ($supBlocks as $supBlock)
+      @if ($supBlock['type'] === 'day')
+      <div class="sup-day">
+        {{ $supBlock['date'] === $supToday ? 'Today' : ($supBlock['date'] === $supYesterday ? 'Yesterday' : \Carbon\Carbon::parse($supBlock['date'])->format('F j' . (\Carbon\Carbon::parse($supBlock['date'])->year === now()->year ? '' : ', Y'))) }}
+      </div>
+      @continue
+      @endif
+      @php
+        $supLastItem = end($supBlock['items']);
+        $supInitials = '';
+        if ($supBlock['role'] === 'them') {
+            $supWords = preg_split('/\s+/', trim($supLastItem->author_label ?: 'Team'));
+            $supInitials = mb_strtoupper(mb_substr(implode('', array_map(fn ($w) => mb_substr($w, 0, 1), $supWords)), 0, 2));
+        }
+      @endphp
+      <div class="sup-cluster {{ $supBlock['role'] }}">
+        @if ($supBlock['role'] === 'them')
+        <div class="sup-them-avatar">{{ $supInitials }}</div>
+        <div class="sup-them-col">
+        @endif
+        @foreach ($supBlock['items'] as $m)
         <div class="sup-bubble">
           @if ($m->body){{ $m->body }}@endif
           @if ($m->attachment_path)
@@ -3502,9 +3538,11 @@ document.addEventListener('DOMContentLoaded',()=>{
           @endif
         </div>
         @endforeach
+        @if ($supBlock['role'] === 'them')
+        </div>
+        @endif
       </div>
-      @php $supLastItem = end($supCluster['items']); @endphp
-      <div class="sup-meta {{ $supCluster['role'] }}">{{ $supCluster['role'] === 'them' ? 'FilmSpec ('.$supLastItem->author_label.') · ' : '' }}{{ \Carbon\Carbon::parse($supLastItem->created_at)->format('M j, g:i A') }}</div>
+      <div class="sup-meta {{ $supBlock['role'] }}">{{ $supBlock['role'] === 'them' ? 'FilmSpec ('.$supLastItem->author_label.') · ' : '' }}{{ \Carbon\Carbon::parse($supLastItem->created_at)->format('g:i A') }}</div>
     @endforeach
     <div class="sup-seen" id="supSeenLine" style="{{ $supSeen ? '' : 'display:none' }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 7 17l-5-5"/><path d="m22 10-9 9-3-3"/></svg>
@@ -3563,13 +3601,29 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSupport
 document.addEventListener('DOMContentLoaded', toggleSupportChat);
 @endif
 
-function supBubbleHtml(m) {
+function supInitials(label) {
+  var words = (label || 'Team').trim().split(/\s+/);
+  return words.map(function (w) { return w.charAt(0); }).join('').toUpperCase().slice(0, 2);
+}
+
+function supDayLabel(dateStr) {
+  var d = new Date(dateStr + 'T00:00:00');
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  if (d.getTime() === today.getTime()) return 'Today';
+  if (d.getTime() === yesterday.getTime()) return 'Yesterday';
+  var opts = d.getFullYear() === today.getFullYear()
+    ? { month: 'long', day: 'numeric' } : { month: 'long', day: 'numeric', year: 'numeric' };
+  return d.toLocaleDateString('en-US', opts);
+}
+
+function supBubbleHtml(m, body) {
   // Each polled-in message renders as its own one-item cluster (rather than merging into
   // the previous DOM cluster) — keeps this function simple; the only cost is that two
   // consecutive same-sender messages arriving in one poll show two small timestamp lines
   // instead of one, which self-corrects on the next full page load.
   var side = m.author_role === 'client' ? 'me' : 'them';
-  var body = m.body ? escapeHtml(m.body) : '';
+  var text = m.body ? escapeHtml(m.body) : '';
   var attach = '';
   if (m.attachment_path) {
     var url = '{{ url('/support-attachment') }}/' + m.message_id;
@@ -3581,10 +3635,21 @@ function supBubbleHtml(m) {
     }
   }
   var when = new Date(m.created_at);
-  var timeStr = when.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  var timeStr = when.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit' });
   var metaPrefix = side === 'them' ? ('FilmSpec (' + escapeHtml(m.author_label || 'Team') + ') · ') : '';
-  return '<div class="sup-cluster ' + side + '"><div class="sup-bubble">' + body + attach + '</div></div>'
-    + '<div class="sup-meta">' + metaPrefix + timeStr + '</div>';
+
+  var dayHtml = '';
+  var mDate = m.created_at.slice(0, 10);
+  if (body.dataset.lastDate !== mDate) {
+    dayHtml = '<div class="sup-day">' + supDayLabel(mDate) + '</div>';
+    body.dataset.lastDate = mDate;
+  }
+
+  var clusterHtml = side === 'them'
+    ? '<div class="sup-cluster them"><div class="sup-them-avatar">' + escapeHtml(supInitials(m.author_label)) + '</div><div class="sup-them-col"><div class="sup-bubble">' + text + attach + '</div></div></div>'
+    : '<div class="sup-cluster me"><div class="sup-bubble">' + text + attach + '</div></div>';
+
+  return dayHtml + clusterHtml + '<div class="sup-meta ' + side + '">' + metaPrefix + timeStr + '</div>';
 }
 
 function updateSeenIndicator(staffLastRead) {
@@ -3609,7 +3674,7 @@ function pollSupportChat() {
         if (empty) empty.remove();
         var atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 30;
         var html = '';
-        d.messages.forEach(m => { html += supBubbleHtml(m); });
+        d.messages.forEach(m => { html += supBubbleHtml(m, body); });
         var seenLine = document.getElementById('supSeenLine');
         if (seenLine) { seenLine.insertAdjacentHTML('beforebegin', html); } else { body.insertAdjacentHTML('beforeend', html); }
         var last = d.messages[d.messages.length - 1];
