@@ -357,6 +357,7 @@ class CrewController extends Controller
                 DB::table('booking_crew')->insert([
                     'booking_id' => $original->booking_id, 'crew_id' => $replacementId, 'position_id' => $original->position_id,
                     'rate_used' => $replacement->base_rate_12hr, 'hours_worked' => $original->hours_worked,
+                    'subtotal' => (float) $replacement->base_rate_12hr * (float) $original->hours_worked,
                     'assignment_status' => 'confirmed', 'notes' => 'Replacement — original crew member withdrew before the shoot.',
                 ]);
             });

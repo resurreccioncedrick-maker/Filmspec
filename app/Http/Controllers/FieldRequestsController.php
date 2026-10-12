@@ -187,6 +187,11 @@ class FieldRequestsController extends Controller
         $vehicleId = (int) $request->input('vehicle_rate_id', 0);
 
         $booking = DB::table('bookings')->where('booking_id', $req->booking_id)->first();
+        // Set true wherever this method actually adds something billable to the booking — used
+        // below to reset cost_approval_status the same way addEquipment()/addCrew()/
+        // addAccessory() already do, so a dispatch after client approval doesn't silently grow
+        // the client's bill without asking them to re-approve.
+        $costChanged = false;
 
         // Crew requests are normally assigned at approval time (BookingDetailController::
         // approveFieldRequest() requires picking a crew_id right there) — but stale/legacy rows
@@ -224,12 +229,14 @@ class FieldRequestsController extends Controller
             if (! DB::table('booking_crew')->where('booking_id', $req->booking_id)->where('crew_id', $assignCid)->exists()) {
                 DB::table('booking_crew')->insert([
                     'booking_id' => $req->booking_id, 'crew_id' => $assignCid, 'position_id' => $req->position_id,
-                    'rate_used' => $rate, 'hours_worked' => $numDaysForCrew, 'notes' => 'Field request: ' . ($req->reason ?? ''),
+                    'rate_used' => $rate, 'hours_worked' => $numDaysForCrew, 'subtotal' => $rate * $numDaysForCrew,
+                    'notes' => 'Field request: ' . ($req->reason ?? ''),
                 ]);
             }
             DB::table('booking_equipment_requests')->where('request_id', $reqId)->update(['crew_id' => $assignCid]);
             $req->crew_id = $assignCid;
             BookingCosting::generateCostEstimate($req->booking_id, $uid);
+            $costChanged = true;
             $assigneeName = trim($assignee->first_name . ' ' . $assignee->last_name);
             ActivityLog::record($uid, 'assign', 'booking', "Field request #$reqId: assigned crew $assigneeName to booking {$req->booking_id}", $req->booking_id);
         }
@@ -293,6 +300,7 @@ class FieldRequestsController extends Controller
             ]);
             BookingCosting::updateBookingTotal($req->booking_id);
             BookingCosting::generateCostEstimate($req->booking_id, $uid);
+            $costChanged = true;
         } elseif ($req->item_type === 'accessory' && $req->accessory_id) {
             $subtotal = (float) $req->quantity * $numDays * (float) $req->daily_rate;
             $existing = DB::table('booking_accessories')->where('booking_id', $req->booking_id)->where('accessory_id', $req->accessory_id)->first();
@@ -318,8 +326,13 @@ class FieldRequestsController extends Controller
                 'checked' => 1, 'checked_by' => $uid, 'checked_at' => now(),
             ]);
             BookingCosting::generateCostEstimate($req->booking_id, $uid);
+            $costChanged = true;
         }
         // crew: already booked at approval — dispatch here only carries the driver/ETA
+
+        if ($costChanged && ($booking->cost_approval_status ?? null) === 'client_approved') {
+            DB::table('bookings')->where('booking_id', $req->booking_id)->update(['cost_approval_status' => 'pending_client', 'updated_at' => now()]);
+        }
 
         $driverName = trim($driver->first_name . ' ' . $driver->last_name);
         ActivityLog::record($uid, 'dispatch', 'booking', "Field request #$reqId dispatched — driver: $driverName", $req->booking_id);

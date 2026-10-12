@@ -611,11 +611,11 @@ class BookingDetailController extends Controller
                 if (! $exists) {
                     DB::table('booking_crew')->insert([
                         'booking_id' => $id, 'crew_id' => $driverCid, 'position_id' => $dpid, 'rate_used' => $driverRate,
-                        'hours_worked' => $bkDays, 'notes' => 'Driver', 'equipment_id' => null,
+                        'hours_worked' => $bkDays, 'subtotal' => $driverRate * $bkDays, 'notes' => 'Driver', 'equipment_id' => null,
                     ]);
                 } else {
                     DB::table('booking_crew')->where('booking_id', $id)->where('crew_id', $driverCid)->update([
-                        'rate_used' => $driverRate, 'hours_worked' => $bkDays,
+                        'rate_used' => $driverRate, 'hours_worked' => $bkDays, 'subtotal' => $driverRate * $bkDays,
                     ]);
                 }
                 $driverName = DB::table('crew_members')->where('crew_id', $driverCid)->selectRaw("CONCAT(first_name,' ',last_name) AS n")->value('n');
@@ -670,7 +670,7 @@ class BookingDetailController extends Controller
         ]);
         DB::table('booking_crew')->insert([
             'booking_id' => $id, 'crew_id' => $cid, 'position_id' => $posid, 'rate_used' => $crate,
-            'hours_worked' => $days, 'notes' => $cnotes, 'equipment_id' => $eid,
+            'hours_worked' => $days, 'subtotal' => $crate * $days, 'notes' => $cnotes, 'equipment_id' => $eid,
         ]);
         DB::table('equipment_transactions')->insert([
             'booking_id' => $id, 'equipment_id' => $eid, 'transaction_type' => 'checkout', 'transaction_date' => now(),
@@ -1315,7 +1315,7 @@ class BookingDetailController extends Controller
 
             DB::table('booking_crew')->insert([
                 'booking_id' => $id, 'crew_id' => $cid, 'position_id' => $posid ?: null, 'rate_used' => $rate,
-                'hours_worked' => $bkDays, 'notes' => $note, 'equipment_id' => $eqLink ?: null,
+                'hours_worked' => $bkDays, 'subtotal' => $rate * $bkDays, 'notes' => $note, 'equipment_id' => $eqLink ?: null,
             ]);
             $added++;
         }
@@ -1384,7 +1384,7 @@ class BookingDetailController extends Controller
         $bkDays = max(1, (int) round((strtotime($booking->shoot_date_end) - strtotime($booking->shoot_date_start)) / 86400) + 1);
         DB::table('booking_crew')->insert([
             'booking_id' => $id, 'crew_id' => $cid, 'position_id' => $posid, 'rate_used' => $rate,
-            'hours_worked' => $bkDays, 'notes' => $notes, 'equipment_id' => $eqLink ?: null,
+            'hours_worked' => $bkDays, 'subtotal' => $rate * $bkDays, 'notes' => $notes, 'equipment_id' => $eqLink ?: null,
         ]);
         BookingCosting::generateCostEstimate($id, Auth::id());
         if (($booking->cost_approval_status ?? null) === 'client_approved') {
@@ -1656,7 +1656,8 @@ class BookingDetailController extends Controller
             if ($crewStatus === 'active' && ! $conflict && ! $unavail) {
                 DB::table('booking_crew')->insert([
                     'booking_id' => $newId, 'crew_id' => $line->crew_id, 'position_id' => $line->position_id,
-                    'rate_used' => $line->rate_used, 'hours_worked' => $newDays, 'notes' => $line->notes,
+                    'rate_used' => $line->rate_used, 'hours_worked' => $newDays, 'subtotal' => (float) $line->rate_used * $newDays,
+                    'notes' => $line->notes,
                     'equipment_id' => in_array($line->equipment_id, $copiedEquipIds, true) ? $line->equipment_id : null,
                 ]);
                 $crewCopied++;
@@ -1791,17 +1792,24 @@ class BookingDetailController extends Controller
 
                 DB::table('booking_crew')->insert([
                     'booking_id' => $id, 'crew_id' => $crewId, 'position_id' => $req->position_id,
-                    'rate_used' => $rate, 'hours_worked' => $numDays, 'notes' => 'Field request: ' . ($req->reason ?? ''),
+                    'rate_used' => $rate, 'hours_worked' => $numDays, 'subtotal' => $rate * $numDays,
+                    'notes' => 'Field request: ' . ($req->reason ?? ''),
                 ]);
             } else {
                 DB::table('booking_crew')->where('booking_id', $id)->where('crew_id', $crewId)
-                    ->update(['rate_used' => $rate, 'hours_worked' => $numDays]);
+                    ->update(['rate_used' => $rate, 'hours_worked' => $numDays, 'subtotal' => $rate * $numDays]);
             }
 
             DB::table('booking_equipment_requests')->where('request_id', $reqId)->update([
                 'status' => 'approved', 'crew_id' => $crewId, 'approved_by' => $uid, 'approved_at' => now(), 'admin_notes' => $notes,
             ]);
             BookingCosting::generateCostEstimate($id, $uid);
+            // Same reset addCrew()/batchAddCrew() already do — this field-request path commits
+            // a new crew member to the booking just as directly, and without this the client's
+            // bill could silently grow past what they last approved.
+            if (($booking->cost_approval_status ?? null) === 'client_approved') {
+                DB::table('bookings')->where('booking_id', $id)->update(['cost_approval_status' => 'pending_client', 'updated_at' => now()]);
+            }
             $crewName = trim($crew->first_name . ' ' . $crew->last_name);
             ActivityLog::record($uid, 'approve', 'booking', "Field request approved: assigned crew $crewName to booking $id", $id);
 
