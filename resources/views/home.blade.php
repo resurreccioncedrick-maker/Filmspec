@@ -1506,7 +1506,8 @@ a.footer-contact-link:hover{color:#60b0ff}
 .sup-bubble{max-width:76%;padding:9px 13px;border-radius:16px;font-size:12.5px;line-height:1.48;white-space:pre-wrap}
 .sup-cluster.me .sup-bubble{background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;border-bottom-right-radius:4px;box-shadow:0 2px 8px rgba(0,96,199,.25)}
 .sup-cluster.them .sup-bubble{background:var(--surface);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:4px;box-shadow:0 1px 3px rgba(13,31,60,.04)}
-.sup-meta{font-family:var(--font-m);font-size:9.5px;color:var(--muted);margin:3px 4px 12px}
+.sup-meta{font-family:var(--font-m);font-size:9.5px;color:var(--muted);margin:3px 4px 12px;text-align:left}
+.sup-meta.me{text-align:right}
 .sup-seen{display:flex;align-items:center;gap:3px;justify-content:flex-end;font-size:9.5px;color:var(--blue);font-weight:600;margin:-8px 4px 10px}
 .sup-seen svg{width:11px;height:11px}
 .sup-empty{text-align:center;color:var(--muted);font-size:12.5px;padding:40px 16px;display:flex;flex-direction:column;align-items:center;gap:10px}
@@ -3503,7 +3504,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         @endforeach
       </div>
       @php $supLastItem = end($supCluster['items']); @endphp
-      <div class="sup-meta">{{ $supCluster['role'] === 'them' ? 'FilmSpec ('.$supLastItem->author_label.') · ' : '' }}{{ \Carbon\Carbon::parse($supLastItem->created_at)->format('M j, g:i A') }}</div>
+      <div class="sup-meta {{ $supCluster['role'] }}">{{ $supCluster['role'] === 'them' ? 'FilmSpec ('.$supLastItem->author_label.') · ' : '' }}{{ \Carbon\Carbon::parse($supLastItem->created_at)->format('M j, g:i A') }}</div>
     @endforeach
     <div class="sup-seen" id="supSeenLine" style="{{ $supSeen ? '' : 'display:none' }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 7 17l-5-5"/><path d="m22 10-9 9-3-3"/></svg>
