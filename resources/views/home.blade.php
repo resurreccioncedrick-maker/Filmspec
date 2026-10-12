@@ -1508,7 +1508,8 @@ a.footer-contact-link:hover{color:#60b0ff}
 .sup-cluster.them{flex-direction:row;align-items:flex-end;gap:8px}
 .sup-them-avatar{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-bottom:1px}
 .sup-them-col{display:flex;flex-direction:column;gap:4px;min-width:0}
-.sup-bubble{max-width:100%;padding:10px 14px;border-radius:17px;font-size:13px;line-height:1.52;white-space:pre-wrap}
+.sup-bubble{max-width:100%;padding:10px 14px;border-radius:17px;font-size:13px;line-height:1.52}
+.sup-bubble-text{white-space:pre-wrap}
 .sup-cluster.me .sup-bubble{max-width:320px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;border-bottom-right-radius:5px;box-shadow:0 2px 8px rgba(0,96,199,.25)}
 .sup-cluster.them .sup-bubble{background:var(--surface);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:5px;box-shadow:0 1px 3px rgba(13,31,60,.04)}
 .sup-meta{font-family:var(--font-m);font-size:10px;color:var(--muted);margin:3px 4px 14px;text-align:left}
@@ -3522,7 +3523,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         @endif
         @foreach ($supBlock['items'] as $m)
         <div class="sup-bubble">
-          @if ($m->body){{ $m->body }}@endif
+          @if ($m->body)<span class="sup-bubble-text">{{ trim($m->body) }}</span>@endif
           @if ($m->attachment_path)
             @if (str_starts_with($m->attachment_mime, 'image/'))
             <img src="{{ route('support-attachment', $m->message_id) }}" class="sup-attach-img" onclick="window.open(this.src,'_blank')" alt="{{ $m->attachment_name }}">
@@ -3623,7 +3624,7 @@ function supBubbleHtml(m, body) {
   // consecutive same-sender messages arriving in one poll show two small timestamp lines
   // instead of one, which self-corrects on the next full page load.
   var side = m.author_role === 'client' ? 'me' : 'them';
-  var text = m.body ? escapeHtml(m.body) : '';
+  var text = m.body ? '<span class="sup-bubble-text">' + escapeHtml(m.body.trim()) + '</span>' : '';
   var attach = '';
   if (m.attachment_path) {
     var url = '{{ url('/support-attachment') }}/' + m.message_id;
