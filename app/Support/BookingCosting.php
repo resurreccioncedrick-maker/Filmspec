@@ -101,7 +101,8 @@ class BookingCosting
             $discountAmt = (float) ($ce->discount ?? 0);
         } else {
             $fsEquipment = (float) DB::table('booking_equipment')->where('booking_id', $bookingId)
-                ->selectRaw('COALESCE(SUM(IF(subtotal>0,subtotal,quantity*days*daily_rate)),0) AS t')->value('t')
+                    ->selectRaw('COALESCE(SUM(IF(subtotal>0,subtotal,quantity*days*daily_rate)),0) AS t')->value('t')
+                    * self::equipmentZoneMultiplier($bookingId)
                 + (float) DB::table('booking_accessories')->where('booking_id', $bookingId)
                     ->selectRaw('COALESCE(SUM(subtotal),0) AS t')->value('t');
             $transportation = (float) (DB::table('bookings')->where('booking_id', $bookingId)->value('transportation_cost') ?? 0);
@@ -226,8 +227,19 @@ class BookingCosting
         $aTotal = (float) DB::table('booking_accessories')->where('booking_id', $id)
             ->selectRaw('COALESCE(SUM(subtotal),0) AS t')->value('t');
         $transCost = (float) (DB::table('bookings')->where('booking_id', $id)->value('transportation_cost') ?? 0);
+        $eTotal *= self::equipmentZoneMultiplier($id);
 
         return $eTotal + $cTotal + $aTotal + $transCost;
+    }
+
+    // Equipment costs more the farther the shoot zone is from Manila — same
+    // bookings.transport_multiplier column Assign Transport already sets (BookingDetailController,
+    // zone map manila=1.0/luzon=1.5/luzon_far=2.0), previously only ever applied on the CE preview
+    // document and never actually billed. Floored at 1.0 since a booking with no zone set yet
+    // stores a NULL/0 multiplier, not a discount.
+    private static function equipmentZoneMultiplier(int $bookingId): float
+    {
+        return max(1.0, (float) (DB::table('bookings')->where('booking_id', $bookingId)->value('transport_multiplier') ?? 1.0));
     }
 
     // Normalizes a discount type string and validates the paired value against the booking's
@@ -295,17 +307,31 @@ class BookingCosting
         if ($error = self::validateDiscountInput($type, $value, $rawSub)) {
             return ['type' => 'danger', 'text' => $error];
         }
-        if (DB::table('booking_discounts')->where('booking_id', $bookingId)->where('status', 'pending')->exists()) {
-            return ['type' => 'danger', 'text' => 'A discount proposal is already pending approval for this booking.'];
+
+        // Locks the booking row so two near-simultaneous proposals (double-click, two open tabs)
+        // can't both pass the "nothing already pending" check before either commits its insert —
+        // the same race was previously unguarded here, unlike BillingController's record_payment,
+        // which already locks this way before its own balance check + insert.
+        $error = DB::transaction(function () use ($bookingId, $type, $value, $reason, $proposerId) {
+            DB::table('bookings')->where('booking_id', $bookingId)->lockForUpdate()->value('booking_id');
+            if (DB::table('booking_discounts')->where('booking_id', $bookingId)->where('status', 'pending')->exists()) {
+                return ['type' => 'danger', 'text' => 'A discount proposal is already pending approval for this booking.'];
+            }
+
+            $computed = self::computeDiscountAmount($type, $value, self::rawBookingSubtotal($bookingId));
+            DB::table('booking_discounts')->insert([
+                'booking_id' => $bookingId, 'discount_type' => $type, 'discount_value' => $value,
+                'computed_amount' => $computed, 'reason' => $reason ?: null, 'status' => 'pending',
+                'proposed_by' => $proposerId, 'created_at' => now(),
+            ]);
+
+            return null;
+        });
+
+        if ($error !== null) {
+            return $error;
         }
 
-        $computed = self::computeDiscountAmount($type, $value, $rawSub);
-
-        DB::table('booking_discounts')->insert([
-            'booking_id' => $bookingId, 'discount_type' => $type, 'discount_value' => $value,
-            'computed_amount' => $computed, 'reason' => $reason ?: null, 'status' => 'pending',
-            'proposed_by' => $proposerId, 'created_at' => now(),
-        ]);
         $desc = self::describeDiscount($type, $value);
         ActivityLog::record($proposerId, 'propose', 'discount', "Proposed $desc discount for booking $bookingId", $bookingId);
 
@@ -323,6 +349,7 @@ class BookingCosting
         $incCharge = (float) DB::table('incident_reports')->where('booking_id', $id)->where('status', '!=', 'closed')
             ->selectRaw('COALESCE(SUM(charge_amount),0) AS t')->value('t');
         $transCost = (float) (DB::table('bookings')->where('booking_id', $id)->value('transportation_cost') ?? 0);
+        $eTotal *= self::equipmentZoneMultiplier($id);
         $sub = $eTotal + $cTotal + $aTotal + $incCharge + $transCost;
 
         $ceAdj = DB::table('cost_estimates')->where('booking_id', $id)->orderByDesc('ce_id')
@@ -377,6 +404,7 @@ class BookingCosting
     {
         $eTotal = (float) DB::table('booking_equipment')->where('booking_id', $id)
             ->selectRaw('COALESCE(SUM(IF(subtotal>0,subtotal,quantity*days*daily_rate)),0) AS t')->value('t');
+        $eTotal *= self::equipmentZoneMultiplier($id);
         $cTotal = (float) DB::table('booking_crew')->where('booking_id', $id)
             ->selectRaw('COALESCE(SUM(rate_used * hours_worked),0) AS t')->value('t');
         $aTotal = (float) DB::table('booking_accessories')->where('booking_id', $id)
@@ -520,7 +548,23 @@ class BookingCosting
         self::generateCostEstimate($bookingId, $userId);
         $latest = DB::table('cost_estimates')->where('booking_id', $bookingId)->orderByDesc('ce_id')->first();
 
-        DB::table('cost_estimates')->where('ce_id', $latest->ce_id)->update(['discount' => $discountAmt]);
+        // Writing the raw discount column alone left subtotal/vat_amount/grand_total stale at
+        // whatever generateCostEstimate() just computed (with the OLD discount, usually none) —
+        // bookings.final_amount below ends up correct, but the CE row's own stored totals stay
+        // wrong until something else happens to regenerate it. Any page reading those columns
+        // directly (CePreviewController does, to avoid a second independent calculation) would
+        // show a price the client was never actually billed. Recompute them here with the same
+        // math generateCostEstimate() uses, now that the real discount is known.
+        $rawSub = self::rawBookingSubtotal($bookingId);
+        [$sub, $vat, $grand] = self::computeTotals(
+            $rawSub, (float) $latest->other_charges, $discountAmt,
+            $latest->pricing_mode ?? 'no_discount',
+            $latest->pricing_input !== null ? (float) $latest->pricing_input : null,
+            (bool) $latest->vat_exempt
+        );
+        DB::table('cost_estimates')->where('ce_id', $latest->ce_id)->update([
+            'discount' => $discountAmt, 'subtotal' => $sub, 'vat_amount' => $vat, 'grand_total' => $grand,
+        ]);
 
         self::updateBookingTotal($bookingId);
     }
@@ -577,17 +621,29 @@ class BookingCosting
         if ($error = self::validateDiscountInput($type, $value, $rawSub)) {
             return ['type' => 'danger', 'text' => $error];
         }
-        if (DB::table('booking_discounts')->where('booking_id', $bookingId)->where('status', 'pending')->exists()) {
-            return ['type' => 'danger', 'text' => 'A discount proposal is already pending approval for this booking — resolve it first.'];
+
+        // Same race guard as proposeDiscount() — locks the booking row so two near-simultaneous
+        // submits can't both pass the "nothing already pending" check before either inserts.
+        $result = DB::transaction(function () use ($bookingId, $type, $value, $reason, $staffId) {
+            DB::table('bookings')->where('booking_id', $bookingId)->lockForUpdate()->value('booking_id');
+            if (DB::table('booking_discounts')->where('booking_id', $bookingId)->where('status', 'pending')->exists()) {
+                return ['error' => ['type' => 'danger', 'text' => 'A discount proposal is already pending approval for this booking — resolve it first.']];
+            }
+
+            $computed = self::computeDiscountAmount($type, $value, self::rawBookingSubtotal($bookingId));
+            DB::table('booking_discounts')->insert([
+                'booking_id' => $bookingId, 'discount_type' => $type, 'discount_value' => $value,
+                'computed_amount' => $computed, 'reason' => $reason ?: null, 'status' => 'approved',
+                'proposed_by' => $staffId, 'approved_by' => $staffId, 'approved_at' => now(), 'created_at' => now(),
+            ]);
+
+            return ['computed' => $computed];
+        });
+
+        if (isset($result['error'])) {
+            return $result['error'];
         }
-
-        $computed = self::computeDiscountAmount($type, $value, $rawSub);
-
-        DB::table('booking_discounts')->insert([
-            'booking_id' => $bookingId, 'discount_type' => $type, 'discount_value' => $value,
-            'computed_amount' => $computed, 'reason' => $reason ?: null, 'status' => 'approved',
-            'proposed_by' => $staffId, 'approved_by' => $staffId, 'approved_at' => now(), 'created_at' => now(),
-        ]);
+        $computed = $result['computed'];
 
         self::applyDiscount($bookingId, $staffId, $computed);
 

@@ -267,7 +267,7 @@ class CePreviewController extends Controller
         $equipBaseTotal = 0.0;
         foreach ($equipGroups as $catLines) {
             foreach ($catLines as $eq) {
-                $equipBaseTotal += (float) $eq->quantity * (float) $eq->daily_rate;
+                $equipBaseTotal += (float) $eq->quantity * (float) $eq->days * (float) $eq->daily_rate;
             }
         }
         $crewTotal = (float) DB::table('booking_crew')->where('booking_id', $bid)
@@ -312,9 +312,17 @@ class CePreviewController extends Controller
             $vat = round($netBase * $vatRate, 2);
             $subtotal = $netBase;
             $grand = $netBase + $vat;
+        } elseif ($ce) {
+            // Read the already-correct, persisted totals BookingCosting itself billed from,
+            // rather than re-deriving them here — a second, independent computation is exactly
+            // what let this page drift out of sync with the real amount (missing the ×days
+            // factor on equipment was one such divergence this caught).
+            $subtotal = (float) $ce->subtotal;
+            $vat = (float) $ce->vat_amount;
+            $grand = (float) $ce->grand_total;
         } else {
-            // Prices are VAT-inclusive. Extract the VAT component via the configurable rate,
-            // matching BookingCosting::extractVat() (not a hardcoded 12/112).
+            // No cost_estimates row yet — nothing persisted to read, so fall back to a live
+            // computation (now date/zone-correct) for this pre-generation preview.
             $vatRate = (float) config('filmspec.vat_rate');
             $grand = max(0, $itemTotal + $ceOtherCharges - $ceDiscount);
             $vat = round($grand * $vatRate / (1 + $vatRate), 2);

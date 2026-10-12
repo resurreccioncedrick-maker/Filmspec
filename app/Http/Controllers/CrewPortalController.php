@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Support\EvidencePhotoUpload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class CrewPortalController extends Controller
 {
@@ -24,6 +26,22 @@ class CrewPortalController extends Controller
     // Same set IncidentsController.php uses — kept in sync manually since it's a small,
     // rarely-changed fixed list, not worth a shared config entry for one array.
     private array $damageTypes = ['scratches' => 'Scratches', 'cracked_broken' => 'Cracked / Broken Part', 'electronic_malfunction' => 'Electronic Malfunction', 'missing_part' => 'Missing Part', 'others' => 'Others'];
+
+    // Same sets RepairPurchaseController.php uses for the staff page — kept in sync manually
+    // for the same reason as $damageTypes above.
+    private array $rpTypeBadge = ['repair' => 'badge-orange', 'purchase' => 'badge-blue'];
+
+    private array $rpTypeLabel = ['repair' => 'Repair', 'purchase' => 'Purchase'];
+
+    private array $rpStatusBadge = [
+        'requested' => 'badge-gray', 'approved' => 'badge-blue', 'in_progress' => 'badge-yellow',
+        'completed' => 'badge-green', 'cancelled' => 'badge-red',
+    ];
+
+    private array $rpStatusLabel = [
+        'requested' => 'Requested', 'approved' => 'Approved', 'in_progress' => 'In Progress',
+        'completed' => 'Completed', 'cancelled' => 'Cancelled',
+    ];
 
     // Lightweight poll for the Equipment Checklist tab — lets the page notice a newly
     // checklist-eligible booking (or an arrival-status change) without a manual reload.
@@ -48,6 +66,7 @@ class CrewPortalController extends Controller
             ->where('bc.crew_id', $crewMember->crew_id)
             ->whereNotIn('bc.assignment_status', ['declined', 'back_out'])
             ->whereIn('b.booking_status', ['confirmed', 'ongoing'])
+            ->where('b.cost_approval_status', 'client_approved')
             ->orderBy('b.booking_id')
             ->select('b.booking_id', 'b.booking_status', 'b.field_arrival_confirmed_at')
             ->get();
@@ -132,6 +151,11 @@ class CrewPortalController extends Controller
                 ->where('bc.crew_id', $cmId)
                 ->whereNotIn('bc.assignment_status', ['declined', 'back_out'])
                 ->whereIn('b.booking_status', ['confirmed', 'ongoing', 'pending_inspection', 'returned'])
+                // Crew shouldn't see (or be able to act on) an assignment until the client has
+                // actually approved the cost estimate — a booking only ever reaches 'ongoing'/
+                // later by having passed through this gate already, so this only ever excludes
+                // genuinely-not-yet-approved 'confirmed' bookings, not historical ones.
+                ->where('b.cost_approval_status', 'client_approved')
                 ->orderByDesc('b.shoot_date_start')
                 ->select('b.booking_id', 'b.booking_reference', 'b.project_title', 'b.shoot_date_start',
                     'b.shoot_date_end', 'b.shoot_location', 'b.booking_status',
@@ -155,6 +179,7 @@ class CrewPortalController extends Controller
                 ->where('bc.crew_id', $cmId)
                 ->whereNotIn('bc.assignment_status', ['declined', 'back_out'])
                 ->whereIn('b.booking_status', ['confirmed', 'ongoing', 'pending_inspection', 'returned'])
+                ->where('b.cost_approval_status', 'client_approved')
                 ->orderByDesc('b.shoot_date_start')
                 ->distinct()
                 // shoot_date_start must be in the SELECT list to ORDER BY it under DISTINCT
@@ -357,6 +382,31 @@ class CrewPortalController extends Controller
             ->limit(20)
             ->get();
 
+        // Repair & Purchase — crew's own submitted tickets (2e). Unlike incident reports, these
+        // aren't tied to one specific booking_id, so the New Ticket equipment picker offers
+        // every piece of equipment across the crew member's own active bookings, deduplicated,
+        // rather than cascading from a Booking select the way the Incident form does.
+        $myTickets = DB::table('repair_purchase_tickets as t')
+            ->leftJoin('equipment as e', 't.equipment_id', '=', 'e.equipment_id')
+            ->where('t.created_by', $uid)
+            ->orderByDesc('t.created_at')
+            ->select('t.*', 'e.equipment_name', 'e.brand')
+            ->limit(30)
+            ->get();
+
+        $myEquipmentList = collect();
+        if ($bookingEquipMap) {
+            $seen = [];
+            foreach ($bookingEquipMap as $rows) {
+                foreach ($rows as $row) {
+                    if (! isset($seen[$row->equipment_id])) {
+                        $seen[$row->equipment_id] = true;
+                        $myEquipmentList->push($row);
+                    }
+                }
+            }
+        }
+
         return view('crew-portal', [
             'msg' => $msg, 'user' => $user, 'crewMember' => $crewMember, 'activeTab' => $activeTab, 'activeSubTab' => $activeSubTab,
             'activeBookingId' => $activeBookingId, 'crewAnnouncements' => $crewAnnouncements,
@@ -366,9 +416,12 @@ class CrewPortalController extends Controller
             'myChecklistBookings' => $myChecklistBookings, 'myTeamBookings' => $myTeamBookings, 'allActiveCrew' => $allActiveCrew,
             'fieldEquipMap' => $fieldEquipMap, 'fieldAccMap' => $fieldAccMap, 'crewPositions' => $crewPositions,
             'myFieldRequests' => $myFieldRequests,
+            'myTickets' => $myTickets, 'myEquipmentList' => $myEquipmentList,
             'typeBadge' => $this->typeBadge, 'typeLabel' => $this->typeLabel, 'statusBadge' => $this->statusBadge,
             'maintBadge' => $this->maintBadge, 'maintLabel' => $this->maintLabel, 'bookingBadge' => $this->bookingBadge,
             'damageTypes' => $this->damageTypes,
+            'rpTypeBadge' => $this->rpTypeBadge, 'rpTypeLabel' => $this->rpTypeLabel,
+            'rpStatusBadge' => $this->rpStatusBadge, 'rpStatusLabel' => $this->rpStatusLabel,
             'condOut' => ['excellent' => 'Excellent', 'good' => 'Good', 'fair' => 'Fair'],
             'condIn' => ['excellent' => 'Excellent', 'good' => 'Good', 'fair' => 'Fair', 'damaged' => 'Damaged', 'missing' => 'Missing'],
             'attStatusLabel' => ['present' => 'Present', 'late' => 'Late', 'absent' => 'Absent', 'no_show' => 'No Show', 'back_out' => 'Back Out'],
@@ -557,6 +610,10 @@ class CrewPortalController extends Controller
             $cause = $request->input('cause', 'unknown');
             $dtypes = array_values(array_unique(array_filter($request->input('damage_types', []))));
             $dothers = trim((string) $request->input('damage_others_note', ''));
+            $photoUpload = EvidencePhotoUpload::handle($request->file('photo'), 'incident-photos');
+            if ($photoUpload['error']) {
+                return ['type' => 'danger', 'text' => $photoUpload['error']];
+            }
 
             if (! $bid || ! $eid || ! $desc) {
                 return ['type' => 'danger', 'text' => 'Please fill in all required fields.'];
@@ -583,7 +640,9 @@ class CrewPortalController extends Controller
             DB::table('incident_reports')->insert([
                 'booking_id' => $bid, 'equipment_id' => $eid, 'equipment_unit_id' => $equipmentUnitId, 'reported_by' => $uid,
                 'incident_type' => $itype, 'incident_date' => $idate,
-                'incident_time' => $itime ?: null, 'description' => $desc, 'cause' => $cause,
+                'incident_time' => $itime ?: null, 'description' => $desc,
+                'photo_path' => $photoUpload['success'] ? $photoUpload['path'] : null,
+                'cause' => $cause,
                 'charge_amount' => 0, 'status' => 'open', 'incident_number' => $irNum,
                 'damage_others_note' => $dothers, 'submitted_by_crew' => 1,
             ]);
@@ -597,6 +656,33 @@ class CrewPortalController extends Controller
             ActivityLog::record($uid, 'create', 'incident', "Crew filed incident report $irNum", $incidentId);
 
             return ['type' => 'success', 'text' => "Incident report <strong>$irNum</strong> filed. The admin will review and set any charges."];
+        }
+
+        if ($action === 'crew_submit_ticket' && $crewMember) {
+            $type = $request->input('type') === 'purchase' ? 'purchase' : 'repair';
+
+            if ($type === 'repair') {
+                $eid = (int) $request->input('equipment_id', 0);
+                if (! $eid) {
+                    return ['type' => 'danger', 'text' => 'Select equipment for a repair ticket.'];
+                }
+                // Ownership check, same idea as crew_file_incident's above — the equipment must
+                // actually be on one of this crew member's own (non-declined) bookings, not just
+                // any equipment_id POSTed by the client.
+                $ownsEquip = DB::table('booking_equipment as be')
+                    ->join('booking_crew as bc', 'be.booking_id', '=', 'bc.booking_id')
+                    ->where('bc.crew_id', $crewMember->crew_id)
+                    ->whereNotIn('bc.assignment_status', ['declined', 'back_out'])
+                    ->where('be.equipment_id', $eid)
+                    ->exists();
+                if (! $ownsEquip) {
+                    return ['type' => 'danger', 'text' => 'That equipment is not part of any of your current bookings.'];
+                }
+            }
+
+            // Reuses RepairPurchaseController's own ticket-creation logic rather than
+            // duplicating the insert here, per the approved plan for this feature.
+            return (new RepairPurchaseController)->createTicket($request, $uid);
         }
 
         if ($action === 'crew_confirm_arrival' && $crewMember) {
@@ -880,6 +966,15 @@ class CrewPortalController extends Controller
                 if (in_array($status, ['completed', 'cancelled'], true)) {
                     $update['completed_at'] = now();
                 }
+                if ($request->hasFile('photo')) {
+                    $photoUpload = EvidencePhotoUpload::handle($request->file('photo'), 'maintenance-photos');
+                    if ($photoUpload['error']) {
+                        return ['type' => 'danger', 'text' => $photoUpload['error']];
+                    }
+                    if ($photoUpload['success']) {
+                        $update['photo_path'] = $photoUpload['path'];
+                    }
+                }
                 DB::table('maintenance_schedules')
                     ->where('schedule_id', $schId)
                     ->where('assigned_crew_id', $crewMember->crew_id)
@@ -890,5 +985,39 @@ class CrewPortalController extends Controller
         }
 
         return null;
+    }
+
+    /** Crew's own view of a photo they (or the office, on their assigned maintenance) attached — scoped to their own records, since crew has no 'incidents' module permission for the staff-side route. */
+    public function incidentPhoto(int $id)
+    {
+        $user = Auth::user();
+        $crewMember = DB::table('crew_members')->where('user_id', $user->user_id ?? 0)->first();
+        abort_unless($crewMember, 404);
+
+        $path = DB::table('incident_reports')->where('incident_id', $id)->where('reported_by', $user->user_id)->value('photo_path');
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path);
+    }
+
+    public function maintenancePhoto(int $id)
+    {
+        $user = Auth::user();
+        $crewMember = DB::table('crew_members')->where('user_id', $user->user_id ?? 0)->first();
+        abort_unless($crewMember, 404);
+
+        $path = DB::table('maintenance_schedules')->where('schedule_id', $id)->where('assigned_crew_id', $crewMember->crew_id)->value('photo_path');
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path);
+    }
+
+    public function ticketPhoto(int $id)
+    {
+        $user = Auth::user();
+        $path = DB::table('repair_purchase_tickets')->where('ticket_id', $id)->where('created_by', $user->user_id ?? 0)->value('photo_path');
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path);
     }
 }

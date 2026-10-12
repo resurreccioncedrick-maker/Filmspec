@@ -435,7 +435,7 @@ footer .footer-sep{margin:0 8px}
       <button type="button" onclick="document.getElementById('requestDiscountBox').style.display='block';this.style.display='none'"
               class="side-btn primary" style="width:auto;padding:8px 16px;font-size:12.5px">Request Discount</button>
       <div id="requestDiscountBox" style="display:none;margin-top:12px;padding:12px;background:var(--s2);border-radius:8px">
-        <form method="POST" action="{{ route('client-booking-detail', $id) }}">
+        <form method="POST" action="{{ route('client-booking-detail', $id) }}" onsubmit="return guardDiscountSubmit()">
           @csrf
           <input type="hidden" name="action" value="request_discount">
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
@@ -450,7 +450,7 @@ footer .footer-sep{margin:0 8px}
           <div id="discReqPackageNote" style="display:none;font-size:11.5px;color:var(--muted);margin:-4px 0 8px">Enter the total you'd like to pay — the discount is calculated automatically from the current itemized total.</div>
           <textarea name="reason" rows="2" placeholder="Why are you requesting this discount? (optional)"
                     style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;resize:vertical;box-sizing:border-box;margin-bottom:8px"></textarea>
-          <button type="submit" class="side-btn primary" style="width:auto;padding:8px 16px;font-size:12.5px">Submit Request</button>
+          <button type="submit" id="discReqSubmitBtn" class="side-btn primary" style="width:auto;padding:8px 16px;font-size:12.5px">Submit Request</button>
         </form>
       </div>
       @else
@@ -1379,6 +1379,14 @@ function closePayModal() {
 // full-balance amount twice and the second one would correctly, but confusingly, get rejected.
 function guardPayNowSubmit() {
   const btn = document.getElementById('payNowSubmitBtn');
+  if (btn.disabled) return false;
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  return true;
+}
+
+function guardDiscountSubmit() {
+  const btn = document.getElementById('discReqSubmitBtn');
   if (btn.disabled) return false;
   btn.disabled = true;
   btn.textContent = 'Submitting…';

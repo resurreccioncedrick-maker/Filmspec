@@ -189,6 +189,21 @@ Route::get('/crew-portal/attendance-print', [CrewPortalController::class, 'print
     ->middleware(['auth'])
     ->name('crew-portal.attendance-print');
 
+Route::get('/crew-portal/incident/{id}/photo', [CrewPortalController::class, 'incidentPhoto'])
+    ->middleware(['auth'])
+    ->whereNumber('id')
+    ->name('crew-portal.incident-photo');
+
+Route::get('/crew-portal/maintenance/{id}/photo', [CrewPortalController::class, 'maintenancePhoto'])
+    ->middleware(['auth'])
+    ->whereNumber('id')
+    ->name('crew-portal.maintenance-photo');
+
+Route::get('/crew-portal/ticket/{id}/photo', [CrewPortalController::class, 'ticketPhoto'])
+    ->middleware(['auth'])
+    ->whereNumber('id')
+    ->name('crew-portal.ticket-photo');
+
 Route::match(['get', 'post'], '/equipment', [EquipmentController::class, 'index'])
     ->middleware(['auth', 'can_access:equipment'])
     ->name('equipment');
@@ -219,6 +234,16 @@ Route::get('/incident-print/{id}', [IncidentsController::class, 'print'])
     ->middleware(['auth', 'can_access:incidents'])
     ->whereNumber('id')
     ->name('incident-print');
+
+Route::get('/incidents/{id}/photo', [IncidentsController::class, 'incidentPhoto'])
+    ->middleware(['auth', 'can_access:incidents'])
+    ->whereNumber('id')
+    ->name('incident-photo');
+
+Route::get('/maintenance/{id}/photo', [IncidentsController::class, 'maintenancePhoto'])
+    ->middleware(['auth', 'can_access:incidents'])
+    ->whereNumber('id')
+    ->name('maintenance-photo');
 
 // Uses a direct role check inside the controller (matching legacy's requireRole()) rather
 // than can_access:clients — the legacy page allows the 'admin' role even though 'admin'
@@ -357,3 +382,8 @@ Route::match(['get', 'post'], '/field-requests', [FieldRequestsController::class
 Route::match(['get', 'post'], '/repair-purchase', [RepairPurchaseController::class, 'index'])
     ->middleware(['auth', 'can_access:repair_purchase'])
     ->name('repair-purchase');
+
+Route::get('/repair-purchase/{id}/photo', [RepairPurchaseController::class, 'ticketPhoto'])
+    ->middleware(['auth', 'can_access:repair_purchase'])
+    ->whereNumber('id')
+    ->name('repair-purchase-photo');

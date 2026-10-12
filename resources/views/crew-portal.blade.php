@@ -793,6 +793,9 @@ button{font-family:var(--font-b);cursor:pointer}
           <div class="it-title">{{ $ir->equipment_name }}</div>
           <div class="it-meta">{{ $ir->booking_reference }} &middot; {{ date('M j, Y', strtotime($ir->created_at)) }}</div>
           <span class="badge {{ $typeBadge[$ir->incident_type] ?? 'badge-gray' }}">{{ $typeLabel[$ir->incident_type] ?? $ir->incident_type }}</span>
+          @if ($ir->photo_path)
+          <a href="{{ route('crew-portal.incident-photo', $ir->incident_id) }}" target="_blank" style="margin-left:6px;font-size:11px;color:var(--blue)">View photo</a>
+          @endif
         </div>
         <div class="it-side">
           <div class="it-rate" style="color:{{ $ir->charge_amount>0?'var(--orange)':'var(--muted)' }}">{{ $ir->charge_amount > 0 ? '₱'.number_format($ir->charge_amount,2) : '—' }}</div>
@@ -883,12 +886,49 @@ button{font-family:var(--font-b);cursor:pointer}
         @if ($mt->notes)
         <div style="font-size:.8rem;color:var(--muted);margin-top:6px;font-style:italic">{{ $mt->notes }}</div>
         @endif
+        @if ($mt->photo_path)
+        <a href="{{ route('crew-portal.maintenance-photo', $mt->schedule_id) }}" target="_blank" style="display:inline-block;margin-top:8px;font-size:11px;color:var(--blue)">View photo</a>
+        @endif
         <button class="btn btn-outline btn-sm" style="margin-top:12px;width:100%" onclick="openUpdateMaint({{ $mt->schedule_id }},'{{ $mt->status }}')">Update Status</button>
       </div>
     </div>
     @endforeach
     @endif
   </div>
+</div>
+
+<!-- ═══════ REPAIR & PURCHASE ═══════ -->
+<div id="pg-repairpurchase" class="pg {{ $activeTab === 'repairpurchase' ? 'on' : '' }}">
+  <div class="ctr">
+    <div class="sec-hd">
+      <div class="sec-title">Repair &amp; Purchase</div>
+      <div class="sec-sub">Flag equipment that needs repair, or request something be purchased. Track your own tickets here.</div>
+    </div>
+
+    <div class="card">
+      @if ($myTickets->isEmpty())
+      <div class="empty">You have not submitted any repair/purchase tickets.</div>
+      @else
+      @foreach ($myTickets as $t)
+      <div class="item">
+        <div>
+          <div class="it-ref">{{ $t->ticket_number }}</div>
+          <div class="it-title">{{ $t->title }}</div>
+          <div class="it-meta">{{ $t->equipment_name ?? 'New purchase' }} &middot; {{ date('M j, Y', strtotime($t->created_at)) }}</div>
+          <span class="badge {{ $rpTypeBadge[$t->type] ?? 'badge-gray' }}">{{ $rpTypeLabel[$t->type] ?? ucfirst($t->type) }}</span>
+          @if ($t->photo_path)
+          <a href="{{ route('crew-portal.ticket-photo', $t->ticket_id) }}" target="_blank" style="margin-left:6px;font-size:11px;color:var(--blue)">View photo</a>
+          @endif
+        </div>
+        <div class="it-side">
+          <span class="badge {{ $rpStatusBadge[$t->status] ?? 'badge-gray' }}">{{ $rpStatusLabel[$t->status] ?? ucfirst($t->status) }}</span>
+        </div>
+      </div>
+      @endforeach
+      @endif
+    </div>
+  </div>
+  <div class="fab"><button onclick="openMo('moNewTicket')">+ New Ticket</button></div>
 </div>
 
 <!-- BOTTOM TAB BAR (3 tabs — Time/Reports/Repairs live in the More sheet) -->
@@ -931,6 +971,10 @@ button{font-family:var(--font-b);cursor:pointer}
         <div class="more-item-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
         <span>Maintenance</span>
       </div>
+      <div class="more-item" style="cursor:pointer" onclick="closeMo('moMore');showPg('repairpurchase')">
+        <div class="more-item-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v16M3 10h5M16 4v16M16 14h5"/></svg></div>
+        <span>Repair &amp; Purchase</span>
+      </div>
       <form method="POST" action="{{ route('logout') }}" style="display:contents">
       @csrf
       <button type="submit" class="more-item" style="color:var(--red);background:none;border:none;cursor:pointer;width:100%;text-align:left;font:inherit">
@@ -949,7 +993,7 @@ button{font-family:var(--font-b);cursor:pointer}
       <div class="mo-title">File Incident Report</div>
       <button class="mo-close" onclick="closeMo('moFileIncident')">&times;</button>
     </div>
-    <form method="POST">
+    <form method="POST" enctype="multipart/form-data">
       @csrf
       <input type="hidden" name="action" value="crew_file_incident">
       <input type="hidden" name="return_tab" id="incidentReturnTab" value="{{ $activeTab }}">
@@ -1019,10 +1063,79 @@ button{font-family:var(--font-b);cursor:pointer}
           <label>Description / What happened *</label>
           <textarea name="description" placeholder="Describe what happened in detail…" required></textarea>
         </div>
+        <div class="fg">
+          <label>Photo</label>
+          <input type="file" name="photo" accept=".jpg,.jpeg,.png,.pdf">
+        </div>
       </div>
       <div class="mo-footer">
         <button type="button" class="btn btn-outline" onclick="closeMo('moFileIncident')">Cancel</button>
         <button type="submit" class="btn btn-primary">Submit Report</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ MODAL: New Repair/Purchase Ticket ═══ -->
+<div class="mo" id="moNewTicket" onclick="if(event.target===this)closeMo('moNewTicket')">
+  <div class="mo-box">
+    <div class="mo-head">
+      <div class="mo-title">New Ticket</div>
+      <button class="mo-close" onclick="closeMo('moNewTicket')">&times;</button>
+    </div>
+    <form method="POST" enctype="multipart/form-data">
+      @csrf
+      <input type="hidden" name="action" value="crew_submit_ticket">
+      <input type="hidden" name="requested_date" value="{{ date('Y-m-d') }}">
+      <input type="hidden" name="return_tab" value="repairpurchase">
+      <div class="mo-body">
+        <div class="fg">
+          <label>Type *</label>
+          <select name="type" id="crewRP_type" required onchange="toggleCrewRPType()">
+            <option value="repair">Repair (existing equipment)</option>
+            <option value="purchase">Purchase (new item)</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Title *</label>
+          <input type="text" name="title" placeholder="e.g. Sony A7III — lens mount repair" required>
+        </div>
+        <div class="fg" id="crewRP_equipWrap">
+          <label>Equipment *</label>
+          <select name="equipment_id" id="crewRP_equipment" onchange="filterRPUnitsByEquipment(this.value)">
+            <option value="">— Select Equipment —</option>
+            @foreach ($myEquipmentList as $eq)
+            <option value="{{ $eq->equipment_id }}">{{ $eq->equipment_name }}{{ $eq->brand ? ' — '.$eq->brand : '' }}{{ $eq->serial_number ? ' ('.$eq->serial_number.')' : '' }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="fg" id="crewRP_unitWrap">
+          <label>Unit</label>
+          <select name="equipment_unit" id="crewRP_unit" disabled>
+            <option value="">— Select equipment first —</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Priority</label>
+          <select name="priority">
+            <option value="low">Low</option>
+            <option value="normal" selected>Normal</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Note</label>
+          <textarea name="note" placeholder="Describe the issue or what's needed…"></textarea>
+        </div>
+        <div class="fg">
+          <label>Photo</label>
+          <input type="file" name="photo" accept=".jpg,.jpeg,.png,.pdf">
+        </div>
+      </div>
+      <div class="mo-footer">
+        <button type="button" class="btn btn-outline" onclick="closeMo('moNewTicket')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Submit Ticket</button>
       </div>
     </form>
   </div>
@@ -1111,7 +1224,7 @@ button{font-family:var(--font-b);cursor:pointer}
       <div class="mo-title">Update Maintenance Status</div>
       <button class="mo-close" onclick="closeMo('moUpdateMaint')">&times;</button>
     </div>
-    <form method="POST">
+    <form method="POST" enctype="multipart/form-data">
       @csrf
       <input type="hidden" name="action" value="update_maintenance_status">
       <input type="hidden" name="return_tab" value="maintenance">
@@ -1128,6 +1241,10 @@ button{font-family:var(--font-b);cursor:pointer}
         <div class="fg">
           <label>Notes / Remarks</label>
           <textarea name="notes" placeholder="Describe what was done or why cancelled…"></textarea>
+        </div>
+        <div class="fg">
+          <label>Photo</label>
+          <input type="file" name="photo" accept=".jpg,.jpeg,.png,.pdf">
         </div>
       </div>
       <div class="mo-footer">
@@ -1212,6 +1329,27 @@ function filterEquipmentByBooking(bookingId) {
 
 function filterUnitsByEquipment(equipmentId) {
   const sel = document.getElementById('crewIR_unit');
+  const units = EQUIPMENT_UNITS[equipmentId] || [];
+  if (!equipmentId || !units.length) {
+    sel.innerHTML = '<option value="">Not sure which unit</option>';
+    sel.disabled = false;
+    return;
+  }
+  sel.innerHTML = units.map(u => `<option value="u${u.unit_id}">${escCrew(u.asset_tag)}</option>`).join('')
+    + '<option value="">Not sure which unit</option>';
+  sel.disabled = false;
+}
+
+// ── New Ticket modal (Repair & Purchase, 2e) ────────────────────────────────
+function toggleCrewRPType() {
+  const isRepair = document.getElementById('crewRP_type').value === 'repair';
+  document.getElementById('crewRP_equipWrap').style.display = isRepair ? '' : 'none';
+  document.getElementById('crewRP_unitWrap').style.display = isRepair ? '' : 'none';
+  document.getElementById('crewRP_equipment').required = isRepair;
+}
+
+function filterRPUnitsByEquipment(equipmentId) {
+  const sel = document.getElementById('crewRP_unit');
   const units = EQUIPMENT_UNITS[equipmentId] || [];
   if (!equipmentId || !units.length) {
     sel.innerHTML = '<option value="">Not sure which unit</option>';

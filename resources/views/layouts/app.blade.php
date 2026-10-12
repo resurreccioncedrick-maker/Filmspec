@@ -86,17 +86,22 @@
   // BillingController::index() already uses for pendingDiscounts/pendingPayBkgs, just as a
   // cheap count rather than the full row data. Only computed for roles that can see Billing
   // at all, so this doesn't add a query to every page load for every role.
-  $billingBadgeCount = 0;
+  // Kept as two named counts (not just one summed total) so the tooltip can say which part is
+  // which — a bare combined number gave no way to tell "pending discounts" from "unbilled
+  // bookings" from the sidebar alone.
+  $billingBadgePendingDiscounts = 0;
+  $billingBadgeUnbilled = 0;
   if ($canAccess('billing')) {
-    $billingBadgeCount = \Illuminate\Support\Facades\DB::table('booking_discounts')->where('status', 'pending')->count()
-      + \Illuminate\Support\Facades\DB::table('bookings')
-          ->whereIn('booking_status', ['confirmed', 'ongoing', 'completed'])
-          ->where('payment_status', '!=', 'paid')
-          ->where(function ($w) {
-              $w->whereNull('approval_status')->orWhere('approval_status', 'approved');
-          })
-          ->count();
+    $billingBadgePendingDiscounts = \Illuminate\Support\Facades\DB::table('booking_discounts')->where('status', 'pending')->count();
+    $billingBadgeUnbilled = \Illuminate\Support\Facades\DB::table('bookings')
+        ->whereIn('booking_status', ['confirmed', 'ongoing', 'completed'])
+        ->where('payment_status', '!=', 'paid')
+        ->where(function ($w) {
+            $w->whereNull('approval_status')->orWhere('approval_status', 'approved');
+        })
+        ->count();
   }
+  $billingBadgeCount = $billingBadgePendingDiscounts + $billingBadgeUnbilled;
 
   // Global "new messages waiting" counts for the Support Chat and Bookings nav items — the
   // per-thread unread dot on the Support Chat inbox and BookingDetailController's own
@@ -191,7 +196,7 @@
             <i data-feather="{{ $item['icon'] }}"></i>
             <span>{{ $item['label'] }}</span>
             @if (! empty($item['sa']))<span class="superadmin-badge">SA</span>@endif
-            @if ($urlKey === 'billing' && $billingBadgeCount > 0)<span class="superadmin-badge" style="background:var(--orange, #f97316)" title="Pending discount approvals + unbilled confirmed bookings">{{ $billingBadgeCount }}</span>@endif
+            @if ($urlKey === 'billing' && $billingBadgeCount > 0)<span class="superadmin-badge" style="background:var(--orange, #f97316)" title="{{ $billingBadgePendingDiscounts }} pending discount approval{{ $billingBadgePendingDiscounts === 1 ? '' : 's' }}, {{ $billingBadgeUnbilled }} unbilled confirmed booking{{ $billingBadgeUnbilled === 1 ? '' : 's' }}">{{ $billingBadgeCount }}</span>@endif
             @if ($urlKey === 'support_chat' && $supportChatBadgeCount > 0)<span class="superadmin-badge" style="background:var(--orange, #f97316)" title="Conversations with new messages">{{ $supportChatBadgeCount }}</span>@endif
             @if ($urlKey === 'bookings' && $bookingsBadgeCount > 0)<span class="superadmin-badge" style="background:var(--orange, #f97316)" title="Bookings with new comments">{{ $bookingsBadgeCount }}</span>@endif
             @if ($urlKey === 'field_requests' && $fieldRequestsBadgeCount > 0)<span class="superadmin-badge" style="background:var(--orange, #f97316)" title="Field requests awaiting review">{{ $fieldRequestsBadgeCount }}</span>@endif

@@ -136,6 +136,12 @@
                class="btn btn-sm btn-outline" title="Print / Save as PDF">
               <i data-feather="printer"></i>
             </a>
+            @if ($ir->photo_path)
+            <a href="{{ route('incident-photo', $ir->incident_id) }}" target="_blank"
+               class="btn btn-sm btn-outline" title="View photo">
+              <i data-feather="image"></i>
+            </a>
+            @endif
             <button onclick="openEditIncident({{ Illuminate\Support\Js::from($ir)->toHtml() }})"
                     class="btn btn-sm btn-outline" title="Edit">
               <i data-feather="edit-2"></i>
@@ -217,6 +223,10 @@
           <td><span class="badge {{ $maintStatBadge[$mt->status] ?? 'badge-gray' }}">{{ ucfirst(str_replace('_',' ',$mt->status)) }}</span></td>
           <td>
             <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+              @if ($mt->photo_path)
+              <a href="{{ route('maintenance-photo', $mt->schedule_id) }}" target="_blank"
+                 class="btn btn-sm btn-outline" title="View photo"><i data-feather="image"></i></a>
+              @endif
               <button onclick="openUpdateMaintenance({{ Illuminate\Support\Js::from($mt)->toHtml() }})"
                       class="btn btn-sm btn-outline" title="Update Status"><i data-feather="edit-2"></i></button>
               @if ($canManage)
@@ -244,7 +254,7 @@
       <h3 class="modal-title"><i data-feather="tool" style="width:16px;height:16px;margin-right:8px;vertical-align:middle"></i>New Maintenance Schedule</h3>
       <button class="modal-close"><i data-feather="x"></i></button>
     </div>
-    <form method="POST">
+    <form method="POST" enctype="multipart/form-data">
       @csrf
       <input type="hidden" name="action" value="create_maintenance">
       <div class="modal-body">
@@ -297,6 +307,10 @@
           <label>Description / Instructions</label>
           <textarea name="description" class="form-control" rows="3" placeholder="What needs to be done…"></textarea>
         </div>
+        <div class="form-group">
+          <label>Photo <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <input type="file" name="photo" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline" data-modal-close>Cancel</button>
@@ -313,7 +327,7 @@
       <h3 class="modal-title"><i data-feather="refresh-cw" style="width:16px;height:16px;margin-right:8px;vertical-align:middle"></i>Update Maintenance Status</h3>
       <button class="modal-close"><i data-feather="x"></i></button>
     </div>
-    <form method="POST">
+    <form method="POST" enctype="multipart/form-data">
       @csrf
       <input type="hidden" name="action" value="update_maintenance">
       <input type="hidden" name="schedule_id" id="updMaint_id">
@@ -331,6 +345,10 @@
         <div class="form-group">
           <label>Notes / Completion Remarks</label>
           <textarea name="notes" id="updMaint_notes" class="form-control" rows="3" placeholder="Describe what was done…"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Photo <span style="color:var(--muted);font-weight:400">(optional — replaces any existing one)</span></label>
+          <input type="file" name="photo" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
         </div>
       </div>
       <div class="modal-footer">
@@ -350,7 +368,7 @@
       <h3 class="modal-title"><i data-feather="alert-triangle" style="width:16px;height:16px;margin-right:8px;vertical-align:middle"></i>New Incident Report</h3>
       <button class="modal-close"><i data-feather="x"></i></button>
     </div>
-    <form method="POST" onsubmit="return prepNewIncident()">
+    <form method="POST" onsubmit="return prepNewIncident()" enctype="multipart/form-data">
       @csrf
       <input type="hidden" name="action" value="create_incident">
       <div class="modal-body" style="max-height:75vh;overflow-y:auto">
@@ -373,6 +391,16 @@
               <input type="hidden" name="equipment_id" id="newIR_equipment">
               <div class="crew-slot-drop" id="newIR_equipDrop"></div>
             </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Unit</label>
+            <select name="equipment_unit" id="newIR_unit" class="form-control" disabled>
+              <option value="">Not sure which unit</option>
+            </select>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Pick the specific one if it's tagged — only shown when this equipment has registered units.</div>
           </div>
         </div>
 
@@ -428,6 +456,11 @@
           <label>Incident Written Report *</label>
           <textarea name="description" class="form-control" rows="3" required
                     placeholder="Describe what happened in detail…"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Photo <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <input type="file" name="photo" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
         </div>
 
         <div class="form-row">
@@ -494,11 +527,21 @@
       <h3 class="modal-title"><i data-feather="edit-2" style="width:16px;height:16px;margin-right:8px;vertical-align:middle"></i>Edit Incident Report — <span id="editIR_num"></span></h3>
       <button class="modal-close"><i data-feather="x"></i></button>
     </div>
-    <form method="POST">
+    <form method="POST" enctype="multipart/form-data">
       @csrf
       <input type="hidden" name="action" value="update_incident">
       <input type="hidden" name="incident_id" id="editIR_id">
       <div class="modal-body" style="max-height:75vh;overflow-y:auto">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label id="editIR_equipLabel">Equipment / Unit</label>
+            <div id="editIR_equipName" style="font-size:13px;font-weight:600;padding:6px 0"></div>
+            <select name="equipment_unit" id="editIR_unit" class="form-control" disabled style="display:none">
+              <option value="">Not sure which unit</option>
+            </select>
+          </div>
+        </div>
 
         <div class="form-row">
           <div class="form-group">
@@ -550,6 +593,12 @@
         <div class="form-group">
           <label>Incident Written Report *</label>
           <textarea name="description" id="editIR_desc" class="form-control" rows="3" required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Photo <span style="color:var(--muted);font-weight:400">(optional — replaces any existing one)</span></label>
+          <div id="editIR_photoLink" style="margin-bottom:6px;font-size:12px"></div>
+          <input type="file" name="photo" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
         </div>
 
         <div class="form-row">
@@ -660,6 +709,28 @@
 // Equipment per booking (pre-loaded)
 const BOOKING_EQUIP = {!! json_encode($bookingEquipMap) !!};
 
+// Registered physical units per equipment model — same data shape/purpose as
+// CrewPortalController's own EQUIPMENT_UNITS, powers the New/Edit Incident Unit select so staff
+// can pin down which specific unit when an equipment model has more than one.
+const EQUIPMENT_UNITS = {!! json_encode($equipmentUnitMap) !!};
+
+function populateIRUnitSelect(equipmentId, selectId, preselect) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const units = EQUIPMENT_UNITS[equipmentId] || [];
+  if (!equipmentId || !units.length) {
+    sel.innerHTML = '<option value="">Not sure which unit</option>';
+    sel.disabled = true;
+    sel.style.display = 'none';
+    return;
+  }
+  sel.innerHTML = units.map((u) => `<option value="u${u.unit_id}">${esc(u.asset_tag)}</option>`).join('')
+    + '<option value="">Not sure which unit</option>';
+  sel.value = preselect ? 'u' + preselect : '';
+  sel.disabled = false;
+  sel.style.display = '';
+}
+
 // Active bookings, for the New Incident booking search (pre-loaded)
 const ACTIVE_BOOKINGS = {!! $activeBookings->values()->toJson() !!};
 
@@ -712,6 +783,7 @@ function selectBookingForIncident(bookingId) {
   eqSearch.value = '';
   eqSearch.disabled = !bookingId;
   eqSearch.placeholder = !bookingId ? 'Select a booking first' : (equip.length ? 'Search equipment or accessory…' : 'No equipment on this booking');
+  populateIRUnitSelect(null, 'newIR_unit', null);
   const crewContainer = document.getElementById('newIR_crewContainer');
   if (crewContainer) populateCrewFromBooking(bookingId, crewContainer);
 }
@@ -743,6 +815,7 @@ function openIREquipSearch(q) {
       document.getElementById('newIR_equipment').value = el.dataset.id;
       document.getElementById('newIR_equipSearch').value = el.dataset.label;
       drop.style.display = 'none';
+      populateIRUnitSelect(el.dataset.id, 'newIR_unit', null);
     });
   });
 }
@@ -872,6 +945,14 @@ function openEditIncident(ir) {
   document.getElementById('editIR_hcrew').value    = ir.head_crew_name || '';
   document.getElementById('editIR_custodian').value= ir.custodian_name || '';
   document.getElementById('editIR_dothers').value  = ir.damage_others_note || '';
+
+  document.getElementById('editIR_equipName').textContent = ir.equipment_name
+    ? ir.equipment_name + (ir.brand ? ' — ' + ir.brand : '')
+    : (ir.accessory_name || '—');
+  populateIRUnitSelect(ir.equipment_id, 'editIR_unit', ir.equipment_unit_id);
+  document.getElementById('editIR_photoLink').innerHTML = ir.photo_path
+    ? `<a href="/incidents/${ir.incident_id}/photo" target="_blank">View current photo</a>`
+    : '<span style="color:var(--muted)">No photo on file</span>';
 
   // Damage type checkboxes
   const dtypes = ir.damage_types ? JSON.parse(ir.damage_types) : [];

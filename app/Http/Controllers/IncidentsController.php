@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Support\BookingCosting;
 use App\Support\DataExporter;
+use App\Support\EvidencePhotoUpload;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -131,6 +133,7 @@ class IncidentsController extends Controller
         }
 
         $bookingEquipMap = [];
+        $equipmentUnitMap = [];
         if ($bookingIds) {
             $equipRows = DB::table('booking_equipment as be')
                 ->join('equipment as e', 'be.equipment_id', '=', 'e.equipment_id')
@@ -139,6 +142,16 @@ class IncidentsController extends Controller
                 ->get();
             foreach ($equipRows as $row) {
                 $bookingEquipMap[$row->booking_id][] = $row;
+            }
+
+            // Powers the New/Edit Incident modals' Unit select — same cascade (Booking ->
+            // Equipment -> Unit) CrewPortalController's own incident form already uses, so staff
+            // can pin down which physical unit when an equipment model has more than one.
+            $equipIdsForUnits = $equipRows->pluck('equipment_id')->unique()->all();
+            if ($equipIdsForUnits) {
+                foreach (DB::table('equipment_units')->whereIn('equipment_id', $equipIdsForUnits)->orderBy('asset_tag')->get() as $u) {
+                    $equipmentUnitMap[$u->equipment_id][] = ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag];
+                }
             }
         }
 
@@ -172,7 +185,7 @@ class IncidentsController extends Controller
             'tab' => $tab, 'search' => $search, 'page' => $page, 'pages' => $pages,
             'incidents' => $incidents, 'kpis' => $kpis, 'tabCounts' => $tabCounts,
             'activeBookings' => $activeBookings, 'allEquipment' => $allEquipment,
-            'bookingCrewMap' => $bookingCrewMap, 'bookingEquipMap' => $bookingEquipMap,
+            'bookingCrewMap' => $bookingCrewMap, 'bookingEquipMap' => $bookingEquipMap, 'equipmentUnitMap' => $equipmentUnitMap,
             'maintTab' => $maintTab, 'maintenances' => $maintenances, 'maintCounts' => $maintCounts,
             'crewForMaint' => $crewForMaint, 'viewTab' => $viewTab,
             'typeBadge' => $this->typeBadge, 'typeLabel' => $this->typeLabel, 'statusBadge' => $this->statusBadge,
@@ -310,6 +323,24 @@ class IncidentsController extends Controller
         ]);
     }
 
+    /** Gated by the 'incidents' route middleware, same as print() above — no extra check needed. */
+    public function incidentPhoto(int $id): StreamedResponse
+    {
+        $path = DB::table('incident_reports')->where('incident_id', $id)->value('photo_path');
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path);
+    }
+
+    /** Same gate as incidentPhoto() above. */
+    public function maintenancePhoto(int $id): StreamedResponse
+    {
+        $path = DB::table('maintenance_schedules')->where('schedule_id', $id)->value('photo_path');
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path);
+    }
+
     private function generateIrNumber(): string
     {
         $year = now()->year;
@@ -345,11 +376,16 @@ class IncidentsController extends Controller
             $cmId = (int) $request->input('assigned_crew_id', 0);
             $desc = trim((string) $request->input('description', ''));
             $iid = (int) $request->input('incident_id', 0);
+            $photoUpload = EvidencePhotoUpload::handle($request->file('photo'), 'maintenance-photos');
+            if ($photoUpload['error']) {
+                return ['type' => 'danger', 'text' => $photoUpload['error']];
+            }
 
             if ($eid && $date) {
                 $scheduleId = DB::table('maintenance_schedules')->insertGetId([
                     'equipment_id' => $eid, 'scheduled_date' => $date, 'maintenance_type' => $mtype,
                     'assigned_crew_id' => $cmId ?: null, 'description' => $desc, 'incident_id' => $iid ?: null,
+                    'photo_path' => $photoUpload['success'] ? $photoUpload['path'] : null,
                     'created_by' => $uid,
                 ]);
                 ActivityLog::record($uid, 'create', 'maintenance', "Maintenance schedule created for equipment ID $eid", $scheduleId);
@@ -369,6 +405,15 @@ class IncidentsController extends Controller
                 if (in_array($status, ['completed', 'cancelled'], true)) {
                     $update['completed_at'] = now();
                 }
+                if ($request->hasFile('photo')) {
+                    $photoUpload = EvidencePhotoUpload::handle($request->file('photo'), 'maintenance-photos');
+                    if ($photoUpload['error']) {
+                        return ['type' => 'danger', 'text' => $photoUpload['error']];
+                    }
+                    if ($photoUpload['success']) {
+                        $update['photo_path'] = $photoUpload['path'];
+                    }
+                }
                 DB::table('maintenance_schedules')->where('schedule_id', $schId)->update($update);
 
                 return ['type' => 'success', 'text' => 'Maintenance schedule updated.'];
@@ -387,6 +432,7 @@ class IncidentsController extends Controller
         if ($action === 'create_incident') {
             $bid = (int) $request->input('booking_id', 0);
             $eid = (int) $request->input('equipment_id', 0);
+            $equipmentUnitId = $this->parseUnitInput($request->input('equipment_unit', ''), $eid);
             $itype = $request->input('incident_type', 'damaged');
             $idate = $request->input('incident_date', now()->toDateString());
             $itime = trim((string) $request->input('incident_time', ''));
@@ -401,13 +447,18 @@ class IncidentsController extends Controller
             $custodian = trim((string) $request->input('custodian_name', ''));
             $lineup = json_encode($this->buildLineup($request, 'crew_lineup_role', 'crew_lineup_name'));
             $extraSigs = json_encode($this->buildLineup($request, 'extra_sig_role', 'extra_sig_name'));
+            $photoUpload = EvidencePhotoUpload::handle($request->file('photo'), 'incident-photos');
+            if ($photoUpload['error']) {
+                return ['type' => 'danger', 'text' => $photoUpload['error']];
+            }
 
             if ($bid && $eid) {
                 $irNum = $this->generateIrNumber();
                 $incidentId = DB::table('incident_reports')->insertGetId([
-                    'booking_id' => $bid, 'equipment_id' => $eid, 'reported_by' => $uid,
+                    'booking_id' => $bid, 'equipment_id' => $eid, 'equipment_unit_id' => $equipmentUnitId, 'reported_by' => $uid,
                     'incident_type' => $itype, 'incident_date' => $idate, 'incident_time' => $itime ?: null,
-                    'description' => $desc, 'cause' => $cause, 'charge_amount' => $charge,
+                    'description' => $desc, 'photo_path' => $photoUpload['success'] ? $photoUpload['path'] : null,
+                    'cause' => $cause, 'charge_amount' => $charge,
                     'payment_mode' => $payMode, 'status' => 'open', 'incident_number' => $irNum,
                     'damage_others_note' => $dothers,
                     'dop_name' => $dop, 'head_crew_name' => $headCrew, 'custodian_name' => $custodian,
@@ -450,15 +501,30 @@ class IncidentsController extends Controller
             $lineup = json_encode($this->buildLineup($request, 'crew_lineup_role', 'crew_lineup_name'));
             $extraSigs = json_encode($this->buildLineup($request, 'extra_sig_role', 'extra_sig_name'));
 
+            $existingEid = (int) DB::table('incident_reports')->where('incident_id', $iid)->value('equipment_id');
+            $equipmentUnitId = $this->parseUnitInput($request->input('equipment_unit', ''), $existingEid);
             $bookingId = (int) DB::table('incident_reports')->where('incident_id', $iid)->value('booking_id');
 
-            DB::table('incident_reports')->where('incident_id', $iid)->update([
+            // A new photo REPLACES the old one; leaving the field blank on edit keeps whatever
+            // was already there rather than clearing it.
+            $updateData = [
+                'equipment_unit_id' => $equipmentUnitId,
                 'incident_type' => $itype, 'incident_date' => $idate, 'incident_time' => $itime ?: null,
                 'description' => $desc, 'cause' => $cause, 'charge_amount' => $charge, 'payment_mode' => $payMode,
                 'damage_others_note' => $dothers,
                 'dop_name' => $dop, 'head_crew_name' => $headCrew, 'custodian_name' => $custodian,
                 'crew_lineup' => $lineup, 'extra_signatories' => $extraSigs,
-            ]);
+            ];
+            if ($request->hasFile('photo')) {
+                $photoUpload = EvidencePhotoUpload::handle($request->file('photo'), 'incident-photos');
+                if ($photoUpload['error']) {
+                    return ['type' => 'danger', 'text' => $photoUpload['error']];
+                }
+                if ($photoUpload['success']) {
+                    $updateData['photo_path'] = $photoUpload['path'];
+                }
+            }
+            DB::table('incident_reports')->where('incident_id', $iid)->update($updateData);
             DB::table('incident_damage_types')->where('incident_id', $iid)->delete();
             if ($dtypes) {
                 DB::table('incident_damage_types')->insert(array_map(
@@ -495,6 +561,23 @@ class IncidentsController extends Controller
             }
 
             return ['type' => 'success', 'text' => 'Incident status updated.'];
+        }
+
+        return null;
+    }
+
+    // Same "u<equipment_unit_id>" / empty convention CrewPortalController's crew_file_incident
+    // already uses — empty or "not sure" leaves the report unit-less, same as before this field
+    // existed. Re-validates server-side that the unit actually belongs to this equipment, rather
+    // than trusting whatever the (same-origin, cascading) <select> posted.
+    private function parseUnitInput(string $unitInput, int $equipmentId): ?int
+    {
+        if (! str_starts_with($unitInput, 'u')) {
+            return null;
+        }
+        $candidate = (int) substr($unitInput, 1);
+        if ($candidate && DB::table('equipment_units')->where('unit_id', $candidate)->where('equipment_id', $equipmentId)->exists()) {
+            return $candidate;
         }
 
         return null;

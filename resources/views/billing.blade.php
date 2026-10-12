@@ -871,7 +871,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline" data-modal-close>Cancel</button>
-        <button type="submit" class="btn btn-primary"><i data-feather="save"></i> Record Payment</button>
+        <button type="submit" id="billingRecordPaymentBtn" class="btn btn-primary"><i data-feather="save"></i> Record Payment</button>
       </div>
     </form>
   </div>
@@ -1118,6 +1118,10 @@ function prepPayment() {
     alert('Please select a booking from the search.');
     return false;
   }
+  const btn = document.getElementById('billingRecordPaymentBtn');
+  if (btn.disabled) return false;
+  btn.disabled = true;
+  btn.innerHTML = '<i data-feather="save"></i> Saving…';
   return true;
 }
 

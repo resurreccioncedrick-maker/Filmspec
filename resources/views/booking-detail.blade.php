@@ -808,7 +808,9 @@
     <div class="card-header">
       <h2 class="card-title">Discounts</h2>
       <div style="display:flex;align-items:center;gap:8px">
-        @if ($discounts->isNotEmpty())
+        @if ($hasPendingDiscount)
+        <span class="badge badge-yellow" title="Awaiting approval">{{ $discounts->where('status', 'pending')->count() }} pending</span>
+        @elseif ($discounts->isNotEmpty())
         <span class="badge badge-gray">{{ $discounts->count() }}</span>
         @endif
         @if ($canSetDiscount)
@@ -871,6 +873,97 @@
     </div>
   </div>
 
+  @if ($canRecord)
+  <div class="card" id="pendingPaySubCard" style="margin-bottom:16px">
+    <div class="card-header">
+      <h2 class="card-title">Client Payment Requests
+        @if ($pendingPaymentSubmissions->isNotEmpty())
+        <span class="badge badge-yellow" style="margin-left:6px">{{ $pendingPaymentSubmissions->count() }} pending</span>
+        @endif
+      </h2>
+    </div>
+    <div class="table-wrap">
+      @if ($pendingPaymentSubmissions->isEmpty())
+      <div class="empty-state"><i data-feather="upload-cloud"></i><h3>No client payment submissions awaiting review</h3></div>
+      @else
+      <table>
+        <thead>
+          <tr><th>Submitted</th><th>Type</th><th>Amount</th><th>Method</th><th>Reference / Bank</th><th>Proof</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          @foreach ($pendingPaymentSubmissions as $s)
+          <tr>
+            <td style="font-size:.8rem">
+              {{ $s->submitted_by_name ?? '—' }}<br>
+              <span style="color:var(--text-muted)">{{ \Illuminate\Support\Carbon::parse($s->created_at)->format('M j, g:i A') }}</span>
+            </td>
+            <td style="font-size:.83rem">{{ ucfirst($s->payment_type) }}</td>
+            <td style="font-weight:700">₱{{ number_format($s->amount, 2) }}</td>
+            <td style="font-size:.83rem">{{ $s->payment_method === 'bank_transfer' ? 'Bank Transfer' : ($s->payment_method === 'gcash' ? 'GCash' : 'Cash') }}</td>
+            <td style="font-size:.83rem">
+              @if ($s->payment_method === 'bank_transfer')
+                {{ $s->bank_name ?: '—' }}@if($s->reference_number) · {{ $s->reference_number }}@endif
+              @else
+                {{ $s->reference_number ?: '—' }}
+              @endif
+            </td>
+            <td>
+              @if ($s->proof_of_payment_path)
+              <a href="{{ route('payment-submission-proof', $s->submission_id) }}" target="_blank" class="btn btn-sm btn-secondary">
+                <i data-feather="eye" style="width:12px;height:12px"></i>
+              </a>
+              @else
+              —
+              @endif
+            </td>
+            <td>
+              <div style="display:flex;gap:5px">
+                <button class="btn btn-sm btn-success" onclick="openApprovePaymentSubModal({{ $s->submission_id }}, '₱{{ number_format($s->amount, 2) }}')">
+                  <i data-feather="check" style="width:12px;height:12px"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="openRejectPaymentSubModal({{ $s->submission_id }})">
+                  <i data-feather="x" style="width:12px;height:12px"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          @endforeach
+        </tbody>
+      </table>
+      @endif
+    </div>
+  </div>
+
+  <div class="card" id="paymentSubHistoryCard" style="margin-bottom:16px">
+    <div class="card-header">
+      <h2 class="card-title">Recent Payment Request History</h2>
+    </div>
+    <div class="table-wrap">
+      @if ($paymentSubmissionHistory->isEmpty())
+      <div class="empty-state"><i data-feather="clock"></i><h3>No reviewed submissions yet</h3></div>
+      @else
+      <table>
+        <thead>
+          <tr><th>Amount</th><th>Status</th><th>Reviewed By</th><th>Date</th></tr>
+        </thead>
+        <tbody>
+          @foreach ($paymentSubmissionHistory as $s)
+          <tr>
+            <td style="font-weight:600">₱{{ number_format($s->amount, 2) }}</td>
+            <td>
+              <span class="badge {{ $s->status === 'approved' ? 'badge-green' : 'badge-red' }}" title="{{ $s->status === 'rejected' ? $s->rejection_reason : '' }}">{{ ucfirst($s->status) }}</span>
+            </td>
+            <td style="font-size:.83rem">{{ $s->reviewed_by_name ?? '—' }}</td>
+            <td style="font-size:.83rem">{{ $s->reviewed_at ? \Illuminate\Support\Carbon::parse($s->reviewed_at)->format('M j, Y') : '—' }}</td>
+          </tr>
+          @endforeach
+        </tbody>
+      </table>
+      @endif
+    </div>
+  </div>
+  @endif
+
   <div class="card" id="paymentsCard">
     <div class="card-header">
       <h2 class="card-title">Payment History</h2>
@@ -887,7 +980,7 @@
         <option value="final">Final</option>
       </select>
       @endif
-      @if (($isAdmin || $role === 'accounting') && $booking->booking_status !== 'cancelled')
+      @if ($canRecord && $booking->booking_status !== 'cancelled')
       <button onclick="openModal('modalRecordPayment')" class="btn btn-primary btn-sm"><i data-feather="plus"></i> Record Payment</button>
       @endif
       </div>
@@ -2032,7 +2125,7 @@
       <h3><i data-feather="credit-card" style="width:16px;height:16px;margin-right:6px;vertical-align:middle"></i>Record Payment</h3>
       <button class="modal-close" onclick="closeModal('modalRecordPayment')">&times;</button>
     </div>
-    <form method="POST" action="{{ $actionUrl }}" enctype="multipart/form-data">
+    <form method="POST" action="{{ $actionUrl }}" enctype="multipart/form-data" onsubmit="return guardBdRecordPaymentSubmit()">
       @csrf
       <input type="hidden" name="action" value="record_payment">
       <div class="modal-body">
@@ -2107,11 +2200,66 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('modalRecordPayment')">Cancel</button>
-        <button type="submit" class="btn btn-success"><i data-feather="check" style="width:13px;height:13px;margin-right:4px;vertical-align:middle"></i>Save Payment</button>
+        <button type="submit" id="bdRecordPaymentBtn" class="btn btn-success"><i data-feather="check" style="width:13px;height:13px;margin-right:4px;vertical-align:middle"></i>Save Payment</button>
       </div>
     </form>
   </div>
 </div>
+
+@if ($canRecord)
+<!-- APPROVE PAYMENT SUBMISSION MODAL -->
+<div class="modal-overlay" id="modalApprovePaymentSub">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <h3><i data-feather="check" style="width:16px;height:16px;margin-right:6px;vertical-align:middle"></i>Approve Client Payment</h3>
+      <button class="modal-close" onclick="closeModal('modalApprovePaymentSub')">&times;</button>
+    </div>
+    <form method="POST" action="{{ $actionUrl }}">
+      @csrf
+      <input type="hidden" name="action" value="approve_payment_submission">
+      <input type="hidden" name="submission_id" id="approvePaymentSubId">
+      <div class="modal-body">
+        <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:6px;padding:10px 14px;font-size:13px">
+          Approving <strong id="approvePaymentSubLabel"></strong> will record it as a real payment, generate a receipt, and show it on the client's payment history. Make sure you've reviewed the uploaded proof of payment first.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalApprovePaymentSub')">Cancel</button>
+        <button type="submit" class="btn btn-success">
+          <i data-feather="check" style="width:13px;height:13px;margin-right:4px;vertical-align:middle"></i>Approve &amp; Record
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- REJECT PAYMENT SUBMISSION MODAL -->
+<div class="modal-overlay" id="modalRejectPaymentSub">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <h3><i data-feather="x" style="width:16px;height:16px;margin-right:6px;vertical-align:middle"></i>Reject Client Payment</h3>
+      <button class="modal-close" onclick="closeModal('modalRejectPaymentSub')">&times;</button>
+    </div>
+    <form method="POST" action="{{ $actionUrl }}">
+      @csrf
+      <input type="hidden" name="action" value="reject_payment_submission">
+      <input type="hidden" name="submission_id" id="rejectPaymentSubId">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Reason for rejection <span style="color:var(--red)">*</span></label>
+          <textarea name="rejection_reason" class="form-control" rows="2" placeholder="Let the client know why (e.g. proof unreadable, amount mismatch)…" required></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalRejectPaymentSub')">Cancel</button>
+        <button type="submit" class="btn btn-danger">
+          <i data-feather="x" style="width:13px;height:13px;margin-right:4px;vertical-align:middle"></i>Reject
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+@endif
 
 <!-- INCIDENT UPDATE MODAL -->
 <div class="modal-overlay" id="modalIncident">
@@ -2494,6 +2642,24 @@ function toggleBdPaymentFields() {
 
   document.getElementById('bdProofWrap').style.display = (isGcash || isBank) ? '' : 'none';
   document.getElementById('bdProofInput').required = isGcash || isBank;
+}
+
+function guardBdRecordPaymentSubmit() {
+  const btn = document.getElementById('bdRecordPaymentBtn');
+  if (btn.disabled) return false;
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  return true;
+}
+
+function openApprovePaymentSubModal(submissionId, label) {
+  document.getElementById('approvePaymentSubId').value = submissionId;
+  document.getElementById('approvePaymentSubLabel').textContent = label;
+  openModal('modalApprovePaymentSub');
+}
+function openRejectPaymentSubModal(submissionId) {
+  document.getElementById('rejectPaymentSubId').value = submissionId;
+  openModal('modalRejectPaymentSub');
 }
 
 function openRelease(eid, ename) {

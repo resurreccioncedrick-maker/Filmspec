@@ -509,6 +509,11 @@ class BillingController extends Controller
                 if ($bkTotal > 0 && $amount > $remaining + 0.005) {
                     return ['type' => 'danger', 'text' => 'Payment of <strong>₱' . number_format($amount, 2) . '</strong> exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong>. Please enter the correct amount.'];
                 }
+                // A payment that fully settles what's left IS the final payment, whatever type
+                // was picked — the Payment Purpose dropdown only auto-suggests this client-side
+                // and stops once staff touch it manually, so without this a downpayment-labeled
+                // payment could complete the booking and stay mislabeled forever.
+                $ptype = $amount >= $remaining - 0.005 ? 'final' : $ptype;
 
                 $rcSeq = (int) DB::table('payments')->where('receipt_type', $rctype)->lockForUpdate()->count() + 1;
                 $rcnum = $rcPrefix . '-' . str_pad((string) $rcSeq, 5, '0', STR_PAD_LEFT);
@@ -645,12 +650,13 @@ class BillingController extends Controller
             if ($bkTotal > 0 && $amount > $remaining + 0.005) {
                 return ['error' => ['type' => 'danger', 'text' => 'This submission of <strong>₱' . number_format($amount, 2) . '</strong> now exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong> — the balance may have changed since it was submitted. Reject it and ask the client to resubmit the correct amount.']];
             }
+            $ptype = $amount >= $remaining - 0.005 ? 'final' : $submission->payment_type;
 
             $rcSeq = (int) DB::table('payments')->where('receipt_type', $rctype)->lockForUpdate()->count() + 1;
             $rcnum = $rcPrefix . '-' . str_pad((string) $rcSeq, 5, '0', STR_PAD_LEFT);
 
             $paymentId = DB::table('payments')->insertGetId([
-                'booking_id' => $bid, 'payment_type' => $submission->payment_type, 'payment_method' => $submission->payment_method,
+                'booking_id' => $bid, 'payment_type' => $ptype, 'payment_method' => $submission->payment_method,
                 'amount' => $amount, 'reference_number' => $submission->reference_number, 'bank_name' => $submission->bank_name,
                 'proof_of_payment_path' => $submission->proof_of_payment_path,
                 'payment_date' => $pdate, 'received_by' => $uid, 'is_vat' => $isVat,

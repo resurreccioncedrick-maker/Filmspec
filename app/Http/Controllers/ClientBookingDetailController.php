@@ -386,12 +386,34 @@ class ClientBookingDetailController extends Controller
             return ['type' => 'danger', 'text' => 'Proof of Payment is required when submitting a payment yourself.'];
         }
 
-        DB::table('client_payment_submissions')->insert([
-            'booking_id' => $id, 'submitted_by' => $uid, 'payment_type' => $ptype, 'payment_method' => $pmethod,
-            'amount' => $amount, 'reference_number' => $ref ?: null, 'bank_name' => $bankName ?: null,
-            'proof_of_payment_path' => $proofPath, 'notes' => $notes ?: null, 'status' => 'pending',
-            'created_at' => now(),
-        ]);
+        // Re-checked and inserted inside a locked transaction — the balance check above (lines
+        // 353-358) runs before the file upload and was the only guard previously, with no lock,
+        // so a double-click or a stale resubmit after a rejection could both pass it and both
+        // insert before either committed. Locking the booking row here closes that race, same
+        // pattern BillingController's record_payment already uses for real payments.
+        $error = DB::transaction(function () use ($id, $uid, $ptype, $pmethod, $amount, $ref, $bankName, $proofPath, $notes, $booking) {
+            DB::table('bookings')->where('booking_id', $id)->lockForUpdate()->value('booking_id');
+            $paidSoFar = (float) DB::table('payments')->where('booking_id', $id)->sum('amount');
+            $pendingSubmitted = (float) DB::table('client_payment_submissions')
+                ->where('booking_id', $id)->where('status', 'pending')->sum('amount');
+            $remaining = round((float) $booking->final_amount - $paidSoFar - $pendingSubmitted, 2);
+            if ((float) $booking->final_amount > 0 && $amount > $remaining + 0.005) {
+                return ['type' => 'danger', 'text' => 'That amount exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong> (after your other pending submissions).'];
+            }
+
+            DB::table('client_payment_submissions')->insert([
+                'booking_id' => $id, 'submitted_by' => $uid, 'payment_type' => $ptype, 'payment_method' => $pmethod,
+                'amount' => $amount, 'reference_number' => $ref ?: null, 'bank_name' => $bankName ?: null,
+                'proof_of_payment_path' => $proofPath, 'notes' => $notes ?: null, 'status' => 'pending',
+                'created_at' => now(),
+            ]);
+
+            return null;
+        });
+
+        if ($error !== null) {
+            return $error;
+        }
 
         return ['type' => 'success', 'text' => 'Your payment of <strong>₱' . number_format($amount, 2) . '</strong> has been submitted and is awaiting review by our team.'];
     }

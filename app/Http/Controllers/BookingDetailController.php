@@ -59,6 +59,13 @@ class BookingDetailController extends Controller
 
         $role = $request->user()->role->role_name ?? '';
         $isAdmin = in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true);
+        // Matches BillingController's $canRecord exactly (role_permissions.*.billing: super_admin/
+        // admin/operations_manager/accounting) — $isAdmin above wrongly includes traffic (no
+        // billing permission) and wrongly excludes accounting (has it), which previously let an
+        // accounting user see the Record Payment button here but have their POST silently
+        // dropped by act()'s role check. Payment-related gating on this page now uses this one
+        // set consistently instead of three different role lists.
+        $canRecord = in_array($role, ['super_admin', 'admin', 'operations_manager', 'accounting'], true);
 
         $equipmentLines = DB::table('booking_equipment as be')
             ->join('equipment as e', 'be.equipment_id', '=', 'e.equipment_id')
@@ -182,6 +189,26 @@ class BookingDetailController extends Controller
                 AND ba2.booking_id != ?),0) AS qty_in_use', [$id])
             ->get();
         $payments = DB::table('payments')->where('booking_id', $id)->orderByDesc('payment_date')->get();
+        // Client-submitted payment claims awaiting approval, same data Billing's own "Client
+        // Payment Requests" tab shows (BillingController::index()) — scoped to just this
+        // booking so staff reviewing a specific booking don't have to go hunt for it elsewhere.
+        $pendingPaymentSubmissions = DB::table('client_payment_submissions as cps')
+            ->leftJoin('users as u', 'cps.submitted_by', '=', 'u.user_id')
+            ->where('cps.booking_id', $id)->where('cps.status', 'pending')
+            ->orderByDesc('cps.submission_id')
+            ->select('cps.*')
+            ->selectRaw("CONCAT(u.first_name,' ',u.last_name) AS submitted_by_name")
+            ->get();
+        $paymentSubmissionHistory = DB::table('client_payment_submissions as cps')
+            ->leftJoin('users as u', 'cps.submitted_by', '=', 'u.user_id')
+            ->leftJoin('users as u2', 'cps.reviewed_by', '=', 'u2.user_id')
+            ->where('cps.booking_id', $id)->where('cps.status', '!=', 'pending')
+            ->orderByDesc('cps.reviewed_at')
+            ->select('cps.*')
+            ->selectRaw("CONCAT(u.first_name,' ',u.last_name) AS submitted_by_name")
+            ->selectRaw("CONCAT(u2.first_name,' ',u2.last_name) AS reviewed_by_name")
+            ->limit(10)
+            ->get();
         $incidents = DB::table('incident_reports as ir')
             ->join('equipment as e', 'ir.equipment_id', '=', 'e.equipment_id')
             ->where('ir.booking_id', $id)
@@ -310,7 +337,8 @@ class BookingDetailController extends Controller
         $msg = $request->session()->get('bd_flash');
 
         return view('booking-detail', [
-            'booking' => $booking, 'id' => $id, 'isAdmin' => $isAdmin, 'role' => $role,
+            'booking' => $booking, 'id' => $id, 'isAdmin' => $isAdmin, 'role' => $role, 'canRecord' => $canRecord,
+            'pendingPaymentSubmissions' => $pendingPaymentSubmissions, 'paymentSubmissionHistory' => $paymentSubmissionHistory,
             'equipmentLines' => $equipmentLines, 'crewLines' => $crewLines, 'equipAssignedCrew' => $equipAssignedCrew,
             'equipCoverage' => $equipCoverage, 'equipOpRequirements' => $equipOpRequirements,
             'catalogEquipment' => $catalogEquipment,
@@ -342,6 +370,9 @@ class BookingDetailController extends Controller
         $role = $user->role->role_name ?? '';
         $uid = $user->user_id;
         $action = $request->input('action', '');
+        // Same role set as show()'s $canRecord — kept in sync manually, matching this
+        // controller's existing convention of inline role checks rather than middleware.
+        $canRecord = in_array($role, ['super_admin', 'admin', 'operations_manager', 'accounting'], true);
 
         $booking = DB::table('bookings as b')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
@@ -411,8 +442,12 @@ class BookingDetailController extends Controller
             $msg = $this->confirmInspection($id, $booking);
         } elseif ($action === 'complete_booking' && in_array($role, ['operations_manager', 'admin', 'super_admin'], true)) {
             $msg = $this->completeBooking($id, $booking, $uid);
-        } elseif ($action === 'record_payment' && in_array($role, ['admin', 'operations_manager', 'super_admin'], true)) {
+        } elseif ($action === 'record_payment' && $canRecord) {
             $msg = $this->recordPayment($request, $id, $uid);
+        } elseif ($action === 'approve_payment_submission' && $canRecord) {
+            $msg = $this->approvePaymentSubmission($request, $uid);
+        } elseif ($action === 'reject_payment_submission' && $canRecord) {
+            $msg = $this->rejectPaymentSubmission($request, $uid);
         } elseif ($action === 'update_incident' && in_array($role, ['operations_manager', 'admin', 'super_admin'], true)) {
             $msg = $this->updateIncident($request, $id);
         } elseif ($action === 'add_booking_accessory' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
@@ -1058,6 +1093,11 @@ class BookingDetailController extends Controller
             if ($bkTotal > 0 && $amount > $remaining + 0.005) {
                 return ['type' => 'danger', 'text' => 'Payment of <strong>₱' . number_format($amount, 2) . '</strong> exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong>.'];
             }
+            // A payment that fully settles what's left IS the final payment, whatever type was
+            // picked — the Payment Type dropdown only auto-suggests this client-side and stops
+            // once staff touch it manually, so without this a downpayment-labeled payment could
+            // complete the booking and stay mislabeled forever.
+            $ptype = $amount >= $remaining - 0.005 ? 'final' : $ptype;
 
             $rcSeq = (int) DB::table('payments')->where('receipt_type', $rctype)->lockForUpdate()->count() + 1;
             $rcnum = $rcPrefix . '-' . str_pad((string) $rcSeq, 5, '0', STR_PAD_LEFT);
@@ -1096,6 +1136,128 @@ class BookingDetailController extends Controller
         ActivityLog::record($uid, 'create', 'payment', 'Payment ₱' . number_format($amount, 2) . " recorded for booking $id", $id);
 
         return ['type' => 'success', 'text' => 'Payment of <strong>₱' . number_format($amount, 2) . '</strong> recorded.'];
+    }
+
+    /**
+     * Deliberately a near-exact copy of BillingController::approvePaymentSubmission() rather
+     * than a shared helper — same convention already established there (see its own comment)
+     * for keeping each entry point's payment-recording logic self-contained and easy to read
+     * in place, at the cost of the two having to be kept in sync by hand if this logic changes.
+     */
+    private function approvePaymentSubmission(Request $request, int $uid): array
+    {
+        $subId = (int) $request->input('submission_id');
+        $submission = DB::table('client_payment_submissions')->where('submission_id', $subId)->first();
+        if (! $submission) {
+            return ['type' => 'danger', 'text' => 'Payment submission not found.'];
+        }
+        if ($submission->status !== 'pending') {
+            return ['type' => 'danger', 'text' => 'This submission has already been reviewed.'];
+        }
+
+        $bid = (int) $submission->booking_id;
+        $bookingClient = DB::table('bookings as b')
+            ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+            ->where('b.booking_id', $bid)
+            ->select('c.is_vat_registered')
+            ->first();
+        if (! $bookingClient) {
+            return ['type' => 'danger', 'text' => 'Booking not found.'];
+        }
+        $isVat = (int) $bookingClient->is_vat_registered ? 1 : 0;
+        $rctype = $isVat ? 'official_receipt' : 'acknowledgement_receipt';
+        $rcPrefix = $isVat ? 'OR' : 'AR';
+        $pdate = \Illuminate\Support\Carbon::parse($submission->created_at)->toDateString();
+
+        $result = DB::transaction(function () use ($rctype, $rcPrefix, $bid, $submission, $pdate, $uid, $isVat, $subId) {
+            $bkTotal = (float) (DB::table('bookings')->where('booking_id', $bid)->lockForUpdate()->value('final_amount') ?? 0);
+            $bkPaid = (float) DB::table('payments')->where('booking_id', $bid)->sum('amount');
+            $remaining = round($bkTotal - $bkPaid, 2);
+            $amount = (float) $submission->amount;
+            if ($bkTotal > 0 && $amount > $remaining + 0.005) {
+                return ['error' => ['type' => 'danger', 'text' => 'This submission of <strong>₱' . number_format($amount, 2) . '</strong> now exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong> — the balance may have changed since it was submitted. Reject it and ask the client to resubmit the correct amount.']];
+            }
+            $ptype = $amount >= $remaining - 0.005 ? 'final' : $submission->payment_type;
+
+            $rcSeq = (int) DB::table('payments')->where('receipt_type', $rctype)->lockForUpdate()->count() + 1;
+            $rcnum = $rcPrefix . '-' . str_pad((string) $rcSeq, 5, '0', STR_PAD_LEFT);
+
+            $paymentId = DB::table('payments')->insertGetId([
+                'booking_id' => $bid, 'payment_type' => $ptype, 'payment_method' => $submission->payment_method,
+                'amount' => $amount, 'reference_number' => $submission->reference_number, 'bank_name' => $submission->bank_name,
+                'proof_of_payment_path' => $submission->proof_of_payment_path,
+                'payment_date' => $pdate, 'received_by' => $uid, 'is_vat' => $isVat,
+                'receipt_number' => $rcnum, 'receipt_type' => $rctype,
+                'notes' => trim('Client-submitted payment, approved. ' . ($submission->notes ?? '')),
+            ]);
+
+            DB::table('client_payment_submissions')->where('submission_id', $subId)->update([
+                'status' => 'approved', 'reviewed_by' => $uid, 'reviewed_at' => now(), 'resulting_payment_id' => $paymentId,
+            ]);
+
+            return ['payment_id' => $paymentId, 'amount' => $amount];
+        });
+
+        if (isset($result['error'])) {
+            return $result['error'];
+        }
+
+        $paid = (float) DB::table('payments')->where('booking_id', $bid)->sum('amount');
+        $total = (float) DB::table('bookings')->where('booking_id', $bid)->value('final_amount');
+        $currentStatus = (string) DB::table('bookings')->where('booking_id', $bid)->value('payment_status');
+        if (! in_array($currentStatus, ['refunded', 'cancelled'], true)) {
+            $payStatus = $paid <= 0 ? 'unpaid' : ($total > 0 && $paid >= $total ? 'paid' : 'partial');
+            DB::table('bookings')->where('booking_id', $bid)->update(['payment_status' => $payStatus, 'updated_at' => now()]);
+        }
+
+        $soaExists = DB::table('statement_of_accounts')->where('booking_id', $bid)->value('soa_id');
+        $balance = max(0, $total - $paid);
+        $soaStatus = $balance <= 0 ? 'paid' : ($paid > 0 ? 'issued' : 'draft');
+        if ($soaExists) {
+            DB::table('statement_of_accounts')->where('booking_id', $bid)->update([
+                'total_payments' => $paid, 'balance' => $balance, 'status' => $soaStatus,
+            ]);
+        } else {
+            $soaRef = 'FB-' . date('Y') . '-' . str_pad((string) $bid, 4, '0', STR_PAD_LEFT);
+            $payTerms2 = (string) DB::table('bookings as b')
+                ->join('clients as c', 'b.client_id', '=', 'c.client_id')
+                ->where('b.booking_id', $bid)->value('c.payment_terms');
+            $dueDays2 = $payTerms2 === '90_days' ? 90 : 7;
+            DB::table('statement_of_accounts')->insert([
+                'booking_id' => $bid, 'soa_reference' => $soaRef, 'prepared_by' => $uid,
+                'total_charges' => $total, 'total_payments' => $paid, 'balance' => $balance,
+                'soa_date' => now()->toDateString(), 'due_date' => now()->addDays($dueDays2)->toDateString(), 'status' => $soaStatus,
+            ]);
+        }
+
+        ActivityLog::record($uid, 'payment', 'billing', 'Approved client-submitted payment ₱' . number_format($result['amount'], 2) . " for booking #$bid", $bid);
+
+        return ['type' => 'success', 'text' => 'Client payment of <strong>₱' . number_format($result['amount'], 2) . '</strong> approved and recorded.'];
+    }
+
+    private function rejectPaymentSubmission(Request $request, int $uid): array
+    {
+        $subId = (int) $request->input('submission_id');
+        $reason = trim($request->input('rejection_reason', ''));
+        if ($reason === '') {
+            return ['type' => 'danger', 'text' => 'A reason is required to reject a payment submission.'];
+        }
+
+        $submission = DB::table('client_payment_submissions')->where('submission_id', $subId)->first();
+        if (! $submission) {
+            return ['type' => 'danger', 'text' => 'Payment submission not found.'];
+        }
+        if ($submission->status !== 'pending') {
+            return ['type' => 'danger', 'text' => 'This submission has already been reviewed.'];
+        }
+
+        DB::table('client_payment_submissions')->where('submission_id', $subId)->update([
+            'status' => 'rejected', 'reviewed_by' => $uid, 'reviewed_at' => now(), 'rejection_reason' => $reason,
+        ]);
+
+        ActivityLog::record($uid, 'payment', 'billing', "Rejected client-submitted payment #$subId for booking #{$submission->booking_id}: $reason", (int) $submission->booking_id);
+
+        return ['type' => 'success', 'text' => 'Payment submission rejected.'];
     }
 
     private function batchAddCrew(Request $request, int $id, $booking): array

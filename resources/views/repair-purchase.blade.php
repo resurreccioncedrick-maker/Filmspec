@@ -158,6 +158,11 @@
                     class="btn btn-sm btn-outline" title="Details &amp; messages">
               <i data-feather="message-square"></i>
             </button>
+            @if ($t->photo_path)
+            <a href="{{ route('repair-purchase-photo', $t->ticket_id) }}" target="_blank" class="btn btn-sm btn-outline" title="View photo">
+              <i data-feather="image"></i>
+            </a>
+            @endif
             @if ($canManage)
             <form method="POST" onsubmit="return confirm('Delete ticket {{ $t->ticket_number }}?')">
               @csrf
@@ -201,7 +206,7 @@
       <h3><i data-feather="tool" style="width:16px;height:16px;margin-right:6px;vertical-align:middle"></i>New Ticket</h3>
       <button class="modal-close" onclick="closeModal('modalNewTicket')">&times;</button>
     </div>
-    <form method="POST">
+    <form method="POST" enctype="multipart/form-data">
       @csrf
       <input type="hidden" name="action" value="add_ticket">
       <div class="modal-body">
@@ -226,6 +231,16 @@
             <input type="hidden" name="equipment_id" id="ticket_equipment">
             <div class="crew-slot-drop" id="ticketEquipDrop"></div>
           </div>
+        </div>
+        <div class="form-group" id="ticketUnitWrap">
+          <label>Unit</label>
+          <select name="equipment_unit" id="ticketUnit" class="form-control" disabled>
+            <option value="">Not sure which unit</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Photo</label>
+          <input type="file" name="photo" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -282,7 +297,7 @@
       <h3><i data-feather="edit-2" style="width:16px;height:16px;margin-right:6px;vertical-align:middle"></i>Edit Ticket</h3>
       <button class="modal-close" onclick="closeModal('modalEditTicket')">&times;</button>
     </div>
-    <form method="POST">
+    <form method="POST" enctype="multipart/form-data">
       @csrf
       <input type="hidden" name="action" value="update_ticket">
       <input type="hidden" name="ticket_id" id="et_ticket_id">
@@ -319,6 +334,12 @@
             <div class="crew-slot-drop" id="et_equipDrop"></div>
           </div>
         </div>
+        <div class="form-group" id="et_unitWrap">
+          <label>Unit</label>
+          <select name="equipment_unit" id="et_unit" class="form-control" disabled>
+            <option value="">Not sure which unit</option>
+          </select>
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label>Serial / asset no.</label>
@@ -328,6 +349,11 @@
             <label>Vendor / Supplier</label>
             <input type="text" name="vendor_supplier" id="et_vendor" class="form-control">
           </div>
+        </div>
+        <div class="form-group">
+          <label>Photo</label>
+          <input type="file" name="photo" id="et_photo" class="form-control" accept=".jpg,.jpeg,.png,.pdf">
+          <div id="et_photoLink" style="font-size:.78rem;margin-top:4px"></div>
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -439,10 +465,30 @@
 function toggleTicketType() {
   const isRepair = document.getElementById('ticketType').value === 'repair';
   document.getElementById('ticketEquipWrap').style.display = isRepair ? '' : 'none';
+  document.getElementById('ticketUnitWrap').style.display = isRepair ? '' : 'none';
 }
 
 // ── Equipment type-to-search (New/Edit Ticket) ──────────────────────────────
 const REPAIR_ALL_EQUIPMENT = {!! $allEquipment->values()->toJson() !!};
+
+// Same cascade (Equipment -> Unit) IncidentsController's incident form already uses, so staff
+// can pin down which physical unit a repair ticket is for.
+const RP_EQUIPMENT_UNITS = {!! json_encode($equipmentUnitMap) !!};
+
+function populateRPUnitSelect(equipmentId, selectId, preselect) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const units = RP_EQUIPMENT_UNITS[equipmentId] || [];
+  if (!equipmentId || !units.length) {
+    sel.innerHTML = '<option value="">Not sure which unit</option>';
+    sel.disabled = true;
+    return;
+  }
+  sel.innerHTML = units.map((u) => `<option value="u${u.unit_id}">${esc(u.asset_tag)}</option>`).join('')
+    + '<option value="">Not sure which unit</option>';
+  sel.value = preselect ? 'u' + preselect : '';
+  sel.disabled = false;
+}
 
 function _ticketEquipLabel(eq) {
   return eq.equipment_name + ' (' + (eq.brand || '') + (eq.serial_number ? ' · ' + eq.serial_number : '') + ')';
@@ -471,6 +517,8 @@ function openTicketEquipSearch(hiddenId, searchId, dropId, q) {
       document.getElementById(hiddenId).value = el.dataset.id;
       document.getElementById(searchId).value = el.dataset.label;
       drop.style.display = 'none';
+      const unitSelectId = hiddenId === 'ticket_equipment' ? 'ticketUnit' : (hiddenId === 'et_equipment' ? 'et_unit' : null);
+      if (unitSelectId) populateRPUnitSelect(el.dataset.id, unitSelectId, null);
     });
   });
 }
@@ -485,6 +533,7 @@ function resetNewTicketForm() {
   const hidden = document.getElementById('ticket_equipment');
   if (search) search.value = '';
   if (hidden) hidden.value = '';
+  populateRPUnitSelect(null, 'ticketUnit', null);
 }
 
 function toggleStatusCost() {
@@ -498,6 +547,7 @@ const TICKET_STATUS_LABELS = @json($statusLabelByType);
 function toggleEditTicketType() {
   const isRepair = document.getElementById('et_type').value === 'repair';
   document.getElementById('et_equipWrap').style.display = isRepair ? '' : 'none';
+  document.getElementById('et_unitWrap').style.display = isRepair ? '' : 'none';
 }
 
 function openEditTicket(t) {
@@ -511,6 +561,7 @@ function openEditTicket(t) {
     const eq = REPAIR_ALL_EQUIPMENT.find((x) => String(x.equipment_id) === String(t.equipment_id));
     document.getElementById('et_equipSearch').value = eq ? _ticketEquipLabel(eq) : '';
   }
+  populateRPUnitSelect(t.equipment_id, 'et_unit', t.equipment_unit_id);
   document.getElementById('et_serial').value = t.serial_no || '';
   document.getElementById('et_vendor').value = t.vendor_supplier || '';
   document.getElementById('et_requested').value = t.requested_date || '';
@@ -519,6 +570,9 @@ function openEditTicket(t) {
   document.getElementById('et_pic').value = t.person_in_charge || '';
   document.getElementById('et_reported').value = t.reported_by || '';
   document.getElementById('et_note').value = t.note || '';
+  document.getElementById('et_photoLink').innerHTML = t.photo_path
+    ? `<a href="/repair-purchase/${t.ticket_id}/photo" target="_blank">View current photo</a>`
+    : '<span style="color:var(--muted)">No photo on file</span>';
   toggleEditTicketType();
   openModal('modalEditTicket');
   if (window.feather) feather.replace();

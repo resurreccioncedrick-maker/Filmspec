@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Support\DataExporter;
+use App\Support\EvidencePhotoUpload;
 use App\Support\PageActivity;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -119,6 +121,18 @@ class RepairPurchaseController extends Controller
             ->select('equipment_id', 'equipment_name', 'brand', 'serial_number')
             ->get();
 
+        // Powers the New/Edit Ticket modals' Unit select — same cascade IncidentsController's
+        // own incident form already uses, so staff can pin down which physical unit a repair
+        // ticket is for when an equipment model has more than one.
+        $equipmentUnitMap = [];
+        $unitRows = DB::table('equipment_units')
+            ->whereIn('equipment_id', $allEquipment->pluck('equipment_id'))
+            ->select('equipment_id', 'unit_id', 'asset_tag')
+            ->get();
+        foreach ($unitRows as $u) {
+            $equipmentUnitMap[$u->equipment_id][] = ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag];
+        }
+
         // Threads for the tickets on this page only — one query, grouped.
         $messages = $tickets->isEmpty() ? collect() : DB::table('repair_purchase_messages as m')
             ->leftJoin('users as u', 'm.user_id', '=', 'u.user_id')
@@ -137,7 +151,7 @@ class RepairPurchaseController extends Controller
             'tab' => $tab, 'typeFilter' => $typeFilter, 'search' => $search,
             'page' => $page, 'pages' => $pages,
             'tickets' => $tickets, 'tabCounts' => $tabCounts, 'kpis' => $kpis,
-            'allEquipment' => $allEquipment,
+            'allEquipment' => $allEquipment, 'equipmentUnitMap' => $equipmentUnitMap,
             'typeBadge' => $this->typeBadge, 'typeLabel' => $this->typeLabel,
             'statusBadge' => $this->statusBadge, 'statusLabel' => $this->statusLabel,
             'priorityBadge' => $this->priorityBadge,
@@ -204,41 +218,86 @@ class RepairPurchaseController extends Controller
         return 'RP-' . $year . '-' . str_pad((string) ($count + 1), 4, '0', STR_PAD_LEFT);
     }
 
+    public function ticketPhoto(int $id): StreamedResponse
+    {
+        $path = DB::table('repair_purchase_tickets')->where('ticket_id', $id)->value('photo_path');
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path);
+    }
+
+    /** Same "u<id>" cascade-select convention as IncidentsController::parseUnitInput(). */
+    private function parseUnitInput(string $unitInput, int $equipmentId): ?int
+    {
+        if (! str_starts_with($unitInput, 'u')) {
+            return null;
+        }
+        $candidate = (int) substr($unitInput, 1);
+        if ($candidate && DB::table('equipment_units')->where('unit_id', $candidate)->where('equipment_id', $equipmentId)->exists()) {
+            return $candidate;
+        }
+
+        return null;
+    }
+
+    /**
+     * Shared ticket-creation logic — used by the staff `add_ticket` action below AND by
+     * CrewPortalController's `crew_submit_ticket` action (crew submits through the crew portal,
+     * which does its own booking/equipment ownership check before calling this, rather than
+     * duplicating the insert logic itself).
+     */
+    public function createTicket(Request $request, int $uid): array
+    {
+        $type = $request->input('type') === 'purchase' ? 'purchase' : 'repair';
+        $title = trim((string) $request->input('title', ''));
+        $reqDate = $request->input('requested_date', '');
+        if ($title === '' || $reqDate === '') {
+            return ['type' => 'danger', 'text' => 'Title and requested date are required.'];
+        }
+
+        $eid = (int) $request->input('equipment_id', 0);
+        // Laravel's ConvertEmptyStringsToNull middleware turns a submitted-but-empty
+        // equipment_unit field into null before it reaches here, so input()'s own default
+        // never kicks in — cast explicitly rather than relying on that default.
+        $equipmentUnitId = ($type === 'repair' && $eid) ? $this->parseUnitInput((string) $request->input('equipment_unit', ''), $eid) : null;
+
+        $photoUpload = EvidencePhotoUpload::handle($request->file('photo'), 'repair-purchase-photos');
+        if ($photoUpload['error']) {
+            return ['type' => 'danger', 'text' => $photoUpload['error']];
+        }
+
+        $ticketNo = $this->generateTicketNumber();
+        $id = DB::table('repair_purchase_tickets')->insertGetId([
+            'ticket_number' => $ticketNo,
+            'type' => $type,
+            'title' => $title,
+            'equipment_id' => ($type === 'repair' && $eid) ? $eid : null,
+            'equipment_unit_id' => $equipmentUnitId,
+            'status' => 'requested',
+            'priority' => $request->input('priority', 'normal'),
+            'vendor_supplier' => $request->input('vendor_supplier') ?: null,
+            'estimated_cost' => $request->input('estimated_cost') !== null && $request->input('estimated_cost') !== '' ? (float) $request->input('estimated_cost') : null,
+            'requested_date' => $reqDate,
+            'target_date' => $request->input('target_date') ?: null,
+            'person_in_charge' => $request->input('person_in_charge') ?: null,
+            'note' => $request->input('note') ?: null,
+            'photo_path' => $photoUpload['success'] ? $photoUpload['path'] : null,
+            'created_by' => $uid,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], 'ticket_id');
+
+        ActivityLog::record($uid, 'create', 'repair_purchase', "Created ticket <strong>$ticketNo</strong> \"$title\".", $id);
+
+        return ['type' => 'success', 'text' => "Ticket <strong>$ticketNo</strong> created."];
+    }
+
     private function handleAction(Request $request, int $uid, bool $canManage): ?array
     {
         $action = $request->input('action', '');
 
         if ($action === 'add_ticket') {
-            $type = $request->input('type') === 'purchase' ? 'purchase' : 'repair';
-            $title = trim((string) $request->input('title', ''));
-            $reqDate = $request->input('requested_date', '');
-            if ($title === '' || $reqDate === '') {
-                return ['type' => 'danger', 'text' => 'Title and requested date are required.'];
-            }
-
-            $eid = (int) $request->input('equipment_id', 0);
-            $ticketNo = $this->generateTicketNumber();
-            $id = DB::table('repair_purchase_tickets')->insertGetId([
-                'ticket_number' => $ticketNo,
-                'type' => $type,
-                'title' => $title,
-                'equipment_id' => ($type === 'repair' && $eid) ? $eid : null,
-                'status' => 'requested',
-                'priority' => $request->input('priority', 'normal'),
-                'vendor_supplier' => $request->input('vendor_supplier') ?: null,
-                'estimated_cost' => $request->input('estimated_cost') !== null && $request->input('estimated_cost') !== '' ? (float) $request->input('estimated_cost') : null,
-                'requested_date' => $reqDate,
-                'target_date' => $request->input('target_date') ?: null,
-                'person_in_charge' => $request->input('person_in_charge') ?: null,
-                'note' => $request->input('note') ?: null,
-                'created_by' => $uid,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ], 'ticket_id');
-
-            ActivityLog::record($uid, 'create', 'repair_purchase', "Created ticket <strong>$ticketNo</strong> \"$title\".", $id);
-
-            return ['type' => 'success', 'text' => "Ticket <strong>$ticketNo</strong> created."];
+            return $this->createTicket($request, $uid);
         }
 
         if ($action === 'update_ticket') {
@@ -255,11 +314,15 @@ class RepairPurchaseController extends Controller
 
             $type = $request->input('type') === 'purchase' ? 'purchase' : 'repair';
             $eid = (int) $request->input('equipment_id', 0);
+            $equipmentUnitId = ($type === 'repair' && $eid) ? $this->parseUnitInput((string) $request->input('equipment_unit', ''), $eid) : null;
 
-            DB::table('repair_purchase_tickets')->where('ticket_id', $id)->update([
+            // A new photo REPLACES the old one; leaving the field blank on edit keeps whatever
+            // was already there rather than clearing it.
+            $updateData = [
                 'type' => $type,
                 'title' => $title,
                 'equipment_id' => ($type === 'repair' && $eid) ? $eid : null,
+                'equipment_unit_id' => $equipmentUnitId,
                 'serial_no' => trim((string) $request->input('serial_no', '')) ?: null,
                 'priority' => $request->input('priority', $ticket->priority),
                 'vendor_supplier' => trim((string) $request->input('vendor_supplier', '')) ?: null,
@@ -271,7 +334,18 @@ class RepairPurchaseController extends Controller
                 'reported_by' => trim((string) $request->input('reported_by', '')) ?: null,
                 'note' => trim((string) $request->input('note', '')) ?: null,
                 'updated_at' => now(),
-            ]);
+            ];
+            if ($request->hasFile('photo')) {
+                $photoUpload = EvidencePhotoUpload::handle($request->file('photo'), 'repair-purchase-photos');
+                if ($photoUpload['error']) {
+                    return ['type' => 'danger', 'text' => $photoUpload['error']];
+                }
+                if ($photoUpload['success']) {
+                    $updateData['photo_path'] = $photoUpload['path'];
+                }
+            }
+
+            DB::table('repair_purchase_tickets')->where('ticket_id', $id)->update($updateData);
 
             ActivityLog::record($uid, 'update', 'repair_purchase', "Edited ticket <strong>{$ticket->ticket_number}</strong>.", $id);
 
