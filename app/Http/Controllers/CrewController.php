@@ -62,7 +62,7 @@ class CrewController extends Controller
 
         $crew = (clone $query)
             ->select('cm.*', 'cp.position_name', 'cp.department', 'lu.email as linked_email')
-            ->orderBy('cm.last_name')->orderBy('cm.first_name')
+            ->orderByDesc('cm.crew_id')
             ->forPage($page, $perPage)
             ->get();
 

@@ -425,7 +425,7 @@
       </h3>
       <button class="modal-close" data-modal-close><i data-feather="x"></i></button>
     </div>
-    <form method="POST" action="{{ $crewBase }}" enctype="multipart/form-data">
+    <form method="POST" action="{{ $crewBase }}" enctype="multipart/form-data" onsubmit="return guardAddCrewSubmit()">
       @csrf
       <input type="hidden" name="action" value="add_crew">
       <div class="modal-body">
@@ -539,7 +539,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline" data-modal-close>Cancel</button>
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="btn btn-primary" id="addCrewSubmitBtn">
           <i data-feather="save"></i> Add Crew Member
         </button>
       </div>
@@ -949,6 +949,14 @@ function crewSchedToday() { const t=new Date(); crewSchedYear=t.getFullYear(); c
 
 document.addEventListener('DOMContentLoaded', crewRenderSchedule);
 @endif
+
+function guardAddCrewSubmit() {
+  var btn = document.getElementById('addCrewSubmitBtn');
+  if (btn.disabled) return false; // already submitting — swallow a double-click/double-submit
+  btn.disabled = true;
+  btn.innerHTML = '<i data-feather="save"></i> Adding…';
+  return true;
+}
 
 function toggleRates(val, prefix) {
   var showStaff = val === 'staff';
