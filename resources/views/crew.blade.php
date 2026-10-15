@@ -751,7 +751,7 @@
       <div id="avail_blocks_list" style="margin-bottom:16px"></div>
       <div style="border-top:1px solid var(--border);padding-top:14px">
         <div style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:10px">Add Blocked Dates</div>
-        <form method="POST" action="{{ $crewBase }}">
+        <form method="POST" action="{{ $crewBase }}" onsubmit="return guardAvailSubmit()">
           @csrf
           <input type="hidden" name="action" value="add_unavailability">
           <input type="hidden" name="crew_id" id="avail_crew_id">
@@ -785,7 +785,7 @@
           </div>
           <div class="modal-footer" style="padding:0;border:0;margin-top:4px">
             <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modalAvailability')">Cancel</button>
-            <button type="submit" class="btn btn-primary btn-sm"><i data-feather="plus" style="width:13px;height:13px;margin-right:3px;vertical-align:middle"></i>Add Block</button>
+            <button type="submit" class="btn btn-primary btn-sm" id="availSubmitBtn"><i data-feather="plus" style="width:13px;height:13px;margin-right:3px;vertical-align:middle"></i>Add Block</button>
           </div>
         </form>
       </div>
@@ -800,7 +800,7 @@
       <h3><i data-feather="user-plus" style="width:16px;height:16px;margin-right:6px;vertical-align:middle"></i>Link Login — <span id="link_crew_name"></span></h3>
       <button class="modal-close" onclick="closeModal('modalLinkCrew')">&times;</button>
     </div>
-    <form method="POST" action="{{ $crewBase }}">
+    <form method="POST" action="{{ $crewBase }}" onsubmit="return guardLinkSubmit()">
       @csrf
       <input type="hidden" name="action" value="link_crew_account">
       <input type="hidden" name="crew_id" id="link_crew_id">
@@ -813,7 +813,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modalLinkCrew')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm"><i data-feather="user-plus" style="width:13px;height:13px;margin-right:3px;vertical-align:middle"></i>Create Login</button>
+        <button type="submit" class="btn btn-primary btn-sm" id="linkCrewSubmitBtn"><i data-feather="user-plus" style="width:13px;height:13px;margin-right:3px;vertical-align:middle"></i>Create Login</button>
       </div>
     </form>
   </div>
@@ -955,6 +955,22 @@ function guardAddCrewSubmit() {
   if (btn.disabled) return false; // already submitting — swallow a double-click/double-submit
   btn.disabled = true;
   btn.innerHTML = '<i data-feather="save"></i> Adding…';
+  return true;
+}
+
+function guardAvailSubmit() {
+  var btn = document.getElementById('availSubmitBtn');
+  if (btn.disabled) return false;
+  btn.disabled = true;
+  btn.innerHTML = 'Adding…';
+  return true;
+}
+
+function guardLinkSubmit() {
+  var btn = document.getElementById('linkCrewSubmitBtn');
+  if (btn.disabled) return false;
+  btn.disabled = true;
+  btn.innerHTML = 'Creating…';
   return true;
 }
 
@@ -1235,8 +1251,11 @@ function switchCdTab(tab) {
 
 function submitAddQualification(e) {
   e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"]');
+  if (btn.disabled) return false; // already submitting — swallow a double-click/double-submit
   const title = document.getElementById('cd_qual_title').value.trim();
   if (!title) { alert('Qualification title is required.'); return false; }
+  btn.disabled = true;
   const fd = new FormData();
   fd.append('ajax_action', 'add_qualification');
   fd.append('crew_id', cdCurrentId);
@@ -1260,7 +1279,8 @@ function submitAddQualification(e) {
       } else {
         alert(data.error || 'Could not add qualification.');
       }
-    });
+    })
+    .finally(() => { btn.disabled = false; });
   return false;
 }
 

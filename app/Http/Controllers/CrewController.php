@@ -575,18 +575,8 @@ class CrewController extends Controller
         if ($action === 'link_crew_account') {
             $cid = (int) $request->input('crew_id');
             $email = trim(strtolower((string) $request->input('email', '')));
-            $cm = DB::table('crew_members')->where('crew_id', $cid)->first();
-            if (! $cm) {
-                return ['type' => 'error', 'text' => 'Crew member not found.'];
-            }
-            if ($cm->user_id) {
-                return ['type' => 'error', 'text' => 'This crew member already has a linked login.'];
-            }
             if (! $email || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 return ['type' => 'danger', 'text' => 'Enter a valid email address.'];
-            }
-            if (DB::table('users')->where('email', $email)->exists()) {
-                return ['type' => 'danger', 'text' => 'That email is already in use by another account.'];
             }
 
             $crewRoleId = DB::table('roles')->where('role_name', 'crew')->value('role_id');
@@ -599,15 +589,40 @@ class CrewController extends Controller
             // (same reasoning DocumentController/ImageUpload use for not wiring email here).
             $tempPassword = Str::random(4) . '-' . Str::random(4);
 
-            $newUserId = DB::table('users')->insertGetId([
-                'role_id' => $crewRoleId, 'first_name' => $cm->first_name, 'last_name' => $cm->last_name,
-                'email' => $email, 'password_hash' => Hash::make($tempPassword), 'phone' => $cm->phone,
-                'is_active' => 1,
-            ]);
-            DB::table('crew_members')->where('crew_id', $cid)->update(['user_id' => $newUserId]);
-            ActivityLog::record($uid, 'update', 'crew', "Linked a login for {$cm->first_name} {$cm->last_name} ($email)", $cid);
+            // Locks the crew_members row for the duration of the check+insert so two
+            // near-simultaneous submits (double-click, two tabs) can't both pass the
+            // "no linked login yet" / "email not in use" checks and create two accounts
+            // (or crash on the email's unique constraint) — same race class fixed
+            // elsewhere this session for discounts/payments.
+            $result = DB::transaction(function () use ($cid, $email, $crewRoleId, $tempPassword) {
+                $cm = DB::table('crew_members')->where('crew_id', $cid)->lockForUpdate()->first();
+                if (! $cm) {
+                    return ['type' => 'error', 'text' => 'Crew member not found.'];
+                }
+                if ($cm->user_id) {
+                    return ['type' => 'error', 'text' => 'This crew member already has a linked login.'];
+                }
+                if (DB::table('users')->where('email', $email)->exists()) {
+                    return ['type' => 'danger', 'text' => 'That email is already in use by another account.'];
+                }
 
-            return ['type' => 'success', 'persist' => true, 'text' => "Login created for <strong>{$cm->first_name} {$cm->last_name}</strong>.<br>Email: <strong>$email</strong><br>Temporary password: <strong>$tempPassword</strong><br>Hand these to them directly — this won't be shown again."];
+                $newUserId = DB::table('users')->insertGetId([
+                    'role_id' => $crewRoleId, 'first_name' => $cm->first_name, 'last_name' => $cm->last_name,
+                    'email' => $email, 'password_hash' => Hash::make($tempPassword), 'phone' => $cm->phone,
+                    'is_active' => 1,
+                ]);
+                DB::table('crew_members')->where('crew_id', $cid)->update(['user_id' => $newUserId]);
+
+                return ['type' => 'success', 'persist' => true, 'text' => "Login created for <strong>{$cm->first_name} {$cm->last_name}</strong>.<br>Email: <strong>$email</strong><br>Temporary password: <strong>$tempPassword</strong><br>Hand these to them directly — this won't be shown again.", 'cm' => $cm];
+            });
+
+            if ($result['type'] === 'success') {
+                $cm = $result['cm'];
+                unset($result['cm']);
+                ActivityLog::record($uid, 'update', 'crew', "Linked a login for {$cm->first_name} {$cm->last_name} ($email)", $cid);
+            }
+
+            return $result;
         }
 
         if ($action === 'unlink_crew_account') {
