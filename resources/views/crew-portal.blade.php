@@ -993,7 +993,7 @@ button{font-family:var(--font-b);cursor:pointer}
       <div class="mo-title">File Incident Report</div>
       <button class="mo-close" onclick="closeMo('moFileIncident')">&times;</button>
     </div>
-    <form method="POST" enctype="multipart/form-data">
+    <form method="POST" enctype="multipart/form-data" onsubmit="return guardCrewSubmit(this)">
       @csrf
       <input type="hidden" name="action" value="crew_file_incident">
       <input type="hidden" name="return_tab" id="incidentReturnTab" value="{{ $activeTab }}">
@@ -1083,7 +1083,7 @@ button{font-family:var(--font-b);cursor:pointer}
       <div class="mo-title">New Ticket</div>
       <button class="mo-close" onclick="closeMo('moNewTicket')">&times;</button>
     </div>
-    <form method="POST" enctype="multipart/form-data">
+    <form method="POST" enctype="multipart/form-data" onsubmit="return guardCrewSubmit(this)">
       @csrf
       <input type="hidden" name="action" value="crew_submit_ticket">
       <input type="hidden" name="requested_date" value="{{ date('Y-m-d') }}">
@@ -1148,7 +1148,7 @@ button{font-family:var(--font-b);cursor:pointer}
       <div class="mo-title">Request Equipment, Accessory, or Crew</div>
       <button class="mo-close" onclick="closeMo('moFieldRequest')">&times;</button>
     </div>
-    <form method="POST">
+    <form method="POST" onsubmit="return guardCrewSubmit(this)">
       @csrf
       <input type="hidden" name="action" value="crew_request_field_item">
       <input type="hidden" name="return_tab" value="fieldrequests">
@@ -1384,6 +1384,18 @@ function showSubTab(group, name, btn) {
 }
 function openMo(id) { document.getElementById(id).classList.add('on'); }
 function closeMo(id) { document.getElementById(id).classList.remove('on'); }
+
+// Guards the Submit Report / Submit Ticket / Submit Request forms against a duplicate
+// record from a double-tap — real risk on a touch UI, unlike the idempotent checklist/
+// attendance/arrival forms elsewhere on this page which don't need this.
+function guardCrewSubmit(form) {
+  var btn = form.querySelector('button[type="submit"]');
+  if (btn.disabled) return false;
+  btn.disabled = true;
+  btn.dataset.origText = btn.textContent;
+  btn.textContent = 'Submitting…';
+  return true;
+}
 function showAttBooking(bookingId) {
   document.querySelectorAll('.att-booking-panel').forEach(p => p.style.display = 'none');
   if (!bookingId) return;
