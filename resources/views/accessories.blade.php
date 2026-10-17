@@ -368,6 +368,12 @@
             Manage individual units from the accessory's <strong>Units</strong> button.
           </div>
         </div>
+        <div class="form-group" style="margin-bottom:0;display:none;grid-column:1/-1" id="editAccDerivedNote">
+          <div style="font-size:.8rem;color:var(--muted);background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+            <i data-feather="hash" style="width:12px;height:12px;margin-right:4px;vertical-align:middle"></i>
+            <span id="editAccDerivedText"></span> — Stock Qty is calculated from Physical Units. Manage them from the accessory's <strong>Units</strong> button.
+          </div>
+        </div>
         <div class="form-group" style="margin-bottom:0;display:none;grid-column:1/-1" id="editAccPublicWrap">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
             <input type="checkbox" id="editAccPublic" style="width:auto">
@@ -580,10 +586,21 @@ function onEditAccTypeChange() {
   const isAddon = document.getElementById('editAccType').value === 'optional_addon';
   document.getElementById('editAccPublicWrap').style.display = isAddon ? '' : 'none';
 }
+let editAccUnitCount = 0;
+
 function onEditAccTrackingChange() {
   const isIndiv = document.getElementById('editAccTracking').value === 'individual';
-  document.getElementById('editAccQtyWrap').style.display = isIndiv ? 'none' : '';
-  document.getElementById('editAccIndivNote').style.display = isIndiv ? '' : 'none';
+  const hasUnits = editAccUnitCount > 0;
+  // Once any Physical Units are recorded, Stock Qty is always calculated from them (same
+  // rule as Equipment) regardless of tracking method — tracking method only still controls
+  // which availability formula is used, not whether Qty can be hand-typed.
+  document.getElementById('editAccQtyWrap').style.display = (!hasUnits && !isIndiv) ? '' : 'none';
+  document.getElementById('editAccIndivNote').style.display = (!hasUnits && isIndiv) ? '' : 'none';
+  document.getElementById('editAccDerivedNote').style.display = hasUnits ? '' : 'none';
+  if (hasUnits) {
+    document.getElementById('editAccDerivedText').textContent =
+      editAccUnitCount + ' active physical unit' + (editAccUnitCount == 1 ? '' : 's');
+  }
 }
 
 function submitAddAcc() {
@@ -628,6 +645,7 @@ function openEditAcc(acc) {
   document.getElementById('editAccTracking').value = acc.tracking_method || 'quantity';
   document.getElementById('editAccQty').value  = acc.quantity || 1;
   document.getElementById('editAccPublic').checked = !!parseInt(acc.is_public ?? 1);
+  editAccUnitCount = parseInt(acc.unit_count || 0);
   onEditAccTypeChange();
   onEditAccTrackingChange();
   const prev = document.getElementById('editAccImgPrev');

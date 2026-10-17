@@ -209,6 +209,19 @@ class AccessoriesController extends Controller
         return DataExporter::respond($request->query('export'), 'Accessories', $headers, $rows, 'accessories-export');
     }
 
+    // Mirrors EquipmentController::recalcFromUnits() — once any Physical Units exist for an
+    // accessory, its quantity column is derived from them (count of non-retired units) rather
+    // than staff-typed, for every tracking_method. Matches the same "stock count should always
+    // equal the real units" rule equipment already follows.
+    private function recalcAccUnits(int $aid): void
+    {
+        $count = DB::table('accessory_units')->where('accessory_id', $aid)->where('status', '!=', 'retired')->count();
+        if ($count === 0) {
+            return;
+        }
+        DB::table('accessories')->where('accessory_id', $aid)->update(['quantity' => $count]);
+    }
+
     private function handleAjaxAction(Request $request): JsonResponse
     {
         $action = $request->input('ajax_action');
@@ -246,6 +259,22 @@ class AccessoriesController extends Controller
                 'quantity' => $tracking === 'individual' ? 1 : $qty, 'image_path' => $imgPath,
                 'is_active' => 1, 'is_public' => $isPublic,
             ]);
+
+            // Stock Qty is meant to always equal the count of real Physical Units, same rule
+            // Equipment follows — placeholder units are created immediately so a brand-new
+            // accessory never sits in the old "quantity without any matching unit" state.
+            // Staff fill in real asset tags/serials from the Units button afterward.
+            $placeholderCount = $tracking === 'individual' ? 1 : $qty;
+            $units = [];
+            for ($n = 1; $n <= $placeholderCount; $n++) {
+                $units[] = [
+                    'accessory_id' => $newId, 'asset_tag' => "ACC{$newId}-{$n}",
+                    'condition' => 'good', 'status' => 'available',
+                    'created_at' => now(), 'updated_at' => now(),
+                ];
+            }
+            DB::table('accessory_units')->insert($units);
+
             foreach ((array) $request->input('equipment_ids', []) as $eid) {
                 $eid = (int) $eid;
                 if ($eid) {
@@ -286,10 +315,16 @@ class AccessoriesController extends Controller
             }
             $isPublic = $type === 'optional_addon' ? (int) $request->boolean('is_public', true) : 0;
 
+            // Once real Physical Units exist, quantity is derived from them (recalcAccUnits(),
+            // kept in sync on every unit add/update/retire) for every tracking method, same as
+            // Equipment — this form no longer accepts a manual quantity in that case. Accessories
+            // with no units yet (pre-existing ones not yet backfilled) keep the old behavior.
+            $hasUnits = DB::table('accessory_units')->where('accessory_id', $aid)->where('status', '!=', 'retired')->exists();
+
             DB::table('accessories')->where('accessory_id', $aid)->update([
                 'accessory_name' => $name, 'description' => $desc, 'daily_rate' => $rate,
                 'is_included' => $incl, 'accessory_type' => $type, 'tracking_method' => $tracking,
-                'quantity' => $tracking === 'individual' ? $row->quantity : $qty, 'image_path' => $imgPath,
+                'quantity' => $hasUnits ? $row->quantity : $qty, 'image_path' => $imgPath,
                 'is_public' => $isPublic,
             ]);
             DB::table('equipment_accessory_links')->where('accessory_id', $aid)->delete();
@@ -360,6 +395,7 @@ class AccessoriesController extends Controller
                 'created_at' => now(), 'updated_at' => now(),
             ]);
             ActivityLog::record($request->user()->user_id, 'create', 'accessory', "Added physical unit $tag", $aid);
+            $this->recalcAccUnits($aid);
 
             return response()->json(['success' => true, 'unit_id' => $unitId]);
         }
@@ -378,6 +414,7 @@ class AccessoriesController extends Controller
                 'updated_at' => now(),
             ]);
             ActivityLog::record($request->user()->user_id, 'update', 'accessory', "Updated physical unit {$unit->asset_tag}", $unit->accessory_id);
+            $this->recalcAccUnits($unit->accessory_id);
 
             return response()->json(['success' => true]);
         }
@@ -390,6 +427,7 @@ class AccessoriesController extends Controller
             }
             DB::table('accessory_units')->where('unit_id', $unitId)->update(['status' => 'retired', 'updated_at' => now()]);
             ActivityLog::record($request->user()->user_id, 'update', 'accessory', "Retired physical unit {$unit->asset_tag}", $unit->accessory_id);
+            $this->recalcAccUnits($unit->accessory_id);
 
             return response()->json(['success' => true]);
         }

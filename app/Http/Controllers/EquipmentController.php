@@ -511,6 +511,16 @@ class EquipmentController extends Controller
                 return ['type' => 'danger', 'text' => 'Failed to add. ' . (str_contains($e->getMessage(), 'Duplicate') ? 'Serial number already exists.' : 'Database error.')];
             }
 
+            // Stock Quantity is meant to always equal the count of real Physical Units — a
+            // placeholder unit is created immediately so a brand-new model never sits in the
+            // old "quantity without any matching unit" state. Staff edit this placeholder's
+            // asset tag/serial from the Physical Units panel once they know the real one.
+            DB::table('equipment_units')->insert([
+                'equipment_id' => $eid, 'asset_tag' => "EQ{$eid}-1",
+                'condition' => 'good', 'status' => 'available', 'date_acquired' => now()->toDateString(),
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+
             $this->syncOperatorPositions($eid, $requiresOp ? (array) $request->input('operator_positions', []) : []);
             ActivityLog::record($uid, 'create', 'equipment', 'Added: ' . $request->input('equipment_name', ''), $eid);
 
