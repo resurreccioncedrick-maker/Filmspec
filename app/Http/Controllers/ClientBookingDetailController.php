@@ -47,10 +47,17 @@ class ClientBookingDetailController extends Controller
         // A client can only ask for a discount while the booking is still live and nothing
         // has been paid/refunded/written off yet — matches the whereNotIn('booking_status',
         // ['cancelled', 'completed']) idiom already used elsewhere in this controller, plus
-        // the payment side so a request can't land after money has already moved.
+        // the payment side so a request can't land after money has already moved. Also closes
+        // off a confusing duplicate: once a discount is pending OR already approved for this
+        // booking, the "Request Discount" button/form must stay hidden — previously it only
+        // checked 'pending', so the button silently reappeared the moment staff approved one,
+        // inviting an identical-looking second request with no real purpose.
+        $hasActiveDiscount = DB::table('booking_discounts')->where('booking_id', $id)
+            ->whereIn('status', ['pending', 'approved'])->exists();
         $canRequestDiscount = ! in_array($booking->booking_status, ['cancelled', 'completed'], true)
             && ! in_array($booking->payment_status, ['paid', 'refunded', 'cancelled'], true)
-            && ! $booking->is_archived;
+            && ! $booking->is_archived
+            && ! $hasActiveDiscount;
 
         if ($request->isMethod('post')) {
             $act = $request->input('action', '');
@@ -355,7 +362,15 @@ class ClientBookingDetailController extends Controller
             ->where('booking_id', $id)->where('status', 'pending')->sum('amount');
         $remaining = round((float) $booking->final_amount - $paidSoFar - $pendingSubmitted, 2);
         if ((float) $booking->final_amount > 0 && $amount > $remaining + 0.005) {
-            return ['type' => 'danger', 'text' => 'That amount exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong> (after your other pending submissions).'];
+            // Distinguishes "already fully settled" (remaining is genuinely ₱0, e.g. a stale
+            // Pay form left open from before the balance cleared) from "this amount is just too
+            // high" — the old message said "exceeds ₱0.00" either way, which read as a confusing
+            // non-sequitur when the client believed they'd already paid in full.
+            if ($remaining <= 0.005) {
+                return ['type' => 'danger', 'text' => 'This booking is already fully paid — no further payment is needed. If you just submitted a payment, it may still be awaiting staff review.'];
+            }
+
+            return ['type' => 'danger', 'text' => 'That amount exceeds the remaining balance of <strong>₱' . number_format($remaining, 2) . '</strong> (after your other pending submissions).'];
         }
 
         if (in_array($pmethod, ['gcash', 'bank_transfer'], true) && $ref === '') {
@@ -398,7 +413,11 @@ class ClientBookingDetailController extends Controller
                 ->where('booking_id', $id)->where('status', 'pending')->sum('amount');
             $remaining = round((float) $booking->final_amount - $paidSoFar - $pendingSubmitted, 2);
             if ((float) $booking->final_amount > 0 && $amount > $remaining + 0.005) {
-                return ['type' => 'danger', 'text' => 'That amount exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong> (after your other pending submissions).'];
+                if ($remaining <= 0.005) {
+                    return ['type' => 'danger', 'text' => 'This booking is already fully paid — no further payment is needed. If you just submitted a payment, it may still be awaiting staff review.'];
+                }
+
+                return ['type' => 'danger', 'text' => 'That amount exceeds the remaining balance of <strong>₱' . number_format($remaining, 2) . '</strong> (after your other pending submissions).'];
             }
 
             DB::table('client_payment_submissions')->insert([

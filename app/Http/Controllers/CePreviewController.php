@@ -446,6 +446,7 @@ class CePreviewController extends Controller
             'equipBaseTotal' => $equipBaseTotal, 'equipTotal' => $equipTotal, 'crewTotal' => $crewTotal,
             'transCost' => $transCost, 'transZone' => $transZone, 'transMult' => $transMult, 'zoneLabels' => $zoneLabels,
             'cePricingMode' => $cePricingMode, 'cePricingInput' => $cePricingInput, 'ceVatExempt' => $ceVatExempt,
+            'ceDiscount' => $ceDiscount,
             'ceBd' => $ceBd, 'ceBdDiscounted' => $ceBdDiscounted, 'grand' => $grand, 'vat' => $vat, 'subtotal' => $subtotal,
             'clientName' => $clientName, 'ceNumber' => $ceNumber, 'infoRows' => $infoRows, 'preparedByName' => $preparedByName,
             'ceVersion' => $ceVersion, 'isSuperseded' => $isSuperseded, 'ceStatus' => $ce->status ?? 'draft',

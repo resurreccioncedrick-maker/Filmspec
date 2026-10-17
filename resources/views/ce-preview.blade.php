@@ -1157,6 +1157,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           ];
         @endphp
         <span style="color:#1e40af;font-weight:600">{{ $pricingLabels[$cePricingMode] ?? '' }}</span>
+        @elseif (($ceDiscount ?? 0) > 0)
+        {{-- Approved client-requested discount (booking_discounts), a separate mechanism from
+             the staff CE-level override above — applyDiscount() bakes it into cost_estimates.discount
+             and the totals already reflect it, so this card must not say "No discount applied". --}}
+        <span style="color:#1e40af;font-weight:600">Discount applied: ₱{{ number_format($ceDiscount, 2) }}</span>
         @else
         <span style="color:var(--muted);font-style:italic">No discount applied</span>
         @endif

@@ -430,8 +430,11 @@ footer .footer-sep{margin:0 8px}
     </div>
     @endif
 
-    @if ($canRequestDiscount)
-      @if (! $discounts->where('status', 'pending')->count())
+    @if ($discounts->where('status', 'pending')->isNotEmpty())
+      <div style="font-size:12.5px;color:var(--muted)">You have a discount request pending review.</div>
+    @elseif ($discounts->where('status', 'approved')->isNotEmpty())
+      <div style="font-size:12.5px;color:var(--muted)">A discount has already been approved for this booking.</div>
+    @elseif ($canRequestDiscount)
       <button type="button" onclick="document.getElementById('requestDiscountBox').style.display='block';this.style.display='none'"
               class="side-btn primary" style="width:auto;padding:8px 16px;font-size:12.5px">Request Discount</button>
       <div id="requestDiscountBox" style="display:none;margin-top:12px;padding:12px;background:var(--s2);border-radius:8px">
@@ -453,11 +456,8 @@ footer .footer-sep{margin:0 8px}
           <button type="submit" id="discReqSubmitBtn" class="side-btn primary" style="width:auto;padding:8px 16px;font-size:12.5px">Submit Request</button>
         </form>
       </div>
-      @else
-      <div style="font-size:12.5px;color:var(--muted)">You have a discount request pending review.</div>
-      @endif
     @else
-    <div style="font-size:12.5px;color:var(--muted)">Discount requests aren't available for this booking right now.</div>
+      <div style="font-size:12.5px;color:var(--muted)">Discount requests aren't available for this booking right now.</div>
     @endif
   </div>
 </div>
@@ -581,7 +581,10 @@ footer .footer-sep{margin:0 8px}
           @elseif ($row->status === 'pending')
           <span class="badge badge-yellow">Awaiting Review</span>
           @else
-          <span class="badge badge-red" title="{{ $row->rejection_reason }}">Rejected</span>
+          <span class="badge badge-red">Rejected</span>
+          @if ($row->rejection_reason)
+          <div style="font-size:12px;color:#b91c1c;margin-top:4px">{{ $row->rejection_reason }}</div>
+          @endif
           @endif
         </td>
       </tr>
