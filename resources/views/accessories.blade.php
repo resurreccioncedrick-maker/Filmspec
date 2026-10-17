@@ -189,7 +189,7 @@
         <i data-feather="edit-2" style="width:11px;height:11px"></i>
       </button>
       <button class="btn btn-outline btn-sm" style="font-size:.72rem"
-              onclick="openAccUnits({{ $acc->accessory_id }}, {{ json_encode($acc->accessory_name) }})" title="Physical Units ({{ $acc->unit_count }})">
+              onclick="openAccUnits({{ $acc->accessory_id }}, {{ json_encode($acc->accessory_name) }}, {{ (int) ($acc->quantity ?? 1) }}, {{ json_encode($acc->tracking_method ?? 'quantity') }})" title="Physical Units ({{ $acc->unit_count }})">
         <i data-feather="hash" style="width:11px;height:11px"></i>
       </button>
       <button class="btn btn-danger btn-sm" style="font-size:.72rem"
@@ -414,7 +414,10 @@
           <tbody id="accUnitsTbody"></tbody>
         </table>
       </div>
-      <div id="accUnitsEmpty" style="display:none;text-align:center;color:var(--muted);padding:16px;font-size:.85rem">No physical units recorded yet.</div>
+      <div id="accUnitsEmpty" style="display:none;text-align:center;color:var(--muted);padding:16px;font-size:.85rem">
+        No physical units recorded yet.
+        <div id="accUnitsEmptyNote" style="margin-top:4px;font-size:.78rem"></div>
+      </div>
 
       <div style="border-top:1px solid var(--border);padding-top:14px">
         <div style="font-size:.78rem;font-weight:700;color:var(--text);margin-bottom:8px">Add Unit</div>
@@ -695,9 +698,13 @@ function submitEditAcc() {
 const ACC_UNIT_COND_LABEL = @json($unitCondLabel);
 const ACC_UNIT_STATUS_LABEL = @json($unitStatusLabel);
 let currentAccUnitsId = null;
+let currentAccUnitsQty = 1;
+let currentAccUnitsTracking = 'quantity';
 
-function openAccUnits(aid, aname) {
+function openAccUnits(aid, aname, qty, trackingMethod) {
   currentAccUnitsId = aid;
+  currentAccUnitsQty = qty || 1;
+  currentAccUnitsTracking = trackingMethod || 'quantity';
   document.getElementById('accUnitsName').textContent = aname;
   document.getElementById('accUnitAssetTag').value = '';
   document.getElementById('accUnitSerialNo').value = '';
@@ -716,6 +723,14 @@ function loadAccUnits() {
       if (!data.length) {
         tbody.innerHTML = '';
         empty.style.display = 'block';
+        // Quantity Tracked accessories use Stock Qty for availability and never read this
+        // units table at all; Individually Tracked ones use the units below instead, and
+        // (unlike equipment) Stock Qty never auto-updates from them — so make the current
+        // mode explicit here rather than leaving an empty table looking like missing data.
+        document.getElementById('accUnitsEmptyNote').textContent = currentAccUnitsTracking === 'individual'
+          ? 'This accessory is Individually Tracked — availability is based on the units added below, not Stock Qty. Add units to make it bookable.'
+          : 'This is normal — this accessory is Quantity Tracked (Stock Qty: ' + currentAccUnitsQty + '), which is what availability is based on. '
+            + 'Physical units here are optional extra detail and are not required.';
         return;
       }
       empty.style.display = 'none';

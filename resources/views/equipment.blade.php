@@ -173,7 +173,7 @@
                   <button type="button" onclick="closeActionMenus(); openAccessories({{ $eq->equipment_id }}, '{{ addslashes($eq->equipment_name) }}')">
                     <i data-feather="package"></i> Accessories
                   </button>
-                  <button type="button" onclick="closeActionMenus(); openUnits({{ $eq->equipment_id }}, {{ json_encode($eq->equipment_name) }})">
+                  <button type="button" onclick="closeActionMenus(); openUnits({{ $eq->equipment_id }}, {{ json_encode($eq->equipment_name) }}, {{ (int) ($eq->stock_quantity ?? 1) }})">
                     <i data-feather="hash"></i> Physical Units <span class="badge badge-gray" style="margin-left:2px">{{ $eq->unit_count }}</span>
                   </button>
                   <div class="action-menu-divider"></div>
@@ -269,7 +269,7 @@
                   <button type="button" onclick="closeActionMenus(); openAccessories({{ $eq->equipment_id }}, '{{ addslashes($eq->equipment_name) }}')">
                     <i data-feather="package"></i> Accessories
                   </button>
-                  <button type="button" onclick="closeActionMenus(); openUnits({{ $eq->equipment_id }}, {{ json_encode($eq->equipment_name) }})">
+                  <button type="button" onclick="closeActionMenus(); openUnits({{ $eq->equipment_id }}, {{ json_encode($eq->equipment_name) }}, {{ (int) ($eq->stock_quantity ?? 1) }})">
                     <i data-feather="hash"></i> Physical Units <span class="badge badge-gray" style="margin-left:2px">{{ $eq->unit_count }}</span>
                   </button>
                   <div class="action-menu-divider"></div>
@@ -576,7 +576,10 @@
           <tbody id="unitsTbody"></tbody>
         </table>
       </div>
-      <div id="unitsEmpty" style="display:none;text-align:center;color:var(--muted);padding:16px;font-size:.85rem">No physical units recorded yet.</div>
+      <div id="unitsEmpty" style="display:none;text-align:center;color:var(--muted);padding:16px;font-size:.85rem">
+        No physical units recorded yet.
+        <div id="unitsEmptyNote" style="margin-top:4px;font-size:.78rem"></div>
+      </div>
 
       <div style="border-top:1px solid var(--border);padding-top:14px">
         <div style="font-size:.78rem;font-weight:700;color:var(--text);margin-bottom:8px">Add Unit</div>
@@ -851,9 +854,11 @@ function deleteAccessory(aid) {
 const UNIT_COND_LABEL = @json($unitCondLabel);
 const UNIT_STATUS_LABEL = @json($unitStatusLabel);
 let currentUnitsEquipId = null;
+let currentUnitsStockQty = 1;
 
-function openUnits(eid, ename) {
+function openUnits(eid, ename, stockQty) {
   currentUnitsEquipId = eid;
+  currentUnitsStockQty = stockQty || 1;
   document.getElementById('unitsEquipName').textContent = ename;
   document.getElementById('unitAssetTag').value = '';
   document.getElementById('unitSerialNo').value = '';
@@ -873,6 +878,15 @@ function loadUnits() {
       if (!data.length) {
         tbody.innerHTML = '';
         empty.style.display = 'block';
+        // Physical units are an optional, separate per-asset tracking layer — the item's
+        // Stock Quantity (used for booking/availability everywhere else) stays a plain
+        // manual count until at least one unit is added, at which point it switches to
+        // being calculated from the units below instead. Zero units here is the normal
+        // starting state, not a sync problem — this note exists so that isn't read as one.
+        document.getElementById('unitsEmptyNote').textContent =
+          'This is normal — Stock Quantity (' + currentUnitsStockQty + ') is a separate, manually-set count used for availability. '
+          + 'Add units below only if you want to track specific serial-tagged items individually; '
+          + 'once you do, Stock Quantity will be calculated from them automatically.';
         return;
       }
       empty.style.display = 'none';
