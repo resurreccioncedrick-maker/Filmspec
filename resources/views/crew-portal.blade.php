@@ -790,7 +790,7 @@ button{font-family:var(--font-b);cursor:pointer}
       <div class="item">
         <div>
           <div class="it-ref">{{ $ir->incident_number ?? '—' }}</div>
-          <div class="it-title">{{ $ir->equipment_name }}</div>
+          <div class="it-title">{{ $ir->equipment_name ?? $ir->accessory_name }}</div>
           <div class="it-meta">{{ $ir->booking_reference }} &middot; {{ date('M j, Y', strtotime($ir->created_at)) }}</div>
           <span class="badge {{ $typeBadge[$ir->incident_type] ?? 'badge-gray' }}">{{ $typeLabel[$ir->incident_type] ?? $ir->incident_type }}</span>
           @if ($ir->photo_path)
@@ -897,40 +897,6 @@ button{font-family:var(--font-b);cursor:pointer}
   </div>
 </div>
 
-<!-- ═══════ REPAIR & PURCHASE ═══════ -->
-<div id="pg-repairpurchase" class="pg {{ $activeTab === 'repairpurchase' ? 'on' : '' }}">
-  <div class="ctr">
-    <div class="sec-hd">
-      <div class="sec-title">Repair &amp; Purchase</div>
-      <div class="sec-sub">Flag equipment that needs repair, or request something be purchased. Track your own tickets here.</div>
-    </div>
-
-    <div class="card">
-      @if ($myTickets->isEmpty())
-      <div class="empty">You have not submitted any repair/purchase tickets.</div>
-      @else
-      @foreach ($myTickets as $t)
-      <div class="item">
-        <div>
-          <div class="it-ref">{{ $t->ticket_number }}</div>
-          <div class="it-title">{{ $t->title }}</div>
-          <div class="it-meta">{{ $t->equipment_name ?? 'New purchase' }} &middot; {{ date('M j, Y', strtotime($t->created_at)) }}</div>
-          <span class="badge {{ $rpTypeBadge[$t->type] ?? 'badge-gray' }}">{{ $rpTypeLabel[$t->type] ?? ucfirst($t->type) }}</span>
-          @if ($t->photo_path)
-          <a href="{{ route('crew-portal.ticket-photo', $t->ticket_id) }}" target="_blank" style="margin-left:6px;font-size:11px;color:var(--blue)">View photo</a>
-          @endif
-        </div>
-        <div class="it-side">
-          <span class="badge {{ $rpStatusBadge[$t->status] ?? 'badge-gray' }}">{{ $rpStatusLabel[$t->status] ?? ucfirst($t->status) }}</span>
-        </div>
-      </div>
-      @endforeach
-      @endif
-    </div>
-  </div>
-  <div class="fab"><button onclick="openMo('moNewTicket')">+ New Ticket</button></div>
-</div>
-
 <!-- BOTTOM TAB BAR (3 tabs — Time/Reports/Repairs live in the More sheet) -->
 <div class="tabbar">
   <button class="{{ $activeTab === 'dashboard' ? 'on' : '' }}" data-tab="dashboard" onclick="showPg('dashboard',this)"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg></span>Today</button>
@@ -971,10 +937,6 @@ button{font-family:var(--font-b);cursor:pointer}
         <div class="more-item-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
         <span>Maintenance</span>
       </div>
-      <div class="more-item" style="cursor:pointer" onclick="closeMo('moMore');showPg('repairpurchase')">
-        <div class="more-item-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v16M3 10h5M16 4v16M16 14h5"/></svg></div>
-        <span>Repair &amp; Purchase</span>
-      </div>
       <form method="POST" action="{{ route('logout') }}" style="display:contents">
       @csrf
       <button type="submit" class="more-item" style="color:var(--red);background:none;border:none;cursor:pointer;width:100%;text-align:left;font:inherit">
@@ -997,6 +959,7 @@ button{font-family:var(--font-b);cursor:pointer}
       @csrf
       <input type="hidden" name="action" value="crew_file_incident">
       <input type="hidden" name="return_tab" id="incidentReturnTab" value="{{ $activeTab }}">
+      <input type="hidden" name="item_type" id="crewIR_itemType" value="equipment">
       <div class="mo-body">
         <div style="background:var(--yellowlt);border:1px solid #fde68a;border-radius:8px;padding:10px 13px;margin-bottom:16px;font-size:.82rem;color:var(--yellow)">
           <strong>Charge Note:</strong> Do not enter any charge amount — charges are set by the Operations Manager after review.
@@ -1010,18 +973,41 @@ button{font-family:var(--font-b);cursor:pointer}
             @endforeach
           </select>
         </div>
-        <div class="fg">
-          <label>Equipment *</label>
-          <select name="equipment_id" id="crewIR_equipment" required disabled onchange="filterUnitsByEquipment(this.value)">
-            <option value="">— Select a booking first —</option>
-          </select>
+        <div class="subtabs" style="margin-bottom:14px">
+          <button type="button" class="subtab-btn on" onclick="crewIRSwitch('equipment', this)">Equipment</button>
+          <button type="button" class="subtab-btn" onclick="crewIRSwitch('accessory', this)">Accessory</button>
         </div>
-        <div class="fg">
-          <label>Unit</label>
-          <select name="equipment_unit" id="crewIR_unit" disabled>
-            <option value="">— Select equipment first —</option>
-          </select>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px">Pick the specific one if it's tagged — otherwise use "Not sure which unit."</div>
+
+        <div id="crewIR_panel-equipment">
+          <div class="fg">
+            <label>Equipment *</label>
+            <select name="equipment_id" id="crewIR_equipment" required disabled onchange="filterUnitsByEquipment(this.value)">
+              <option value="">— Select a booking first —</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Unit</label>
+            <select name="equipment_unit" id="crewIR_unit" disabled>
+              <option value="">— Select equipment first —</option>
+            </select>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">Pick the specific one if it's tagged — otherwise use "Not sure which unit."</div>
+          </div>
+        </div>
+
+        <div id="crewIR_panel-accessory" style="display:none">
+          <div class="fg">
+            <label>Accessory *</label>
+            <select name="accessory_id" id="crewIR_accessory" disabled onchange="filterUnitsByAccessory(this.value)">
+              <option value="">— Select a booking first —</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Unit</label>
+            <select name="accessory_unit" id="crewIR_accunit" disabled>
+              <option value="">— Select accessory first —</option>
+            </select>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">Pick the specific one if it's tagged — otherwise use "Not sure which unit."</div>
+          </div>
         </div>
         <div style="display:flex;gap:10px">
           <div class="fg" style="flex:1">
@@ -1071,71 +1057,6 @@ button{font-family:var(--font-b);cursor:pointer}
       <div class="mo-footer">
         <button type="button" class="btn btn-outline" onclick="closeMo('moFileIncident')">Cancel</button>
         <button type="submit" class="btn btn-primary">Submit Report</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ═══ MODAL: New Repair/Purchase Ticket ═══ -->
-<div class="mo" id="moNewTicket" onclick="if(event.target===this)closeMo('moNewTicket')">
-  <div class="mo-box">
-    <div class="mo-head">
-      <div class="mo-title">New Ticket</div>
-      <button class="mo-close" onclick="closeMo('moNewTicket')">&times;</button>
-    </div>
-    <form method="POST" enctype="multipart/form-data" onsubmit="return guardCrewSubmit(this)">
-      @csrf
-      <input type="hidden" name="action" value="crew_submit_ticket">
-      <input type="hidden" name="requested_date" value="{{ date('Y-m-d') }}">
-      <input type="hidden" name="return_tab" value="repairpurchase">
-      <div class="mo-body">
-        <div class="fg">
-          <label>Type *</label>
-          <select name="type" id="crewRP_type" required onchange="toggleCrewRPType()">
-            <option value="repair">Repair (existing equipment)</option>
-            <option value="purchase">Purchase (new item)</option>
-          </select>
-        </div>
-        <div class="fg">
-          <label>Title *</label>
-          <input type="text" name="title" placeholder="e.g. Sony A7III — lens mount repair" required>
-        </div>
-        <div class="fg" id="crewRP_equipWrap">
-          <label>Equipment *</label>
-          <select name="equipment_id" id="crewRP_equipment" onchange="filterRPUnitsByEquipment(this.value)">
-            <option value="">— Select Equipment —</option>
-            @foreach ($myEquipmentList as $eq)
-            <option value="{{ $eq->equipment_id }}">{{ $eq->equipment_name }}{{ $eq->brand ? ' — '.$eq->brand : '' }}{{ $eq->serial_number ? ' ('.$eq->serial_number.')' : '' }}</option>
-            @endforeach
-          </select>
-        </div>
-        <div class="fg" id="crewRP_unitWrap">
-          <label>Unit</label>
-          <select name="equipment_unit" id="crewRP_unit" disabled>
-            <option value="">— Select equipment first —</option>
-          </select>
-        </div>
-        <div class="fg">
-          <label>Priority</label>
-          <select name="priority">
-            <option value="low">Low</option>
-            <option value="normal" selected>Normal</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
-          </select>
-        </div>
-        <div class="fg">
-          <label>Note</label>
-          <textarea name="note" placeholder="Describe the issue or what's needed…"></textarea>
-        </div>
-        <div class="fg">
-          <label>Photo</label>
-          <input type="file" name="photo" accept=".jpg,.jpeg,.png,.pdf">
-        </div>
-      </div>
-      <div class="mo-footer">
-        <button type="button" class="btn btn-outline" onclick="closeMo('moNewTicket')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Submit Ticket</button>
       </div>
     </form>
   </div>
@@ -1264,6 +1185,10 @@ const BOOKING_EQUIP = {!! json_encode($bookingEquipMap, JSON_HEX_TAG | JSON_HEX_
 // select, cascading a second level deeper than BOOKING_EQUIP (Booking -> Equipment -> Unit).
 const EQUIPMENT_UNITS = {!! json_encode($equipmentUnitMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 
+// Same two-level cascade as equipment above, for the Incident Report modal's Accessory option.
+const BOOKING_ACC_IR = {!! json_encode($bookingAccMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
+const ACCESSORY_UNITS = {!! json_encode($accessoryUnitMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
+
 // Field-request pickers — the OPPOSITE list from BOOKING_EQUIP above: equipment/accessories
 // NOT yet on the booking (available to request), keyed by booking_id, same shape ClientBookingDetailController
 // builds server-side for the client's own request form.
@@ -1318,13 +1243,14 @@ function filterEquipmentByBooking(bookingId) {
   if (!bookingId || !equip.length) {
     sel.innerHTML = '<option value="">— No equipment on this booking —</option>';
     sel.disabled = true;
-    return;
+  } else {
+    sel.innerHTML = '<option value="">— Select Equipment —</option>' + equip.map(e =>
+      `<option value="${e.equipment_id}">${escCrew(e.equipment_name)}${e.brand ? ' — ' + escCrew(e.brand) : ''}${e.serial_number ? ' (' + escCrew(e.serial_number) + ')' : ''}</option>`
+    ).join('');
+    sel.disabled = false;
   }
-  sel.innerHTML = '<option value="">— Select Equipment —</option>' + equip.map(e =>
-    `<option value="${e.equipment_id}">${escCrew(e.equipment_name)}${e.brand ? ' — ' + escCrew(e.brand) : ''}${e.serial_number ? ' (' + escCrew(e.serial_number) + ')' : ''}</option>`
-  ).join('');
-  sel.disabled = false;
   filterUnitsByEquipment('');
+  filterAccessoryByBooking(bookingId);
 }
 
 function filterUnitsByEquipment(equipmentId) {
@@ -1340,18 +1266,25 @@ function filterUnitsByEquipment(equipmentId) {
   sel.disabled = false;
 }
 
-// ── New Ticket modal (Repair & Purchase, 2e) ────────────────────────────────
-function toggleCrewRPType() {
-  const isRepair = document.getElementById('crewRP_type').value === 'repair';
-  document.getElementById('crewRP_equipWrap').style.display = isRepair ? '' : 'none';
-  document.getElementById('crewRP_unitWrap').style.display = isRepair ? '' : 'none';
-  document.getElementById('crewRP_equipment').required = isRepair;
+function filterAccessoryByBooking(bookingId) {
+  const sel = document.getElementById('crewIR_accessory');
+  const acc = BOOKING_ACC_IR[bookingId] || [];
+  if (!bookingId || !acc.length) {
+    sel.innerHTML = '<option value="">— No accessories on this booking —</option>';
+    sel.disabled = true;
+  } else {
+    sel.innerHTML = '<option value="">— Select Accessory —</option>' + acc.map(a =>
+      `<option value="${a.accessory_id}">${escCrew(a.accessory_name)}</option>`
+    ).join('');
+    sel.disabled = false;
+  }
+  filterUnitsByAccessory('');
 }
 
-function filterRPUnitsByEquipment(equipmentId) {
-  const sel = document.getElementById('crewRP_unit');
-  const units = EQUIPMENT_UNITS[equipmentId] || [];
-  if (!equipmentId || !units.length) {
+function filterUnitsByAccessory(accessoryId) {
+  const sel = document.getElementById('crewIR_accunit');
+  const units = ACCESSORY_UNITS[accessoryId] || [];
+  if (!accessoryId || !units.length) {
     sel.innerHTML = '<option value="">Not sure which unit</option>';
     sel.disabled = false;
     return;
@@ -1359,6 +1292,16 @@ function filterRPUnitsByEquipment(equipmentId) {
   sel.innerHTML = units.map(u => `<option value="u${u.unit_id}">${escCrew(u.asset_tag)}</option>`).join('')
     + '<option value="">Not sure which unit</option>';
   sel.disabled = false;
+}
+
+function crewIRSwitch(type, btn) {
+  document.getElementById('crewIR_itemType').value = type;
+  document.getElementById('crewIR_panel-equipment').style.display = type === 'equipment' ? '' : 'none';
+  document.getElementById('crewIR_panel-accessory').style.display = type === 'accessory' ? '' : 'none';
+  document.getElementById('crewIR_equipment').required = type === 'equipment';
+  document.getElementById('crewIR_accessory').required = type === 'accessory';
+  btn.parentElement.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
 }
 
 function showPg(id, btn) {

@@ -57,7 +57,7 @@ return [
         // BookingDetailController::act() grants the 'accounting' role, so this only ever
         // opens booking-detail read-only; it's what makes Cost Estimates' "view booking"
         // link actually work for them instead of dead-ending in a 403.
-        'accounting'         => ['dashboard', 'billing', 'reports', 'profile', 'reminders', 'faqs', 'repair_purchase', 'cost_estimates', 'crew_data', 'equipment_data', 'calendar_data', 'bookings', 'support_chat'],
+        'accounting'         => ['dashboard', 'billing', 'reports', 'profile', 'reminders', 'faqs', 'cost_estimates', 'crew_data', 'equipment_data', 'calendar_data', 'bookings', 'support_chat'],
         'client'             => ['portal'],
         'crew'               => ['crew_portal'],
     ],

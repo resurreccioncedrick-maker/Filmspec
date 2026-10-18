@@ -27,22 +27,6 @@ class CrewPortalController extends Controller
     // rarely-changed fixed list, not worth a shared config entry for one array.
     private array $damageTypes = ['scratches' => 'Scratches', 'cracked_broken' => 'Cracked / Broken Part', 'electronic_malfunction' => 'Electronic Malfunction', 'missing_part' => 'Missing Part', 'others' => 'Others'];
 
-    // Same sets RepairPurchaseController.php uses for the staff page — kept in sync manually
-    // for the same reason as $damageTypes above.
-    private array $rpTypeBadge = ['repair' => 'badge-orange', 'purchase' => 'badge-blue'];
-
-    private array $rpTypeLabel = ['repair' => 'Repair', 'purchase' => 'Purchase'];
-
-    private array $rpStatusBadge = [
-        'requested' => 'badge-gray', 'approved' => 'badge-blue', 'in_progress' => 'badge-yellow',
-        'completed' => 'badge-green', 'cancelled' => 'badge-red',
-    ];
-
-    private array $rpStatusLabel = [
-        'requested' => 'Requested', 'approved' => 'Approved', 'in_progress' => 'In Progress',
-        'completed' => 'Completed', 'cancelled' => 'Cancelled',
-    ];
-
     // Lightweight poll for the Equipment Checklist tab — lets the page notice a newly
     // checklist-eligible booking (or an arrival-status change) without a manual reload.
     // Returns a cheap signature (not the full dataset) that the frontend just compares
@@ -131,6 +115,8 @@ class CrewPortalController extends Controller
         $myActiveBookings = collect();
         $bookingEquipMap = [];
         $equipmentUnitMap = [];
+        $bookingAccMap = [];
+        $accessoryUnitMap = [];
         $myAttendance = collect();
         $myTimesheets = collect();
         $myChecklistBookings = collect();
@@ -211,6 +197,24 @@ class CrewPortalController extends Controller
                 if ($equipIdsForUnits) {
                     foreach (DB::table('equipment_units')->whereIn('equipment_id', $equipIdsForUnits)->orderBy('asset_tag')->get() as $u) {
                         $equipmentUnitMap[$u->equipment_id][] = ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag];
+                    }
+                }
+
+                // Same two-level cascade (Booking -> Accessory -> Unit) as equipment above, so the
+                // File Incident Report modal can report on an accessory, not just equipment.
+                $accRows = DB::table('booking_accessories as ba')
+                    ->join('accessories as a', 'ba.accessory_id', '=', 'a.accessory_id')
+                    ->whereIn('ba.booking_id', $activeBookingIds)
+                    ->select('ba.booking_id', 'a.accessory_id', 'a.accessory_name')
+                    ->get();
+                foreach ($accRows as $row) {
+                    $bookingAccMap[$row->booking_id][] = $row;
+                }
+
+                $accIdsForUnits = collect($accRows)->pluck('accessory_id')->unique()->all();
+                if ($accIdsForUnits) {
+                    foreach (DB::table('accessory_units')->whereIn('accessory_id', $accIdsForUnits)->orderBy('asset_tag')->get() as $u) {
+                        $accessoryUnitMap[$u->accessory_id][] = ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag];
                     }
                 }
             }
@@ -373,55 +377,31 @@ class CrewPortalController extends Controller
                 ->get();
         }
 
+        // Left, not inner — an accessory-only incident (ir.equipment_id null) must still show up
+        // in the crew member's own history, same reasoning as IncidentsController.php's admin list.
         $myIncidents = DB::table('incident_reports as ir')
-            ->join('equipment as e', 'ir.equipment_id', '=', 'e.equipment_id')
+            ->leftJoin('equipment as e', 'ir.equipment_id', '=', 'e.equipment_id')
+            ->leftJoin('accessories as acc', 'ir.accessory_id', '=', 'acc.accessory_id')
             ->join('bookings as b', 'ir.booking_id', '=', 'b.booking_id')
             ->where('ir.reported_by', $uid)
             ->orderByDesc('ir.created_at')
-            ->select('ir.*', 'e.equipment_name', 'b.booking_reference', 'b.project_title')
+            ->select('ir.*', 'e.equipment_name', 'acc.accessory_name', 'b.booking_reference', 'b.project_title')
             ->limit(20)
             ->get();
-
-        // Repair & Purchase — crew's own submitted tickets (2e). Unlike incident reports, these
-        // aren't tied to one specific booking_id, so the New Ticket equipment picker offers
-        // every piece of equipment across the crew member's own active bookings, deduplicated,
-        // rather than cascading from a Booking select the way the Incident form does.
-        $myTickets = DB::table('repair_purchase_tickets as t')
-            ->leftJoin('equipment as e', 't.equipment_id', '=', 'e.equipment_id')
-            ->where('t.created_by', $uid)
-            ->orderByDesc('t.created_at')
-            ->select('t.*', 'e.equipment_name', 'e.brand')
-            ->limit(30)
-            ->get();
-
-        $myEquipmentList = collect();
-        if ($bookingEquipMap) {
-            $seen = [];
-            foreach ($bookingEquipMap as $rows) {
-                foreach ($rows as $row) {
-                    if (! isset($seen[$row->equipment_id])) {
-                        $seen[$row->equipment_id] = true;
-                        $myEquipmentList->push($row);
-                    }
-                }
-            }
-        }
 
         return view('crew-portal', [
             'msg' => $msg, 'user' => $user, 'crewMember' => $crewMember, 'activeTab' => $activeTab, 'activeSubTab' => $activeSubTab,
             'activeBookingId' => $activeBookingId, 'crewAnnouncements' => $crewAnnouncements,
             'myBookings' => $myBookings, 'myIncidents' => $myIncidents, 'myMaintenances' => $myMaintenances,
             'myActiveBookings' => $myActiveBookings, 'bookingEquipMap' => $bookingEquipMap, 'equipmentUnitMap' => $equipmentUnitMap,
+            'bookingAccMap' => $bookingAccMap, 'accessoryUnitMap' => $accessoryUnitMap,
             'myAttendance' => $myAttendance, 'myTimesheets' => $myTimesheets,
             'myChecklistBookings' => $myChecklistBookings, 'myTeamBookings' => $myTeamBookings, 'allActiveCrew' => $allActiveCrew,
             'fieldEquipMap' => $fieldEquipMap, 'fieldAccMap' => $fieldAccMap, 'crewPositions' => $crewPositions,
             'myFieldRequests' => $myFieldRequests,
-            'myTickets' => $myTickets, 'myEquipmentList' => $myEquipmentList,
             'typeBadge' => $this->typeBadge, 'typeLabel' => $this->typeLabel, 'statusBadge' => $this->statusBadge,
             'maintBadge' => $this->maintBadge, 'maintLabel' => $this->maintLabel, 'bookingBadge' => $this->bookingBadge,
             'damageTypes' => $this->damageTypes,
-            'rpTypeBadge' => $this->rpTypeBadge, 'rpTypeLabel' => $this->rpTypeLabel,
-            'rpStatusBadge' => $this->rpStatusBadge, 'rpStatusLabel' => $this->rpStatusLabel,
             'condOut' => ['excellent' => 'Excellent', 'good' => 'Good', 'fair' => 'Fair'],
             'condIn' => ['excellent' => 'Excellent', 'good' => 'Good', 'fair' => 'Fair', 'damaged' => 'Damaged', 'missing' => 'Missing'],
             'attStatusLabel' => ['present' => 'Present', 'late' => 'Late', 'absent' => 'Absent', 'no_show' => 'No Show', 'back_out' => 'Back Out'],
@@ -591,16 +571,23 @@ class CrewPortalController extends Controller
 
         if ($action === 'crew_file_incident' && $crewMember) {
             $bid = (int) $request->input('booking_id', 0);
-            $eid = (int) $request->input('equipment_id', 0);
-            // "unit" is either "u<equipment_unit_id>" (a genuinely registered physical unit) or
+            $itemType = $request->input('item_type') === 'accessory' ? 'accessory' : 'equipment';
+            $eid = $itemType === 'equipment' ? (int) $request->input('equipment_id', 0) : 0;
+            $aid = $itemType === 'accessory' ? (int) $request->input('accessory_id', 0) : 0;
+
+            // "unit" is either "u<unit_id>" (a genuinely registered physical unit) or
             // empty/"unsure" when the crew member picks "Not sure which unit" — there's nothing
             // to validate for that case, it just leaves the report unit-less like before.
-            $unitInput = (string) $request->input('equipment_unit', '');
+            $unitField = $itemType === 'accessory' ? 'accessory_unit' : 'equipment_unit';
+            $unitInput = (string) $request->input($unitField, '');
             $equipmentUnitId = null;
+            $accessoryUnitId = null;
             if (str_starts_with($unitInput, 'u')) {
                 $candidate = (int) substr($unitInput, 1);
-                if ($candidate && DB::table('equipment_units')->where('unit_id', $candidate)->where('equipment_id', $eid)->exists()) {
+                if ($candidate && $itemType === 'equipment' && DB::table('equipment_units')->where('unit_id', $candidate)->where('equipment_id', $eid)->exists()) {
                     $equipmentUnitId = $candidate;
+                } elseif ($candidate && $itemType === 'accessory' && DB::table('accessory_units')->where('unit_id', $candidate)->where('accessory_id', $aid)->exists()) {
+                    $accessoryUnitId = $candidate;
                 }
             }
             $itype = $request->input('incident_type', 'damaged');
@@ -615,22 +602,30 @@ class CrewPortalController extends Controller
                 return ['type' => 'danger', 'text' => $photoUpload['error']];
             }
 
-            if (! $bid || ! $eid || ! $desc) {
+            $itemId = $itemType === 'accessory' ? $aid : $eid;
+            if (! $bid || ! $itemId || ! $desc) {
                 return ['type' => 'danger', 'text' => 'Please fill in all required fields.'];
             }
 
-            // Ownership check — a booking_id/equipment_id must actually be this crew member's
-            // own (non-declined) assignment and that booking's own equipment, not just any ID
-            // POSTed by the client. The booking/equipment <select>s only ever offer these in the
+            // Ownership check — a booking_id/item_id must actually be this crew member's own
+            // (non-declined) assignment and that booking's own equipment/accessory, not just any
+            // ID POSTed by the client. The booking/item <select>s only ever offer these in the
             // real UI, but the server re-validates rather than trusting that alone.
             $ownsBooking = DB::table('booking_crew')->where('crew_id', $crewMember->crew_id)
                 ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
             if (! $ownsBooking) {
                 return ['type' => 'danger', 'text' => 'That booking is not assigned to you.'];
             }
-            $equipOnBooking = DB::table('booking_equipment')->where('booking_id', $bid)->where('equipment_id', $eid)->exists();
-            if (! $equipOnBooking) {
-                return ['type' => 'danger', 'text' => 'That equipment is not part of this booking.'];
+            if ($itemType === 'equipment') {
+                $itemOnBooking = DB::table('booking_equipment')->where('booking_id', $bid)->where('equipment_id', $eid)->exists();
+                if (! $itemOnBooking) {
+                    return ['type' => 'danger', 'text' => 'That equipment is not part of this booking.'];
+                }
+            } else {
+                $itemOnBooking = DB::table('booking_accessories')->where('booking_id', $bid)->where('accessory_id', $aid)->exists();
+                if (! $itemOnBooking) {
+                    return ['type' => 'danger', 'text' => 'That accessory is not part of this booking.'];
+                }
             }
 
             $year = now()->year;
@@ -638,7 +633,8 @@ class CrewPortalController extends Controller
             $irNum = 'IR-' . $year . '-' . str_pad((string) ($count + 1), 4, '0', STR_PAD_LEFT);
 
             DB::table('incident_reports')->insert([
-                'booking_id' => $bid, 'equipment_id' => $eid, 'equipment_unit_id' => $equipmentUnitId, 'reported_by' => $uid,
+                'booking_id' => $bid, 'equipment_id' => $eid ?: null, 'accessory_id' => $aid ?: null,
+                'equipment_unit_id' => $equipmentUnitId, 'accessory_unit_id' => $accessoryUnitId, 'reported_by' => $uid,
                 'incident_type' => $itype, 'incident_date' => $idate,
                 'incident_time' => $itime ?: null, 'description' => $desc,
                 'photo_path' => $photoUpload['success'] ? $photoUpload['path'] : null,
@@ -656,33 +652,6 @@ class CrewPortalController extends Controller
             ActivityLog::record($uid, 'create', 'incident', "Crew filed incident report $irNum", $incidentId);
 
             return ['type' => 'success', 'text' => "Incident report <strong>$irNum</strong> filed. The admin will review and set any charges."];
-        }
-
-        if ($action === 'crew_submit_ticket' && $crewMember) {
-            $type = $request->input('type') === 'purchase' ? 'purchase' : 'repair';
-
-            if ($type === 'repair') {
-                $eid = (int) $request->input('equipment_id', 0);
-                if (! $eid) {
-                    return ['type' => 'danger', 'text' => 'Select equipment for a repair ticket.'];
-                }
-                // Ownership check, same idea as crew_file_incident's above — the equipment must
-                // actually be on one of this crew member's own (non-declined) bookings, not just
-                // any equipment_id POSTed by the client.
-                $ownsEquip = DB::table('booking_equipment as be')
-                    ->join('booking_crew as bc', 'be.booking_id', '=', 'bc.booking_id')
-                    ->where('bc.crew_id', $crewMember->crew_id)
-                    ->whereNotIn('bc.assignment_status', ['declined', 'back_out'])
-                    ->where('be.equipment_id', $eid)
-                    ->exists();
-                if (! $ownsEquip) {
-                    return ['type' => 'danger', 'text' => 'That equipment is not part of any of your current bookings.'];
-                }
-            }
-
-            // Reuses RepairPurchaseController's own ticket-creation logic rather than
-            // duplicating the insert here, per the approved plan for this feature.
-            return (new RepairPurchaseController)->createTicket($request, $uid);
         }
 
         if ($action === 'crew_confirm_arrival' && $crewMember) {
@@ -1012,12 +981,4 @@ class CrewPortalController extends Controller
         return Storage::disk('local')->response($path);
     }
 
-    public function ticketPhoto(int $id)
-    {
-        $user = Auth::user();
-        $path = DB::table('repair_purchase_tickets')->where('ticket_id', $id)->where('created_by', $user->user_id ?? 0)->value('photo_path');
-        abort_unless($path && Storage::disk('local')->exists($path), 404);
-
-        return Storage::disk('local')->response($path);
-    }
 }

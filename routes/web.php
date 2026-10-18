@@ -199,11 +199,6 @@ Route::get('/crew-portal/maintenance/{id}/photo', [CrewPortalController::class, 
     ->whereNumber('id')
     ->name('crew-portal.maintenance-photo');
 
-Route::get('/crew-portal/ticket/{id}/photo', [CrewPortalController::class, 'ticketPhoto'])
-    ->middleware(['auth'])
-    ->whereNumber('id')
-    ->name('crew-portal.ticket-photo');
-
 Route::match(['get', 'post'], '/equipment', [EquipmentController::class, 'index'])
     ->middleware(['auth', 'can_access:equipment'])
     ->name('equipment');
