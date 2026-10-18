@@ -35,6 +35,13 @@ a{text-decoration:none;color:inherit}
 .container{max-width:1180px;margin:0 auto;padding:28px 20px;flex:1;width:100%}
 .layout-grid{display:grid;grid-template-columns:1fr 320px;gap:22px;align-items:start}
 @media (max-width:860px){ .layout-grid{grid-template-columns:1fr} .sidebar-col{position:static !important} }
+/* A grid item's min-width defaults to auto, which means it won't shrink past its widest
+   unwrapped child's min-content size — any one wide table/row anywhere inside main-col was
+   enough to force the whole page wider than the phone's viewport and scroll sideways, with
+   no visible cue that it was happening. min-width:0 makes main-col respect its actual grid
+   track instead, so overflow-x:auto on individual tables (.table-wrap) contains itself
+   properly rather than blowing out the page around it. */
+.main-col,.sidebar-col{min-width:0}
 
 @media (max-width:640px){
   .container{padding:16px 14px}
@@ -56,6 +63,51 @@ a{text-decoration:none;color:inherit}
 
   .tbl th{font-size:.68rem;padding:9px 12px}
   .tbl td{font-size:.85rem;padding:10px 12px}
+
+  /* Equipment table — 6 columns (Item, Category, Qty, Days, Rate/Day, Subtotal) was wide
+     enough that real item names forced horizontal scroll on phones, with no visual hint it
+     was scrollable — easy to miss and read as a cut-off/broken table. Converts to a stacked
+     card per row instead, same CSS-Grid-over-existing-<td>s approach as My Bookings' cards;
+     filterable/other JS untouched since no markup was removed, only data-label attributes
+     added for the three cells that need a caption once they're no longer in a labeled column. */
+  .table-wrap:has(.tbl-equip){overflow-x:visible}
+  .tbl-equip,.tbl-equip thead,.tbl-equip tbody{display:block;width:100%}
+  .tbl-equip thead{display:none}
+  .tbl-equip tbody tr{
+    display:grid;grid-template-columns:repeat(3,1fr);column-gap:10px;row-gap:3px;
+    padding:14px 0;border-bottom:1px solid var(--border);
+  }
+  .tbl-equip tbody tr:first-child{padding-top:2px}
+  .tbl-equip td{padding:0!important;border-bottom:none!important;max-width:none!important;font-size:.85rem!important}
+  .tbl-equip td[data-label="Item"]{grid-column:1/-1;grid-row:1}
+  .tbl-equip td[data-label="Category"]{grid-column:1/-1;grid-row:2;margin-top:2px}
+  .tbl-equip td[data-label="Qty"],.tbl-equip td[data-label="Days"],.tbl-equip td[data-label="Rate/Day"]{grid-row:3;margin-top:6px}
+  .tbl-equip td[data-label="Qty"]::before,.tbl-equip td[data-label="Days"]::before,.tbl-equip td[data-label="Rate/Day"]::before{
+    content:attr(data-label);display:block;font-size:.62rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700;margin-bottom:2px;
+  }
+  .tbl-equip td[data-label="Subtotal"]{grid-column:1/-1;grid-row:4;margin-top:8px;font-size:1rem!important;text-align:right}
+  .tbl-equip tfoot,.tbl-equip tfoot tr{display:flex;width:100%;align-items:center;justify-content:space-between}
+  .tbl-equip tfoot td{flex:none!important;width:auto!important}
+
+  /* Remaining data tables (Crew, Payment History, Extension/Field Requests) — same
+     card-per-row overflow fix as Equipment above, but as stacked label:value rows since
+     these don't need Equipment's asymmetric 3-column meta layout. */
+  .table-wrap:has(.tbl:not(.tbl-equip)){overflow-x:visible}
+  .tbl:not(.tbl-equip) thead{display:none}
+  .tbl:not(.tbl-equip) tbody,.tbl:not(.tbl-equip) tbody tr{display:block}
+  .tbl:not(.tbl-equip) tbody tr{padding:10px 0;border-bottom:1px solid var(--border)}
+  .tbl:not(.tbl-equip) tbody tr:first-child{padding-top:2px}
+  .tbl:not(.tbl-equip) tbody td{
+    display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
+    padding:3px 0!important;border-bottom:none!important;text-align:right;max-width:none!important;
+  }
+  .tbl:not(.tbl-equip) tbody td[data-label]::before{
+    content:attr(data-label);font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--muted);font-weight:700;text-align:left;flex-shrink:0;
+  }
+  .tbl:not(.tbl-equip) tfoot,.tbl:not(.tbl-equip) tfoot tr{display:flex;width:100%;align-items:center;justify-content:space-between}
+  .tbl:not(.tbl-equip) tfoot td{flex:none!important;width:auto!important;background:none!important}
+  .tbl:not(.tbl-equip) tfoot td:empty{display:none}
 
   /* Modals — 44px tap targets, 16px inputs (avoids Safari auto-zoom) */
   .modal-box{max-width:94vw!important}
@@ -315,9 +367,9 @@ footer .footer-sep{margin:0 8px}
       <tbody>
         @foreach ($extensionRequests as $er)
         <tr>
-          <td>{{ \Illuminate\Support\Carbon::parse($er->current_end_date)->format('M j, Y') }}</td>
-          <td style="font-weight:700;color:var(--blue)">{{ \Illuminate\Support\Carbon::parse($er->requested_end_date)->format('M j, Y') }}</td>
-          <td>
+          <td data-label="Current End Date">{{ \Illuminate\Support\Carbon::parse($er->current_end_date)->format('M j, Y') }}</td>
+          <td data-label="Requested End Date" style="font-weight:700;color:var(--blue)">{{ \Illuminate\Support\Carbon::parse($er->requested_end_date)->format('M j, Y') }}</td>
+          <td data-label="Status">
             @if ($er->status === 'pending')
             <span class="badge badge-yellow">Pending Review</span>
             @elseif ($er->status === 'approved')
@@ -326,7 +378,7 @@ footer .footer-sep{margin:0 8px}
             <span class="badge badge-red">Rejected</span>
             @endif
           </td>
-          <td style="font-size:.82rem;color:var(--sub)">{{ $er->admin_notes ?: '—' }}</td>
+          <td data-label="Admin Notes" style="font-size:.82rem;color:var(--sub)">{{ $er->admin_notes ?: '—' }}</td>
         </tr>
         @endforeach
       </tbody>
@@ -349,7 +401,7 @@ footer .footer-sep{margin:0 8px}
           };
         @endphp
         <tr>
-          <td>
+          <td data-label="Item">
             <div style="font-weight:600">{{ $itemLabel }}</div>
             @if ($r->item_type === 'equipment')
             <div style="font-size:.75rem;color:var(--muted)">{{ trim($r->brand . ' ' . $r->model) }}</div>
@@ -357,8 +409,8 @@ footer .footer-sep{margin:0 8px}
             <div style="font-size:.75rem;color:var(--muted);text-transform:capitalize">{{ $r->item_type }}</div>
             @endif
           </td>
-          <td>{{ $r->quantity }}</td>
-          <td>
+          <td data-label="Qty">{{ $r->quantity }}</td>
+          <td data-label="Status">
             @if ($r->status === 'pending')
             <span class="badge badge-yellow">Pending Review</span>
             @elseif ($r->status === 'approved')
@@ -371,7 +423,7 @@ footer .footer-sep{margin:0 8px}
             <span class="badge badge-red">Rejected</span>
             @endif
           </td>
-          <td style="font-size:.8rem;color:var(--sub)">
+          <td data-label="Delivery" style="font-size:.8rem;color:var(--sub)">
             @if (in_array($r->status, ['dispatched', 'delivered'], true))
               @if ($r->driver_name){{ trim($r->driver_name) }}@endif
               @if ($r->eta)<div style="font-size:.72rem;color:var(--muted)">ETA {{ \Illuminate\Support\Carbon::parse($r->eta)->format('M j, g:ia') }}</div>@endif
@@ -380,7 +432,7 @@ footer .footer-sep{margin:0 8px}
               —
             @endif
           </td>
-          <td style="font-size:.82rem;color:var(--sub)">{{ $r->admin_notes ?: '—' }}</td>
+          <td data-label="Admin Notes" style="font-size:.82rem;color:var(--sub)">{{ $r->admin_notes ?: '—' }}</td>
         </tr>
         @endforeach
       </tbody>
@@ -472,20 +524,20 @@ footer .footer-sep{margin:0 8px}
   <div class="empty-msg">No equipment added yet.</div>
   @else
   <div class="table-wrap">
-  <table class="tbl">
+  <table class="tbl tbl-equip">
     <thead>
       <tr><th>Item</th><th>Category</th><th>Qty</th><th>Days</th><th>Rate/Day</th><th>Subtotal</th></tr>
     </thead>
     <tbody>
       @foreach ($equipmentLines as $line)
       <tr>
-        <td><div style="font-weight:600">{{ $line->equipment_name }}</div>
+        <td data-label="Item"><div style="font-weight:600">{{ $line->equipment_name }}</div>
             <div style="font-size:.75rem;color:var(--muted)">{{ trim($line->brand . ' ' . $line->model) }}</div></td>
-        <td><span class="badge badge-blue">{{ $line->category_name }}</span></td>
-        <td>{{ $line->quantity }}</td>
-        <td>{{ $line->days }}</td>
-        <td>₱{{ number_format($line->daily_rate, 2) }}</td>
-        <td style="font-weight:700;color:var(--blue)">₱{{ number_format($line->subtotal, 2) }}</td>
+        <td data-label="Category"><span class="badge badge-blue">{{ $line->category_name }}</span></td>
+        <td data-label="Qty">{{ $line->quantity }}</td>
+        <td data-label="Days">{{ $line->days }}</td>
+        <td data-label="Rate/Day">₱{{ number_format($line->daily_rate, 2) }}</td>
+        <td data-label="Subtotal" style="font-weight:700;color:var(--blue)">₱{{ number_format($line->subtotal, 2) }}</td>
       </tr>
       @endforeach
     </tbody>
@@ -517,10 +569,10 @@ footer .footer-sep{margin:0 8px}
     <tbody>
       @foreach ($crewLines as $cl)
       <tr>
-        <td style="font-weight:600">{{ $cl->crew_name }}</td>
-        <td>{{ $cl->position_name ?? '—' }}</td>
-        <td>₱{{ number_format($cl->rate_used, 2) }}/12hr{!! $cl->is_overtime ? ' <span class="badge badge-orange" style="font-size:.6rem">OT</span>' : '' !!}</td>
-        <td style="font-weight:700;color:var(--blue)">₱{{ number_format($cl->subtotal, 2) }}</td>
+        <td data-label="Crew Member" style="font-weight:600">{{ $cl->crew_name }}</td>
+        <td data-label="Position">{{ $cl->position_name ?? '—' }}</td>
+        <td data-label="Rate">₱{{ number_format($cl->rate_used, 2) }}/12hr{!! $cl->is_overtime ? ' <span class="badge badge-orange" style="font-size:.6rem">OT</span>' : '' !!}</td>
+        <td data-label="Subtotal" style="font-weight:700;color:var(--blue)">₱{{ number_format($cl->subtotal, 2) }}</td>
       </tr>
       @endforeach
     </tbody>
@@ -569,11 +621,11 @@ footer .footer-sep{margin:0 8px}
     <tbody>
       @foreach ($historyRows as $row)
       <tr>
-        <td>{{ \Illuminate\Support\Carbon::parse($row->date)->format('M j, Y') }}</td>
-        <td><span class="badge badge-blue">{{ ucfirst($row->type) }}</span></td>
-        <td>{{ ucwords(str_replace('_', ' ', $row->method)) }}</td>
-        <td style="font-weight:700;color:var(--blue)">₱{{ number_format($row->amount, 2) }}</td>
-        <td>
+        <td data-label="Date">{{ \Illuminate\Support\Carbon::parse($row->date)->format('M j, Y') }}</td>
+        <td data-label="Type"><span class="badge badge-blue">{{ ucfirst($row->type) }}</span></td>
+        <td data-label="Method">{{ ucwords(str_replace('_', ' ', $row->method)) }}</td>
+        <td data-label="Amount" style="font-weight:700;color:var(--blue)">₱{{ number_format($row->amount, 2) }}</td>
+        <td data-label="Receipt">
           @if ($row->kind === 'payment')
           <a href="{{ route('payment-receipt', $row->payment_id) }}" target="_blank" style="font-size:.8rem;color:var(--blue);font-weight:600;text-decoration:none">
             {{ $row->receipt_number ?: 'View' }} &rarr;

@@ -1438,33 +1438,50 @@ a.footer-contact-link:hover{color:#60b0ff}
   .req-btn{margin-top:8px;padding:9px;font-size:11.5px;min-height:38px}
 
   /* My Bookings — card layout instead of a horizontally-scrolled 7-column
-     table, matching the artifact's card exactly (ref+title left / status
-     badge right, one meta line, total+action footer) via CSS Grid placement
-     of the existing <td>s. filterMyBookings() still targets the same
-     tr[data-search]/data-status rows — no markup restructuring, just how
-     each cell is positioned and styled. */
+     table, via CSS Grid placement of the existing <td>s (filterMyBookings()
+     still targets the same tr[data-search]/data-status rows — no markup
+     restructuring, just how each cell is positioned and styled).
+
+     Status now leads every card as a full-bleed colored header strip (the
+     status <td>, nth-child(5)) instead of a small badge buried after the
+     project/reference — status is what a client said matters most at a
+     glance, so it reads first, before the title. */
   .table-wrap{overflow-x:visible;background:transparent!important;border:none!important}
   .bk-tbl,.bk-tbl thead,.bk-tbl tbody{display:block;width:100%}
   .bk-tbl thead{display:none}
   .bk-tbl tbody tr{
     display:grid;grid-template-columns:1fr auto;column-gap:10px;
     background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);
-    padding:14px 15px;margin-bottom:10px;
+    padding:0;margin-bottom:10px;overflow:hidden;
   }
   .bk-tbl tbody tr.row-action td:first-child,.bk-tbl tbody tr.row-pending td:first-child,
   .bk-tbl tbody tr.row-confirmed td:first-child,.bk-tbl tbody tr.row-completed td:first-child{box-shadow:none}
   .bk-tbl td{padding:0;border-bottom:none;max-width:none!important}
   .bk-tbl td[data-label]::before{content:none}
-  .bk-tbl td:nth-child(1){grid-column:1;grid-row:1;font-size:12px!important}
-  .bk-tbl td:nth-child(2){grid-column:1;grid-row:2;margin-top:2px}
-  .bk-tbl td:nth-child(2) div:first-child{font-size:16px!important;white-space:normal!important}
+
+  /* Row 1 — status header strip, full bleed, solid color by status */
+  .bk-tbl td:nth-child(5){grid-column:1/-1;grid-row:1;padding:9px 15px}
+  .bk-tbl td:nth-child(5) .bk-pill{display:flex;width:100%;border-radius:0;background:none!important;color:#fff!important;font-size:12px;letter-spacing:.02em;padding:0}
+  .bk-tbl tbody tr.row-confirmed td:nth-child(5){background:var(--blue)}
+  .bk-tbl tbody tr.row-completed td:nth-child(5){background:var(--green)}
+  .bk-tbl tbody tr.row-pending td:nth-child(5){background:var(--yellow)}
+  .bk-tbl tbody tr.row-action td:nth-child(5){background:var(--orange)}
+  .bk-tbl tbody tr:not(.row-action):not(.row-pending):not(.row-confirmed):not(.row-completed) td:nth-child(5){background:var(--sub)}
+
+  /* Row 2 — project title leads the body; row 3 — reference, small, secondary */
+  .bk-tbl td:nth-child(2){grid-column:1/-1;grid-row:2;padding:13px 15px 0}
+  .bk-tbl td:nth-child(2) div:first-child{font-size:16.5px!important;white-space:normal!important}
   .bk-tbl td:nth-child(2) div:last-child{display:none}
-  .bk-tbl td:nth-child(3){grid-column:1/-1;grid-row:3;font-size:13px!important;margin-top:8px}
-  .bk-tbl td:nth-child(3)::after{content:" · ";color:var(--sub)}
-  .bk-tbl td:nth-child(4){grid-column:1/-1;grid-row:4;font-size:13px!important;margin-top:0;white-space:normal!important}
-  .bk-tbl td:nth-child(5){grid-column:2;grid-row:1/3;align-self:start;justify-self:end}
-  .bk-tbl td:nth-child(6){grid-column:1;grid-row:5;font-size:14px!important;margin-top:10px}
-  .bk-tbl td:nth-child(7){grid-column:2;grid-row:5;margin-top:10px}
+  .bk-tbl td:nth-child(1){grid-column:1/-1;grid-row:3;font-size:11.5px!important;color:var(--muted)!important;padding:2px 15px 0}
+  .bk-tbl td:nth-child(1) strong{color:var(--muted)!important;font-weight:600!important}
+
+  /* Row 4/5 — meta: dates, then items */
+  .bk-tbl td:nth-child(4){grid-column:1/-1;grid-row:4;font-size:12.5px!important;color:var(--sub)!important;padding:10px 15px 0;white-space:normal!important}
+  .bk-tbl td:nth-child(3){grid-column:1/-1;grid-row:5;font-size:12.5px!important;padding:2px 15px 0}
+
+  /* Row 6 — divider + price/action footer */
+  .bk-tbl td:nth-child(6){grid-column:1;grid-row:6;font-size:15px!important;padding:13px 15px 14px;margin-top:12px;border-top:1px solid var(--border)}
+  .bk-tbl td:nth-child(7){grid-column:2;grid-row:6;padding:13px 15px 14px;margin-top:12px;border-top:1px solid var(--border);justify-self:end}
   .bk-cta{min-height:40px;padding:8px 14px}
   #myBkSearch,#myBkStatus{font-size:16px!important;min-height:46px}
 
