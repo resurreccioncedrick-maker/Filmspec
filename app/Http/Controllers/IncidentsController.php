@@ -453,23 +453,45 @@ class IncidentsController extends Controller
             }
 
             if ($bid && $eid) {
-                $irNum = $this->generateIrNumber();
-                $incidentId = DB::table('incident_reports')->insertGetId([
-                    'booking_id' => $bid, 'equipment_id' => $eid, 'equipment_unit_id' => $equipmentUnitId, 'reported_by' => $uid,
-                    'incident_type' => $itype, 'incident_date' => $idate, 'incident_time' => $itime ?: null,
-                    'description' => $desc, 'photo_path' => $photoUpload['success'] ? $photoUpload['path'] : null,
-                    'cause' => $cause, 'charge_amount' => $charge,
-                    'payment_mode' => $payMode, 'status' => 'open', 'incident_number' => $irNum,
-                    'damage_others_note' => $dothers,
-                    'dop_name' => $dop, 'head_crew_name' => $headCrew, 'custodian_name' => $custodian,
-                    'crew_lineup' => $lineup, 'extra_signatories' => $extraSigs,
-                ]);
-                if ($dtypes) {
-                    DB::table('incident_damage_types')->insert(array_map(
-                        fn ($t) => ['incident_id' => $incidentId, 'damage_type' => $t], $dtypes
-                    ));
+                // Same resend-guard as CrewPortalController::crew_file_incident — a slow photo
+                // upload can make the browser/network retry the same POST before the first
+                // attempt's response arrives, which previously produced a second, orphaned
+                // incident_reports row (and an uncaught 500 if its damage-types insert then
+                // collided with the first attempt's). Treat an identical submission landing
+                // within the last 20s as that resend instead of filing it twice.
+                $dupe = DB::table('incident_reports')
+                    ->where('reported_by', $uid)->where('booking_id', $bid)->where('equipment_id', $eid)
+                    ->where('description', $desc)
+                    ->where('created_at', '>=', now()->subSeconds(20))
+                    ->orderByDesc('created_at')
+                    ->first();
+                if ($dupe) {
+                    $printUrl = route('incident-print', $dupe->incident_id);
+
+                    return ['type' => 'success', 'text' => "Report <strong>{$dupe->incident_number}</strong> filed. <a href='$printUrl' target='_blank' style='text-decoration:underline'>Print &rarr;</a>"];
                 }
-                ActivityLog::record($uid, 'create', 'incident', "Incident report $irNum filed", $incidentId);
+
+                [$irNum, $incidentId] = DB::transaction(function () use ($bid, $eid, $equipmentUnitId, $uid, $itype, $idate, $itime, $desc, $photoUpload, $cause, $charge, $payMode, $dtypes, $dothers, $dop, $headCrew, $custodian, $lineup, $extraSigs) {
+                    $irNum = $this->generateIrNumber();
+                    $incidentId = DB::table('incident_reports')->insertGetId([
+                        'booking_id' => $bid, 'equipment_id' => $eid, 'equipment_unit_id' => $equipmentUnitId, 'reported_by' => $uid,
+                        'incident_type' => $itype, 'incident_date' => $idate, 'incident_time' => $itime ?: null,
+                        'description' => $desc, 'photo_path' => $photoUpload['success'] ? $photoUpload['path'] : null,
+                        'cause' => $cause, 'charge_amount' => $charge,
+                        'payment_mode' => $payMode, 'status' => 'open', 'incident_number' => $irNum,
+                        'damage_others_note' => $dothers,
+                        'dop_name' => $dop, 'head_crew_name' => $headCrew, 'custodian_name' => $custodian,
+                        'crew_lineup' => $lineup, 'extra_signatories' => $extraSigs,
+                    ]);
+                    if ($dtypes) {
+                        DB::table('incident_damage_types')->insertOrIgnore(array_map(
+                            fn ($t) => ['incident_id' => $incidentId, 'damage_type' => $t], $dtypes
+                        ));
+                    }
+                    ActivityLog::record($uid, 'create', 'incident', "Incident report $irNum filed", $incidentId);
+
+                    return [$irNum, $incidentId];
+                });
                 // A charge set at filing time (staff/auto-filed paths, unlike the
                 // always-zero crew self-report) must land in the booking's real total —
                 // this was previously only wired up on BookingDetailController's separate

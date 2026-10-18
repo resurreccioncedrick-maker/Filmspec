@@ -628,28 +628,47 @@ class CrewPortalController extends Controller
                 }
             }
 
-            $year = now()->year;
-            $count = (int) DB::table('incident_reports')->whereYear('created_at', $year)->count();
-            $irNum = 'IR-' . $year . '-' . str_pad((string) ($count + 1), 4, '0', STR_PAD_LEFT);
-
-            DB::table('incident_reports')->insert([
-                'booking_id' => $bid, 'equipment_id' => $eid ?: null, 'accessory_id' => $aid ?: null,
-                'equipment_unit_id' => $equipmentUnitId, 'accessory_unit_id' => $accessoryUnitId, 'reported_by' => $uid,
-                'incident_type' => $itype, 'incident_date' => $idate,
-                'incident_time' => $itime ?: null, 'description' => $desc,
-                'photo_path' => $photoUpload['success'] ? $photoUpload['path'] : null,
-                'cause' => $cause,
-                'charge_amount' => 0, 'status' => 'open', 'incident_number' => $irNum,
-                'damage_others_note' => $dothers, 'submitted_by_crew' => 1,
-            ]);
-
-            $incidentId = DB::getPdo()->lastInsertId();
-            if ($dtypes) {
-                DB::table('incident_damage_types')->insert(array_map(
-                    fn ($t) => ['incident_id' => $incidentId, 'damage_type' => $t], $dtypes
-                ));
+            // A slow mobile upload can make the browser/network retry the same POST before the
+            // first attempt's response ever arrives — guardCrewSubmit() only stops a second
+            // in-page click, not a network-level resend. Treat an identical submission (same
+            // reporter/booking/item/description) landing within the last 20s as that resend and
+            // hand back the already-filed report instead of creating a second one.
+            $dupe = DB::table('incident_reports')
+                ->where('reported_by', $uid)->where('booking_id', $bid)
+                ->where('equipment_id', $eid ?: null)->where('accessory_id', $aid ?: null)
+                ->where('description', $desc)
+                ->where('created_at', '>=', now()->subSeconds(20))
+                ->orderByDesc('created_at')
+                ->first();
+            if ($dupe) {
+                return ['type' => 'success', 'text' => "Incident report <strong>{$dupe->incident_number}</strong> filed. The admin will review and set any charges."];
             }
-            ActivityLog::record($uid, 'create', 'incident', "Crew filed incident report $irNum", $incidentId);
+
+            $irNum = DB::transaction(function () use ($bid, $eid, $aid, $equipmentUnitId, $accessoryUnitId, $uid, $itype, $idate, $itime, $desc, $photoUpload, $cause, $dothers, $dtypes) {
+                $year = now()->year;
+                $count = (int) DB::table('incident_reports')->whereYear('created_at', $year)->count();
+                $irNum = 'IR-' . $year . '-' . str_pad((string) ($count + 1), 4, '0', STR_PAD_LEFT);
+
+                $incidentId = DB::table('incident_reports')->insertGetId([
+                    'booking_id' => $bid, 'equipment_id' => $eid ?: null, 'accessory_id' => $aid ?: null,
+                    'equipment_unit_id' => $equipmentUnitId, 'accessory_unit_id' => $accessoryUnitId, 'reported_by' => $uid,
+                    'incident_type' => $itype, 'incident_date' => $idate,
+                    'incident_time' => $itime ?: null, 'description' => $desc,
+                    'photo_path' => $photoUpload['success'] ? $photoUpload['path'] : null,
+                    'cause' => $cause,
+                    'charge_amount' => 0, 'status' => 'open', 'incident_number' => $irNum,
+                    'damage_others_note' => $dothers, 'submitted_by_crew' => 1,
+                ]);
+
+                if ($dtypes) {
+                    DB::table('incident_damage_types')->insertOrIgnore(array_map(
+                        fn ($t) => ['incident_id' => $incidentId, 'damage_type' => $t], $dtypes
+                    ));
+                }
+                ActivityLog::record($uid, 'create', 'incident', "Crew filed incident report $irNum", $incidentId);
+
+                return $irNum;
+            });
 
             return ['type' => 'success', 'text' => "Incident report <strong>$irNum</strong> filed. The admin will review and set any charges."];
         }
