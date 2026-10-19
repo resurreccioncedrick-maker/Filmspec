@@ -11,7 +11,6 @@ class StaffTeamLabel
 {
     private const LABELS = [
         'super_admin' => 'Admin Team',
-        'admin' => 'Staff',
         'operations_manager' => 'Operations Team',
         'traffic' => 'Traffic Team',
         'accounting' => 'Accounting Team',

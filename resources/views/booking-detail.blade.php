@@ -242,7 +242,7 @@
         @if ($ce)
         @if ($ce->status === 'confirmed')
         <span class="badge badge-green" style="align-self:center"><i data-feather="check" style="width:11px;height:11px"></i> Confirmed</span>
-        @if (in_array($role, ['super_admin', 'admin', 'operations_manager'], true))
+        @if (in_array($role, ['super_admin', 'operations_manager'], true))
         <form method="POST" action="{{ $actionUrl }}" style="display:inline"
               onsubmit="return confirm('Reopen this cost estimate for edits?\n\nIt will go back to draft, and any client approval on it will be cleared since the numbers are about to change.')">
           @csrf
@@ -250,7 +250,7 @@
           <button type="submit" class="btn btn-outline btn-sm" title="Undo the confirmation and make this cost estimate editable again"><i data-feather="rotate-ccw"></i> Reopen for Edits</button>
         </form>
         @endif
-        @elseif (in_array($role, ['super_admin', 'admin', 'operations_manager'], true))
+        @elseif (in_array($role, ['super_admin', 'operations_manager'], true))
         {{-- 'issued' is a legacy intermediate state (historical rows may still carry it) —
              there's no way to newly set it any more (see BookingCosting::issueCe() removal),
              but the badge is kept so an old issued-but-unconfirmed CE still reads clearly. --}}
@@ -544,7 +544,7 @@
       @php
         $ceTypeOptions = ['fs_front' => 'FS Front', 'client_direct' => 'Client Direct', 'partner_front' => 'Partner Front'];
       @endphp
-      @if (in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true) && $booking->booking_status !== 'cancelled')
+      @if (in_array($role, ['super_admin', 'operations_manager', 'traffic'], true) && $booking->booking_status !== 'cancelled')
       <form method="POST" action="{{ $actionUrl }}">
         @csrf
         <input type="hidden" name="action" value="update_project_details">
@@ -695,7 +695,7 @@
         <button type="button" class="btn btn-outline btn-sm" disabled title="Confirm the cost estimate before emailing it to the client"><i data-feather="mail"></i> Email to Client</button>
         @endif
         @endif
-        @if (in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true))
+        @if (in_array($role, ['super_admin', 'operations_manager', 'traffic'], true))
         <button type="button" class="btn btn-outline btn-sm" onclick="openModal('modalCloseProject')">
           <i data-feather="check-square"></i> Close Project
         </button>
@@ -765,7 +765,7 @@
       </div>
       @endif
 
-      @if (in_array($role, ['super_admin', 'admin', 'operations_manager'], true) && $booking->booking_status !== 'cancelled')
+      @if (in_array($role, ['super_admin', 'operations_manager'], true) && $booking->booking_status !== 'cancelled')
       <form method="POST" action="{{ $actionUrl }}">
         @csrf
         <input type="hidden" name="action" value="update_ce_pricing">
@@ -797,7 +797,7 @@
   </div>
 
   @php
-    $canReviewDiscounts = in_array($role, ['super_admin', 'admin', 'operations_manager', 'accounting', 'traffic'], true);
+    $canReviewDiscounts = in_array($role, ['super_admin', 'operations_manager', 'accounting', 'traffic'], true);
     $discStatusBadge = ['pending' => 'badge-yellow', 'approved' => 'badge-green', 'rejected' => 'badge-red'];
   @endphp
   @php
@@ -1252,7 +1252,7 @@
       <h2 class="card-title">Cancellation History</h2>
     </div>
     <div class="card-body">
-      @if ($pendingCancellation && in_array($role, ['super_admin', 'admin', 'operations_manager'], true))
+      @if ($pendingCancellation && in_array($role, ['super_admin', 'operations_manager'], true))
       <div style="background:#1c1917;border:1px solid #b45309;color:#fbbf24;padding:14px 16px;border-radius:8px;margin-bottom:16px">
         <div style="font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px">
           <i data-feather="alert-triangle" style="width:15px;height:15px"></i>

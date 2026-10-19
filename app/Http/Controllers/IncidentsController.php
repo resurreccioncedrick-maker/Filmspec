@@ -38,7 +38,7 @@ class IncidentsController extends Controller
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
-        $canPost = in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true);
+        $canPost = in_array($role, ['super_admin', 'operations_manager', 'traffic'], true);
         $canManage = in_array($role, config('filmspec.manage_roles'), true);
 
         $msg = null;

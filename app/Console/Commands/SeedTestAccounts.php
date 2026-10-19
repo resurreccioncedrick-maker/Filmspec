@@ -33,7 +33,6 @@ class SeedTestAccounts extends Command
 
         $roles = [
             'super_admin' => ['tag' => 'superadmin', 'name' => 'Super Admin'],
-            'admin' => ['tag' => 'admin', 'name' => 'Admin'],
             'operations_manager' => ['tag' => 'ops', 'name' => 'Operations Manager'],
             'traffic' => ['tag' => 'traffic', 'name' => 'Traffic'],
             'accounting' => ['tag' => 'accounting', 'name' => 'Accounting'],

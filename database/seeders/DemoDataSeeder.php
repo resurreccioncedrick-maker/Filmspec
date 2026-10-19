@@ -78,7 +78,6 @@ SVG;
         $roleIds = [];
         foreach ([
             'super_admin' => 'Full system access',
-            'admin' => 'Administrative access',
             'operations_manager' => 'Operations oversight',
             'traffic' => 'Booking & scheduling coordination',
             'accounting' => 'Billing and financial records',
@@ -94,8 +93,8 @@ SVG;
         $hash = Hash::make('Password123!');
         $staff = [
             ['Cedrick', 'Resurreccion', 'super_admin', 'cedrick@filmspec.ph'],
-            ['Andrea', 'Reyes', 'admin', 'andrea.reyes@filmspec.ph'],
             ['Marco', 'Villanueva', 'operations_manager', 'marco.villanueva@filmspec.ph'],
+            ['Andrea', 'Reyes', 'operations_manager', 'andrea.reyes@filmspec.ph'],
             ['Bea', 'Santiago', 'traffic', 'bea.santiago@filmspec.ph'],
             ['Ryan', 'Cruz', 'traffic', 'ryan.cruz@filmspec.ph'],
             ['Liza', 'Fernandez', 'accounting', 'liza.fernandez@filmspec.ph'],
@@ -111,7 +110,6 @@ SVG;
         $this->ids['staff'] = $staffIds;
         $this->ids['uid'] = [
             'super_admin' => $staffIds['super_admin'][0],
-            'admin' => $staffIds['admin'][0],
             'ops' => $staffIds['operations_manager'][0],
             'traffic1' => $staffIds['traffic'][0],
             'traffic2' => $staffIds['traffic'][1],

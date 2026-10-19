@@ -31,7 +31,7 @@ class BillingController extends Controller
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
-        $canRecord = in_array($role, ['super_admin', 'admin', 'operations_manager', 'accounting'], true);
+        $canRecord = in_array($role, ['super_admin', 'operations_manager', 'accounting'], true);
 
         // Auto-mark overdue SOAs and bookings
         DB::table('statement_of_accounts')

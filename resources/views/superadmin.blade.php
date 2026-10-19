@@ -36,8 +36,8 @@
   </div>
   <div class="stat-card">
     <div class="stat-icon"><i data-feather="users"></i></div>
-    <div class="stat-value">{{ $stats['admins'] }}</div>
-    <div class="stat-label">Admin Accounts</div>
+    <div class="stat-value">{{ $stats['ops_managers'] }}</div>
+    <div class="stat-label">Operations Managers</div>
     <span class="stat-delta up"><i data-feather="star"></i> {{ $stats['super_admins'] }} super admin</span>
   </div>
   <div class="stat-card green">

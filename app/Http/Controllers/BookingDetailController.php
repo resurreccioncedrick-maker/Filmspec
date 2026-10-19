@@ -58,14 +58,14 @@ class BookingDetailController extends Controller
         }
 
         $role = $request->user()->role->role_name ?? '';
-        $isAdmin = in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true);
+        $isAdmin = in_array($role, ['super_admin', 'operations_manager', 'traffic'], true);
         // Matches BillingController's $canRecord exactly (role_permissions.*.billing: super_admin/
         // admin/operations_manager/accounting) — $isAdmin above wrongly includes traffic (no
         // billing permission) and wrongly excludes accounting (has it), which previously let an
         // accounting user see the Record Payment button here but have their POST silently
         // dropped by act()'s role check. Payment-related gating on this page now uses this one
         // set consistently instead of three different role lists.
-        $canRecord = in_array($role, ['super_admin', 'admin', 'operations_manager', 'accounting'], true);
+        $canRecord = in_array($role, ['super_admin', 'operations_manager', 'accounting'], true);
 
         $equipmentLines = DB::table('booking_equipment as be')
             ->join('equipment as e', 'be.equipment_id', '=', 'e.equipment_id')
@@ -372,7 +372,7 @@ class BookingDetailController extends Controller
         $action = $request->input('action', '');
         // Same role set as show()'s $canRecord — kept in sync manually, matching this
         // controller's existing convention of inline role checks rather than middleware.
-        $canRecord = in_array($role, ['super_admin', 'admin', 'operations_manager', 'accounting'], true);
+        $canRecord = in_array($role, ['super_admin', 'operations_manager', 'accounting'], true);
 
         $booking = DB::table('bookings as b')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
@@ -385,34 +385,34 @@ class BookingDetailController extends Controller
 
         $msg = null;
 
-        if ($action === 'add_equipment' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+        if ($action === 'add_equipment' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->addEquipment($request, $id, $booking);
-        } elseif ($action === 'assign_transport' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+        } elseif ($action === 'assign_transport' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->assignTransport($request, $id, $booking, $uid);
-        } elseif ($action === 'field_add_equipment' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true) && $booking->booking_status === 'ongoing') {
+        } elseif ($action === 'field_add_equipment' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true) && $booking->booking_status === 'ongoing') {
             $msg = $this->fieldAddEquipment($request, $id, $uid);
-        } elseif ($action === 'batch_add_crew' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+        } elseif ($action === 'batch_add_crew' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->batchAddCrew($request, $id, $booking);
-        } elseif ($action === 'add_crew' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+        } elseif ($action === 'add_crew' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->addCrew($request, $id, $booking);
-        } elseif ($action === 'update_crew_status' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+        } elseif ($action === 'update_crew_status' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->updateCrewStatus($request, $id);
-        } elseif ($action === 'remove_crew' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+        } elseif ($action === 'remove_crew' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->removeCrew($request, $id, $uid);
-        } elseif ($action === 'generate_ce' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+        } elseif ($action === 'generate_ce' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             BookingCosting::generateCostEstimate($id, $uid);
             $msg = ['type' => 'success', 'text' => 'Cost estimate generated.'];
-        } elseif ($action === 'confirm_ce' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
+        } elseif ($action === 'confirm_ce' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             // The booking itself must be approved before its cost estimate can be confirmed —
             // otherwise a project that was never approved could still have a confirmed CE.
             $msg = ($booking->approval_status ?? null) !== 'approved'
                 ? ['type' => 'danger', 'text' => 'Cannot confirm the cost estimate — approve the booking first.']
                 : BookingCosting::confirmCe($id, $uid, $request->input('confirmation_note'));
-        } elseif ($action === 'reopen_ce' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
+        } elseif ($action === 'reopen_ce' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $msg = BookingCosting::reopenCe($id, $uid);
-        } elseif ($action === 'update_ce_pricing' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
+        } elseif ($action === 'update_ce_pricing' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $msg = $this->updateCePricing($request, $id, $uid);
-        } elseif ($action === 'update_project_details' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+        } elseif ($action === 'update_project_details' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->updateProjectDetails($request, $id, $uid);
         } elseif ($action === 'clear_fs_equipment' && in_array($role, config('filmspec.manage_roles'), true)) {
             $msg = $this->clearFsEquipment($id, $uid);
@@ -422,25 +422,25 @@ class BookingDetailController extends Controller
             $msg = $this->emailCeToClient($id, $booking, $uid);
         } elseif ($action === 'erase_ce' && in_array($role, config('filmspec.manage_roles'), true)) {
             $msg = $this->eraseCe($request, $id, $uid);
-        } elseif ($action === 'close_project' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+        } elseif ($action === 'close_project' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->closeProject($request, $id, $uid);
-        } elseif ($action === 'post_comment' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic', 'accounting'], true)) {
+        } elseif ($action === 'post_comment' && in_array($role, ['super_admin', 'operations_manager', 'traffic', 'accounting'], true)) {
             $msg = $this->postComment($request, $id, $uid, $role);
-        } elseif ($action === 'duplicate_booking' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+        } elseif ($action === 'duplicate_booking' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             return $this->duplicateBooking($request, $id, $booking, $user, $role);
-        } elseif ($action === 'checkout' && in_array($role, ['operations_manager', 'admin', 'super_admin'], true)) {
+        } elseif ($action === 'checkout' && in_array($role, ['operations_manager', 'super_admin'], true)) {
             $msg = $this->checkout($request, $id, $booking, $uid);
-        } elseif ($action === 'checkin' && in_array($role, ['operations_manager', 'admin', 'super_admin'], true)) {
+        } elseif ($action === 'checkin' && in_array($role, ['operations_manager', 'super_admin'], true)) {
             $msg = $this->checkin($request, $id, $booking, $uid);
-        } elseif ($action === 'bulk_checkout' && in_array($role, ['operations_manager', 'admin', 'super_admin'], true)) {
+        } elseif ($action === 'bulk_checkout' && in_array($role, ['operations_manager', 'super_admin'], true)) {
             $msg = $this->bulkCheckout($id, $booking, $uid);
-        } elseif ($action === 'bulk_checkin' && in_array($role, ['operations_manager', 'admin', 'super_admin'], true)) {
+        } elseif ($action === 'bulk_checkin' && in_array($role, ['operations_manager', 'super_admin'], true)) {
             $msg = $this->bulkCheckin($id, $booking, $uid);
-        } elseif ($action === 'extend_rental' && in_array($role, ['operations_manager', 'admin', 'super_admin'], true)) {
+        } elseif ($action === 'extend_rental' && in_array($role, ['operations_manager', 'super_admin'], true)) {
             $msg = $this->extendRental($request, $id, $booking, $uid);
-        } elseif ($action === 'confirm_inspection' && in_array($role, ['operations_manager', 'admin', 'super_admin'], true)) {
+        } elseif ($action === 'confirm_inspection' && in_array($role, ['operations_manager', 'super_admin'], true)) {
             $msg = $this->confirmInspection($id, $booking);
-        } elseif ($action === 'complete_booking' && in_array($role, ['operations_manager', 'admin', 'super_admin'], true)) {
+        } elseif ($action === 'complete_booking' && in_array($role, ['operations_manager', 'super_admin'], true)) {
             $msg = $this->completeBooking($id, $booking, $uid);
         } elseif ($action === 'record_payment' && $canRecord) {
             $msg = $this->recordPayment($request, $id, $uid);
@@ -448,36 +448,36 @@ class BookingDetailController extends Controller
             $msg = $this->approvePaymentSubmission($request, $uid);
         } elseif ($action === 'reject_payment_submission' && $canRecord) {
             $msg = $this->rejectPaymentSubmission($request, $uid);
-        } elseif ($action === 'update_incident' && in_array($role, ['operations_manager', 'admin', 'super_admin'], true)) {
+        } elseif ($action === 'update_incident' && in_array($role, ['operations_manager', 'super_admin'], true)) {
             $msg = $this->updateIncident($request, $id);
-        } elseif ($action === 'add_booking_accessory' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+        } elseif ($action === 'add_booking_accessory' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->addBookingAccessory($request, $id);
-        } elseif ($action === 'remove_booking_accessory' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+        } elseif ($action === 'remove_booking_accessory' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->removeBookingAccessory($request, $id);
-        } elseif ($action === 'request_cancellation' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+        } elseif ($action === 'request_cancellation' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->requestCancellation($request, $id, $booking, $role, $uid);
-        } elseif ($action === 'approve_cancellation' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
+        } elseif ($action === 'approve_cancellation' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $msg = $this->approveCancellation($request, $id, $booking, $uid);
-        } elseif ($action === 'reject_cancellation' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
+        } elseif ($action === 'reject_cancellation' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $msg = $this->rejectCancellation($request, $id, $uid);
-        } elseif ($action === 'approve_extension' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
+        } elseif ($action === 'approve_extension' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $msg = $this->approveExtension($request, $id, $booking, $uid);
-        } elseif ($action === 'reject_extension' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
+        } elseif ($action === 'reject_extension' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $msg = $this->rejectExtension($request, $id, $uid);
-        } elseif ($action === 'approve_discount' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
+        } elseif ($action === 'approve_discount' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $msg = BookingCosting::approveDiscount($id, (int) $request->input('discount_id'), $uid, trim((string) $request->input('review_notes', '')) ?: null);
-        } elseif ($action === 'reject_discount' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
+        } elseif ($action === 'reject_discount' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $msg = BookingCosting::rejectDiscount($id, (int) $request->input('discount_id'), $uid, trim((string) $request->input('review_notes', '')) ?: null);
-        } elseif ($action === 'set_discount' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
+        } elseif ($action === 'set_discount' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $msg = BookingCosting::setDiscount(
                 $id, $uid,
                 (string) $request->input('discount_type', 'flat'),
                 (float) $request->input('discount_value', 0),
                 trim((string) $request->input('reason', ''))
             );
-        } elseif ($action === 'approve_field_request' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
+        } elseif ($action === 'approve_field_request' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $msg = $this->approveFieldRequest($request, $id, $booking, $uid);
-        } elseif ($action === 'reject_field_request' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
+        } elseif ($action === 'reject_field_request' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $msg = $this->rejectFieldRequest($request, $id, $uid);
         } elseif ($action === 'approve_booking' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             DB::table('bookings')->where('booking_id', $id)->update([
@@ -1440,7 +1440,7 @@ class BookingDetailController extends Controller
             $reqType = 'on_field';
         }
 
-        if ($reqType === 'on_field' && in_array($role, ['super_admin', 'admin', 'operations_manager'], true)) {
+        if ($reqType === 'on_field' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $finalAmt = (float) $booking->final_amount;
             $paidAmt = (float) DB::table('payments')->where('booking_id', $id)->sum('amount');
             $penaltyAmt = round($finalAmt * 0.50, 2);
@@ -1562,7 +1562,7 @@ class BookingDetailController extends Controller
         if (strtotime($de) < strtotime($ds)) {
             return $fail('End date must be on or after the start date.');
         }
-        if (! in_array($role, ['super_admin', 'admin'], true) && strtotime($ds) < strtotime('+48 hours')) {
+        if (! in_array($role, ['super_admin'], true) && strtotime($ds) < strtotime('+48 hours')) {
             return $fail('Bookings must be made at least <strong>48 hours in advance</strong>.');
         }
         if ((strtotime($de) - strtotime($ds)) / 86400 > 90) {

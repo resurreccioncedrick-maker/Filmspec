@@ -18,7 +18,6 @@
   $navRole = $navUser->role->role_name ?? '';
   $navRoleColors = [
     'super_admin'        => '#3b82f6',
-    'admin'              => '#60a5fa',
     'operations_manager' => '#4ade80',
     'traffic'            => '#fb923c',
     'accounting'         => '#c084fc',
@@ -26,7 +25,6 @@
   ];
   $navRoleLabels = [
     'super_admin'        => 'Super Admin',
-    'admin'              => 'Admin',
     'operations_manager' => 'Ops Manager',
     'traffic'            => 'Traffic',
     'accounting'         => 'Accounting',

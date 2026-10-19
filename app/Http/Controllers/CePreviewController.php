@@ -378,14 +378,14 @@ class CePreviewController extends Controller
         // the Client & Project Info "Edit" action) reuses BookingDetailController::act()'s
         // existing, already-validated actions — same permission gate it uses
         // ($isAdmin + a live, non-superseded booking) — rather than duplicating that logic here.
-        $isAdmin = in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true);
+        $isAdmin = in_array($role, ['super_admin', 'operations_manager', 'traffic'], true);
         $canManage = $isAdmin && ! $isClientView && ! $isSuperseded
             && in_array($booking->booking_status, ['pending', 'confirmed', 'ongoing'], true);
         // set_discount is the one in-place-editing action BookingDetailController::act() does
         // NOT extend to 'traffic' (unlike add_equipment/batch_add_crew/assign_transport/etc,
         // all of which do) — the Add Discount button/modal needs its own, stricter check so a
         // traffic-role viewer isn't shown a control that silently does nothing when submitted.
-        $canDiscount = $canManage && in_array($role, ['super_admin', 'admin', 'operations_manager'], true);
+        $canDiscount = $canManage && in_array($role, ['super_admin', 'operations_manager'], true);
 
         $availEquip = collect();
         $availCrew = collect();

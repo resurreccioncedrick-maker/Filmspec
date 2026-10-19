@@ -96,7 +96,7 @@ class BookingsController extends Controller
         }
         $archivedCount = (int) $baseCountQuery()->where('is_archived', true)->count();
 
-        $pendingApprovalCount = in_array($role, ['admin', 'super_admin', 'operations_manager'], true)
+        $pendingApprovalCount = in_array($role, ['super_admin', 'operations_manager'], true)
             ? (int) Booking::where('approval_status', 'pending_approval')->where('is_archived', false)->count()
             : 0;
 
@@ -217,7 +217,7 @@ class BookingsController extends Controller
         // 'accounting' deliberately excluded: this force-sets payment_status directly with no
         // payments-table row, receipt, or SOA sync — accounting's real path is record_payment
         // (BillingController / BookingDetailController), which keeps all of that in sync.
-        if ($action === 'update_payment_status' && in_array($role, ['admin', 'super_admin', 'operations_manager'], true)) {
+        if ($action === 'update_payment_status' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $bid = (int) $request->input('booking_id');
             $pStatus = $request->input('payment_status');
             $allowed = ['unpaid', 'partial', 'paid', 'overdue', 'refunded', 'cancelled'];
@@ -231,7 +231,7 @@ class BookingsController extends Controller
             return null;
         }
 
-        if (! in_array($role, ['admin', 'super_admin', 'operations_manager', 'traffic'], true)) {
+        if (! in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             return null;
         }
 
@@ -265,11 +265,11 @@ class BookingsController extends Controller
             return $this->editBooking($request);
         }
 
-        if ($action === 'propose_discount' && in_array($role, ['super_admin', 'admin', 'operations_manager', 'traffic'], true)) {
+        if ($action === 'propose_discount' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             return $this->proposeDiscount($request, $uid);
         }
 
-        if ($action === 'archive_booking' && in_array($role, ['admin', 'super_admin', 'operations_manager'], true)) {
+        if ($action === 'archive_booking' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $bid = (int) $request->input('booking_id');
             $status = Booking::where('booking_id', $bid)->value('booking_status');
             if (in_array($status, ['pending', 'cancelled'], true)) {
@@ -291,7 +291,7 @@ class BookingsController extends Controller
             return ['type' => 'danger', 'text' => 'Only pending or cancelled bookings can be archived.'];
         }
 
-        if ($action === 'unarchive_booking' && in_array($role, ['admin', 'super_admin', 'operations_manager'], true)) {
+        if ($action === 'unarchive_booking' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $bid = (int) $request->input('booking_id');
             $ref = Booking::where('booking_id', $bid)->value('booking_reference');
             Booking::where('booking_id', $bid)->where('is_archived', true)->update([
@@ -302,7 +302,7 @@ class BookingsController extends Controller
             return ['type' => 'success', 'text' => "Booking <strong>" . e($ref) . "</strong> restored."];
         }
 
-        if ($action === 'approve_booking' && in_array($role, ['admin', 'super_admin', 'operations_manager', 'traffic'], true)) {
+        if ($action === 'approve_booking' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $bid = (int) $request->input('booking_id', 0);
             Booking::where('booking_id', $bid)->where('approval_status', 'pending_approval')->update([
                 'approval_status' => 'approved', 'approved_by' => $uid, 'approved_at' => now(),
@@ -321,7 +321,7 @@ class BookingsController extends Controller
             return ['type' => 'success', 'text' => 'Booking approved and confirmed.'];
         }
 
-        if ($action === 'reject_booking' && in_array($role, ['admin', 'super_admin', 'operations_manager'], true)) {
+        if ($action === 'reject_booking' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $bid = (int) $request->input('booking_id', 0);
             $notes = trim($request->input('approval_notes', ''));
             Booking::where('booking_id', $bid)->update(['approval_status' => 'rejected', 'approval_notes' => $notes, 'updated_at' => now()]);
@@ -330,7 +330,7 @@ class BookingsController extends Controller
             return ['type' => 'danger', 'text' => 'Booking has been rejected.'];
         }
 
-        if ($action === 'resubmit_booking' && in_array($role, ['traffic', 'admin', 'operations_manager'], true)) {
+        if ($action === 'resubmit_booking' && in_array($role, ['traffic', 'operations_manager'], true)) {
             $bid = (int) $request->input('booking_id', 0);
             Booking::where('booking_id', $bid)->where('approval_status', 'rejected')->update([
                 'approval_status' => 'pending_approval', 'approval_notes' => null, 'updated_at' => now(),
@@ -448,7 +448,7 @@ class BookingsController extends Controller
         $ds = $request->input('shoot_date_start', '');
         $de = $request->input('shoot_date_end', '');
 
-        if ($ds && ! in_array($role, ['super_admin', 'admin'], true) && strtotime($ds) < strtotime('+48 hours')) {
+        if ($ds && ! in_array($role, ['super_admin'], true) && strtotime($ds) < strtotime('+48 hours')) {
             return ['type' => 'error', 'text' => 'Bookings must be made at least <strong>48 hours in advance</strong>. Please select a shoot date at least 2 days from today.'];
         }
         if ($ds && $de && (strtotime($de) - strtotime($ds)) / 86400 > 90) {

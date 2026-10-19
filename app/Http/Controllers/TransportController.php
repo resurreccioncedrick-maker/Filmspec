@@ -26,7 +26,7 @@ class TransportController extends Controller
     public function index(Request $request): View|StreamedResponse|Response
     {
         $role = $request->user()->role->role_name ?? '';
-        $canManage = in_array($role, ['super_admin', 'admin', 'operations_manager'], true);
+        $canManage = in_array($role, ['super_admin', 'operations_manager'], true);
 
         $msg = null;
         if ($request->isMethod('post') && $canManage) {

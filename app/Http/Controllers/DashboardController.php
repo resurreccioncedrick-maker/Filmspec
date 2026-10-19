@@ -196,7 +196,6 @@ class DashboardController extends Controller
 
         $roleColors = [
             'super_admin' => '#7c3aed',
-            'admin' => '#0060C7',
             'operations_manager' => '#16a34a',
             'traffic' => '#d97706',
             'accounting' => '#0891b2',

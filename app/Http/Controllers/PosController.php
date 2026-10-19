@@ -16,7 +16,7 @@ class PosController extends Controller
         $msg = null;
 
         if ($request->isMethod('post') && $request->input('action') === 'quick_sale'
-            && in_array($role, ['super_admin', 'admin', 'operations_manager', 'accounting'], true)) {
+            && in_array($role, ['super_admin', 'operations_manager', 'accounting'], true)) {
             $msg = $this->quickSale($request);
         }
 

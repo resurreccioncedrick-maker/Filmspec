@@ -16,8 +16,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SuperAdminController extends Controller
 {
-    // Mirrors legacy $ROLES_DEF — the 'admin' role exists in the DB (grandfathered accounts)
-    // but is intentionally not assignable from this UI, matching legacy exactly.
+    // Mirrors legacy $ROLES_DEF.
     private array $rolesDef = [
         'super_admin' => ['label' => 'Super Admin', 'color' => '7c3aed', 'desc' => 'Full access — manage users, roles, all system data'],
         'operations_manager' => ['label' => 'Operations Manager', 'color' => '0891b2', 'desc' => 'Equipment, crew, bookings, billing, reports, user management'],
@@ -87,7 +86,7 @@ class SuperAdminController extends Controller
             'total_users' => $users->count(),
             'active_users' => $users->where('is_active', 1)->count(),
             'super_admins' => $users->where('role_name', 'super_admin')->count(),
-            'admins' => $users->whereIn('role_name', ['admin', 'super_admin'])->count(),
+            'ops_managers' => $users->where('role_name', 'operations_manager')->count(),
         ];
 
         $recentActivity = DB::table('activity_logs as al')

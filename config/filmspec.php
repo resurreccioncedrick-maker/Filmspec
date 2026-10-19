@@ -42,15 +42,6 @@ return [
     // names correspond to the pages being ported over one by one.
     'role_permissions' => [
         'super_admin'        => ['dashboard', 'equipment', 'accessories', 'crew', 'bookings', 'clients', 'billing', 'reports', 'users', 'activity', 'profile', 'superadmin', 'attendance', 'pos', 'incidents', 'transport', 'reminders', 'faqs', 'field_requests', 'repair_purchase', 'cost_estimates', 'crew_data', 'equipment_data', 'calendar_data', 'support_chat', 'data_retention'],
-        // 'admin' isn't offered anywhere a new user is created (add_user's role dropdown
-        // only lists the roles actually in this array) but the roles table carries a leftover
-        // 'admin' row, and every action-level check across the app (BookingDetailController,
-        // EquipmentController, BookingsController, ...) already treats it as equivalent to
-        // operations_manager via ad-hoc in_array() lists — kept here, same permission set,
-        // so assigning it (a raw DB edit, or a future admin-tool change) can't become a
-        // silent full-lockout instead of the "same as operations_manager" every action check
-        // already assumes.
-        'admin'              => ['dashboard', 'equipment', 'accessories', 'crew', 'bookings', 'clients', 'billing', 'reports', 'users', 'activity', 'profile', 'attendance', 'pos', 'incidents', 'transport', 'reminders', 'faqs', 'field_requests', 'repair_purchase', 'cost_estimates', 'crew_data', 'equipment_data', 'calendar_data', 'support_chat'],
         'operations_manager' => ['dashboard', 'equipment', 'accessories', 'crew', 'bookings', 'clients', 'billing', 'reports', 'users', 'activity', 'profile', 'attendance', 'pos', 'incidents', 'transport', 'reminders', 'faqs', 'field_requests', 'repair_purchase', 'cost_estimates', 'crew_data', 'equipment_data', 'calendar_data', 'support_chat'],
         'traffic'            => ['dashboard', 'bookings', 'clients', 'crew', 'profile', 'attendance', 'incidents', 'transport', 'reminders', 'faqs', 'field_requests', 'repair_purchase', 'cost_estimates', 'crew_data', 'equipment_data', 'calendar_data', 'support_chat'],
         // Part B1: view-only bookings access for accounting — no mutating action in
@@ -62,12 +53,12 @@ return [
         'crew'               => ['crew_portal'],
     ],
 
-    'manage_roles' => ['super_admin', 'operations_manager', 'admin'],
+    'manage_roles' => ['super_admin', 'operations_manager'],
 
     // Scoped to the Checklist page only — Traffic staff need to release/return equipment day to
     // day, but must NOT get the sweeping app-wide 'manage_roles' grant (client management, crew
     // management, erasing a booking's CE, etc). Keep this list separate from manage_roles.
-    'checklist_office_roles' => ['super_admin', 'operations_manager', 'admin', 'traffic'],
+    'checklist_office_roles' => ['super_admin', 'operations_manager', 'traffic'],
 
     // Optional explicit paths to the mysqldump/mysql CLI binaries, for Super Admin's
     // Database Backup/Restore. Left unset by default — DatabaseBackup looks the binaries
@@ -77,7 +68,7 @@ return [
     'mysqldump_path' => env('FILMSPEC_MYSQLDUMP_PATH'),
     'mysql_path' => env('FILMSPEC_MYSQL_PATH'),
 
-    'all_staff' => ['super_admin', 'operations_manager', 'admin', 'traffic', 'accounting'],
+    'all_staff' => ['super_admin', 'operations_manager', 'traffic', 'accounting'],
 
     // module slug => Laravel route name, used by layouts/app.blade.php's sidebar nav
     // ($pageUrl()/$curPage) to turn a nav item into a URL and highlight the active one.

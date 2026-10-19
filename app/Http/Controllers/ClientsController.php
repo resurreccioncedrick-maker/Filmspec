@@ -44,7 +44,7 @@ class ClientsController extends Controller
         $user = $request->user();
         $role = $user->role->role_name ?? '';
 
-        if (! in_array($role, ['admin', 'super_admin', 'operations_manager', 'traffic'], true)) {
+        if (! in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             return redirect()->route('dashboard');
         }
 

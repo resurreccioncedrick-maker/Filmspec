@@ -241,8 +241,7 @@ Route::get('/maintenance/{id}/photo', [IncidentsController::class, 'maintenanceP
     ->name('maintenance-photo');
 
 // Uses a direct role check inside the controller (matching legacy's requireRole()) rather
-// than can_access:clients — the legacy page allows the 'admin' role even though 'admin'
-// has no entries in ROLE_PERMISSIONS/role_permissions at all.
+// than can_access:clients.
 Route::match(['get', 'post'], '/clients', [ClientsController::class, 'index'])
     ->middleware(['auth'])
     ->name('clients');

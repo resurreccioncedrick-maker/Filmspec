@@ -199,12 +199,12 @@
           </td>
           <td>
             @php
-              $canDiscount = $hasRole(['admin', 'super_admin', 'operations_manager', 'traffic']) && ! $bk->pending_discount && $bk->booking_status !== 'cancelled';
-              $canEdit = $hasRole(['admin', 'super_admin', 'operations_manager', 'traffic']);
-              $canArchive = $hasRole(['admin', 'super_admin', 'operations_manager']) && in_array($bk->booking_status, ['pending', 'cancelled']) && ! $bk->is_archived;
-              $canRestore = $hasRole(['admin', 'super_admin', 'operations_manager']) && $bk->is_archived;
-              $canApproveReject = $hasRole(['admin', 'super_admin', 'operations_manager']) && ($bk->approval_status ?? 'approved') === 'pending_approval';
-              $canResubmit = ($bk->approval_status ?? 'approved') === 'rejected' && $hasRole(['traffic', 'admin', 'operations_manager']);
+              $canDiscount = $hasRole(['super_admin', 'operations_manager', 'traffic']) && ! $bk->pending_discount && $bk->booking_status !== 'cancelled';
+              $canEdit = $hasRole(['super_admin', 'operations_manager', 'traffic']);
+              $canArchive = $hasRole(['super_admin', 'operations_manager']) && in_array($bk->booking_status, ['pending', 'cancelled']) && ! $bk->is_archived;
+              $canRestore = $hasRole(['super_admin', 'operations_manager']) && $bk->is_archived;
+              $canApproveReject = $hasRole(['super_admin', 'operations_manager']) && ($bk->approval_status ?? 'approved') === 'pending_approval';
+              $canResubmit = ($bk->approval_status ?? 'approved') === 'rejected' && $hasRole(['traffic', 'operations_manager']);
               $hasMenuItems = $bk->latest_ce_id || $canDiscount || $canEdit || $canApproveReject || $canResubmit || $canArchive || $canRestore;
             @endphp
             <div style="display:flex;gap:6px;align-items:center">
