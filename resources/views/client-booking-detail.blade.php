@@ -987,8 +987,8 @@ footer .footer-sep{margin:0 8px}
   @endif
 
   @php
-    $deptColors = ['staff' => '#0060C7', 'accounting' => '#16A34A', 'operations_manager' => '#7C3AED'];
-    $deptInitials = ['staff' => 'FS', 'accounting' => 'AC', 'operations_manager' => 'OM'];
+    $deptColors = ['staff' => '#0060C7', 'accounting' => '#16A34A', 'traffic' => '#d97706', 'operations_manager' => '#7C3AED'];
+    $deptInitials = ['staff' => 'FS', 'accounting' => 'AC', 'traffic' => 'TR', 'operations_manager' => 'OM'];
   @endphp
 
   <!-- DEPARTMENT PICKER -->

@@ -61,12 +61,14 @@ class HomeController extends Controller
         $supportMsg = null;
         if ($isLoggedIn && $request->isMethod('post') && $request->input('action') === 'post_support_message') {
             $body = trim($request->input('body', ''));
+            $dept = $request->input('department', '');
+            $dept = \App\Support\BookingChatDepartment::isValid($dept) ? $dept : 'staff';
             $attach = ChatAttachmentUpload::handle($request->file('attachment'));
             if ($attach['error']) {
                 $supportMsg = ['type' => 'error', 'text' => $attach['error']];
             } elseif (($body !== '' || $attach['success']) && $clientId) {
                 DB::table('client_support_messages')->insert([
-                    'client_id' => $clientId, 'user_id' => $uid, 'body' => $body,
+                    'client_id' => $clientId, 'user_id' => $uid, 'department' => $dept, 'body' => $body,
                     'attachment_path' => $attach['success'] ? $attach['path'] : null,
                     'attachment_name' => $attach['success'] ? $attach['name'] : null,
                     'attachment_mime' => $attach['success'] ? $attach['mime'] : null,
@@ -138,10 +140,13 @@ class HomeController extends Controller
                 ->join('roles as r', 'u.role_id', '=', 'r.role_id')
                 ->where('m.client_id', $clientId)->where('m.is_internal', false)
                 ->orderBy('m.created_at')
-                ->select('m.*', 'r.role_name as author_role')
+                ->select('m.*', DB::raw("CONCAT(u.first_name,' ',u.last_name) AS author_name"), 'r.role_name as author_role')
                 ->get()
                 ->each(function ($m) {
                     $m->author_label = $m->author_role === 'client' ? null : \App\Support\StaffTeamLabel::forRole($m->author_role);
+                    // Pre-department-routing rows have no department — treated as the 'staff'
+                    // bucket, same convention as ClientBookingDetailController's booking chat.
+                    $m->department = $m->department ?: 'staff';
                 });
 
             // Newest time ANY staff member opened this client's thread — used for a client-side
@@ -261,7 +266,9 @@ class HomeController extends Controller
         $erasurePending = $clientId && DB::table('data_erasure_requests')
             ->where('client_id', $clientId)->where('status', 'pending')->exists();
 
-        return view('home', compact('isLoggedIn', 'user', 'categories', 'equipment', 'clientBookings', 'stats', 'statusMap', 'supportMessages', 'supportMsg', 'staffLastRead', 'faqs', 'publicReviews', 'accountMsg', 'erasurePending'));
+        $chatDepartments = \App\Support\BookingChatDepartment::LABELS;
+
+        return view('home', compact('isLoggedIn', 'user', 'categories', 'equipment', 'clientBookings', 'stats', 'statusMap', 'supportMessages', 'supportMsg', 'staffLastRead', 'faqs', 'publicReviews', 'accountMsg', 'erasurePending', 'chatDepartments'));
     }
 
     /**
@@ -284,10 +291,11 @@ class HomeController extends Controller
             ->where('m.client_id', $clientId)->where('m.is_internal', false)
             ->where('m.message_id', '>', $after)
             ->orderBy('m.created_at')
-            ->select('m.*', 'r.role_name as author_role')
+            ->select('m.*', DB::raw("CONCAT(u.first_name,' ',u.last_name) AS author_name"), 'r.role_name as author_role')
             ->get()
             ->each(function ($m) {
                 $m->author_label = $m->author_role === 'client' ? null : \App\Support\StaffTeamLabel::forRole($m->author_role);
+                $m->department = $m->department ?: 'staff';
             });
 
         $staffLastRead = DB::table('staff_message_reads')

@@ -20,7 +20,7 @@ class SupportChatController extends Controller
     public function index()
     {
         return view('support-chat', array_merge(
-            ['activeClientId' => null, 'client' => null, 'messages' => collect()],
+            ['activeClientId' => null, 'client' => null, 'messages' => collect(), 'chatDepartments' => \App\Support\BookingChatDepartment::LABELS],
             $this->threadList()
         ));
     }
@@ -42,8 +42,14 @@ class SupportChatController extends Controller
             } elseif ($body === '' && ! $attach['success']) {
                 $flash = ['type' => 'danger', 'text' => 'Message cannot be empty.'];
             } else {
+                // Department is derived from the replying staff member's own role, not picked —
+                // same convention BookingDetailController::postComment() uses for booking chat,
+                // so a client's "Accounting" thread always lands replies from whoever actually
+                // handles accounting, regardless of which conversation the staffer clicked into.
+                $role = Auth::user()->role->role_name ?? null;
                 DB::table('client_support_messages')->insert([
-                    'client_id' => $clientId, 'user_id' => $uid, 'body' => $body,
+                    'client_id' => $clientId, 'user_id' => $uid,
+                    'department' => \App\Support\BookingChatDepartment::bucketForRole($role), 'body' => $body,
                     'attachment_path' => $attach['success'] ? $attach['path'] : null,
                     'attachment_name' => $attach['success'] ? $attach['name'] : null,
                     'attachment_mime' => $attach['success'] ? $attach['mime'] : null,
@@ -66,12 +72,15 @@ class SupportChatController extends Controller
             ->where('m.client_id', $clientId)
             ->orderBy('m.created_at')
             ->select('m.*', 'r.role_name as author_role', 'u.first_name', 'u.last_name')
-            ->get();
+            ->get()
+            ->each(function ($m) {
+                $m->department = $m->department ?: 'staff';
+            });
 
         MessageReadTracker::markRead($uid, 'support', $clientId, $messages->last()->created_at ?? null);
 
         return view('support-chat', array_merge(
-            ['activeClientId' => $clientId, 'client' => $client, 'messages' => $messages],
+            ['activeClientId' => $clientId, 'client' => $client, 'messages' => $messages, 'chatDepartments' => \App\Support\BookingChatDepartment::LABELS],
             $this->threadList()
         ));
     }
@@ -136,7 +145,10 @@ class SupportChatController extends Controller
             ->where('m.message_id', '>', $after)
             ->orderBy('m.created_at')
             ->select('m.*', 'r.role_name as author_role', 'u.first_name', 'u.last_name')
-            ->get();
+            ->get()
+            ->each(function ($m) {
+                $m->department = $m->department ?: 'staff';
+            });
 
         if ($messages->isNotEmpty()) {
             MessageReadTracker::markRead(Auth::id(), 'support', $clientId, $messages->last()->created_at);

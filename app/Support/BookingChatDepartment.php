@@ -3,21 +3,23 @@
 namespace App\Support;
 
 /**
- * The three client-facing departments a booking's chat can be routed to. Crew and the
- * super_admin/traffic roles deliberately have no department of their own here — crew have no
- * inbox for these messages at all (separate crew portal), and super_admin/traffic fold into
- * 'staff' since they share the same general-admin relationship to a client as 'admin' does.
+ * The client-facing departments a booking's (or the general support widget's) chat can be
+ * routed to. Crew and super_admin deliberately have no department of their own here — crew have
+ * no inbox for these messages at all (separate crew portal), and super_admin folds into 'staff'
+ * since it shares the same general-admin relationship to a client as 'admin' does.
  */
 class BookingChatDepartment
 {
     public const LABELS = [
         'staff' => 'FilmSpec Staff',
         'accounting' => 'Accounting',
+        'traffic' => 'Traffic',
         'operations_manager' => 'Operations Manager',
     ];
 
     private const ROLE_BUCKETS = [
         'accounting' => 'accounting',
+        'traffic' => 'traffic',
         'operations_manager' => 'operations_manager',
     ];
 

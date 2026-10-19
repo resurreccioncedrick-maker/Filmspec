@@ -1509,6 +1509,17 @@ a.footer-contact-link:hover{color:#60b0ff}
 .sup-panel.open{display:flex}
 .sup-h{position:relative;padding:20px 22px 18px;flex-shrink:0;background:radial-gradient(520px 160px at 85% -40%,rgba(255,255,255,.16),transparent 60%),linear-gradient(135deg,var(--blue),var(--blue2))}
 .sup-h-top{display:flex;align-items:flex-start;gap:12px}
+.sup-back{width:26px;height:26px;border:none;background:rgba(255,255,255,.14);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;flex-shrink:0;transition:background .15s;margin-top:2px}
+.sup-back:hover{background:rgba(255,255,255,.26)}
+.sup-back svg{width:13px;height:13px}
+.sup-dept-list{gap:3px}
+.dept-row{display:flex;align-items:center;gap:11px;width:100%;padding:10px 8px;background:none;border:none;border-radius:10px;cursor:pointer;text-align:left;font-family:inherit;transition:background .15s}
+.dept-row:hover{background:var(--surface)}
+.dept-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12.5px;font-weight:700;flex-shrink:0}
+.dept-info{flex:1;min-width:0}
+.dept-name{display:block;font-size:12.5px;font-weight:700;color:var(--text)}
+.dept-preview{display:block;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.dept-time{font-size:9.5px;color:var(--muted);flex-shrink:0;align-self:flex-start;margin-top:2px}
 .sup-h-avatar{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
 .sup-h-avatar svg{width:20px;height:20px;color:#fff}
 .sup-h-dot{position:absolute;bottom:0;right:0;width:11px;height:11px;border-radius:50%;background:#39d98a;border:2.5px solid var(--blue2)}
@@ -3461,47 +3472,83 @@ document.addEventListener('DOMContentLoaded',()=>{
 <div class="sup-panel" id="supPanel">
   <div class="sup-h">
    <div class="sup-h-top">
+    <button class="sup-back" id="supBackBtn" onclick="showDeptPicker()" style="display:none" title="Back to departments">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
     <div class="sup-h-avatar">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
       <span class="sup-h-dot"></span>
     </div>
     <div class="sup-h-text">
-      <div class="t">FilmSpec Team</div>
-      <div class="s">Usually replies within a few hours</div>
+      <div class="t" id="supHTitle">FilmSpec Team</div>
+      <div class="s" id="supHSub">Who do you want to message?</div>
     </div>
     <button class="sup-close" onclick="closeSupportChat()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>
    </div>
   </div>
-  @php
-    $supLastMsg = $supportMessages->last();
-    $supSeen = $supLastMsg && $supLastMsg->author_role === 'client' && $staffLastRead
-      && \Carbon\Carbon::parse($supLastMsg->created_at)->lte(\Carbon\Carbon::parse($staffLastRead));
-  @endphp
-  <div class="sup-body" id="supBody"
-       data-last-id="{{ $supLastMsg->message_id ?? 0 }}"
-       data-last-role="{{ $supLastMsg->author_role ?? '' }}"
-       data-last-at="{{ $supLastMsg->created_at ?? '' }}"
-       data-last-date="{{ $supLastMsg ? \Carbon\Carbon::parse($supLastMsg->created_at)->toDateString() : '' }}">
-    @if ($supportMsg)
-    <div style="padding:9px 12px;border-radius:7px;font-size:12px;font-weight:600;
-                background:{{ $supportMsg['type'] === 'success' ? 'var(--greenlt)' : 'var(--redlt)' }};
-                color:{{ $supportMsg['type'] === 'success' ? '#15803d' : '#b91c1c' }}">
-      {{ $supportMsg['text'] }}
-    </div>
-    @endif
 
-    @if ($supportMessages->isEmpty())
+  @if ($supportMsg)
+  <div style="padding:9px 12px;margin:10px 14px 0;border-radius:7px;font-size:12px;font-weight:600;
+              background:{{ $supportMsg['type'] === 'success' ? 'var(--greenlt)' : 'var(--redlt)' }};
+              color:{{ $supportMsg['type'] === 'success' ? '#15803d' : '#b91c1c' }}">
+    {{ $supportMsg['text'] }}
+  </div>
+  @endif
+
+  @php
+    $deptColors = ['staff' => '#0060C7', 'accounting' => '#16A34A', 'traffic' => '#d97706', 'operations_manager' => '#7C3AED'];
+    $deptInitials = ['staff' => 'FS', 'accounting' => 'AC', 'traffic' => 'TR', 'operations_manager' => 'OM'];
+  @endphp
+
+  <!-- DEPARTMENT PICKER -->
+  <div class="sup-body sup-dept-list" id="deptPicker">
+    @foreach ($chatDepartments as $deptKey => $deptLabel)
+    @php
+      $deptMsgs = $supportMessages->where('department', $deptKey)->values();
+      $deptLastMsg = $deptMsgs->last();
+    @endphp
+    <button type="button" class="dept-row" onclick="openDeptThread('{{ $deptKey }}')">
+      <span class="dept-avatar" style="background:{{ $deptColors[$deptKey] }}">{{ $deptInitials[$deptKey] }}</span>
+      <span class="dept-info">
+        <span class="dept-name">{{ $deptLabel }}</span>
+        <span class="dept-preview">{{ $deptLastMsg ? \Illuminate\Support\Str::limit($deptLastMsg->body, 42) : 'No messages yet — tap to start' }}</span>
+      </span>
+      @if ($deptLastMsg)
+      <span class="dept-time">{{ \Carbon\Carbon::parse($deptLastMsg->created_at)->diffForHumans(null, true) }}</span>
+      @endif
+    </button>
+    @endforeach
+  </div>
+
+  <!-- ONE THREAD + FORM PER DEPARTMENT -->
+  @foreach ($chatDepartments as $deptKey => $deptLabel)
+  @php
+    $deptMsgs = $supportMessages->where('department', $deptKey)->values();
+    $deptLastMsg = $deptMsgs->last();
+    $deptSeen = $deptLastMsg && $deptLastMsg->author_role === 'client' && $staffLastRead
+      && \Carbon\Carbon::parse($deptLastMsg->created_at)->lte(\Carbon\Carbon::parse($staffLastRead));
+  @endphp
+  <div class="sup-body" id="thread-{{ $deptKey }}" style="display:none"
+       data-last-id="{{ $deptLastMsg->message_id ?? 0 }}"
+       data-last-role="{{ $deptLastMsg->author_role ?? '' }}"
+       data-last-at="{{ $deptLastMsg->created_at ?? '' }}"
+       data-last-date="{{ $deptLastMsg ? \Carbon\Carbon::parse($deptLastMsg->created_at)->toDateString() : '' }}">
+    @if ($deptMsgs->isEmpty())
     <div class="sup-empty">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
+      @if ($deptKey === 'staff')
       No messages yet. Have a general question about FilmSpec? Send us a message below — for questions about a specific booking, open that booking and use the chat bubble there instead, so your staff contact sees it in the right place.
+      @else
+      No messages yet with {{ $deptLabel }}. Send one below to start the conversation.
+      @endif
     </div>
     @else
     @php
       $supBlocks = [];
       $supPrevDate = null;
-      foreach ($supportMessages as $m) {
+      foreach ($deptMsgs as $m) {
           $mDate = \Carbon\Carbon::parse($m->created_at)->toDateString();
           if ($mDate !== $supPrevDate) {
               $supBlocks[] = ['type' => 'day', 'date' => $mDate];
@@ -3560,39 +3607,43 @@ document.addEventListener('DOMContentLoaded',()=>{
         </div>
         @endif
       </div>
-      <div class="sup-meta {{ $supBlock['role'] }}">{{ $supBlock['role'] === 'them' ? 'FilmSpec ('.$supLastItem->author_label.') · ' : '' }}{{ \Carbon\Carbon::parse($supLastItem->created_at)->format('g:i A') }}</div>
+      <div class="sup-meta {{ $supBlock['role'] }}">{{ $supBlock['role'] === 'them' ? $supLastItem->author_label.' ('.$supLastItem->author_name.') · ' : '' }}{{ \Carbon\Carbon::parse($supLastItem->created_at)->format('g:i A') }}</div>
     @endforeach
-    <div class="sup-seen" id="supSeenLine" style="{{ $supSeen ? '' : 'display:none' }}">
+    <div class="sup-seen" id="supSeenLine-{{ $deptKey }}" style="{{ $deptSeen ? '' : 'display:none' }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 7 17l-5-5"/><path d="m22 10-9 9-3-3"/></svg>
       Seen
     </div>
     @endif
   </div>
-  <form method="POST" action="{{ route('home') }}" class="sup-input" enctype="multipart/form-data">
+  <form method="POST" action="{{ route('home') }}" class="sup-input" id="form-{{ $deptKey }}" style="display:none" enctype="multipart/form-data">
     @csrf
     <input type="hidden" name="action" value="post_support_message">
-    <div class="sup-file-chip" id="supFileChip">
+    <input type="hidden" name="department" value="{{ $deptKey }}">
+    <div class="sup-file-chip" id="supFileChip-{{ $deptKey }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M21.44 11.05 12.25 20.24a5 5 0 0 1-7.07-7.07l9.19-9.19a3.33 3.33 0 0 1 4.71 4.71l-9.2 9.19a1.67 1.67 0 0 1-2.36-2.36l8.49-8.48"/></svg>
       <span class="name"></span>
-      <span class="rm" onclick="clearSupFile()" title="Remove">
+      <span class="rm" onclick="clearSupFile('{{ $deptKey }}')" title="Remove">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10" height="10"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </span>
     </div>
     <div class="sup-input-row">
-      <button type="button" class="sup-attach-btn" onclick="document.getElementById('supFile').click()" title="Attach file">
+      <button type="button" class="sup-attach-btn" onclick="document.getElementById('supFile-{{ $deptKey }}').click()" title="Attach file">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.44 11.05 12.25 20.24a5 5 0 0 1-7.07-7.07l9.19-9.19a3.33 3.33 0 0 1 4.71 4.71l-9.2 9.19a1.67 1.67 0 0 1-2.36-2.36l8.49-8.48"/></svg>
       </button>
-      <input type="file" id="supFile" name="attachment" accept="image/*,.pdf,.doc,.docx" style="display:none" onchange="showSupFilePreview(this)">
-      <textarea name="body" rows="1" placeholder="Message the FilmSpec team…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.form.submit()}"></textarea>
+      <input type="file" id="supFile-{{ $deptKey }}" name="attachment" accept="image/*,.pdf,.doc,.docx" style="display:none" onchange="showSupFilePreview(this,'{{ $deptKey }}')">
+      <textarea name="body" rows="1" placeholder="Message {{ $deptLabel }}…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.form.submit()}"></textarea>
       <button type="submit" class="sup-send" title="Send">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg>
       </button>
     </div>
   </form>
+  @endforeach
 </div>
 <script>
-function showSupFilePreview(input){
-  var chip = document.getElementById('supFileChip');
+var CHAT_DEPT_LABELS = {!! json_encode($chatDepartments) !!};
+
+function showSupFilePreview(input, dept){
+  var chip = document.getElementById('supFileChip-' + dept);
   if (input.files && input.files[0]) {
     chip.querySelector('.name').textContent = input.files[0].name;
     chip.classList.add('show');
@@ -3600,23 +3651,53 @@ function showSupFilePreview(input){
     chip.classList.remove('show');
   }
 }
-function clearSupFile(){
-  document.getElementById('supFile').value = '';
-  document.getElementById('supFileChip').classList.remove('show');
+function clearSupFile(dept){
+  document.getElementById('supFile-' + dept).value = '';
+  document.getElementById('supFileChip-' + dept).classList.remove('show');
 }
+
+function showDeptPicker(){
+  document.getElementById('deptPicker').style.display = 'flex';
+  Object.keys(CHAT_DEPT_LABELS).forEach(function (d) {
+    var t = document.getElementById('thread-' + d), f = document.getElementById('form-' + d);
+    if (t) t.style.display = 'none';
+    if (f) f.style.display = 'none';
+  });
+  document.getElementById('supBackBtn').style.display = 'none';
+  document.getElementById('supHTitle').textContent = 'FilmSpec Team';
+  document.getElementById('supHSub').textContent = 'Who do you want to message?';
+}
+
+function openDeptThread(dept){
+  document.getElementById('deptPicker').style.display = 'none';
+  Object.keys(CHAT_DEPT_LABELS).forEach(function (d) {
+    var t = document.getElementById('thread-' + d), f = document.getElementById('form-' + d);
+    if (t) t.style.display = (d === dept) ? 'flex' : 'none';
+    if (f) f.style.display = (d === dept) ? 'flex' : 'none';
+  });
+  document.getElementById('supBackBtn').style.display = 'flex';
+  document.getElementById('supHTitle').textContent = CHAT_DEPT_LABELS[dept] || dept;
+  document.getElementById('supHSub').textContent = 'Usually replies within a few hours';
+  var thread = document.getElementById('thread-' + dept);
+  if (thread) thread.scrollTop = thread.scrollHeight;
+}
+
 function toggleSupportChat(){
   var p = document.getElementById('supPanel'), o = document.getElementById('supOverlay');
   var open = p.classList.toggle('open');
   o.classList.toggle('open', open);
-  if (open) { var b = document.getElementById('supBody'); b.scrollTop = b.scrollHeight; }
 }
 function closeSupportChat(){
   document.getElementById('supPanel').classList.remove('open');
   document.getElementById('supOverlay').classList.remove('open');
+  showDeptPicker();
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSupportChat(); });
 @if (request('action') === 'post_support_message')
-document.addEventListener('DOMContentLoaded', toggleSupportChat);
+document.addEventListener('DOMContentLoaded', function () {
+  toggleSupportChat();
+  openDeptThread('{{ in_array(request('department'), array_keys($chatDepartments ?? []), true) ? request('department') : 'staff' }}');
+});
 @endif
 
 function supInitials(label) {
@@ -3654,7 +3735,7 @@ function supBubbleHtml(m, body) {
   }
   var when = new Date(m.created_at);
   var timeStr = when.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit' });
-  var metaPrefix = side === 'them' ? ('FilmSpec (' + escapeHtml(m.author_label || 'Team') + ') · ') : '';
+  var metaPrefix = side === 'them' ? (escapeHtml(m.author_label || 'Team') + ' (' + escapeHtml(m.author_name || '') + ') · ') : '';
 
   var dayHtml = '';
   var mDate = m.created_at.slice(0, 10);
@@ -3670,47 +3751,61 @@ function supBubbleHtml(m, body) {
   return dayHtml + clusterHtml + '<div class="sup-meta ' + side + '">' + metaPrefix + timeStr + '</div>';
 }
 
-function updateSeenIndicator(staffLastRead) {
-  var seenLine = document.getElementById('supSeenLine');
-  var body = document.getElementById('supBody');
-  if (!seenLine || !body) return;
-  var seen = body.dataset.lastRole === 'client' && staffLastRead && body.dataset.lastAt
-    && new Date(body.dataset.lastAt) <= new Date(staffLastRead);
-  seenLine.style.display = seen ? 'flex' : 'none';
+function updateSeenIndicators(staffLastRead) {
+  Object.keys(CHAT_DEPT_LABELS).forEach(function (dept) {
+    var seenLine = document.getElementById('supSeenLine-' + dept);
+    var body = document.getElementById('thread-' + dept);
+    if (!seenLine || !body) return;
+    var seen = body.dataset.lastRole === 'client' && staffLastRead && body.dataset.lastAt
+      && new Date(body.dataset.lastAt) <= new Date(staffLastRead);
+    seenLine.style.display = seen ? 'flex' : 'none';
+  });
 }
 
 function pollSupportChat() {
   if (!IS_LOGIN || document.hidden) return;
-  var body = document.getElementById('supBody');
-  if (!body) return;
-  var lastId = parseInt(body.dataset.lastId || '0');
+  var lastId = 0;
+  Object.keys(CHAT_DEPT_LABELS).forEach(function (d) {
+    var t = document.getElementById('thread-' + d);
+    if (t) lastId = Math.max(lastId, parseInt(t.dataset.lastId || '0'));
+  });
   fetch('{{ route('support-poll') }}?after=' + lastId)
     .then(r => r.json())
     .then(d => {
       if (d.messages && d.messages.length) {
-        var empty = body.querySelector('.sup-empty');
-        if (empty) empty.remove();
-        var atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 30;
-        var html = '';
-        d.messages.forEach(m => { html += supBubbleHtml(m, body); });
-        var seenLine = document.getElementById('supSeenLine');
-        if (seenLine) { seenLine.insertAdjacentHTML('beforebegin', html); } else { body.insertAdjacentHTML('beforeend', html); }
-        var last = d.messages[d.messages.length - 1];
-        body.dataset.lastId = last.message_id;
-        body.dataset.lastRole = last.author_role;
-        body.dataset.lastAt = last.created_at;
-        if (atBottom) body.scrollTop = body.scrollHeight;
+        var panelOpen = document.getElementById('supPanel').classList.contains('open');
+        var byDept = {};
+        d.messages.forEach(m => {
+          var dept = CHAT_DEPT_LABELS[m.department] ? m.department : 'staff';
+          (byDept[dept] = byDept[dept] || []).push(m);
+        });
+        Object.keys(byDept).forEach(function (dept) {
+          var body = document.getElementById('thread-' + dept);
+          if (!body) return;
+          var empty = body.querySelector('.sup-empty');
+          if (empty) empty.remove();
+          var atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 30;
+          var html = '';
+          byDept[dept].forEach(m => { html += supBubbleHtml(m, body); });
+          var seenLine = document.getElementById('supSeenLine-' + dept);
+          if (seenLine) { seenLine.insertAdjacentHTML('beforebegin', html); } else { body.insertAdjacentHTML('beforeend', html); }
+          var last = byDept[dept][byDept[dept].length - 1];
+          body.dataset.lastId = last.message_id;
+          body.dataset.lastRole = last.author_role;
+          body.dataset.lastAt = last.created_at;
+          if (atBottom) body.scrollTop = body.scrollHeight;
+        });
 
         var fab = document.querySelector('.sup-fab');
         var badge = document.querySelector('.sup-fab-badge');
-        if (fab && !document.getElementById('supPanel').classList.contains('open')) {
+        if (fab && !panelOpen) {
           var n = (badge ? parseInt(badge.textContent) : 0) + d.messages.length;
           if (badge) { badge.textContent = n; } else {
             fab.insertAdjacentHTML('beforeend', '<span class="sup-fab-badge">' + n + '</span>');
           }
         }
       }
-      updateSeenIndicator(d.staff_last_read);
+      updateSeenIndicators(d.staff_last_read);
     })
     .catch(() => {});
 }

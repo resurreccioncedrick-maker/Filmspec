@@ -96,7 +96,7 @@
               @endif
             @endif
           </div>
-          <div class="sc-bubble-meta">{{ trim($m->first_name . ' ' . $m->last_name) }} &middot; {{ \Illuminate\Support\Carbon::parse($m->created_at)->format('M j, g:i a') }}</div>
+          <div class="sc-bubble-meta">{{ $out ? \App\Support\BookingChatDepartment::label($m->department).' · ' : 'To '.\App\Support\BookingChatDepartment::label($m->department).' · ' }}{{ trim($m->first_name . ' ' . $m->last_name) }} &middot; {{ \Illuminate\Support\Carbon::parse($m->created_at)->format('M j, g:i a') }}</div>
         </div>
       </div>
       @endforeach
@@ -130,6 +130,8 @@ function scEscapeHtml(s) {
   d.textContent = s;
   return d.innerHTML;
 }
+var CHAT_DEPT_LABELS = {!! json_encode($chatDepartments ?? []) !!};
+
 function scBubbleHtml(m) {
   var out = m.author_role !== 'client';
   var internalTag = m.is_internal ? '<span class="sc-bubble-tag">Internal Only</span>' : '';
@@ -144,10 +146,12 @@ function scBubbleHtml(m) {
     }
   }
   var name = scEscapeHtml((m.first_name || '') + ' ' + (m.last_name || ''));
+  var deptLabel = CHAT_DEPT_LABELS[m.department] || CHAT_DEPT_LABELS['staff'] || 'Staff';
+  var deptPrefix = out ? (scEscapeHtml(deptLabel) + ' · ') : ('To ' + scEscapeHtml(deptLabel) + ' · ');
   var when = new Date(m.created_at).toLocaleString();
   return '<div class="sc-bubble-row ' + (out ? 'out' : 'in') + '"><div>'
     + '<div class="sc-bubble ' + (m.is_internal ? 'internal' : '') + '">' + internalTag + body + attach + '</div>'
-    + '<div class="sc-bubble-meta">' + name + ' &middot; ' + when + '</div>'
+    + '<div class="sc-bubble-meta">' + deptPrefix + name + ' &middot; ' + when + '</div>'
     + '</div></div>';
 }
 function pollSupportThread() {
