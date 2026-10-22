@@ -44,7 +44,11 @@ a{text-decoration:none;color:inherit}
 .main-col,.sidebar-col{min-width:0}
 
 @media (max-width:640px){
-  .container{padding:16px 14px}
+  /* The support-chat FAB is fixed at bottom:22px/right:22px (52px) and sits on top of
+     whatever content happens to be underneath — without reserved space here, the last
+     card's own buttons/text could end up hidden behind it even though the page itself
+     scrolls fine, reading as "stuck"/"can't scroll past this" rather than what it is. */
+  .container{padding:16px 14px 100px}
   .nav{padding:0 14px;height:auto;min-height:58px;flex-wrap:wrap;row-gap:6px}
   .nav img{height:26px}
   .nav-back{font-size:12px;padding:6px 10px}
@@ -214,10 +218,14 @@ footer .footer-sep{margin:0 8px}
 .sup-fab:hover{transform:translateY(-2px) scale(1.04);box-shadow:0 10px 26px rgba(0,96,199,.4),0 2px 8px rgba(0,30,80,.18)}
 .sup-fab svg{width:22px;height:22px;color:#fff}
 .sup-fab-badge{position:absolute;top:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2.5px solid var(--bg)}
-.sup-overlay{display:none;position:fixed;inset:0;backdrop-filter:blur(6px) saturate(1.05);-webkit-backdrop-filter:blur(6px) saturate(1.05);background:rgba(11,26,51,.14);z-index:950}
-.sup-overlay.open{display:block}
-.sup-panel{position:fixed;bottom:22px;right:22px;width:328px;max-height:min(70vh,540px);background:var(--surface);border-radius:18px;box-shadow:0 16px 48px rgba(0,30,80,.18),0 2px 10px rgba(0,30,80,.08);border:1px solid var(--border);display:none;flex-direction:column;overflow:hidden;z-index:960}
-.sup-panel.open{display:flex}
+/* pointer-events:none belt-and-suspenders alongside display:none — a couple of mobile
+   browser engines are known to still hit-test a display:none element that has
+   backdrop-filter set, which would silently eat scroll/tap gestures on the page behind
+   it even though nothing is visibly wrong. Re-enabled only once .open is actually applied. */
+.sup-overlay{display:none;pointer-events:none;position:fixed;inset:0;backdrop-filter:blur(6px) saturate(1.05);-webkit-backdrop-filter:blur(6px) saturate(1.05);background:rgba(11,26,51,.14);z-index:950}
+.sup-overlay.open{display:block;pointer-events:auto}
+.sup-panel{position:fixed;bottom:22px;right:22px;width:328px;max-height:min(70vh,540px);background:var(--surface);border-radius:18px;box-shadow:0 16px 48px rgba(0,30,80,.18),0 2px 10px rgba(0,30,80,.08);border:1px solid var(--border);display:none;pointer-events:none;flex-direction:column;overflow:hidden;z-index:960}
+.sup-panel.open{display:flex;pointer-events:auto}
 .sup-h{padding:16px 18px;display:flex;align-items:center;gap:11px;flex-shrink:0;background:linear-gradient(135deg,var(--blue),var(--blue2))}
 .sup-h-avatar{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
 .sup-h-avatar svg{width:18px;height:18px;color:#fff}

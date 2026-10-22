@@ -1503,10 +1503,14 @@ a.footer-contact-link:hover{color:#60b0ff}
 .sup-fab.rl-hide{display:none}
 .sup-fab svg{width:22px;height:22px;color:#fff}
 .sup-fab-badge{position:absolute;top:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2.5px solid var(--bg)}
-.sup-overlay{display:none;position:fixed;inset:0;backdrop-filter:blur(6px) saturate(1.05);-webkit-backdrop-filter:blur(6px) saturate(1.05);background:rgba(11,26,51,.14);z-index:950}
-.sup-overlay.open{display:block}
-.sup-panel{position:fixed;bottom:22px;right:22px;width:440px;max-height:min(78vh,660px);background:var(--surface);border-radius:22px;box-shadow:0 24px 64px rgba(2,12,34,.24),0 2px 10px rgba(2,12,34,.08);border:1px solid var(--border);display:none;flex-direction:column;overflow:hidden;z-index:960}
-.sup-panel.open{display:flex}
+/* pointer-events:none belt-and-suspenders alongside display:none — a couple of mobile
+   browser engines are known to still hit-test a display:none element that has
+   backdrop-filter set, which would silently eat scroll/tap gestures on the page behind
+   it even though nothing is visibly wrong. Re-enabled only once .open is actually applied. */
+.sup-overlay{display:none;pointer-events:none;position:fixed;inset:0;backdrop-filter:blur(6px) saturate(1.05);-webkit-backdrop-filter:blur(6px) saturate(1.05);background:rgba(11,26,51,.14);z-index:950}
+.sup-overlay.open{display:block;pointer-events:auto}
+.sup-panel{position:fixed;bottom:22px;right:22px;width:440px;max-height:min(78vh,660px);background:var(--surface);border-radius:22px;box-shadow:0 24px 64px rgba(2,12,34,.24),0 2px 10px rgba(2,12,34,.08);border:1px solid var(--border);display:none;pointer-events:none;flex-direction:column;overflow:hidden;z-index:960}
+.sup-panel.open{display:flex;pointer-events:auto}
 .sup-h{position:relative;padding:20px 22px 18px;flex-shrink:0;background:radial-gradient(520px 160px at 85% -40%,rgba(255,255,255,.16),transparent 60%),linear-gradient(135deg,var(--blue),var(--blue2))}
 .sup-h-top{display:flex;align-items:flex-start;gap:12px}
 .sup-back{width:26px;height:26px;border:none;background:rgba(255,255,255,.14);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;flex-shrink:0;transition:background .15s;margin-top:2px}
