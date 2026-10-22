@@ -1369,7 +1369,11 @@ a.footer-contact-link:hover{color:#60b0ff}
      already shown in the top nav, so it's not repeated here). Same markup,
      CSS only: hero-left's logo/eyebrow hidden, stats become their own row,
      hero-right becomes the gradient card. */
-  .hero{background:linear-gradient(145deg,#ffffff 0%,#eef4ff 55%,#f0f5fb 100%)}
+  /* min-height:86vh is a desktop-only full-bleed-image sizing rule that was never reset
+     here — on mobile it forced this much shorter compact-card content to vertically center
+     inside a near-full-screen box (align-items:center, inherited from the desktop rule too),
+     which is what was reading as empty space above and below the cards. */
+  .hero{background:linear-gradient(145deg,#ffffff 0%,#eef4ff 55%,#f0f5fb 100%);min-height:auto}
   .hero-inner{display:flex;flex-direction:column;padding:16px}
   .hero-logo-wrap,.hero-left>div:nth-child(2){display:none}
   .hero-left{margin-bottom:0;margin-top:14px;order:2}
