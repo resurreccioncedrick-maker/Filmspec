@@ -68,6 +68,14 @@ a{text-decoration:none;color:inherit}
   .tbl th{font-size:.68rem;padding:9px 12px}
   .tbl td{font-size:.85rem;padding:10px 12px}
 
+  /* Equipment/Crew/Payment History's .table-wrap sits directly inside .card with no
+     .card-body wrapper around it (unlike most other cards), so it never got that wrapper's
+     16-18px side padding — harmless on desktop where .tbl td already carries its own
+     14px/side cell padding, but the mobile card-per-row rules below zero that cell padding
+     out (assuming a .card-body would still be providing the outer breathing room), leaving
+     values with nothing between them and the card's edge. */
+  .card > .table-wrap{padding:0 14px}
+
   /* Equipment table — 6 columns (Item, Category, Qty, Days, Rate/Day, Subtotal) was wide
      enough that real item names forced horizontal scroll on phones, with no visual hint it
      was scrollable — easy to miss and read as a cut-off/broken table. Converts to a stacked
