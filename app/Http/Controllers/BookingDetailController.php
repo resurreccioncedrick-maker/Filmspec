@@ -397,6 +397,8 @@ class BookingDetailController extends Controller
             $msg = $this->addCrew($request, $id, $booking);
         } elseif ($action === 'update_crew_status' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->updateCrewStatus($request, $id);
+        } elseif ($action === 'set_head_crew' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
+            $msg = $this->setHeadCrew($request, $id, $uid);
         } elseif ($action === 'remove_crew' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->removeCrew($request, $id, $uid);
         } elseif ($action === 'generate_ce' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
@@ -1404,6 +1406,48 @@ class BookingDetailController extends Controller
         DB::table('booking_crew')->where('bk_crew_id', $bcid)->where('booking_id', $id)->update(['assignment_status' => $status]);
 
         return ['type' => 'success', 'text' => 'Crew status updated.'];
+    }
+
+    // Marks (or un-marks) one crew assignment as the booking's Head Crew. Only one head per
+    // booking: setting a new one clears the previous; sending the current head again toggles
+    // the mark off. The head is the only crew member who gets Attendance and Equipment
+    // Checklist in the crew portal (see CrewPortalController). Internal-only — nothing
+    // client-facing ever reads is_head_crew.
+    private function setHeadCrew(Request $request, int $id, int $uid): array
+    {
+        if (DB::table('bookings')->where('booking_id', $id)->value('booking_status') === 'completed') {
+            return ['type' => 'error', 'text' => 'This booking is completed — its crew roster is locked to protect historical analytics.'];
+        }
+
+        $bcid = (int) $request->input('bk_crew_id');
+        $row = DB::table('booking_crew as bc')
+            ->join('crew_members as cm', 'bc.crew_id', '=', 'cm.crew_id')
+            ->where('bc.bk_crew_id', $bcid)->where('bc.booking_id', $id)
+            ->selectRaw("bc.is_head_crew, bc.assignment_status, CONCAT(cm.first_name,' ',cm.last_name) AS n")
+            ->first();
+
+        if (! $row) {
+            return ['type' => 'error', 'text' => 'Crew assignment not found.'];
+        }
+
+        if ((int) $row->is_head_crew === 1) {
+            DB::table('booking_crew')->where('bk_crew_id', $bcid)->update(['is_head_crew' => 0]);
+            ActivityLog::record($uid, 'update', 'booking', 'Removed Head Crew mark from ' . $row->n . " on booking $id", $id);
+
+            return ['type' => 'success', 'text' => '<strong>' . e($row->n) . '</strong> is no longer the Head Crew for this booking.'];
+        }
+
+        if (in_array($row->assignment_status, ['declined', 'back_out', 'no_show', 'replaced'], true)) {
+            return ['type' => 'error', 'text' => 'That crew member is not an active assignment, so they cannot be the Head Crew.'];
+        }
+
+        DB::transaction(function () use ($id, $bcid) {
+            DB::table('booking_crew')->where('booking_id', $id)->update(['is_head_crew' => 0]);
+            DB::table('booking_crew')->where('bk_crew_id', $bcid)->where('booking_id', $id)->update(['is_head_crew' => 1]);
+        });
+        ActivityLog::record($uid, 'update', 'booking', 'Marked ' . $row->n . " as Head Crew for booking $id", $id);
+
+        return ['type' => 'success', 'text' => '<strong>' . e($row->n) . '</strong> is now the Head Crew for this booking. Only they can use Attendance and Checklist in the crew portal.'];
     }
 
     private function removeCrew(Request $request, int $id, int $uid): array

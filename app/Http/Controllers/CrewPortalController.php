@@ -48,6 +48,8 @@ class CrewPortalController extends Controller
         $rows = DB::table('booking_crew as bc')
             ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
             ->where('bc.crew_id', $crewMember->crew_id)
+            // Checklist is Head Crew only — a non-head has nothing to poll for.
+            ->where('bc.is_head_crew', 1)
             ->whereNotIn('bc.assignment_status', ['declined', 'back_out'])
             ->whereIn('b.booking_status', ['confirmed', 'ongoing'])
             ->where('b.cost_approval_status', 'client_approved')
@@ -59,6 +61,20 @@ class CrewPortalController extends Controller
             ->implode('|');
 
         return response()->json(['ok' => true, 'signature' => md5($signature)]);
+    }
+
+    // Head Crew gate — staff mark ONE crew member per booking as Head Crew (booking_crew.is_head_crew,
+    // set from the Crew Talent Fee card). Only that person may use Attendance and Equipment
+    // Checklist (Confirm Arrival / Check-In) for that booking. Everything else in the portal is
+    // open to every assigned crew member. A head who is declined / backed out loses access
+    // automatically because those assignments are excluded here.
+    private function isHeadCrewOf(int $crewId, int $bookingId): bool
+    {
+        return $bookingId > 0 && DB::table('booking_crew')
+            ->where('crew_id', $crewId)->where('booking_id', $bookingId)
+            ->where('is_head_crew', 1)
+            ->whereNotIn('assignment_status', ['declined', 'back_out'])
+            ->exists();
     }
 
     public function index(Request $request)
@@ -126,6 +142,8 @@ class CrewPortalController extends Controller
         $fieldAccMap = [];
         $crewPositions = collect();
         $myFieldRequests = collect();
+        $headBookingIds = [];
+        $isHeadCrew = false;
 
         if ($crewMember) {
             $cmId = $crewMember->crew_id;
@@ -150,6 +168,15 @@ class CrewPortalController extends Controller
                     'c.company_name', 'c.contact_person')
                 ->limit(30)
                 ->get();
+
+            // Bookings (among this crew member's own active assignments) where they are the
+            // marked Head Crew — drives who sees/uses Attendance and Checklist.
+            $headBookingIds = DB::table('booking_crew')
+                ->where('crew_id', $cmId)->where('is_head_crew', 1)
+                ->whereNotIn('assignment_status', ['declined', 'back_out'])
+                ->whereIn('booking_id', $myBookings->pluck('booking_id')->all())
+                ->pluck('booking_id')->map(fn ($v) => (int) $v)->all();
+            $isHeadCrew = ! empty($headBookingIds);
 
             $myMaintenances = DB::table('maintenance_schedules as ms')
                 ->join('equipment as e', 'ms.equipment_id', '=', 'e.equipment_id')
@@ -244,7 +271,9 @@ class CrewPortalController extends Controller
             // there the moment every item is checked in, and without this the booking would
             // vanish from the crew's own checklist the instant they finished, with no way left
             // to reopen it and fix a mistake (an item wrongly checked, or one missed entirely).
-            $checklistBookings = $myBookings->whereIn('booking_status', ['confirmed', 'ongoing', 'pending_inspection']);
+            // Head Crew only — non-head crew get no checklist bookings at all.
+            $checklistBookings = $myBookings->whereIn('booking_status', ['confirmed', 'ongoing', 'pending_inspection'])
+                ->whereIn('booking_id', $headBookingIds);
             $checklistBookingIds = $checklistBookings->pluck('booking_id')->all();
             if ($checklistBookingIds) {
                 $equipRows = DB::table('booking_equipment as be')
@@ -330,9 +359,14 @@ class CrewPortalController extends Controller
                     $teamByBooking[$row->booking_id][] = $row;
                 }
                 foreach ($teamBookings as $bk) {
+                    $bkIsHead = in_array((int) $bk->booking_id, $headBookingIds, true);
                     $myTeamBookings->push((object) [
                         'booking' => $bk,
-                        'team' => $teamByBooking[$bk->booking_id] ?? [],
+                        // $myTeamBookings also feeds the Field Requests booking picker, which every
+                        // crew member keeps — so the list stays, but the teammate roster used for
+                        // marking attendance is only handed to the Head Crew of that booking.
+                        'is_head' => $bkIsHead,
+                        'team' => $bkIsHead ? ($teamByBooking[$bk->booking_id] ?? []) : [],
                     ]);
                 }
 
@@ -389,9 +423,15 @@ class CrewPortalController extends Controller
             ->limit(20)
             ->get();
 
+        // Attendance / Checklist belong to the Head Crew only — never land a non-head on them.
+        if (! $isHeadCrew && in_array($activeTab, ['attendance', 'checklist'], true)) {
+            $activeTab = 'dashboard';
+        }
+
         return view('crew-portal', [
             'msg' => $msg, 'user' => $user, 'crewMember' => $crewMember, 'activeTab' => $activeTab, 'activeSubTab' => $activeSubTab,
             'activeBookingId' => $activeBookingId, 'crewAnnouncements' => $crewAnnouncements,
+            'isHeadCrew' => $isHeadCrew, 'headBookingIds' => $headBookingIds,
             'myBookings' => $myBookings, 'myIncidents' => $myIncidents, 'myMaintenances' => $myMaintenances,
             'myActiveBookings' => $myActiveBookings, 'bookingEquipMap' => $bookingEquipMap, 'equipmentUnitMap' => $equipmentUnitMap,
             'bookingAccMap' => $bookingAccMap, 'accessoryUnitMap' => $accessoryUnitMap,
@@ -683,6 +723,9 @@ class CrewPortalController extends Controller
             if (! $ownsBooking) {
                 return ['type' => 'danger', 'text' => 'That booking is not assigned to you.'];
             }
+            if (! $this->isHeadCrewOf((int) $crewMember->crew_id, $bid)) {
+                return ['type' => 'danger', 'text' => 'Only the Head Crew of this booking can do this.'];
+            }
 
             DB::table('bookings')->where('booking_id', $bid)->update([
                 'field_arrival_confirmed_at' => now(), 'field_arrival_confirmed_by' => $uid,
@@ -701,6 +744,9 @@ class CrewPortalController extends Controller
                 ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
             if (! $ownsBooking) {
                 return ['type' => 'danger', 'text' => 'That booking is not assigned to you.'];
+            }
+            if (! $this->isHeadCrewOf((int) $crewMember->crew_id, $bid)) {
+                return ['type' => 'danger', 'text' => 'Only the Head Crew of this booking can do this.'];
             }
 
             DB::table('bookings')->where('booking_id', $bid)->update([
@@ -747,6 +793,9 @@ class CrewPortalController extends Controller
                 ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
             if (! $ownsBooking) {
                 return ['type' => 'danger', 'text' => 'That booking is not assigned to you.'];
+            }
+            if (! $this->isHeadCrewOf((int) $crewMember->crew_id, $bid)) {
+                return ['type' => 'danger', 'text' => 'Only the Head Crew of this booking can do this.'];
             }
 
             // Every item on the booking is processed, not just the checked ones — reopening this
@@ -843,6 +892,9 @@ class CrewPortalController extends Controller
                 ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
             if (! $ownsBooking) {
                 return ['type' => 'danger', 'text' => 'That booking is not assigned to you.'];
+            }
+            if (! $this->isHeadCrewOf((int) $crewMember->crew_id, $bid)) {
+                return ['type' => 'danger', 'text' => 'Only the Head Crew of this booking can do this.'];
             }
 
             // A crew lead's own submitted date, otherwise unbounded — protects the payroll

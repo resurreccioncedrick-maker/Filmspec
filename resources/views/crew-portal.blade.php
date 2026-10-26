@@ -346,10 +346,12 @@ button{font-family:var(--font-b);cursor:pointer}
     @endif
 
     <div class="qa-row">
+      @if ($isHeadCrew)
       <button class="qa-btn" onclick="showPg('attendance')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
         <span>My Time</span>
       </button>
+      @endif
       <button class="qa-btn" onclick="openMo('moFileIncident')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>
         <span>File Report</span>
@@ -453,6 +455,8 @@ button{font-family:var(--font-b);cursor:pointer}
 </div>
 
 <!-- ═══════ ATTENDANCE ═══════ -->
+@if ($isHeadCrew)
+@php $headTeamBookings = $myTeamBookings->where('is_head', true)->values(); @endphp
 <div id="pg-attendance" class="pg {{ $activeTab === 'attendance' ? 'on' : '' }}">
   <div class="ctr">
     <div class="sec-hd">
@@ -467,16 +471,16 @@ button{font-family:var(--font-b);cursor:pointer}
     </div>
 
     <div class="subpanel {{ $attSubTab === 'attendance' ? 'on' : '' }}" data-group="attendance" id="sub-attendance-attendance">
-    @if ($myTeamBookings->isNotEmpty())
+    @if ($headTeamBookings->isNotEmpty())
     <div class="card">
       <div class="ch">Mark Today's Attendance</div>
-      <div style="padding:12px 16px 0;font-size:12px;color:var(--sub)">As the crew member on record for this booking, you can mark attendance for the whole field team — not just yourself.</div>
+      <div style="padding:12px 16px 0;font-size:12px;color:var(--sub)">As the Head Crew for this booking, you can mark attendance for the whole field team — not just yourself.</div>
       <div class="fg" style="padding:12px 16px 0;margin-bottom:8px">
         <label>Search Bookings</label>
         <input type="text" id="attBookingSearch" placeholder="Search by reference or project title…" oninput="filterBookingList('att', this.value)">
       </div>
       <div style="padding:0 16px 4px">
-        @foreach ($myTeamBookings as $tb)
+        @foreach ($headTeamBookings as $tb)
         <div class="booking-pick-item {{ $activeBookingId === $tb->booking->booking_id ? 'active' : '' }}" data-kind="att" data-booking="{{ $tb->booking->booking_id }}" data-search="{{ strtolower($tb->booking->booking_reference.' '.($tb->booking->project_title ?: '')) }}" onclick="selectBooking('att', {{ $tb->booking->booking_id }}, this)">
           <div>
             <div class="bp-ref">{{ $tb->booking->booking_reference }}</div>
@@ -487,7 +491,7 @@ button{font-family:var(--font-b);cursor:pointer}
         @endforeach
         <div class="bp-empty" id="attBookingEmpty" style="display:none">No bookings match your search.</div>
       </div>
-      @foreach ($myTeamBookings as $tb)
+      @foreach ($headTeamBookings as $tb)
       <div class="att-booking-panel" data-booking="{{ $tb->booking->booking_id }}" style="display:none">
       <form method="POST" style="padding:12px 16px 16px">
         @csrf
@@ -607,8 +611,10 @@ button{font-family:var(--font-b);cursor:pointer}
     </div><!-- /sub-attendance-timesheets -->
   </div>
 </div>
+@endif
 
 <!-- ═══════ EQUIPMENT CHECKLIST ═══════ -->
+@if ($isHeadCrew)
 <div id="pg-checklist" class="pg {{ $activeTab === 'checklist' ? 'on' : '' }}">
   <div class="ctr">
     <div class="sec-hd">
@@ -773,6 +779,7 @@ button{font-family:var(--font-b);cursor:pointer}
     @endforeach
   </div>
 </div>
+@endif
 
 <!-- ═══════ INCIDENTS ═══════ -->
 <div id="pg-incidents" class="pg {{ $activeTab === 'incidents' ? 'on' : '' }}">
@@ -914,6 +921,7 @@ button{font-family:var(--font-b);cursor:pointer}
       <button class="mo-close" onclick="closeMo('moMore')">&times;</button>
     </div>
     <div>
+      @if ($isHeadCrew)
       <div class="more-group-label">My Shift</div>
       <div class="more-item" style="cursor:pointer" onclick="closeMo('moMore');showPg('attendance')">
         <div class="more-item-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
@@ -924,6 +932,7 @@ button{font-family:var(--font-b);cursor:pointer}
         <span>Equipment Checklist</span>
       </div>
       <div class="more-divider"></div>
+      @endif
       <div class="more-group-label">Report Something</div>
       <div class="more-item" style="cursor:pointer" onclick="closeMo('moMore');showPg('incidents')">
         <div class="more-item-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg></div>
@@ -1446,6 +1455,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') document.que
 // booking previously only ever appeared after a manual page reload. Polls a cheap signature
 // (not the full dataset) and surfaces a tap-to-refresh banner instead of silently reloading
 // out from under someone mid-form.
+@if ($isHeadCrew)
 (function () {
   let lastSignature = null;
   function pollChecklist() {
@@ -1465,6 +1475,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') document.que
   pollChecklist();
   setInterval(pollChecklist, 25000);
 })();
+@endif
 </script>
 <script src="{{ asset('assets/js/keyboard-aware.js') }}"></script>
 @include('partials.inactivity-logout')

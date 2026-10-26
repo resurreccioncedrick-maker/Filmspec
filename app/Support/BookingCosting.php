@@ -210,7 +210,7 @@ class BookingCosting
             ->join('crew_members as cm', 'bc.crew_id', '=', 'cm.crew_id')
             ->leftJoin('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
             ->where('bc.booking_id', $bookingId)
-            ->selectRaw("CONCAT(cm.first_name,' ',cm.last_name) AS crew_name, cp.position_name, bc.rate_used, bc.hours_worked")
+            ->selectRaw("bc.bk_crew_id, bc.assignment_status, bc.is_head_crew, CONCAT(cm.first_name,' ',cm.last_name) AS crew_name, cp.position_name, bc.rate_used, bc.hours_worked")
             ->get();
 
         return ['groups' => $groups, 'crew' => $crew];
