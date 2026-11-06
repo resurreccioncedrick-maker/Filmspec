@@ -324,16 +324,35 @@ class BookingsController extends Controller
         if ($action === 'reject_booking' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $bid = (int) $request->input('booking_id', 0);
             $notes = trim($request->input('approval_notes', ''));
-            Booking::where('booking_id', $bid)->update(['approval_status' => 'rejected', 'approval_notes' => $notes, 'updated_at' => now()]);
+            // booking_status must move in lockstep with approval_status — every other surface
+            // (client portal badge/tracker, admin Status column, equipment availability) reads
+            // booking_status, not approval_status, so leaving it at 'pending' here is what made
+            // a rejected booking still show as "Awaiting Review"/"Pending" everywhere but the
+            // small reference-row badge. Mirrors BookingDetailController's own reject_booking
+            // branch: booking_status -> 'cancelled' (booking_status has no separate "rejected"
+            // value) and release any equipment this booking had reserved.
+            DB::table('equipment')->whereIn('equipment_id', function ($q) use ($bid) {
+                $q->select('equipment_id')->from('booking_equipment')->where('booking_id', $bid);
+            })->update(['availability_status' => 'available']);
+            Booking::where('booking_id', $bid)->update([
+                'approval_status' => 'rejected', 'approval_notes' => $notes,
+                'booking_status' => 'cancelled', 'cancelled_by' => $uid,
+                'cancellation_reason' => $notes ?: 'Rejected during approval review', 'updated_at' => now(),
+            ]);
+            DB::table('quotation_log')->insert([
+                'booking_id' => $bid, 'log_type' => 'cancelled', 'logged_by' => $uid,
+                'previous_status' => 'pending', 'new_status' => 'cancelled', 'remarks' => $notes, 'log_date' => now(),
+            ]);
             \App\Models\ActivityLog::record($uid, 'reject', 'booking', "Rejected booking ID: $bid", $bid);
 
-            return ['type' => 'danger', 'text' => 'Booking has been rejected.'];
+            return ['type' => 'danger', 'text' => 'Booking has been rejected. Any reserved equipment returned to available.'];
         }
 
         if ($action === 'resubmit_booking' && in_array($role, ['traffic', 'operations_manager'], true)) {
             $bid = (int) $request->input('booking_id', 0);
             Booking::where('booking_id', $bid)->where('approval_status', 'rejected')->update([
-                'approval_status' => 'pending_approval', 'approval_notes' => null, 'updated_at' => now(),
+                'approval_status' => 'pending_approval', 'approval_notes' => null,
+                'booking_status' => 'pending', 'updated_at' => now(),
             ]);
             \App\Models\ActivityLog::record($uid, 'resubmit', 'booking', "Resubmitted booking ID: $bid for approval", $bid);
 

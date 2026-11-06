@@ -147,17 +147,23 @@ class CartController extends Controller
         if (! $equipment) {
             return response()->json(['error' => 'Equipment not found']);
         }
-        if ($equipment->availability_status !== 'available') {
-            return response()->json(['error' => 'Equipment is not available for booking']);
-        }
 
         // Right-now available units (not date-specific — EquipmentAvailability::check() at
         // final submit is the date-aware authority) — same hybrid used on the catalog/detail
         // badges, so the cap shown to the client can never disagree with what's enforced here.
+        // This is the sole availability check: the legacy whole-row availability_status column
+        // can go stale for unit-tracked gear (e.g. stuck on "rented" while individual units have
+        // since come back to "available"), which previously made the catalog badge promise N
+        // available while this blocked the add outright — the per-unit count below is always the
+        // real, current answer, and already falls back to availability_status for gear with no
+        // individual units tracked.
         $unitCount = (int) DB::table('equipment_units')->where('equipment_id', $eid)->where('status', '!=', 'retired')->count();
         $availableUnits = $unitCount > 0
             ? (int) DB::table('equipment_units')->where('equipment_id', $eid)->where('status', 'available')->count()
-            : max(1, (int) $equipment->stock_quantity);
+            : ($equipment->availability_status === 'available' ? max(1, (int) $equipment->stock_quantity) : 0);
+        if ($availableUnits <= 0) {
+            return response()->json(['error' => 'Equipment is not available for booking']);
+        }
         if ($qty > $availableUnits) {
             return response()->json(['error' => "Only $availableUnits unit(s) of this equipment are available right now."]);
         }
