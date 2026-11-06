@@ -917,8 +917,16 @@ button{font-family:var(--font-b);cursor:pointer}
 }
 .rl-upload-again{font-size:11px;color:var(--blue);font-weight:700;text-decoration:underline;cursor:pointer;flex-shrink:0;background:none;border:none;font-family:var(--font-b)}
 
-.rl-flagged{background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;max-height:260px;overflow-y:auto;padding:12px 16px}
+.rl-flagged{background:var(--surface);flex-shrink:0;max-height:260px;overflow-y:auto;padding:12px 16px}
 .rl-flagged-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--orange);margin-bottom:8px}
+.rl-resize-handle{
+  flex-shrink:0;height:14px;cursor:ns-resize;position:relative;
+  border-top:1px solid var(--border);background:var(--s2);
+  display:flex;align-items:center;justify-content:center;touch-action:none;
+}
+.rl-resize-handle:hover,.rl-resize-handle.dragging{background:var(--bluelt)}
+.rl-resize-handle::after{content:'';width:32px;height:3px;border-radius:2px;background:var(--border)}
+.rl-resize-handle:hover::after,.rl-resize-handle.dragging::after{background:var(--blue)}
 .rl-flag-group{background:var(--s2);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:8px}
 .rl-flag-group:last-child{margin-bottom:0}
 .rl-flag-group-h{padding:7px 11px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
@@ -2056,6 +2064,7 @@ a.footer-contact-link:hover{color:#60b0ff}
       <p>Browse equipment and click "Add to Request List" on items you need for your production.</p>
     </div>
   </div>
+  <div id="rlResizeHandle" class="rl-resize-handle" style="display:none" title="Drag to resize"></div>
   <div id="rlFlaggedBox" class="rl-flagged" style="display:none"></div>
   <div class="rl-foot">
     <div id="ceSumBox" style="display:none"></div>
@@ -2962,7 +2971,12 @@ function uploadGearList() {
 
 function renderFlagged(flagged) {
   const box = document.getElementById('rlFlaggedBox');
-  if (!flagged.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const handle = document.getElementById('rlResizeHandle');
+  if (!flagged.length) {
+    box.style.display = 'none'; box.innerHTML = ''; box.style.maxHeight = '';
+    handle.style.display = 'none';
+    return;
+  }
 
   const groups = {};
   flagged.forEach(f => { (groups[f.reason] = groups[f.reason] || []).push(f); });
@@ -2976,10 +2990,56 @@ function renderFlagged(flagged) {
       ${rows.map(r => `<div class="rl-flag-row">${escapeHtml(r.line)}</div>`).join('')}
     </div>`;
   });
+  handle.style.display = 'flex';
+  let savedH = 260;
+  try { savedH = parseInt(localStorage.getItem('fs_rl_flagged_h')) || 260; } catch (e) {}
+  box.style.maxHeight = Math.max(60, Math.min(savedH, 560)) + 'px';
 
   box.innerHTML = html;
   box.style.display = 'block';
 }
+
+// ── Drag the handle between the matched items and the flagged/needs-review box ──
+(function () {
+  const handle = document.getElementById('rlResizeHandle');
+  const box = document.getElementById('rlFlaggedBox');
+  if (!handle || !box) return;
+
+  let dragging = false, startY = 0, startH = 0;
+
+  function onMove(clientY) {
+    const delta = startY - clientY; // drag up = taller flagged box, drag down = shorter
+    const next = Math.max(60, Math.min(startH + delta, 560));
+    box.style.maxHeight = next + 'px';
+  }
+  function stop() {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    try { localStorage.setItem('fs_rl_flagged_h', parseInt(box.style.maxHeight) || 260); } catch (e) {}
+    document.removeEventListener('mousemove', mouseMove);
+    document.removeEventListener('mouseup', stop);
+    document.removeEventListener('touchmove', touchMove);
+    document.removeEventListener('touchend', stop);
+  }
+  function mouseMove(e) { onMove(e.clientY); }
+  function touchMove(e) { if (e.touches[0]) { onMove(e.touches[0].clientY); e.preventDefault(); } }
+
+  function start(clientY) {
+    dragging = true;
+    startY = clientY;
+    startH = parseInt(box.style.maxHeight) || box.getBoundingClientRect().height || 260;
+    handle.classList.add('dragging');
+  }
+  handle.addEventListener('mousedown', e => { start(e.clientY); e.preventDefault();
+    document.addEventListener('mousemove', mouseMove);
+    document.addEventListener('mouseup', stop);
+  });
+  handle.addEventListener('touchstart', e => { if (e.touches[0]) { start(e.touches[0].clientY);
+    document.addEventListener('touchmove', touchMove, { passive: false });
+    document.addEventListener('touchend', stop);
+  } }, { passive: true });
+})();
 
 function escapeHtml(s) {
   const d = document.createElement('div');
