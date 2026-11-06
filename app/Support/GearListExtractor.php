@@ -7,6 +7,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory as SpreadsheetIOFactory;
 use PhpOffice\PhpWord\Element\AbstractContainer;
 use PhpOffice\PhpWord\Element\Table;
 use PhpOffice\PhpWord\Element\Text;
+use PhpOffice\PhpWord\Element\TextRun;
 use PhpOffice\PhpWord\IOFactory as WordIOFactory;
 
 /**
@@ -116,7 +117,15 @@ class GearListExtractor
             $parts[] = self::elementText($element);
         }
 
-        return implode(' ', array_filter($parts, fn ($p) => $p !== ''));
+        // A TextRun's own children are fragments of one continuous run of text — Word splits a
+        // single word across several <w:r> runs for spell-check/revision markers all the time
+        // ("Amira" as two runs "Ami" + "ra"), so these must be concatenated with no separator or
+        // the joined text corrupts ("Ami ra") and silently breaks catalog matching downstream.
+        // Only genuinely separate block-level children (paragraphs within a cell, etc.) get a
+        // space between them so distinct lines don't run together.
+        $sep = $container instanceof TextRun ? '' : ' ';
+
+        return implode($sep, array_filter($parts, fn ($p) => $p !== ''));
     }
 
     private static function elementText(mixed $element): string
