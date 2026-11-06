@@ -42,7 +42,8 @@
       'clients'   => ['icon' => 'briefcase', 'label' => 'Clients', 'mod' => 'clients'],
       'billing'   => ['icon' => 'file-text', 'label' => 'Billing & POS', 'mod' => 'billing'],
       'field-requests' => ['icon' => 'truck', 'label' => 'Field Resource Requests', 'mod' => 'field_requests'],
-      'support-chat' => ['icon' => 'message-circle', 'label' => 'Support Chat', 'mod' => 'support_chat'],
+      // temporarily hidden: support chat still buggy
+      // 'support-chat' => ['icon' => 'message-circle', 'label' => 'Support Chat', 'mod' => 'support_chat'],
     ],
     'Inventory' => [
       'equipment'   => ['icon' => 'camera', 'label' => 'Equipment', 'mod' => 'equipment'],

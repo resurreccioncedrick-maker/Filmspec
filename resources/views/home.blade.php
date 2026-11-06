@@ -901,17 +901,6 @@ button{font-family:var(--font-b);cursor:pointer}
 }
 .rl-upload-pick:hover{border-color:var(--blue)}
 .rl-upload-pick.has-file{color:var(--text);font-weight:600;border-style:solid}
-.rl-upload-days{
-  display:flex;align-items:center;gap:6px;
-  background:var(--surface);border:1.5px solid var(--bluemid);border-radius:8px;
-  padding:0 6px 0 10px;flex-shrink:0;
-}
-.rl-upload-days span{font-size:10.5px;color:var(--sub);font-weight:600;white-space:nowrap}
-.rl-upload-days input{
-  width:38px;border:none;background:none;outline:none;
-  font-family:var(--font-m);font-size:12px;color:var(--text);font-weight:600;
-  padding:9px 4px;text-align:center;
-}
 .rl-upload-go{
   width:100%;margin-top:8px;padding:10px;border-radius:8px;border:none;cursor:pointer;
   background:var(--blue);color:#fff;font-size:12.5px;font-weight:700;font-family:var(--font-b);
@@ -1491,7 +1480,6 @@ a.footer-contact-link:hover{color:#60b0ff}
 
   /* Gear-list upload — bigger tap targets */
   .rl-upload-pick,.rl-upload-go{min-height:44px}
-  .rl-upload-days input{min-height:44px;font-size:16px}
 
   /* Account forms — 16px avoids Safari's auto-zoom-on-focus */
   .acct-input{font-size:16px!important;min-height:44px}
@@ -2052,10 +2040,6 @@ a.footer-contact-link:hover{color:#60b0ff}
       <div class="rl-upload-row">
         <label class="rl-upload-pick" id="rlUploadPick" for="rlGearFile">Choose file…</label>
         <input type="file" id="rlGearFile" accept=".doc,.docx,.xlsx,.xls,.csv,.txt" style="display:none" onchange="onGearFilePicked(this)">
-        <div class="rl-upload-days">
-          <span>Days</span>
-          <input type="number" id="rlGearDays" value="1" min="1">
-        </div>
       </div>
       <button class="rl-upload-go" id="rlUploadGo" disabled onclick="uploadGearList()">Upload &amp; Match</button>
     </div>
@@ -2940,12 +2924,10 @@ function uploadGearList() {
   const file = fileInput.files[0];
   if (!file) return;
 
-  const days = Math.max(1, parseInt(document.getElementById('rlGearDays').value) || 1);
   const fd = new FormData();
   fd.append('_token', CSRF_TOKEN);
   fd.append('action', 'bulk_add');
   fd.append('file', file);
-  fd.append('days', days);
 
   const go = document.getElementById('rlUploadGo');
   go.disabled = true;
@@ -3467,7 +3449,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 
-@if($isLoggedIn)
+@if($isLoggedIn && false) {{-- temporarily hidden: support chat still buggy --}}
 <!-- Support chat (general, not tied to a specific booking) -->
 <button class="sup-fab" onclick="toggleSupportChat()" aria-label="Message FilmSpec">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>

@@ -437,16 +437,42 @@ class CartController extends Controller
      * substring". A NULL brand/model naturally never matches (CONCAT with NULL is NULL in
      * MySQL), so this is safe against nullable columns without extra guards.
      */
+    /**
+     * Tiered so a weak signal (brand alone) never dilutes a strong one: "Arri Amira" should
+     * resolve uniquely via brand+model ("Arri" + "Amira"), not come back ambiguous across every
+     * other "Arri ..." camera package just because they all share the same brand.
+     *
+     * CHAR_LENGTH guards matter here: a stray one/two-letter brand or model value (bad data,
+     * but real data is never guaranteed clean) would otherwise substring-match almost any line
+     * of text and silently poison the results.
+     */
     private function findMatchingEquipment(string $text): Collection
     {
-        // CHAR_LENGTH guards matter here: a stray one/two-letter brand or model value (bad
-        // data, but real data is never guaranteed clean) would otherwise substring-match
-        // almost any line of text and silently poison the results.
+        // Tier 1: the full equipment_name appears in the line — the strongest signal.
+        $exact = DB::table('equipment')
+            ->where('availability_status', '!=', 'retired')
+            ->whereRaw('CHAR_LENGTH(equipment_name) >= 3 AND ? LIKE CONCAT(\'%\', equipment_name, \'%\')', [$text])
+            ->get();
+        if ($exact->count() > 0) {
+            return $exact;
+        }
+
+        // Tier 2: both brand and model appear in the line — specific enough to disambiguate
+        // between several products from the same brand.
+        $brandModel = DB::table('equipment')
+            ->where('availability_status', '!=', 'retired')
+            ->whereRaw('CHAR_LENGTH(brand) >= 3 AND ? LIKE CONCAT(\'%\', brand, \'%\')', [$text])
+            ->whereRaw('CHAR_LENGTH(model) >= 3 AND ? LIKE CONCAT(\'%\', model, \'%\')', [$text])
+            ->get();
+        if ($brandModel->count() > 0) {
+            return $brandModel;
+        }
+
+        // Tier 3: fall back to any single weak signal (brand, model, or serial alone).
         return DB::table('equipment')
             ->where('availability_status', '!=', 'retired')
             ->where(function ($w) use ($text) {
-                $w->whereRaw('CHAR_LENGTH(equipment_name) >= 3 AND ? LIKE CONCAT(\'%\', equipment_name, \'%\')', [$text])
-                    ->orWhereRaw('CHAR_LENGTH(brand) >= 3 AND ? LIKE CONCAT(\'%\', brand, \'%\')', [$text])
+                $w->whereRaw('CHAR_LENGTH(brand) >= 3 AND ? LIKE CONCAT(\'%\', brand, \'%\')', [$text])
                     ->orWhereRaw('CHAR_LENGTH(model) >= 3 AND ? LIKE CONCAT(\'%\', model, \'%\')', [$text])
                     ->orWhereRaw('CHAR_LENGTH(serial_number) >= 3 AND ? LIKE CONCAT(\'%\', serial_number, \'%\')', [$text]);
             })

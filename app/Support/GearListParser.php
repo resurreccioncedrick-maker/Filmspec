@@ -74,12 +74,50 @@ class GearListParser
         return ['rows' => $rows, 'truncated' => $truncated];
     }
 
+    /**
+     * Category-label words seen in real gear lists that skip the trailing colon — "CAMERA",
+     * "STANDS", "Light Requirements", "DOLLY/SCAFF". A line counts as a header only when every
+     * word in it is one of these, so an actual item ("assorted apple boxes", "gaffers tape")
+     * never gets swallowed as a category label.
+     */
+    private const HEADER_WORDS = [
+        'camera', 'cameras', 'lens', 'lenses', 'light', 'lights', 'lighting', 'grip', 'grips',
+        'stand', 'stands', 'frame', 'frames', 'gobo', 'gobos', 'clamp', 'clamps', 'other', 'others',
+        'misc', 'miscellaneous', 'sound', 'audio', 'accessory', 'accessories', 'monitor', 'monitors',
+        'power', 'cable', 'cables', 'electrical', 'production', 'wardrobe', 'makeup', 'art',
+        'transpo', 'transport', 'transportation', 'catering', 'purchasing', 'rental', 'rentals',
+        'equipment', 'crew', 'vehicle', 'vehicles', 'scaff', 'scaffolding', 'dolly', 'silk',
+        'backing', 'black', 'filter', 'filters', 'battery', 'batteries', 'media', 'storage',
+        'set', 'sets', 'requirement', 'requirements', 'gel', 'gels', 'for',
+    ];
+
     private static function isSectionHeader(string $line): bool
     {
         // A header is a short label ending in ':' with no leading quantity — "Lighting:",
         // "Camera accessories:", "JA Tadena lights:". A line that happens to end in ':' but
         // starts with a number (unlikely in practice) is treated as an item instead.
-        return str_ends_with($line, ':') && ! preg_match('/^\s*\d/', $line);
+        if (str_ends_with($line, ':') && ! preg_match('/^\s*\d/', $line)) {
+            return true;
+        }
+
+        // No trailing colon — only treat it as a header when it's short, has no digits/colon
+        // (rules out metadata lines like "Shoot Date: October 22, 2026"), and every word in it
+        // is a known category word.
+        if (strlen($line) > 40 || str_contains($line, ':') || preg_match('/\d/', $line)) {
+            return false;
+        }
+
+        $words = preg_split('/[^A-Za-z]+/', $line, -1, PREG_SPLIT_NO_EMPTY);
+        if (! $words) {
+            return false;
+        }
+        foreach ($words as $word) {
+            if (! in_array(strtolower($word), self::HEADER_WORDS, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
