@@ -260,7 +260,7 @@ body{
           <div class="match-err" id="matchErr">Passwords do not match.</div>
         </div>
         <div class="dpa-row">
-          <input type="checkbox" name="dpa_consent" id="dpaConsent" value="1" required onchange="updateSignupBtn()">
+          <input type="checkbox" name="dpa_consent" id="dpaConsent" value="1" required onchange="onDpaCheckboxChange(event)">
           <span>
             I have read and agree to FilmSpec's
             <strong class="link" onclick="openDpaModal(event)">Terms &amp; Conditions</strong>
@@ -333,12 +333,48 @@ function validateSignup(){
   return true;
 }
 
-function openDpaModal(e){ e.preventDefault(); document.getElementById('dpaMo').style.display='flex'; }
+function openDpaModal(e){
+  e.preventDefault();
+  document.getElementById('dpaMo').style.display='flex';
+  const body = document.getElementById('dpaScrollBody');
+  body.scrollTop = 0;
+  setDpaAgreeEnabled(false);
+  checkDpaScrolledToBottom(); // in case the content is short enough to not need scrolling at all
+}
 function closeDpaModal(){ document.getElementById('dpaMo').style.display='none'; }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDpaModal(); });
 function updateSignupBtn(){
   const btn = document.getElementById('createAcctBtn');
   if (btn) btn.disabled = !document.getElementById('dpaConsent').checked;
+}
+let dpaRead = false;
+function onDpaCheckboxChange(e){
+  // Checking the box is only honored once they've actually opened the terms and scrolled
+  // through them via the modal's own "I Understand & Agree" button — ticking the box directly
+  // (without reading) gets reverted and sent into the modal instead.
+  if (e.target.checked && !dpaRead) {
+    e.target.checked = false;
+    openDpaModal(e);
+    return;
+  }
+  updateSignupBtn();
+}
+function setDpaAgreeEnabled(enabled){
+  const btn = document.getElementById('dpaAgreeBtn');
+  const hint = document.getElementById('dpaScrollHint');
+  if (!btn) return;
+  btn.disabled = !enabled;
+  btn.style.opacity = enabled ? '1' : '.5';
+  btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+  if (hint) hint.style.display = enabled ? 'none' : 'block';
+}
+function checkDpaScrolledToBottom(){
+  const body = document.getElementById('dpaScrollBody');
+  if (!body) return;
+  // 4px slack for sub-pixel scroll rounding across browsers.
+  if (body.scrollTop + body.clientHeight >= body.scrollHeight - 4) {
+    setDpaAgreeEnabled(true);
+  }
 }
 </script>
 <script src="{{ asset('assets/js/keyboard-aware.js') }}"></script>
@@ -349,7 +385,7 @@ function updateSignupBtn(){
       <div style="font-size:15px;font-weight:700;color:#1e293b">Terms &amp; Conditions &amp; Privacy Notice</div>
       <button onclick="closeDpaModal()" style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1;transition:color .15s" onmouseover="this.style.color='#1e293b'" onmouseout="this.style.color='#94a3b8'">&times;</button>
     </div>
-    <div style="overflow-y:auto;padding:20px 24px;font-size:13px;color:#64748b;line-height:1.85;flex:1">
+    <div id="dpaScrollBody" onscroll="checkDpaScrolledToBottom()" style="overflow-y:auto;padding:20px 24px;font-size:13px;color:#64748b;line-height:1.85;flex:1">
       <p style="color:#1e293b;font-weight:600;margin-bottom:12px">FilmSpec — Terms &amp; Conditions</p>
       <p style="margin-bottom:14px">By creating a FilmSpec account, you agree to use the system only for legitimate film equipment and crew booking purposes, to provide accurate account and booking information, and to comply with FilmSpec's booking, payment, and equipment-handling policies shown at the time of each booking. FilmSpec reserves the right to suspend or close accounts found to be fraudulent, abusive, or in violation of these terms.</p>
       <p style="color:#1e293b;font-weight:700;margin:18px 0 12px;border-top:1px solid #e8eef6;padding-top:16px">FilmSpec — Data Privacy Act Consent (R.A. 10173)</p>
@@ -372,10 +408,11 @@ function updateSignupBtn(){
       <p style="color:#1e293b;font-weight:600;margin-bottom:7px">Data Retention</p>
       <p>Your data is retained for the duration of your account and for the period required by applicable regulations after account closure.</p>
     </div>
-    <div style="padding:16px 24px;border-top:1px solid #e8eef6;display:flex;justify-content:flex-end">
-      <button onclick="closeDpaModal();document.getElementById('dpaConsent').checked=true;updateSignupBtn();"
-              style="background:#2563eb;color:#fff;border:none;padding:10px 26px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s"
-              onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+    <div style="padding:16px 24px;border-top:1px solid #e8eef6;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <span id="dpaScrollHint" style="font-size:11.5px;color:#94a3b8;font-weight:600">Scroll down to read the full terms &amp; privacy notice</span>
+      <button id="dpaAgreeBtn" disabled onclick="dpaRead=true;closeDpaModal();document.getElementById('dpaConsent').checked=true;updateSignupBtn();"
+              style="background:#2563eb;color:#fff;border:none;padding:10px 26px;border-radius:8px;font-size:13px;font-weight:700;cursor:not-allowed;font-family:'DM Sans',sans-serif;transition:all .15s;opacity:.5;flex-shrink:0"
+              onmouseover="if(!this.disabled)this.style.background='#1d4ed8'" onmouseout="if(!this.disabled)this.style.background='#2563eb'">
         I Understand &amp; Agree
       </button>
     </div>
