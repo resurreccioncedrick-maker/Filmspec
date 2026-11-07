@@ -604,10 +604,15 @@ class CartController extends Controller
                     $sub = $it->quantity * $numDays * $rate;
                     $equipTotal += $sub;
                     // subtotal is a STORED GENERATED column (quantity*days*daily_rate) — must not be set explicitly
-                    DB::table('booking_equipment')->insert([
+                    $bkEquipId = DB::table('booking_equipment')->insertGetId([
                         'booking_id' => $bid, 'equipment_id' => $it->equipment_id, 'quantity' => $it->quantity,
                         'days' => $numDays, 'daily_rate' => $rate,
-                    ]);
+                    ], 'bk_equip_id');
+                    // Allocated right at booking creation, not only at Equipment Checklist
+                    // check-out time — the client never sees which unit, this just reserves
+                    // real inventory immediately so staff/incident-report pages already know
+                    // which physical unit(s) are on this booking from the start.
+                    \App\Support\EquipmentUnitAllocator::allocate($bkEquipId, $it->equipment_id, (int) $it->quantity);
 
                     $cartAccRows = DB::table('booking_cart_accessories')->where('cart_id', $it->cart_id)->get();
                     if ($cartAccRows->isNotEmpty()) {

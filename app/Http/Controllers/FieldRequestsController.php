@@ -282,11 +282,13 @@ class FieldRequestsController extends Controller
                 // depth, since a DB-fetched column isn't guaranteed to already be a true PHP int.
                 $addQty = (int) $req->quantity;
                 DB::table('booking_equipment')->where('bk_equip_id', $existing->bk_equip_id)->update(['quantity' => DB::raw("quantity + $addQty")]);
+                \App\Support\EquipmentUnitAllocator::allocate($existing->bk_equip_id, $req->equipment_id, $addQty);
             } else {
-                DB::table('booking_equipment')->insert([
+                $bkEquipId = DB::table('booking_equipment')->insertGetId([
                     'booking_id' => $req->booking_id, 'equipment_id' => $req->equipment_id, 'quantity' => $req->quantity,
                     'days' => $numDays, 'daily_rate' => $req->daily_rate,
-                ]);
+                ], 'bk_equip_id');
+                \App\Support\EquipmentUnitAllocator::allocate($bkEquipId, $req->equipment_id, (int) $req->quantity);
             }
             DB::table('equipment_transactions')->insert([
                 'booking_id' => $req->booking_id, 'equipment_id' => $req->equipment_id, 'transaction_type' => 'checkout',

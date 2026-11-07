@@ -405,13 +405,13 @@
           </div>
         </div>
 
-        <div class="form-row">
+        <div class="form-row" id="newIR_unitWrap" style="display:none">
           <div class="form-group">
             <label>Unit</label>
             <select name="equipment_unit" id="newIR_unit" class="form-control" disabled>
               <option value="">Not sure which unit</option>
             </select>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Pick the specific one if it's tagged — only shown when this equipment has registered units.</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Auto-filled when exactly one unit is allocated to this booking — only shown here when there are two or more to choose from.</div>
           </div>
         </div>
 
@@ -551,6 +551,7 @@
             <select name="equipment_unit" id="editIR_unit" class="form-control" disabled style="display:none">
               <option value="">Not sure which unit</option>
             </select>
+            <div id="editIR_unitHint" style="font-size:11px;color:var(--text-muted);margin-top:4px;display:none">Auto-filled when exactly one unit is allocated to this booking — only shown here when there are two or more to choose from.</div>
           </div>
         </div>
 
@@ -749,21 +750,35 @@ const BOOKING_EQUIPMENT_UNITS = {!! json_encode($bookingEquipmentUnitMap) !!};
 function populateIRUnitSelect(equipmentId, selectId, preselect, bookingId) {
   const sel = document.getElementById(selectId);
   if (!sel) return;
+  const wrap = document.getElementById(selectId + 'Wrap'); // e.g. newIR_unitWrap (edit modal has none)
+  const hint = document.getElementById(selectId.replace('_unit', '_unitHint'));
   const bookedUnits = (bookingId && BOOKING_EQUIPMENT_UNITS[bookingId + '_' + equipmentId]) || [];
   const units = bookedUnits.length ? bookedUnits : (EQUIPMENT_UNITS[equipmentId] || []);
+
   if (!equipmentId || !units.length) {
     sel.innerHTML = '<option value="">Not sure which unit</option>';
     sel.disabled = true;
     sel.style.display = 'none';
+    if (wrap) wrap.style.display = 'none';
+    if (hint) hint.style.display = 'none';
     return;
   }
+
   sel.innerHTML = units.map((u) => `<option value="u${u.unit_id}">${esc(u.asset_tag)}</option>`).join('')
     + '<option value="">Not sure which unit</option>';
   // An explicit preselect (editing an incident that already has a unit saved) always wins;
-  // otherwise auto-fill from the checklist-matched unit when there's exactly one candidate.
+  // otherwise auto-fill from the booking-allocated unit when there's exactly one candidate.
   sel.value = preselect ? 'u' + preselect : (!preselect && bookedUnits.length === 1 ? 'u' + bookedUnits[0].unit_id : '');
   sel.disabled = false;
-  sel.style.display = '';
+
+  // Only ask when there's genuine ambiguity — 2+ units actually booked for this equipment.
+  // A single booked unit is carried silently via the preselected value above instead of making
+  // staff pick from a list of one; the fallback (no booking-allocation data at all, bookedUnits
+  // empty) still shows the full list since we genuinely don't know which one it is.
+  const showPicker = bookedUnits.length === 0 || bookedUnits.length >= 2;
+  sel.style.display = showPicker ? '' : 'none';
+  if (wrap) wrap.style.display = showPicker ? '' : 'none';
+  if (hint) hint.style.display = showPicker ? '' : 'none';
 }
 
 // Active bookings, for the New Incident booking search (pre-loaded)

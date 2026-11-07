@@ -236,12 +236,23 @@ class CrewPortalController extends Controller
                     }
                 }
 
-                // Booking-scoped unit map: which specific unit was actually checked out for THIS
-                // booking's equipment, per the Equipment Checklist (direction='out'). The Unit
-                // select tries this first so crew don't have to guess which physical unit they
-                // actually had — falls back to $equipmentUnitMap above when no per-unit checklist
-                // row exists for that booking+equipment yet.
+                // Booking-scoped unit map: which specific unit(s) are on THIS booking's
+                // equipment. Primary source is booking_equipment_units — allocated the moment
+                // equipment is added to a booking (EquipmentUnitAllocator), not just at
+                // Checklist check-out time. Falls back to the Checklist (direction='out') for
+                // bookings created before this table existed, then to $equipmentUnitMap above
+                // (every unit of that model) as a last resort.
                 $bookingEquipmentUnitMap = [];
+                $allocatedUnits = DB::table('booking_equipment_units as beu')
+                    ->join('booking_equipment as be', 'beu.bk_equip_id', '=', 'be.bk_equip_id')
+                    ->join('equipment_units as eu', 'beu.equipment_unit_id', '=', 'eu.unit_id')
+                    ->whereIn('be.booking_id', $activeBookingIds)
+                    ->select('be.booking_id', 'be.equipment_id', 'eu.unit_id', 'eu.asset_tag')
+                    ->get();
+                foreach ($allocatedUnits as $row) {
+                    $bookingEquipmentUnitMap[$row->booking_id . '_' . $row->equipment_id][] = ['unit_id' => $row->unit_id, 'asset_tag' => $row->asset_tag];
+                }
+
                 $checkedOutUnits = DB::table('equipment_checklist as ec')
                     ->join('equipment_units as eu', 'ec.equipment_unit_id', '=', 'eu.unit_id')
                     ->whereIn('ec.booking_id', $activeBookingIds)
@@ -251,7 +262,14 @@ class CrewPortalController extends Controller
                     ->distinct()
                     ->get();
                 foreach ($checkedOutUnits as $row) {
-                    $bookingEquipmentUnitMap[$row->booking_id . '_' . $row->equipment_id][] = ['unit_id' => $row->unit_id, 'asset_tag' => $row->asset_tag];
+                    $key = $row->booking_id . '_' . $row->equipment_id;
+                    if (! isset($bookingEquipmentUnitMap[$key])) {
+                        $bookingEquipmentUnitMap[$key] = [];
+                    }
+                    $already = collect($bookingEquipmentUnitMap[$key])->pluck('unit_id')->all();
+                    if (! in_array($row->unit_id, $already, true)) {
+                        $bookingEquipmentUnitMap[$key][] = ['unit_id' => $row->unit_id, 'asset_tag' => $row->asset_tag];
+                    }
                 }
 
                 // Same two-level cascade (Booking -> Accessory -> Unit) as equipment above, so the

@@ -1138,7 +1138,7 @@ button{font-family:var(--font-b);cursor:pointer}
               <option value="">— Select a booking first —</option>
             </select>
           </div>
-          <div class="fg">
+          <div class="fg" id="crewIR_unitWrap">
             <label>Unit</label>
             <select name="equipment_unit" id="crewIR_unit" disabled>
               <option value="">— Select equipment first —</option>
@@ -1416,23 +1416,33 @@ function filterEquipmentByBooking(bookingId) {
 
 function filterUnitsByEquipment(equipmentId) {
   const sel = document.getElementById('crewIR_unit');
-  // Prefer the unit(s) actually checked out for this specific booking (from the Equipment
-  // Checklist); only fall back to "every unit of this model" when no checklist record exists
-  // for this booking+equipment yet (e.g. older bookings, or untracked gear).
+  const wrap = document.getElementById('crewIR_unitWrap');
+  // Which unit(s) are actually on THIS booking for this equipment — from booking-time
+  // allocation first, falling back to the Checklist, falling back to "every unit of this
+  // model" (BOOKING_EQUIPMENT_UNITS already carries that tiered result server-side).
   const bookedUnits = BOOKING_EQUIPMENT_UNITS[crewIR_currentBookingId + '_' + equipmentId] || [];
   const units = bookedUnits.length ? bookedUnits : (EQUIPMENT_UNITS[equipmentId] || []);
   const autoFilled = bookedUnits.length > 0;
+
   if (!equipmentId || !units.length) {
     sel.innerHTML = '<option value="">Not sure which unit</option>';
     sel.disabled = false;
+    if (wrap) wrap.style.display = '';
     return;
   }
+
   sel.innerHTML = units.map((u, i) => `<option value="u${u.unit_id}"${autoFilled && i === 0 ? ' selected' : ''}>${escCrew(u.asset_tag)}</option>`).join('')
     + '<option value="">Not sure which unit</option>';
   sel.disabled = false;
+
+  // Only one unit is actually on this booking for this equipment — nothing to ask, so just
+  // carry that single value silently and hide the field instead of making crew pick from a
+  // list of one. Only show the picker when there's genuine ambiguity (2+ units booked).
+  if (wrap) wrap.style.display = (autoFilled && bookedUnits.length === 1) ? 'none' : '';
+
   const hint = document.getElementById('crewIR_unitHint');
   if (hint) hint.textContent = autoFilled
-    ? 'Auto-filled from the equipment checklist for this booking — change it if that\'s not the unit you had.'
+    ? 'Auto-filled from this booking\'s allocated unit — change it if that\'s not the unit you had.'
     : 'Pick the specific one if it\'s tagged — otherwise use "Not sure which unit."';
 }
 

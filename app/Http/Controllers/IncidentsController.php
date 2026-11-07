@@ -6,6 +6,7 @@ use App\Models\ActivityLog;
 use App\Support\BookingCosting;
 use App\Support\DataExporter;
 use App\Support\EvidencePhotoUpload;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
@@ -34,7 +35,7 @@ class IncidentsController extends Controller
 
     private array $maintStatBadge = ['pending' => 'badge-yellow', 'in_progress' => 'badge-blue', 'completed' => 'badge-green', 'cancelled' => 'badge-gray'];
 
-    public function index(Request $request): View|StreamedResponse|Response
+    public function index(Request $request): View|StreamedResponse|Response|JsonResponse
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
@@ -159,14 +160,24 @@ class IncidentsController extends Controller
             }
         }
 
-        // Booking-scoped unit map: which specific unit(s) were actually checked out for THIS
-        // booking's equipment, per the Equipment Checklist (direction='out'). Lets the Unit
-        // select auto-narrow to the real unit instead of listing every unit of that model
-        // company-wide. Falls back to $equipmentUnitMap above for bookings/equipment with no
-        // per-unit checklist row (checked out before per-unit tracking existed, or untracked
-        // gear) — the JS tries this map first, then falls back.
+        // Booking-scoped unit map: which specific unit(s) are on THIS booking's equipment.
+        // Primary source is booking_equipment_units — allocated the moment equipment is added
+        // to a booking (EquipmentUnitAllocator), not just at Checklist check-out time. Falls
+        // back to the Checklist (direction='out') for bookings created before this table
+        // existed, then to $equipmentUnitMap (every unit of that model) as a last resort — the
+        // JS tries each in order.
         $bookingEquipmentUnitMap = [];
         if ($bookingIds) {
+            $allocatedUnits = DB::table('booking_equipment_units as beu')
+                ->join('booking_equipment as be', 'beu.bk_equip_id', '=', 'be.bk_equip_id')
+                ->join('equipment_units as eu', 'beu.equipment_unit_id', '=', 'eu.unit_id')
+                ->whereIn('be.booking_id', $bookingIds)
+                ->select('be.booking_id', 'be.equipment_id', 'eu.unit_id', 'eu.asset_tag')
+                ->get();
+            foreach ($allocatedUnits as $row) {
+                $bookingEquipmentUnitMap[$row->booking_id . '_' . $row->equipment_id][] = ['unit_id' => $row->unit_id, 'asset_tag' => $row->asset_tag];
+            }
+
             $checkedOutUnits = DB::table('equipment_checklist as ec')
                 ->join('equipment_units as eu', 'ec.equipment_unit_id', '=', 'eu.unit_id')
                 ->whereIn('ec.booking_id', $bookingIds)
@@ -176,7 +187,14 @@ class IncidentsController extends Controller
                 ->distinct()
                 ->get();
             foreach ($checkedOutUnits as $row) {
-                $bookingEquipmentUnitMap[$row->booking_id . '_' . $row->equipment_id][] = ['unit_id' => $row->unit_id, 'asset_tag' => $row->asset_tag];
+                $key = $row->booking_id . '_' . $row->equipment_id;
+                if (! isset($bookingEquipmentUnitMap[$key])) {
+                    $bookingEquipmentUnitMap[$key] = [];
+                }
+                $already = collect($bookingEquipmentUnitMap[$key])->pluck('unit_id')->all();
+                if (! in_array($row->unit_id, $already, true)) {
+                    $bookingEquipmentUnitMap[$key][] = ['unit_id' => $row->unit_id, 'asset_tag' => $row->asset_tag];
+                }
             }
         }
 

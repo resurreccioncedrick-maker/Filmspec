@@ -546,9 +546,10 @@ class BookingDetailController extends Controller
             return $conflictError;
         }
 
-        DB::table('booking_equipment')->insert([
+        $bkEquipId = DB::table('booking_equipment')->insertGetId([
             'booking_id' => $id, 'equipment_id' => $eid, 'quantity' => $qty, 'days' => $days, 'daily_rate' => $rate, 'notes' => $notes,
-        ]);
+        ], 'bk_equip_id');
+        \App\Support\EquipmentUnitAllocator::allocate($bkEquipId, $eid, $qty);
         BookingCosting::updateBookingTotal($id);
         BookingCosting::generateCostEstimate($id, Auth::id());
 
@@ -667,9 +668,10 @@ class BookingDetailController extends Controller
             return ['type' => 'error', 'text' => 'Crew member is not active (status: ' . ucfirst($crewStatus ?? 'unknown') . ').'];
         }
 
-        DB::table('booking_equipment')->insert([
+        $bkEquipId = DB::table('booking_equipment')->insertGetId([
             'booking_id' => $id, 'equipment_id' => $eid, 'quantity' => $qty, 'days' => $days, 'daily_rate' => $rate, 'notes' => $notes,
-        ]);
+        ], 'bk_equip_id');
+        \App\Support\EquipmentUnitAllocator::allocate($bkEquipId, $eid, $qty);
         DB::table('booking_crew')->insert([
             'booking_id' => $id, 'crew_id' => $cid, 'position_id' => $posid, 'rate_used' => $crate,
             'hours_worked' => $days, 'subtotal' => $crate * $days, 'notes' => $cnotes, 'equipment_id' => $eid,
@@ -2308,6 +2310,8 @@ class BookingDetailController extends Controller
             return ['type' => 'danger', 'text' => 'There are no FilmSpec equipment lines to clear.'];
         }
 
+        DB::table('booking_equipment')->where('booking_id', $id)->pluck('bk_equip_id')
+            ->each(fn ($bkEquipId) => \App\Support\EquipmentUnitAllocator::release($bkEquipId));
         DB::table('booking_equipment')->where('booking_id', $id)->delete();
         BookingCosting::generateCostEstimate($id, $uid);
         ActivityLog::record($uid, 'delete', 'booking', "Cleared $count FilmSpec equipment line(s).", $id);
