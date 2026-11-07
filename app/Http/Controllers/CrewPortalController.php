@@ -140,6 +140,7 @@ class CrewPortalController extends Controller
         $bookingEquipMap = [];
         $equipmentUnitMap = [];
         $bookingEquipmentUnitMap = [];
+        $bookingAccessoryUnitMap = [];
         $bookingAccMap = [];
         $accessoryUnitMap = [];
         $myAttendance = collect();
@@ -288,6 +289,20 @@ class CrewPortalController extends Controller
                     foreach (DB::table('accessory_units')->whereIn('accessory_id', $accIdsForUnits)->orderBy('asset_tag')->get() as $u) {
                         $accessoryUnitMap[$u->accessory_id][] = ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag];
                     }
+                }
+
+                // Booking-scoped accessory unit map — same idea as $bookingEquipmentUnitMap
+                // above, sourced from booking_accessory_units (allocated the moment the
+                // accessory is added to a booking).
+                $bookingAccessoryUnitMap = [];
+                $allocatedAccUnits = DB::table('booking_accessory_units as bau')
+                    ->join('booking_accessories as ba', 'bau.ba_id', '=', 'ba.ba_id')
+                    ->join('accessory_units as au', 'bau.accessory_unit_id', '=', 'au.unit_id')
+                    ->whereIn('ba.booking_id', $activeBookingIds)
+                    ->select('ba.booking_id', 'ba.accessory_id', 'au.unit_id', 'au.asset_tag')
+                    ->get();
+                foreach ($allocatedAccUnits as $row) {
+                    $bookingAccessoryUnitMap[$row->booking_id . '_' . $row->accessory_id][] = ['unit_id' => $row->unit_id, 'asset_tag' => $row->asset_tag];
                 }
             }
 
@@ -480,7 +495,7 @@ class CrewPortalController extends Controller
             'isHeadCrew' => $isHeadCrew, 'headBookingIds' => $headBookingIds,
             'myBookings' => $myBookings, 'myIncidents' => $myIncidents, 'myMaintenances' => $myMaintenances,
             'myActiveBookings' => $myActiveBookings, 'bookingEquipMap' => $bookingEquipMap, 'equipmentUnitMap' => $equipmentUnitMap,
-            'bookingEquipmentUnitMap' => $bookingEquipmentUnitMap,
+            'bookingEquipmentUnitMap' => $bookingEquipmentUnitMap, 'bookingAccessoryUnitMap' => $bookingAccessoryUnitMap,
             'bookingAccMap' => $bookingAccMap, 'accessoryUnitMap' => $accessoryUnitMap,
             'myAttendance' => $myAttendance, 'myTimesheets' => $myTimesheets,
             'myChecklistBookings' => $myChecklistBookings, 'myTeamBookings' => $myTeamBookings, 'allActiveCrew' => $allActiveCrew,

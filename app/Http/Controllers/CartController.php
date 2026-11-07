@@ -634,6 +634,10 @@ class CartController extends Controller
                                 'daily_rate' => $accRate, 'is_included' => 0, 'subtotal' => $accSub,
                                 'notes' => 'Added with equipment: ' . $real->accessory_name,
                             ]);
+                            $baId = DB::table('booking_accessories')->where('booking_id', $bid)->where('accessory_id', $cartAcc->accessory_id)->value('ba_id');
+                            if ($baId) {
+                                \App\Support\EquipmentUnitAllocator::allocateAccessory($baId, $cartAcc->accessory_id, $accQty);
+                            }
                         }
                     }
                 }

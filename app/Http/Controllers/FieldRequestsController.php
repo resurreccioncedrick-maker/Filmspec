@@ -315,12 +315,14 @@ class FieldRequestsController extends Controller
                     'quantity' => DB::raw("quantity + $addQty"),
                     'subtotal' => DB::raw("subtotal + $addSubtotal"),
                 ]);
+                \App\Support\EquipmentUnitAllocator::allocateAccessory($existing->ba_id, $req->accessory_id, $addQty);
             } else {
-                DB::table('booking_accessories')->insert([
+                $baId = DB::table('booking_accessories')->insertGetId([
                     'booking_id' => $req->booking_id, 'accessory_id' => $req->accessory_id, 'quantity' => $req->quantity,
                     'days' => $numDays, 'daily_rate' => $req->daily_rate, 'is_included' => 0, 'subtotal' => $subtotal,
                     'notes' => 'Field request dispatch',
-                ]);
+                ], 'ba_id');
+                \App\Support\EquipmentUnitAllocator::allocateAccessory($baId, $req->accessory_id, (int) $req->quantity);
             }
             DB::table('equipment_checklist')->insertOrIgnore([
                 'booking_id' => $req->booking_id, 'accessory_id' => $req->accessory_id, 'direction' => 'out',

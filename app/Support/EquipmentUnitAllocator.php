@@ -63,4 +63,43 @@ class EquipmentUnitAllocator
         DB::table('equipment_units')->whereIn('unit_id', $unitIds)->where('status', 'allocated')->update(['status' => 'available']);
         DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->delete();
     }
+
+    /** Accessory equivalent of allocate() above — same idea, accessory_units/booking_accessory_units. */
+    public static function allocateAccessory(int $baId, int $accessoryId, int $qty): void
+    {
+        if ($qty < 1) {
+            return;
+        }
+
+        $units = DB::table('accessory_units')
+            ->where('accessory_id', $accessoryId)
+            ->where('status', 'available')
+            ->orderBy('asset_tag')
+            ->limit($qty)
+            ->pluck('unit_id');
+
+        if ($units->isEmpty()) {
+            return;
+        }
+
+        $now = now();
+        DB::table('booking_accessory_units')->insert(
+            $units->map(fn ($unitId) => [
+                'ba_id' => $baId, 'accessory_unit_id' => $unitId, 'allocated_at' => $now,
+            ])->all()
+        );
+        DB::table('accessory_units')->whereIn('unit_id', $units)->update(['status' => 'allocated']);
+    }
+
+    /** Accessory equivalent of release() above. */
+    public static function releaseAccessory(int $baId): void
+    {
+        $unitIds = DB::table('booking_accessory_units')->where('ba_id', $baId)->pluck('accessory_unit_id');
+        if ($unitIds->isEmpty()) {
+            return;
+        }
+
+        DB::table('accessory_units')->whereIn('unit_id', $unitIds)->where('status', 'allocated')->update(['status' => 'available']);
+        DB::table('booking_accessory_units')->where('ba_id', $baId)->delete();
+    }
 }

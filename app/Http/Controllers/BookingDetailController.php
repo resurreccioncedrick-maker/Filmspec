@@ -1958,10 +1958,11 @@ class BookingDetailController extends Controller
 
         $rate = (float) $acc->daily_rate;
         $sub = round($rate * $qty * $days, 2);
-        DB::table('booking_accessories')->insert([
+        $baId = DB::table('booking_accessories')->insertGetId([
             'booking_id' => $id, 'accessory_id' => $aid, 'quantity' => $qty, 'days' => $days,
             'daily_rate' => $rate, 'is_included' => (int) $acc->is_included, 'subtotal' => $sub, 'notes' => $notes,
-        ]);
+        ], 'ba_id');
+        \App\Support\EquipmentUnitAllocator::allocateAccessory($baId, $aid, $qty);
         BookingCosting::updateBookingTotal($id);
         BookingCosting::generateCostEstimate($id, Auth::id());
 
@@ -1984,6 +1985,7 @@ class BookingDetailController extends Controller
             ->where('ba.ba_id', $baid)->where('ba.booking_id', $id)
             ->value('a.accessory_name');
 
+        \App\Support\EquipmentUnitAllocator::releaseAccessory($baid);
         DB::table('booking_accessories')->where('ba_id', $baid)->where('booking_id', $id)->delete();
         BookingCosting::updateBookingTotal($id);
         BookingCosting::generateCostEstimate($id, Auth::id());

@@ -1154,12 +1154,12 @@ button{font-family:var(--font-b);cursor:pointer}
               <option value="">— Select a booking first —</option>
             </select>
           </div>
-          <div class="fg">
+          <div class="fg" id="crewIR_accunitWrap">
             <label>Unit</label>
             <select name="accessory_unit" id="crewIR_accunit" disabled>
               <option value="">— Select accessory first —</option>
             </select>
-            <div style="font-size:11px;color:var(--muted);margin-top:4px">Pick the specific one if it's tagged — otherwise use "Not sure which unit."</div>
+            <div id="crewIR_accunitHint" style="font-size:11px;color:var(--muted);margin-top:4px">Pick the specific one if it's tagged — otherwise use "Not sure which unit."</div>
           </div>
         </div>
         <div style="display:flex;gap:10px">
@@ -1349,6 +1349,10 @@ let crewIR_currentBookingId = '';
 const BOOKING_ACC_IR = {!! json_encode($bookingAccMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 const ACCESSORY_UNITS = {!! json_encode($accessoryUnitMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 
+// Which unit was actually allocated to THIS booking's accessory — same idea as
+// BOOKING_EQUIPMENT_UNITS, sourced from booking_accessory_units.
+const BOOKING_ACCESSORY_UNITS = {!! json_encode($bookingAccessoryUnitMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
+
 // Field-request pickers — the OPPOSITE list from BOOKING_EQUIP above: equipment/accessories
 // NOT yet on the booking (available to request), keyed by booking_id, same shape ClientBookingDetailController
 // builds server-side for the client's own request form.
@@ -1463,15 +1467,28 @@ function filterAccessoryByBooking(bookingId) {
 
 function filterUnitsByAccessory(accessoryId) {
   const sel = document.getElementById('crewIR_accunit');
-  const units = ACCESSORY_UNITS[accessoryId] || [];
+  const wrap = document.getElementById('crewIR_accunitWrap');
+  const bookedUnits = BOOKING_ACCESSORY_UNITS[crewIR_currentBookingId + '_' + accessoryId] || [];
+  const units = bookedUnits.length ? bookedUnits : (ACCESSORY_UNITS[accessoryId] || []);
+  const autoFilled = bookedUnits.length > 0;
+
   if (!accessoryId || !units.length) {
     sel.innerHTML = '<option value="">Not sure which unit</option>';
     sel.disabled = false;
+    if (wrap) wrap.style.display = '';
     return;
   }
-  sel.innerHTML = units.map(u => `<option value="u${u.unit_id}">${escCrew(u.asset_tag)}</option>`).join('')
+
+  sel.innerHTML = units.map((u, i) => `<option value="u${u.unit_id}"${autoFilled && i === 0 ? ' selected' : ''}>${escCrew(u.asset_tag)}</option>`).join('')
     + '<option value="">Not sure which unit</option>';
   sel.disabled = false;
+
+  // Same rule as the equipment Unit field — only ask when 2+ units were actually allocated.
+  if (wrap) wrap.style.display = (autoFilled && bookedUnits.length === 1) ? 'none' : '';
+  const hint = document.getElementById('crewIR_accunitHint');
+  if (hint) hint.textContent = autoFilled
+    ? 'Auto-filled from this booking\'s allocated unit — change it if that\'s not the unit you had.'
+    : 'Pick the specific one if it\'s tagged — otherwise use "Not sure which unit."';
 }
 
 function crewIRSwitch(type, btn) {
