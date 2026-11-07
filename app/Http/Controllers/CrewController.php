@@ -37,8 +37,17 @@ class CrewController extends Controller
             return $this->handleAjaxAction($request);
         }
 
+        // Crew profile-change approvals: a deliberately narrower (but overlapping) role set
+        // than $canManage — traffic can approve/reject a crew member's own requested contact
+        // info/password change even though traffic doesn't get the sweeping crew-management
+        // ($canManage) grant used for everything else on this page.
+        $canApproveCrewProfile = in_array($role, ['super_admin', 'operations_manager', 'traffic'], true);
+
         $msg = null;
-        if ($request->isMethod('post') && $canManage) {
+        if ($request->isMethod('post') && $canApproveCrewProfile
+            && in_array($request->input('action'), ['approve_profile_request', 'reject_profile_request'], true)) {
+            $msg = $this->handleProfileApproval($request, $user->user_id);
+        } elseif ($request->isMethod('post') && $canManage) {
             $msg = $this->handleAction($request);
         }
 
@@ -46,7 +55,21 @@ class CrewController extends Controller
             return $this->export($request);
         }
 
-        $tab = in_array($request->query('tab'), ['members', 'positions', 'schedule', 'attendance'], true) ? $request->query('tab') : 'members';
+        $tab = in_array($request->query('tab'), ['members', 'positions', 'schedule', 'attendance', 'approvals'], true) ? $request->query('tab') : 'members';
+
+        $pendingProfileCount = (int) DB::table('crew_profile_requests')->where('status', 'pending')->count();
+        $pendingProfileRequests = collect();
+        if ($tab === 'approvals' && $canApproveCrewProfile) {
+            $pendingProfileRequests = DB::table('crew_profile_requests as cpr')
+                ->join('crew_members as cm', 'cpr.crew_id', '=', 'cm.crew_id')
+                ->leftJoin('crew_positions as cp', 'cm.primary_position_id', '=', 'cp.position_id')
+                ->where('cpr.status', 'pending')
+                ->orderBy('cpr.requested_at')
+                ->select('cpr.*', 'cm.first_name', 'cm.last_name', 'cm.email as current_email',
+                    'cm.phone as current_phone', 'cm.gcash_number as current_gcash', 'cm.address as current_address',
+                    'cp.position_name')
+                ->get();
+        }
 
         $statusFilter = $request->query('status', '');
         $posFilter = (int) $request->query('pos', 0);
@@ -139,6 +162,8 @@ class CrewController extends Controller
 
         return view('crew', [
             'msg' => $msg, 'canManage' => $canManage, 'tab' => $tab,
+            'canApproveCrewProfile' => $canApproveCrewProfile,
+            'pendingProfileCount' => $pendingProfileCount, 'pendingProfileRequests' => $pendingProfileRequests,
             'stats' => $stats, 'crew' => $crew, 'positions' => $positions, 'positionsWithCounts' => $positionsWithCounts,
             'total' => $total, 'pages' => $pages, 'page' => $page,
             'statusFilter' => $statusFilter, 'posFilter' => $posFilter, 'etFilter' => $etFilter, 'search' => $search,
@@ -403,6 +428,61 @@ class CrewController extends Controller
             'base_rate_12hr' => $baseRate, 'overtime_rate' => $overtime, 'double_pay_rate' => $doublePay,
             'monthly_salary' => 0,
         ];
+    }
+
+    /**
+     * Approve/reject a crew member's self-requested profile change (contact info and/or
+     * password, from the crew portal's My Profile page). Deliberately separate from
+     * handleAction() — reachable by traffic too, which doesn't get the general $canManage grant.
+     */
+    private function handleProfileApproval(Request $request, int $reviewerUid): ?array
+    {
+        $action = $request->input('action', '');
+        $reqId = (int) $request->input('request_id', 0);
+        $notes = trim($request->input('review_notes', ''));
+
+        $pr = DB::table('crew_profile_requests')->where('request_id', $reqId)->where('status', 'pending')->first();
+        if (! $pr) {
+            return ['type' => 'danger', 'text' => 'That request is no longer pending.'];
+        }
+
+        if ($action === 'reject_profile_request') {
+            DB::table('crew_profile_requests')->where('request_id', $reqId)->update([
+                'status' => 'rejected', 'reviewed_by' => $reviewerUid, 'reviewed_at' => now(), 'review_notes' => $notes ?: null,
+            ]);
+            ActivityLog::record($reviewerUid, 'reject', 'crew_profile', "Rejected crew profile change request #$reqId", $pr->crew_id);
+
+            return ['type' => 'success', 'text' => 'Request rejected.'];
+        }
+
+        // approve_profile_request
+        $changes = json_decode($pr->changes ?? '{}', true) ?: [];
+        $update = [];
+        foreach ($changes as $field => $vals) {
+            if (in_array($field, ['email', 'phone', 'gcash_number', 'address'], true)) {
+                $update[$field] = $vals['new'];
+            }
+        }
+        if ($update) {
+            $update['updated_at'] = now();
+            DB::table('crew_members')->where('crew_id', $pr->crew_id)->update($update);
+        }
+
+        if ($pr->password_change_requested && $pr->new_password_hash) {
+            $crewUserId = DB::table('crew_members')->where('crew_id', $pr->crew_id)->value('user_id');
+            if ($crewUserId) {
+                DB::table('users')->where('user_id', $crewUserId)->update([
+                    'password_hash' => $pr->new_password_hash, 'updated_at' => now(),
+                ]);
+            }
+        }
+
+        DB::table('crew_profile_requests')->where('request_id', $reqId)->update([
+            'status' => 'approved', 'reviewed_by' => $reviewerUid, 'reviewed_at' => now(), 'review_notes' => $notes ?: null,
+        ]);
+        ActivityLog::record($reviewerUid, 'approve', 'crew_profile', "Approved crew profile change request #$reqId", $pr->crew_id);
+
+        return ['type' => 'success', 'text' => 'Request approved and applied.'];
     }
 
     private function handleAction(Request $request): ?array

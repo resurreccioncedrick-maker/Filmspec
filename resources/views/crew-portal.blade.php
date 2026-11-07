@@ -938,15 +938,84 @@ button{font-family:var(--font-b);cursor:pointer}
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-head" style="padding:14px 16px 0;font-weight:700;font-size:13px">Contact Information</div>
-      <div class="card-body" style="padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px">
-        <div class="att-member-row"><span class="att-member-role">Email</span><span class="att-member-name" style="font-size:13px">{{ $crewMember->email ?: '—' }}</span></div>
-        <div class="att-member-row"><span class="att-member-role">Phone</span><span class="att-member-name" style="font-size:13px">{{ $crewMember->phone ?: '—' }}</span></div>
-        <div class="att-member-row"><span class="att-member-role">GCash Number</span><span class="att-member-name" style="font-size:13px">{{ $crewMember->gcash_number ?: '—' }}</span></div>
-        <div class="att-member-row"><span class="att-member-role">Address</span><span class="att-member-name" style="font-size:13px;text-align:right">{{ $crewMember->address ?: '—' }}</span></div>
+    @if ($pendingProfileRequest)
+    @php $pendingChanges = json_decode($pendingProfileRequest->changes ?? '{}', true) ?: []; @endphp
+    <div class="card" style="border-color:var(--yellow)">
+      <div class="card-body" style="padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span class="badge badge-yellow">Awaiting Approval</span>
+          <span style="font-size:11.5px;color:var(--muted)">Submitted {{ \Carbon\Carbon::parse($pendingProfileRequest->requested_at)->diffForHumans() }}</span>
+        </div>
+        @if ($pendingChanges)
+        <div style="font-size:12.5px;display:flex;flex-direction:column;gap:4px;margin-bottom:{{ $pendingProfileRequest->password_change_requested ? '6px' : '0' }}">
+          @foreach ($pendingChanges as $field => $vals)
+          <div><strong style="text-transform:capitalize">{{ str_replace('_', ' ', $field) }}:</strong> {{ $vals['old'] ?: '—' }} &rarr; {{ $vals['new'] ?: '—' }}</div>
+          @endforeach
+        </div>
+        @endif
+        @if ($pendingProfileRequest->password_change_requested)
+        <div style="font-size:12.5px">Password change requested.</div>
+        @endif
+        <div style="font-size:11px;color:var(--muted);margin-top:8px">Your current info stays active until a Super Admin, Operations Manager, or Traffic staff reviews this.</div>
       </div>
     </div>
+    @else
+    <div class="card">
+      <div class="card-head" style="padding:14px 16px 0;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-weight:700;font-size:13px">Contact Information</span>
+        <button type="button" onclick="toggleProfileEdit()" id="profileEditToggle" style="background:none;border:none;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer">Edit</button>
+      </div>
+      <div class="card-body" style="padding:12px 16px 16px">
+        <div id="profileViewMode" style="display:flex;flex-direction:column;gap:10px">
+          <div class="att-member-row"><span class="att-member-role">Email</span><span class="att-member-name" style="font-size:13px">{{ $crewMember->email ?: '—' }}</span></div>
+          <div class="att-member-row"><span class="att-member-role">Phone</span><span class="att-member-name" style="font-size:13px">{{ $crewMember->phone ?: '—' }}</span></div>
+          <div class="att-member-row"><span class="att-member-role">GCash Number</span><span class="att-member-name" style="font-size:13px">{{ $crewMember->gcash_number ?: '—' }}</span></div>
+          <div class="att-member-row"><span class="att-member-role">Address</span><span class="att-member-name" style="font-size:13px;text-align:right">{{ $crewMember->address ?: '—' }}</span></div>
+        </div>
+        <form method="POST" id="profileEditForm" style="display:none">
+          @csrf
+          <input type="hidden" name="action" value="crew_request_profile_change">
+          <input type="hidden" name="return_tab" value="profile">
+          <div class="fg">
+            <label>Email</label>
+            <input type="email" name="email" class="form-control" value="{{ $crewMember->email }}">
+          </div>
+          <div class="fg">
+            <label>Phone</label>
+            <input type="text" name="phone" class="form-control" value="{{ $crewMember->phone }}">
+          </div>
+          <div class="fg">
+            <label>GCash Number</label>
+            <input type="text" name="gcash_number" class="form-control" value="{{ $crewMember->gcash_number }}">
+          </div>
+          <div class="fg">
+            <label>Address</label>
+            <textarea name="address" class="form-control" rows="2">{{ $crewMember->address }}</textarea>
+          </div>
+
+          <div style="border-top:1px solid var(--border);margin:14px 0 10px;padding-top:12px;font-weight:700;font-size:12.5px">Change Password <span style="font-weight:400;color:var(--muted)">(optional)</span></div>
+          <div class="fg">
+            <label>Current Password</label>
+            <input type="password" name="current_password" class="form-control" autocomplete="current-password">
+          </div>
+          <div class="fg">
+            <label>New Password</label>
+            <input type="password" name="new_password" class="form-control" autocomplete="new-password" minlength="8">
+          </div>
+          <div class="fg">
+            <label>Confirm New Password</label>
+            <input type="password" name="confirm_password" class="form-control" autocomplete="new-password" minlength="8">
+          </div>
+
+          <div style="font-size:11px;color:var(--muted);margin:4px 0 12px">All changes (including password) need approval from a Super Admin, Operations Manager, or Traffic staff before they take effect.</div>
+          <div style="display:flex;gap:8px">
+            <button type="button" class="btn btn-outline" style="flex:1" onclick="toggleProfileEdit()">Cancel</button>
+            <button type="submit" class="btn btn-primary" style="flex:1">Submit for Approval</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    @endif
 
     <div class="card">
       <div class="card-head" style="padding:14px 16px 0;font-weight:700;font-size:13px">Work Details</div>
@@ -969,8 +1038,6 @@ button{font-family:var(--font-b);cursor:pointer}
       <div class="card-body" style="padding:12px 16px 16px;font-size:13px;color:var(--sub);line-height:1.6">{{ $crewMember->profile_notes }}</div>
     </div>
     @endif
-
-    <div style="font-size:11px;color:var(--muted);text-align:center;padding:6px 0 16px">To update any of this information, contact your Operations Manager or Super Admin.</div>
     @endif
   </div>
 </div>
@@ -1405,6 +1472,17 @@ function crewIRSwitch(type, btn) {
   document.getElementById('crewIR_accessory').required = type === 'accessory';
   btn.parentElement.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
+}
+
+function toggleProfileEdit() {
+  const view = document.getElementById('profileViewMode');
+  const form = document.getElementById('profileEditForm');
+  const toggle = document.getElementById('profileEditToggle');
+  if (!view || !form) return;
+  const editing = form.style.display !== 'none';
+  view.style.display = editing ? 'flex' : 'none';
+  form.style.display = editing ? 'none' : 'block';
+  if (toggle) toggle.style.display = editing ? '' : 'none';
 }
 
 function showPg(id, btn) {

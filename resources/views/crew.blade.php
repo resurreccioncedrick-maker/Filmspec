@@ -63,6 +63,13 @@
   <a href="{{ $crewBase }}?tab=positions" class="tab-btn {{ $tab === 'positions' ? 'active' : '' }}"><i data-feather="briefcase" style="width:13px;height:13px;margin-right:5px;vertical-align:middle"></i>Positions <span class="badge badge-gray" style="margin-left:4px">{{ $positionsWithCounts->count() }}</span></a>
   <a href="{{ $crewBase }}?tab=schedule" class="tab-btn {{ $tab === 'schedule' ? 'active' : '' }}"><i data-feather="calendar" style="width:13px;height:13px;margin-right:5px;vertical-align:middle"></i>Schedule</a>
   <a href="{{ $crewBase }}?tab=attendance" class="tab-btn {{ $tab === 'attendance' ? 'active' : '' }}"><i data-feather="clock" style="width:13px;height:13px;margin-right:5px;vertical-align:middle"></i>Attendance</a>
+  @if ($canApproveCrewProfile)
+  <a href="{{ $crewBase }}?tab=approvals" class="tab-btn {{ $tab === 'approvals' ? 'active' : '' }}"><i data-feather="user-check" style="width:13px;height:13px;margin-right:5px;vertical-align:middle"></i>Profile Approvals
+    @if ($pendingProfileCount > 0)
+    <span class="badge badge-orange" style="margin-left:4px">{{ $pendingProfileCount }}</span>
+    @endif
+  </a>
+  @endif
 </div>
 
 @if ($tab === 'members')
@@ -409,6 +416,68 @@
   </div>
   <div class="card-body" style="padding:0">
     <iframe src="{{ route('attendance') }}" style="width:100%;height:900px;border:none;display:block"></iframe>
+  </div>
+</div>
+@endif
+
+@if ($tab === 'approvals' && $canApproveCrewProfile)
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title"><i data-feather="user-check" style="width:15px;height:15px;margin-right:6px;vertical-align:middle"></i>Pending Profile Changes <span class="badge badge-orange" style="margin-left:6px">{{ $pendingProfileRequests->count() }}</span></h2>
+  </div>
+  <div class="card-body">
+    @if ($pendingProfileRequests->isEmpty())
+    <div class="empty-state" style="padding:30px 0">
+      <i data-feather="check-circle" style="width:32px;height:32px;color:var(--muted)"></i>
+      <p>No profile change requests awaiting review.</p>
+    </div>
+    @else
+    @foreach ($pendingProfileRequests as $pr)
+    @php $prChanges = json_decode($pr->changes ?? '{}', true) ?: []; @endphp
+    <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
+        <div>
+          <div style="font-weight:700">{{ $pr->first_name }} {{ $pr->last_name }}</div>
+          <div style="font-size:.78rem;color:var(--muted)">{{ $pr->position_name ?? 'Crew' }} &middot; Submitted {{ \Carbon\Carbon::parse($pr->requested_at)->diffForHumans() }}</div>
+        </div>
+        <span class="badge badge-yellow">Pending</span>
+      </div>
+
+      @if ($prChanges)
+      <table style="width:100%;font-size:.83rem;margin-bottom:{{ $pr->password_change_requested ? '10px' : '0' }}">
+        <thead><tr style="color:var(--muted);text-align:left"><th style="padding:4px 8px 4px 0">Field</th><th style="padding:4px 8px">Current</th><th style="padding:4px 8px">Requested</th></tr></thead>
+        <tbody>
+        @foreach ($prChanges as $field => $vals)
+        <tr>
+          <td style="padding:4px 8px 4px 0;text-transform:capitalize;font-weight:600">{{ str_replace('_', ' ', $field) }}</td>
+          <td style="padding:4px 8px;color:var(--muted)">{{ $vals['old'] ?: '—' }}</td>
+          <td style="padding:4px 8px;font-weight:600">{{ $vals['new'] ?: '—' }}</td>
+        </tr>
+        @endforeach
+        </tbody>
+      </table>
+      @endif
+      @if ($pr->password_change_requested)
+      <div style="font-size:.83rem;margin-bottom:10px"><i data-feather="lock" style="width:13px;height:13px;vertical-align:middle;margin-right:4px"></i>Password change requested (new password is hashed — not shown).</div>
+      @endif
+
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <form method="POST" action="{{ $crewBase }}?tab=approvals" style="display:contents" onsubmit="return confirm('Reject this request?')">
+          @csrf
+          <input type="hidden" name="action" value="reject_profile_request">
+          <input type="hidden" name="request_id" value="{{ $pr->request_id }}">
+          <button type="submit" class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)">Reject</button>
+        </form>
+        <form method="POST" action="{{ $crewBase }}?tab=approvals" style="display:contents">
+          @csrf
+          <input type="hidden" name="action" value="approve_profile_request">
+          <input type="hidden" name="request_id" value="{{ $pr->request_id }}">
+          <button type="submit" class="btn btn-success btn-sm">Approve</button>
+        </form>
+      </div>
+    </div>
+    @endforeach
+    @endif
   </div>
 </div>
 @endif

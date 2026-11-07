@@ -7,6 +7,7 @@ use App\Support\EvidencePhotoUpload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
 class CrewPortalController extends Controller
@@ -125,6 +126,13 @@ class CrewPortalController extends Controller
             ->where('cm.user_id', $uid)
             ->select('cm.*', 'cp.position_name')
             ->first();
+
+        // The My Profile page shows this instead of the edit form while a submission is still
+        // awaiting super_admin/operations_manager/traffic review, so crew can't submit a second,
+        // conflicting request before the first is resolved.
+        $pendingProfileRequest = $crewMember
+            ? DB::table('crew_profile_requests')->where('crew_id', $crewMember->crew_id)->where('status', 'pending')->first()
+            : null;
 
         $myBookings = collect();
         $myMaintenances = collect();
@@ -449,6 +457,7 @@ class CrewPortalController extends Controller
 
         return view('crew-portal', [
             'msg' => $msg, 'user' => $user, 'crewMember' => $crewMember, 'activeTab' => $activeTab, 'activeSubTab' => $activeSubTab,
+            'pendingProfileRequest' => $pendingProfileRequest,
             'activeBookingId' => $activeBookingId, 'crewAnnouncements' => $crewAnnouncements,
             'isHeadCrew' => $isHeadCrew, 'headBookingIds' => $headBookingIds,
             'myBookings' => $myBookings, 'myIncidents' => $myIncidents, 'myMaintenances' => $myMaintenances,
@@ -628,6 +637,64 @@ class CrewPortalController extends Controller
         $action = $request->input('action', '');
 
         $crewMember = DB::table('crew_members')->where('user_id', $uid)->first();
+
+        if ($action === 'crew_request_profile_change' && $crewMember) {
+            // One pending request at a time — otherwise a second submission could race the
+            // first through approval with stale old-value diffs.
+            $existing = DB::table('crew_profile_requests')
+                ->where('crew_id', $crewMember->crew_id)->where('status', 'pending')->exists();
+            if ($existing) {
+                return ['type' => 'danger', 'text' => 'You already have a profile change request awaiting approval.'];
+            }
+
+            $editable = ['email' => 'email', 'phone' => 'phone', 'gcash_number' => 'gcash_number', 'address' => 'address'];
+            $changes = [];
+            foreach ($editable as $field => $column) {
+                if (! $request->has($field)) {
+                    continue;
+                }
+                $new = trim((string) $request->input($field, ''));
+                $old = (string) ($crewMember->{$column} ?? '');
+                if ($new !== $old) {
+                    $changes[$field] = ['old' => $old, 'new' => $new];
+                }
+            }
+
+            $wantsPasswordChange = $request->filled('new_password') || $request->filled('current_password') || $request->filled('confirm_password');
+            $newPasswordHash = null;
+            if ($wantsPasswordChange) {
+                $curr = $request->input('current_password', '');
+                $new = $request->input('new_password', '');
+                $conf = $request->input('confirm_password', '');
+                $hash = DB::table('users')->where('user_id', $uid)->value('password_hash');
+                if (! Hash::check($curr, $hash)) {
+                    return ['type' => 'danger', 'text' => 'Current password is incorrect.'];
+                }
+                if (strlen($new) < 8) {
+                    return ['type' => 'danger', 'text' => 'New password must be at least 8 characters.'];
+                }
+                if ($new !== $conf) {
+                    return ['type' => 'danger', 'text' => 'New password and confirmation do not match.'];
+                }
+                $newPasswordHash = Hash::make($new);
+            }
+
+            if (! $changes && ! $newPasswordHash) {
+                return ['type' => 'danger', 'text' => 'No changes to submit.'];
+            }
+
+            DB::table('crew_profile_requests')->insert([
+                'crew_id' => $crewMember->crew_id,
+                'changes' => $changes ? json_encode($changes) : null,
+                'password_change_requested' => $newPasswordHash ? 1 : 0,
+                'new_password_hash' => $newPasswordHash,
+                'status' => 'pending',
+                'requested_at' => now(),
+            ]);
+            ActivityLog::record($uid, 'request', 'crew_profile', 'Requested a profile change', $crewMember->crew_id);
+
+            return ['type' => 'success', 'text' => 'Your changes were submitted for approval. You\'ll see them reflected once reviewed.'];
+        }
 
         if ($action === 'crew_file_incident' && $crewMember) {
             $bid = (int) $request->input('booking_id', 0);
