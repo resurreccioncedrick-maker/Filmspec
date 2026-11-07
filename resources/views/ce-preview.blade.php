@@ -1059,7 +1059,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           @php $anyEquip = true; $rowAmt = (float) $eq->quantity * (float) $eq->daily_rate; @endphp
           <tr>
             <td>{{ $eq->quantity }}</td>
-            <td>{{ $eq->equipment_name }}{{ $eq->brand ? ' ('.$eq->brand.')' : '' }}</td>
+            <td>
+              {{ $eq->equipment_name }}{{ $eq->brand ? ' ('.$eq->brand.')' : '' }}
+              @if (! empty($eq->bk_equip_id) && $equipUnitTags->get($eq->bk_equip_id))
+              <div style="font-size:11px;color:var(--muted);font-family:var(--font-m, monospace)">Unit: {{ $equipUnitTags->get($eq->bk_equip_id) }}</div>
+              @endif
+            </td>
             <td class="r">{{ $eq->days }}</td>
             <td class="r amt">₱{{ number_format($eq->daily_rate, 2) }}</td>
             <td class="r amt">₱{{ number_format($rowAmt, 2) }}</td>
@@ -1133,7 +1138,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           @forelse ($accLines as $ac)
           <tr>
             <td>{{ $ac->quantity }}</td>
-            <td>{{ $ac->accessory_name }}{{ $ac->is_included ? ' (Included)' : '' }}</td>
+            <td>
+              {{ $ac->accessory_name }}{{ $ac->is_included ? ' (Included)' : '' }}
+              @if ($accUnitTags->get($ac->ba_id))
+              <div style="font-size:11px;color:var(--muted);font-family:var(--font-m, monospace)">Unit: {{ $accUnitTags->get($ac->ba_id) }}</div>
+              @endif
+            </td>
             <td class="r">{{ $ac->days }}</td>
             <td class="r amt">₱{{ number_format($ac->daily_rate, 2) }}</td>
             <td class="r amt">₱{{ number_format($ac->subtotal, 2) }}</td>

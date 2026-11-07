@@ -192,7 +192,7 @@ class BookingCosting
             ->join('equipment as e', 'be.equipment_id', '=', 'e.equipment_id')
             ->leftJoin('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
             ->where('be.booking_id', $bookingId)
-            ->select('be.quantity', 'be.days', 'be.daily_rate', 'e.equipment_name', 'e.brand', 'ec.category_name')
+            ->select('be.bk_equip_id', 'be.equipment_id', 'be.quantity', 'be.days', 'be.daily_rate', 'e.equipment_name', 'e.brand', 'ec.category_name')
             ->get();
 
         $groups = [];

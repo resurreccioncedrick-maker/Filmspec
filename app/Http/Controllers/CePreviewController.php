@@ -262,6 +262,22 @@ class CePreviewController extends Controller
             ->orderBy('a.accessory_name')
             ->select('ba.*', 'a.accessory_name')
             ->get();
+
+        // Which specific unit(s) are allocated to each equipment/accessory line — same
+        // EquipmentUnitAllocator data the Checklist and Incident Report pages already read,
+        // so the CE editor shows the same real asset tag(s) instead of staff having to guess
+        // or look it up elsewhere.
+        $equipUnitTags = DB::table('booking_equipment_units as beu')
+            ->join('equipment_units as eu', 'beu.equipment_unit_id', '=', 'eu.unit_id')
+            ->where('beu.bk_equip_id', '>', 0)
+            ->whereIn('beu.bk_equip_id', DB::table('booking_equipment')->where('booking_id', $bid)->pluck('bk_equip_id'))
+            ->select('beu.bk_equip_id', 'eu.asset_tag')
+            ->get()->groupBy('bk_equip_id')->map(fn ($g) => $g->pluck('asset_tag')->implode(', '));
+        $accUnitTags = DB::table('booking_accessory_units as bau')
+            ->join('accessory_units as au', 'bau.accessory_unit_id', '=', 'au.unit_id')
+            ->whereIn('bau.ba_id', $accLines->pluck('ba_id'))
+            ->select('bau.ba_id', 'au.asset_tag')
+            ->get()->groupBy('ba_id')->map(fn ($g) => $g->pluck('asset_tag')->implode(', '));
         $accTotal = (float) $accLines->sum('subtotal');
 
         $equipBaseTotal = 0.0;
@@ -443,6 +459,7 @@ class CePreviewController extends Controller
         $viewData = [
             'mode' => $mode, 'bid' => $bid, 'ceId' => $ce->ce_id ?? 0, 'role' => $role, 'isClientView' => $isClientView,
             'equipGroups' => $equipGroups, 'crewLines' => $crewLines, 'accLines' => $accLines, 'accTotal' => $accTotal,
+            'equipUnitTags' => $equipUnitTags, 'accUnitTags' => $accUnitTags,
             'equipBaseTotal' => $equipBaseTotal, 'equipTotal' => $equipTotal, 'crewTotal' => $crewTotal,
             'transCost' => $transCost, 'transZone' => $transZone, 'transMult' => $transMult, 'zoneLabels' => $zoneLabels,
             'cePricingMode' => $cePricingMode, 'cePricingInput' => $cePricingInput, 'ceVatExempt' => $ceVatExempt,
