@@ -373,8 +373,27 @@ class CrewPortalController extends Controller
                         'ci.checked as ci_checked', 'ci.quantity_actual as ci_qty', 'ci.condition_in', 'ci.notes as ci_notes')
                     ->get();
 
+                // Which specific unit(s) are allocated to each line, so crew sees the real asset
+                // tag(s) instead of just an anonymous "Qty N" — same source of truth as the
+                // admin Checklist page and the Incident Report form's Unit field.
+                $allocEqTags = DB::table('booking_equipment_units as beu')
+                    ->join('booking_equipment as be', 'beu.bk_equip_id', '=', 'be.bk_equip_id')
+                    ->join('equipment_units as eu', 'beu.equipment_unit_id', '=', 'eu.unit_id')
+                    ->whereIn('be.booking_id', $checklistBookingIds)
+                    ->select('be.booking_id', 'be.equipment_id', 'eu.asset_tag')
+                    ->get()->groupBy(fn ($r) => $r->booking_id . '_' . $r->equipment_id);
+                $allocAccTags = DB::table('booking_accessory_units as bau')
+                    ->join('booking_accessories as ba', 'bau.ba_id', '=', 'ba.ba_id')
+                    ->join('accessory_units as au', 'bau.accessory_unit_id', '=', 'au.unit_id')
+                    ->whereIn('ba.booking_id', $checklistBookingIds)
+                    ->select('ba.booking_id', 'ba.accessory_id', 'au.asset_tag')
+                    ->get()->groupBy(fn ($r) => $r->booking_id . '_' . $r->accessory_id);
+
                 $itemsByBooking = [];
                 foreach ($equipRows->concat($accRows) as $row) {
+                    $tagMap = $row->item_type === 'accessory' ? $allocAccTags : $allocEqTags;
+                    $tags = $tagMap->get($row->booking_id . '_' . $row->ref_id, collect())->pluck('asset_tag');
+                    $row->unit_tags = $tags->isNotEmpty() ? $tags->implode(', ') : null;
                     $itemsByBooking[$row->booking_id][] = $row;
                 }
                 foreach ($checklistBookings as $bk) {

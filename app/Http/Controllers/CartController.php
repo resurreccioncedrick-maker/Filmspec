@@ -552,6 +552,15 @@ class CartController extends Controller
                 }
             }
 
+            // Everything from here on writes real booking data across several tables — wrapped
+            // in a transaction so a failure partway through (e.g. the equipment-unit allocator,
+            // or any other step) can never leave a half-created booking visible to the admin
+            // queue while the client sees an error and retries, creating a duplicate. Confirmed
+            // this exact failure mode happened for real: a migration gap mid-deploy threw from
+            // inside this method after the booking row had already committed, and the client's
+            // retry produced two near-identical "Pending Approval" bookings for the same project.
+            DB::beginTransaction();
+
             $year = date('Y');
             $lastNum = (int) DB::table('bookings')
                 ->where('booking_reference', 'like', "FS-$year-%")
@@ -662,8 +671,14 @@ class CartController extends Controller
 
             DB::table('booking_cart')->where('user_id', $uid)->delete();
 
+            DB::commit();
+
             return response()->json(['ok' => true, 'booking_reference' => $ref, 'booking_id' => $bid, 'total' => $equipTotal]);
         } catch (\Throwable $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+
             return response()->json(['error' => 'Booking failed: ' . $e->getMessage()]);
         }
     }

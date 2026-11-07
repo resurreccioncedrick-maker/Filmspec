@@ -723,6 +723,9 @@ button{font-family:var(--font-b);cursor:pointer}
             <span style="flex:1">
               <span class="it-title" style="margin-top:0">{{ $it->item_name }}{{ $it->item_type === 'accessory' ? ' (Accessory)' : '' }}</span>
               <span class="it-meta">{{ trim($it->brand.' '.$it->model) ?: '—' }}</span>
+              @if ($it->unit_tags)
+              <span class="it-meta" style="font-family:var(--font-m)">Unit: {{ $it->unit_tags }}</span>
+              @endif
             </span>
           </label>
           <span class="it-side">
@@ -769,6 +772,9 @@ button{font-family:var(--font-b);cursor:pointer}
             <span style="flex:1">
               <span class="it-title" style="margin-top:0">{{ $it->item_name }}{{ $it->item_type === 'accessory' ? ' (Accessory)' : '' }}</span>
               <span class="it-meta">{{ trim($it->brand.' '.$it->model) ?: '—' }}</span>
+              @if ($it->unit_tags)
+              <span class="it-meta" style="font-family:var(--font-m)">Unit: {{ $it->unit_tags }}</span>
+              @endif
             </span>
             <span class="it-side" style="font-family:var(--font-m);font-size:11.5px;color:var(--muted)">Qty {{ $it->quantity }}</span>
           </label>

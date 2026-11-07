@@ -189,6 +189,7 @@
         <tr>
           @if ($canManage)<th style="width:40px">#</th>@endif
           <th>Equipment</th>
+          <th>Unit</th>
           <th>Category</th>
           <th>Qty</th>
           @if ($dir === 'out')
@@ -247,6 +248,15 @@
             </div>
             @if ($canManage && ! $eq->is_multi)
             <input type="hidden" name="items[{{ $lineKey }}][quantity_expected]" value="{{ $eq->quantity }}">
+            @endif
+          </td>
+          <td style="font-family:var(--font-mono);font-size:.82rem">
+            @if ($eq->is_multi)
+            <span style="color:var(--muted)">see units below</span>
+            @elseif ($eq->unit_tag)
+            <span class="badge badge-gray">{{ $eq->unit_tag }}</span>
+            @else
+            <span style="color:var(--muted)">—</span>
             @endif
           </td>
           <td><span class="badge badge-blue">{{ $eq->category_name }}</span></td>
@@ -381,6 +391,7 @@
             <div style="font-weight:600;font-size:.8rem;font-family:var(--font-mono)">{{ $s->tag }}</div>
             <div style="font-size:.68rem;color:var(--muted);font-family:var(--font-mono)">{{ $s->sn }}</div>
           </td>
+          <td>—</td>
           <td>—</td>
           <td>—</td>
           <td>—</td>

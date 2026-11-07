@@ -300,6 +300,23 @@ class ChecklistController extends Controller
             ->get()
             ->keyBy(fn ($r) => 'u' . ($r->equipment_unit_id ?: $r->accessory_unit_id));
 
+        // Which specific unit(s) are actually allocated to THIS booking's equipment/accessory
+        // lines (EquipmentUnitAllocator, set the moment the item was added to the booking) —
+        // the checklist should show/offer these, not an independent "whatever's available"
+        // guess, so a line's Unit here always agrees with the Incident Report form's Unit field.
+        $allocatedEq = DB::table('booking_equipment_units as beu')
+            ->join('booking_equipment as be', 'beu.bk_equip_id', '=', 'be.bk_equip_id')
+            ->join('equipment_units as eu', 'beu.equipment_unit_id', '=', 'eu.unit_id')
+            ->where('be.booking_id', $bid)
+            ->select('be.equipment_id', 'eu.unit_id', 'eu.asset_tag', 'eu.serial_no')
+            ->get()->groupBy('equipment_id');
+        $allocatedAcc = DB::table('booking_accessory_units as bau')
+            ->join('booking_accessories as ba', 'bau.ba_id', '=', 'ba.ba_id')
+            ->join('accessory_units as au', 'bau.accessory_unit_id', '=', 'au.unit_id')
+            ->where('ba.booking_id', $bid)
+            ->select('ba.accessory_id', 'au.unit_id', 'au.asset_tag', 'au.serial_no')
+            ->get()->groupBy('accessory_id');
+
         foreach ($equipLines as $eq) {
             $isAcc = $eq->item_type === 'accessory';
             $base = ($isAcc ? 'acc_' : 'eq_') . $eq->ref_id;
@@ -319,11 +336,18 @@ class ChecklistController extends Controller
                 $eq->condition_in = $in->condition_in ?? null;
                 $eq->ci_notes = $in->notes ?? null;
                 $eq->slots = [];
+                $allocatedOne = ($isAcc ? ($allocatedAcc[$eq->ref_id] ?? collect()) : ($allocatedEq[$eq->ref_id] ?? collect()))->first();
+                $eq->unit_tag = $allocatedOne->asset_tag ?? null;
                 continue;
             }
 
-            $realUnits = ($isAcc ? ($accUnitRows[$eq->ref_id] ?? collect()) : ($unitRows[$eq->ref_id] ?? collect()))
-                ->take($eq->quantity);
+            $allocated = $isAcc ? ($allocatedAcc[$eq->ref_id] ?? collect()) : ($allocatedEq[$eq->ref_id] ?? collect());
+            $fallbackUnits = ($isAcc ? ($accUnitRows[$eq->ref_id] ?? collect()) : ($unitRows[$eq->ref_id] ?? collect()))
+                ->reject(fn ($u) => $allocated->contains('unit_id', $u->unit_id));
+            // Allocated units first (what's actually recorded against this booking), topped up
+            // with any other real unit of that model if the booking needs more slots than it has
+            // allocations for (e.g. allocated before stock ran out, or predates allocation).
+            $realUnits = $allocated->concat($fallbackUnits)->take($eq->quantity);
             $slots = [];
             foreach ($realUnits as $u) {
                 $slots[] = (object) [
