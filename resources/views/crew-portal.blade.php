@@ -1076,7 +1076,7 @@ button{font-family:var(--font-b);cursor:pointer}
             <select name="equipment_unit" id="crewIR_unit" disabled>
               <option value="">— Select equipment first —</option>
             </select>
-            <div style="font-size:11px;color:var(--muted);margin-top:4px">Pick the specific one if it's tagged — otherwise use "Not sure which unit."</div>
+            <div id="crewIR_unitHint" style="font-size:11px;color:var(--muted);margin-top:4px">Pick the specific one if it's tagged — otherwise use "Not sure which unit."</div>
           </div>
         </div>
 
@@ -1271,6 +1271,13 @@ const BOOKING_EQUIP = {!! json_encode($bookingEquipMap, JSON_HEX_TAG | JSON_HEX_
 // select, cascading a second level deeper than BOOKING_EQUIP (Booking -> Equipment -> Unit).
 const EQUIPMENT_UNITS = {!! json_encode($equipmentUnitMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 
+// Which unit was actually checked out for THIS booking's equipment, per the Equipment
+// Checklist — keyed "bookingId_equipmentId". Tried before the company-wide EQUIPMENT_UNITS
+// list above, so the Unit field can auto-fill with the real unit instead of making the crew
+// member guess among every unit of that model.
+const BOOKING_EQUIPMENT_UNITS = {!! json_encode($bookingEquipmentUnitMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
+let crewIR_currentBookingId = '';
+
 // Same two-level cascade as equipment above, for the Incident Report modal's Accessory option.
 const BOOKING_ACC_IR = {!! json_encode($bookingAccMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 const ACCESSORY_UNITS = {!! json_encode($accessoryUnitMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
@@ -1324,6 +1331,7 @@ function escCrew(s) {
 }
 
 function filterEquipmentByBooking(bookingId) {
+  crewIR_currentBookingId = bookingId;
   const sel = document.getElementById('crewIR_equipment');
   const equip = BOOKING_EQUIP[bookingId] || [];
   if (!bookingId || !equip.length) {
@@ -1341,15 +1349,24 @@ function filterEquipmentByBooking(bookingId) {
 
 function filterUnitsByEquipment(equipmentId) {
   const sel = document.getElementById('crewIR_unit');
-  const units = EQUIPMENT_UNITS[equipmentId] || [];
+  // Prefer the unit(s) actually checked out for this specific booking (from the Equipment
+  // Checklist); only fall back to "every unit of this model" when no checklist record exists
+  // for this booking+equipment yet (e.g. older bookings, or untracked gear).
+  const bookedUnits = BOOKING_EQUIPMENT_UNITS[crewIR_currentBookingId + '_' + equipmentId] || [];
+  const units = bookedUnits.length ? bookedUnits : (EQUIPMENT_UNITS[equipmentId] || []);
+  const autoFilled = bookedUnits.length > 0;
   if (!equipmentId || !units.length) {
     sel.innerHTML = '<option value="">Not sure which unit</option>';
     sel.disabled = false;
     return;
   }
-  sel.innerHTML = units.map(u => `<option value="u${u.unit_id}">${escCrew(u.asset_tag)}</option>`).join('')
+  sel.innerHTML = units.map((u, i) => `<option value="u${u.unit_id}"${autoFilled && i === 0 ? ' selected' : ''}>${escCrew(u.asset_tag)}</option>`).join('')
     + '<option value="">Not sure which unit</option>';
   sel.disabled = false;
+  const hint = document.getElementById('crewIR_unitHint');
+  if (hint) hint.textContent = autoFilled
+    ? 'Auto-filled from the equipment checklist for this booking — change it if that\'s not the unit you had.'
+    : 'Pick the specific one if it\'s tagged — otherwise use "Not sure which unit."';
 }
 
 function filterAccessoryByBooking(bookingId) {

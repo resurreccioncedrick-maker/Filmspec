@@ -50,6 +50,10 @@ class IncidentsController extends Controller
             return $this->export($request);
         }
 
+        if ($request->filled('get_unit_history')) {
+            return $this->unitHistory((int) $request->query('get_unit_history'));
+        }
+
         $tab = $request->query('tab', 'all');
         $search = $request->query('q', '');
         $page = max(1, (int) $request->query('p', 1));
@@ -64,7 +68,7 @@ class IncidentsController extends Controller
             ->leftJoin('users as u', 'ir.reported_by', '=', 'u.user_id')
             ->orderByDesc('ir.created_at')
             ->select('ir.*', 'e.equipment_name', 'e.brand', 'e.serial_number as equip_serial',
-                'ac.accessory_name',
+                'ac.accessory_name', 'eu.asset_tag as unit_asset_tag',
                 'b.booking_reference', 'b.project_title', 'b.shoot_location',
                 'c.contact_person', 'c.company_name',
                 DB::raw("CONCAT(u.first_name,' ',u.last_name) AS reported_by_name"))
@@ -155,6 +159,27 @@ class IncidentsController extends Controller
             }
         }
 
+        // Booking-scoped unit map: which specific unit(s) were actually checked out for THIS
+        // booking's equipment, per the Equipment Checklist (direction='out'). Lets the Unit
+        // select auto-narrow to the real unit instead of listing every unit of that model
+        // company-wide. Falls back to $equipmentUnitMap above for bookings/equipment with no
+        // per-unit checklist row (checked out before per-unit tracking existed, or untracked
+        // gear) — the JS tries this map first, then falls back.
+        $bookingEquipmentUnitMap = [];
+        if ($bookingIds) {
+            $checkedOutUnits = DB::table('equipment_checklist as ec')
+                ->join('equipment_units as eu', 'ec.equipment_unit_id', '=', 'eu.unit_id')
+                ->whereIn('ec.booking_id', $bookingIds)
+                ->where('ec.direction', 'out')
+                ->whereNotNull('ec.equipment_unit_id')
+                ->select('ec.booking_id', 'ec.equipment_id', 'eu.unit_id', 'eu.asset_tag')
+                ->distinct()
+                ->get();
+            foreach ($checkedOutUnits as $row) {
+                $bookingEquipmentUnitMap[$row->booking_id . '_' . $row->equipment_id][] = ['unit_id' => $row->unit_id, 'asset_tag' => $row->asset_tag];
+            }
+        }
+
         $maintTab = $request->query('mtab', 'pending');
         $maintQuery = $this->filteredMaintenanceQuery($request);
         $maintenances = $maintQuery
@@ -186,6 +211,7 @@ class IncidentsController extends Controller
             'incidents' => $incidents, 'kpis' => $kpis, 'tabCounts' => $tabCounts,
             'activeBookings' => $activeBookings, 'allEquipment' => $allEquipment,
             'bookingCrewMap' => $bookingCrewMap, 'bookingEquipMap' => $bookingEquipMap, 'equipmentUnitMap' => $equipmentUnitMap,
+            'bookingEquipmentUnitMap' => $bookingEquipmentUnitMap,
             'maintTab' => $maintTab, 'maintenances' => $maintenances, 'maintCounts' => $maintCounts,
             'crewForMaint' => $crewForMaint, 'viewTab' => $viewTab,
             'typeBadge' => $this->typeBadge, 'typeLabel' => $this->typeLabel, 'statusBadge' => $this->statusBadge,
@@ -206,6 +232,9 @@ class IncidentsController extends Controller
             // show up here, not silently vanish from every incidents listing.
             ->leftJoin('equipment as e', 'ir.equipment_id', '=', 'e.equipment_id')
             ->leftJoin('accessories as ac', 'ir.accessory_id', '=', 'ac.accessory_id')
+            // Left — not every incident has a specific unit pinned down (older rows, or
+            // "Not sure which unit" at report time), so this must never drop a row.
+            ->leftJoin('equipment_units as eu', 'ir.equipment_unit_id', '=', 'eu.unit_id')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id');
         if ($tab !== 'all') {
             $incQuery->where('ir.status', $tab);
@@ -240,6 +269,61 @@ class IncidentsController extends Controller
         return $maintQuery;
     }
 
+    /**
+     * A single physical unit's full history — incidents, checklist check-in/out, and
+     * maintenance — combined in one place. Reached by clicking a Unit cell in the Incidents
+     * table; no equivalent combined view existed before this (the Equipment Units page only
+     * ever showed maintenance-log history, via EquipmentController's own
+     * ?get_unit_maintenance_history= branch).
+     */
+    private function unitHistory(int $unitId): \Illuminate\Http\JsonResponse
+    {
+        $unit = DB::table('equipment_units as eu')
+            ->join('equipment as e', 'eu.equipment_id', '=', 'e.equipment_id')
+            ->where('eu.unit_id', $unitId)
+            ->select('eu.unit_id', 'eu.asset_tag', 'eu.status', 'eu.condition', 'eu.serial_no',
+                'e.equipment_name', 'e.brand')
+            ->first();
+        if (! $unit) {
+            return response()->json(['error' => 'Unit not found'], 404);
+        }
+
+        $incidents = DB::table('incident_reports as ir')
+            ->join('bookings as b', 'ir.booking_id', '=', 'b.booking_id')
+            ->where('ir.equipment_unit_id', $unitId)
+            ->orderByDesc('ir.incident_date')
+            ->select('ir.incident_id', 'ir.incident_number', 'ir.incident_date', 'ir.incident_type',
+                'ir.status', 'ir.cause', 'ir.charge_amount', 'b.booking_reference')
+            ->get();
+
+        $checklist = DB::table('equipment_checklist as ec')
+            ->join('bookings as b', 'ec.booking_id', '=', 'b.booking_id')
+            ->where('ec.equipment_unit_id', $unitId)
+            ->orderByDesc('ec.checked_at')
+            ->select('ec.checklist_id', 'ec.direction', 'ec.condition_out', 'ec.condition_in',
+                'ec.notes', 'ec.checked_at', 'b.booking_reference')
+            ->get();
+
+        // maintenance_schedules tracks a whole equipment MODEL, not an individual unit — the
+        // only unit-level maintenance record is equipment_unit_maintenance_log (mark/return
+        // under-maintenance events), the same table EquipmentController's own
+        // ?get_unit_maintenance_history= branch already reads for the Equipment Units page.
+        $maintenance = DB::table('equipment_unit_maintenance_log as l')
+            ->leftJoin('users as u', 'l.performed_by', '=', 'u.user_id')
+            ->where('l.unit_id', $unitId)
+            ->orderByDesc('l.performed_at')
+            ->select('l.log_id', 'l.action', 'l.reason', 'l.notes', 'l.performed_at',
+                DB::raw("CONCAT(u.first_name,' ',u.last_name) AS performed_by_name"))
+            ->get();
+
+        return response()->json([
+            'unit' => $unit,
+            'incidents' => $incidents,
+            'checklist' => $checklist,
+            'maintenance' => $maintenance,
+        ]);
+    }
+
     /** Export ▾ — two independent datasets (incidents list, maintenance schedule), each unbounded. */
     private function export(Request $request): StreamedResponse|Response
     {
@@ -265,16 +349,17 @@ class IncidentsController extends Controller
             return DataExporter::respond($request->query('format', 'csv'), 'Maintenance Schedule', $headers, $rows, 'maintenance-export');
         }
 
-        $headers = ['Incident #', 'Booking', 'Item', 'Type', 'Status', 'Cause', 'Resolution', 'Charge'];
+        $headers = ['Incident #', 'Booking', 'Item', 'Unit', 'Type', 'Status', 'Cause', 'Resolution', 'Charge'];
         $rows = $this->filteredIncidentsQuery($request)
             ->orderByDesc('ir.created_at')
             ->select('ir.incident_number', 'b.booking_reference', 'e.equipment_name', 'ac.accessory_name', 'ir.incident_type',
-                'ir.status', 'ir.cause', 'ir.resolution', 'ir.charge_amount')
+                'ir.status', 'ir.cause', 'ir.resolution', 'ir.charge_amount', 'eu.asset_tag as unit_asset_tag')
             ->get()
             ->map(fn ($i) => [
                 $i->incident_number,
                 $i->booking_reference,
                 $i->equipment_name ?: $i->accessory_name,
+                $i->unit_asset_tag ?: '—',
                 $this->typeLabel[$i->incident_type] ?? ucfirst($i->incident_type),
                 ucfirst($i->status),
                 $this->causeLabel[$i->cause] ?? ucfirst((string) $i->cause),

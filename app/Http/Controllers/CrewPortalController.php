@@ -131,6 +131,7 @@ class CrewPortalController extends Controller
         $myActiveBookings = collect();
         $bookingEquipMap = [];
         $equipmentUnitMap = [];
+        $bookingEquipmentUnitMap = [];
         $bookingAccMap = [];
         $accessoryUnitMap = [];
         $myAttendance = collect();
@@ -225,6 +226,24 @@ class CrewPortalController extends Controller
                     foreach (DB::table('equipment_units')->whereIn('equipment_id', $equipIdsForUnits)->orderBy('asset_tag')->get() as $u) {
                         $equipmentUnitMap[$u->equipment_id][] = ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag];
                     }
+                }
+
+                // Booking-scoped unit map: which specific unit was actually checked out for THIS
+                // booking's equipment, per the Equipment Checklist (direction='out'). The Unit
+                // select tries this first so crew don't have to guess which physical unit they
+                // actually had — falls back to $equipmentUnitMap above when no per-unit checklist
+                // row exists for that booking+equipment yet.
+                $bookingEquipmentUnitMap = [];
+                $checkedOutUnits = DB::table('equipment_checklist as ec')
+                    ->join('equipment_units as eu', 'ec.equipment_unit_id', '=', 'eu.unit_id')
+                    ->whereIn('ec.booking_id', $activeBookingIds)
+                    ->where('ec.direction', 'out')
+                    ->whereNotNull('ec.equipment_unit_id')
+                    ->select('ec.booking_id', 'ec.equipment_id', 'eu.unit_id', 'eu.asset_tag')
+                    ->distinct()
+                    ->get();
+                foreach ($checkedOutUnits as $row) {
+                    $bookingEquipmentUnitMap[$row->booking_id . '_' . $row->equipment_id][] = ['unit_id' => $row->unit_id, 'asset_tag' => $row->asset_tag];
                 }
 
                 // Same two-level cascade (Booking -> Accessory -> Unit) as equipment above, so the
@@ -434,6 +453,7 @@ class CrewPortalController extends Controller
             'isHeadCrew' => $isHeadCrew, 'headBookingIds' => $headBookingIds,
             'myBookings' => $myBookings, 'myIncidents' => $myIncidents, 'myMaintenances' => $myMaintenances,
             'myActiveBookings' => $myActiveBookings, 'bookingEquipMap' => $bookingEquipMap, 'equipmentUnitMap' => $equipmentUnitMap,
+            'bookingEquipmentUnitMap' => $bookingEquipmentUnitMap,
             'bookingAccMap' => $bookingAccMap, 'accessoryUnitMap' => $accessoryUnitMap,
             'myAttendance' => $myAttendance, 'myTimesheets' => $myTimesheets,
             'myChecklistBookings' => $myChecklistBookings, 'myTeamBookings' => $myTeamBookings, 'allActiveCrew' => $allActiveCrew,

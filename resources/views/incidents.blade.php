@@ -99,6 +99,7 @@
           <th>IR #</th>
           <th>Date</th>
           <th>Equipment</th>
+          <th>Unit</th>
           <th>Booking</th>
           <th>Type</th>
           <th>Charge</th>
@@ -119,6 +120,16 @@
           @else
           <div style="font-weight:600">{{ $ir->accessory_name }}</div>
           <span class="badge badge-gray" style="font-size:9px">ACCESSORY</span>
+          @endif
+        </td>
+        <td>
+          @if ($ir->unit_asset_tag)
+          <button type="button" onclick="openUnitHistory({{ $ir->equipment_unit_id }}, '{{ addslashes($ir->unit_asset_tag) }}')"
+                  style="font-family:monospace;font-size:.83rem;font-weight:700;color:var(--accent);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline">
+            {{ $ir->unit_asset_tag }}
+          </button>
+          @else
+          <span style="color:var(--muted);font-size:.83rem">—</span>
           @endif
         </td>
         <td>
@@ -705,6 +716,22 @@
   </div>
 </div>
 
+<!-- ══ UNIT HISTORY MODAL ══ -->
+<div class="modal-overlay" id="modalUnitHistory">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <h3 class="modal-title"><i data-feather="tag" style="width:16px;height:16px;margin-right:8px;vertical-align:middle"></i>Unit History — <span id="unitHist_tag"></span></h3>
+      <button class="modal-close"><i data-feather="x"></i></button>
+    </div>
+    <div class="modal-body" id="unitHist_body" style="max-height:60vh;overflow-y:auto">
+      <div style="text-align:center;padding:30px;color:var(--muted)">Loading…</div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" data-modal-close>Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // Equipment per booking (pre-loaded)
 const BOOKING_EQUIP = {!! json_encode($bookingEquipMap) !!};
@@ -714,10 +741,16 @@ const BOOKING_EQUIP = {!! json_encode($bookingEquipMap) !!};
 // can pin down which specific unit when an equipment model has more than one.
 const EQUIPMENT_UNITS = {!! json_encode($equipmentUnitMap) !!};
 
-function populateIRUnitSelect(equipmentId, selectId, preselect) {
+// Which unit was actually checked out for a given booking's equipment, per the Equipment
+// Checklist — keyed "bookingId_equipmentId". Tried first so the Unit field can auto-fill with
+// the real unit instead of staff having to guess among every unit of that model company-wide.
+const BOOKING_EQUIPMENT_UNITS = {!! json_encode($bookingEquipmentUnitMap) !!};
+
+function populateIRUnitSelect(equipmentId, selectId, preselect, bookingId) {
   const sel = document.getElementById(selectId);
   if (!sel) return;
-  const units = EQUIPMENT_UNITS[equipmentId] || [];
+  const bookedUnits = (bookingId && BOOKING_EQUIPMENT_UNITS[bookingId + '_' + equipmentId]) || [];
+  const units = bookedUnits.length ? bookedUnits : (EQUIPMENT_UNITS[equipmentId] || []);
   if (!equipmentId || !units.length) {
     sel.innerHTML = '<option value="">Not sure which unit</option>';
     sel.disabled = true;
@@ -726,7 +759,9 @@ function populateIRUnitSelect(equipmentId, selectId, preselect) {
   }
   sel.innerHTML = units.map((u) => `<option value="u${u.unit_id}">${esc(u.asset_tag)}</option>`).join('')
     + '<option value="">Not sure which unit</option>';
-  sel.value = preselect ? 'u' + preselect : '';
+  // An explicit preselect (editing an incident that already has a unit saved) always wins;
+  // otherwise auto-fill from the checklist-matched unit when there's exactly one candidate.
+  sel.value = preselect ? 'u' + preselect : (!preselect && bookedUnits.length === 1 ? 'u' + bookedUnits[0].unit_id : '');
   sel.disabled = false;
   sel.style.display = '';
 }
@@ -739,6 +774,61 @@ const BOOKING_CREW = {!! json_encode($bookingCrewMap) !!};
 
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Unit History modal — combined incidents + checklist + maintenance for one physical unit ──
+function openUnitHistory(unitId, assetTag) {
+  document.getElementById('unitHist_tag').textContent = assetTag || ('#' + unitId);
+  const body = document.getElementById('unitHist_body');
+  body.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">Loading…</div>';
+  openModal('modalUnitHistory');
+
+  fetch('{{ route('incidents') }}?get_unit_history=' + unitId)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { body.innerHTML = '<div style="padding:20px;color:var(--red)">' + esc(data.error) + '</div>'; return; }
+      const u = data.unit;
+      let html = `<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div style="flex:1">
+          <div style="font-weight:700">${esc(u.equipment_name)} — ${esc(u.brand || '')}</div>
+          <div style="font-size:.8rem;color:var(--muted)">Serial: ${esc(u.serial_no || '—')}</div>
+        </div>
+        <span class="badge badge-gray">${esc(u.status)}</span>
+        <span class="badge badge-gray">${esc(u.condition)}</span>
+      </div>`;
+
+      html += '<div style="font-weight:700;font-size:.85rem;margin-bottom:8px">Incident Reports (' + data.incidents.length + ')</div>';
+      html += data.incidents.length
+        ? data.incidents.map(i => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:.83rem">
+            <span style="font-family:monospace;font-weight:700">${esc(i.incident_number || '#' + i.incident_id)}</span>
+            &middot; ${esc(i.incident_date)} &middot; ${esc(i.incident_type)} &middot; <span class="badge ${i.status === 'open' ? 'badge-yellow' : (i.status === 'resolved' ? 'badge-green' : 'badge-gray')}">${esc(i.status)}</span>
+            &middot; ${esc(i.booking_reference)}
+            ${i.charge_amount > 0 ? ' &middot; ₱' + Number(i.charge_amount).toLocaleString(undefined,{minimumFractionDigits:2}) : ''}
+          </div>`).join('')
+        : '<div style="color:var(--muted);font-size:.83rem;padding-bottom:12px">No incidents filed on this unit.</div>';
+
+      html += '<div style="font-weight:700;font-size:.85rem;margin:16px 0 8px">Checklist Check-In / Check-Out (' + data.checklist.length + ')</div>';
+      html += data.checklist.length
+        ? data.checklist.map(c => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:.83rem">
+            <span class="badge ${c.direction === 'out' ? 'badge-blue' : 'badge-green'}">${c.direction === 'out' ? 'Checked Out' : 'Checked In'}</span>
+            &middot; ${esc(c.booking_reference)} &middot; ${c.checked_at ? esc(c.checked_at) : '—'}
+            ${c.condition_out ? ' &middot; out: ' + esc(c.condition_out) : ''}${c.condition_in ? ' &middot; in: ' + esc(c.condition_in) : ''}
+          </div>`).join('')
+        : '<div style="color:var(--muted);font-size:.83rem;padding-bottom:12px">No checklist records for this unit.</div>';
+
+      html += '<div style="font-weight:700;font-size:.85rem;margin:16px 0 8px">Maintenance Log (' + data.maintenance.length + ')</div>';
+      html += data.maintenance.length
+        ? data.maintenance.map(m => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:.83rem">
+            <span class="badge ${m.action === 'mark' ? 'badge-orange' : 'badge-green'}">${m.action === 'mark' ? 'Marked for Maintenance' : 'Returned to Service'}</span>
+            &middot; ${esc(m.performed_at)} ${m.performed_by_name ? '&middot; ' + esc(m.performed_by_name) : ''}
+            ${m.reason ? '<div style="color:var(--muted);margin-top:2px">' + esc(m.reason) + '</div>' : ''}
+          </div>`).join('')
+        : '<div style="color:var(--muted);font-size:.83rem">No maintenance log for this unit.</div>';
+
+      body.innerHTML = html;
+      if (typeof feather !== 'undefined') feather.replace();
+    })
+    .catch(() => { body.innerHTML = '<div style="padding:20px;color:var(--red)">Could not load unit history.</div>'; });
 }
 
 // ── Booking type-to-search (New Incident) ───────────────────────────────────
@@ -783,7 +873,7 @@ function selectBookingForIncident(bookingId) {
   eqSearch.value = '';
   eqSearch.disabled = !bookingId;
   eqSearch.placeholder = !bookingId ? 'Select a booking first' : (equip.length ? 'Search equipment or accessory…' : 'No equipment on this booking');
-  populateIRUnitSelect(null, 'newIR_unit', null);
+  populateIRUnitSelect(null, 'newIR_unit', null, bookingId);
   const crewContainer = document.getElementById('newIR_crewContainer');
   if (crewContainer) populateCrewFromBooking(bookingId, crewContainer);
 }
@@ -815,7 +905,7 @@ function openIREquipSearch(q) {
       document.getElementById('newIR_equipment').value = el.dataset.id;
       document.getElementById('newIR_equipSearch').value = el.dataset.label;
       drop.style.display = 'none';
-      populateIRUnitSelect(el.dataset.id, 'newIR_unit', null);
+      populateIRUnitSelect(el.dataset.id, 'newIR_unit', null, bookingId);
     });
   });
 }
@@ -949,7 +1039,7 @@ function openEditIncident(ir) {
   document.getElementById('editIR_equipName').textContent = ir.equipment_name
     ? ir.equipment_name + (ir.brand ? ' — ' + ir.brand : '')
     : (ir.accessory_name || '—');
-  populateIRUnitSelect(ir.equipment_id, 'editIR_unit', ir.equipment_unit_id);
+  populateIRUnitSelect(ir.equipment_id, 'editIR_unit', ir.equipment_unit_id, ir.booking_id);
   document.getElementById('editIR_photoLink').innerHTML = ir.photo_path
     ? `<a href="/incidents/${ir.incident_id}/photo" target="_blank">View current photo</a>`
     : '<span style="color:var(--muted)">No photo on file</span>';
