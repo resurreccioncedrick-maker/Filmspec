@@ -230,11 +230,17 @@ button{font-family:var(--font-b);cursor:pointer}
 <div class="topbar">
   <div class="brand">FILMSPEC</div>
   <div style="display:flex;align-items:center;gap:10px">
-    <div style="text-align:right">
+    <div style="text-align:right;cursor:pointer" onclick="showPg('profile')" title="View my profile">
       <div style="font-weight:700;font-size:12.5px;line-height:1.3">{{ $crewMember ? $crewMember->first_name.' '.$crewMember->last_name : trim(($user->first_name ?? '').' '.($user->last_name ?? '')) }}</div>
       <div style="font-size:10px;color:var(--muted)">{{ $crewMember ? ($crewMember->position_name ?? 'Crew') : 'Crew' }}</div>
     </div>
-    <div class="av">{{ strtoupper(substr($user->first_name ?? 'C', 0, 1)) }}</div>
+    <div class="av" style="cursor:pointer;overflow:hidden" onclick="showPg('profile')" title="View my profile">
+      @if ($crewMember && $crewMember->photo_path)
+      <img src="{{ asset('storage/' . $crewMember->photo_path) }}" alt="" style="width:100%;height:100%;object-fit:cover">
+      @else
+      {{ strtoupper(substr($user->first_name ?? 'C', 0, 1)) }}
+      @endif
+    </div>
     <form method="POST" action="{{ route('logout') }}" style="display:contents">
       @csrf
       <button type="submit" title="Logout" class="logout-btn" style="background:none;border:none;cursor:pointer">
@@ -904,6 +910,71 @@ button{font-family:var(--font-b);cursor:pointer}
   </div>
 </div>
 
+<div id="pg-profile" class="pg {{ $activeTab === 'profile' ? 'on' : '' }}">
+  <div class="ctr">
+    @if ($crewMember)
+    @php
+      $pfTypeBadge = ['staff' => 'badge-blue', 'freelance' => 'badge-purple', 'on_call' => 'badge-yellow'];
+      $pfTypeLabel = ['staff' => 'Staff', 'freelance' => 'Freelance', 'on_call' => 'On Call'];
+      $pfStatusBadge = ['active' => 'badge-green', 'inactive' => 'badge-gray', 'blacklisted' => 'badge-red'];
+    @endphp
+    <div class="card">
+      <div class="card-body" style="display:flex;align-items:center;gap:14px;padding:18px">
+        <div class="av" style="width:64px;height:64px;border-radius:50%;font-size:22px;overflow:hidden">
+          @if ($crewMember->photo_path)
+          <img src="{{ asset('storage/' . $crewMember->photo_path) }}" alt="" style="width:100%;height:100%;object-fit:cover">
+          @else
+          {{ strtoupper(substr($crewMember->first_name, 0, 1)) }}
+          @endif
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:800;font-size:17px">{{ $crewMember->first_name }} {{ $crewMember->last_name }}</div>
+          <div style="font-size:12.5px;color:var(--muted);margin-top:1px">{{ $crewMember->position_name ?? 'Crew' }}</div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <span class="badge {{ $pfStatusBadge[$crewMember->status] ?? 'badge-gray' }}">{{ ucfirst($crewMember->status) }}</span>
+            <span class="badge {{ $pfTypeBadge[$crewMember->employment_type] ?? 'badge-gray' }}">{{ $pfTypeLabel[$crewMember->employment_type] ?? ucfirst($crewMember->employment_type) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head" style="padding:14px 16px 0;font-weight:700;font-size:13px">Contact Information</div>
+      <div class="card-body" style="padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px">
+        <div class="att-member-row"><span class="att-member-role">Email</span><span class="att-member-name" style="font-size:13px">{{ $crewMember->email ?: '—' }}</span></div>
+        <div class="att-member-row"><span class="att-member-role">Phone</span><span class="att-member-name" style="font-size:13px">{{ $crewMember->phone ?: '—' }}</span></div>
+        <div class="att-member-row"><span class="att-member-role">GCash Number</span><span class="att-member-name" style="font-size:13px">{{ $crewMember->gcash_number ?: '—' }}</span></div>
+        <div class="att-member-row"><span class="att-member-role">Address</span><span class="att-member-name" style="font-size:13px;text-align:right">{{ $crewMember->address ?: '—' }}</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head" style="padding:14px 16px 0;font-weight:700;font-size:13px">Work Details</div>
+      <div class="card-body" style="padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px">
+        <div class="att-member-row"><span class="att-member-role">Date Joined</span><span class="att-member-name" style="font-size:13px">{{ $crewMember->date_joined ? \Carbon\Carbon::parse($crewMember->date_joined)->format('M j, Y') : '—' }}</span></div>
+        <div class="att-member-row"><span class="att-member-role">Total Shoots</span><span class="att-member-name" style="font-size:13px">{{ $crewMember->total_shoots ?? 0 }}</span></div>
+        @if ($crewMember->employment_type === 'staff')
+        <div class="att-member-row"><span class="att-member-role">Monthly Salary</span><span class="att-member-name" style="font-size:13px">&#8369;{{ number_format((float) $crewMember->monthly_salary, 2) }}</span></div>
+        @else
+        <div class="att-member-row"><span class="att-member-role">Base Rate (12hr)</span><span class="att-member-name" style="font-size:13px">&#8369;{{ number_format((float) $crewMember->base_rate_12hr, 2) }}</span></div>
+        <div class="att-member-row"><span class="att-member-role">Overtime Rate</span><span class="att-member-name" style="font-size:13px">&#8369;{{ number_format((float) $crewMember->overtime_rate, 2) }}</span></div>
+        <div class="att-member-row"><span class="att-member-role">Double Pay Rate</span><span class="att-member-name" style="font-size:13px">&#8369;{{ number_format((float) $crewMember->double_pay_rate, 2) }}</span></div>
+        @endif
+      </div>
+    </div>
+
+    @if ($crewMember->profile_notes)
+    <div class="card">
+      <div class="card-head" style="padding:14px 16px 0;font-weight:700;font-size:13px">Notes</div>
+      <div class="card-body" style="padding:12px 16px 16px;font-size:13px;color:var(--sub);line-height:1.6">{{ $crewMember->profile_notes }}</div>
+    </div>
+    @endif
+
+    <div style="font-size:11px;color:var(--muted);text-align:center;padding:6px 0 16px">To update any of this information, contact your Operations Manager or Super Admin.</div>
+    @endif
+  </div>
+</div>
+
 <!-- BOTTOM TAB BAR (3 tabs — Time/Reports/Repairs live in the More sheet) -->
 <div class="tabbar">
   <button class="{{ $activeTab === 'dashboard' ? 'on' : '' }}" data-tab="dashboard" onclick="showPg('dashboard',this)"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg></span>Today</button>
@@ -921,6 +992,12 @@ button{font-family:var(--font-b);cursor:pointer}
       <button class="mo-close" onclick="closeMo('moMore')">&times;</button>
     </div>
     <div>
+      <div class="more-group-label">Account</div>
+      <div class="more-item" style="cursor:pointer" onclick="closeMo('moMore');showPg('profile')">
+        <div class="more-item-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg></div>
+        <span>My Profile</span>
+      </div>
+      <div class="more-divider"></div>
       @if ($isHeadCrew)
       <div class="more-group-label">My Shift</div>
       <div class="more-item" style="cursor:pointer" onclick="closeMo('moMore');showPg('attendance')">
