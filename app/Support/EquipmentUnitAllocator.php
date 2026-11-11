@@ -64,6 +64,70 @@ class EquipmentUnitAllocator
         DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->delete();
     }
 
+    /**
+     * Staff-picked replacement for whatever's currently allocated to this booking_equipment
+     * line — used when a staff member manually assigns/confirms specific unit(s) on the Cost
+     * Estimate page, overriding allocate()'s auto-pick. Releases the line's current allocation
+     * first (so a unit dropped from the selection goes back to 'available'), then assigns
+     * exactly the given unit IDs, which must already be 'available' (or already allocated to
+     * THIS same line — re-saving the same choice must not fail). Silently ignores any unit ID
+     * that fails that check rather than throwing, so a stale/raced selection can't corrupt data.
+     */
+    public static function allocateSpecific(int $bkEquipId, array $unitIds): void
+    {
+        $alreadyOnThisLine = DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->pluck('equipment_unit_id')->all();
+        self::release($bkEquipId);
+
+        $unitIds = array_values(array_unique(array_filter($unitIds)));
+        if (! $unitIds) {
+            return;
+        }
+
+        $validIds = DB::table('equipment_units')
+            ->whereIn('unit_id', $unitIds)
+            ->where(fn ($w) => $w->where('status', 'available')->orWhereIn('unit_id', $alreadyOnThisLine))
+            ->pluck('unit_id');
+        if ($validIds->isEmpty()) {
+            return;
+        }
+
+        $now = now();
+        DB::table('booking_equipment_units')->insert(
+            $validIds->map(fn ($unitId) => [
+                'bk_equip_id' => $bkEquipId, 'equipment_unit_id' => $unitId, 'allocated_at' => $now,
+            ])->all()
+        );
+        DB::table('equipment_units')->whereIn('unit_id', $validIds)->update(['status' => 'allocated']);
+    }
+
+    /** Accessory equivalent of allocateSpecific() above. */
+    public static function allocateSpecificAccessory(int $baId, array $unitIds): void
+    {
+        $alreadyOnThisLine = DB::table('booking_accessory_units')->where('ba_id', $baId)->pluck('accessory_unit_id')->all();
+        self::releaseAccessory($baId);
+
+        $unitIds = array_values(array_unique(array_filter($unitIds)));
+        if (! $unitIds) {
+            return;
+        }
+
+        $validIds = DB::table('accessory_units')
+            ->whereIn('unit_id', $unitIds)
+            ->where(fn ($w) => $w->where('status', 'available')->orWhereIn('unit_id', $alreadyOnThisLine))
+            ->pluck('unit_id');
+        if ($validIds->isEmpty()) {
+            return;
+        }
+
+        $now = now();
+        DB::table('booking_accessory_units')->insert(
+            $validIds->map(fn ($unitId) => [
+                'ba_id' => $baId, 'accessory_unit_id' => $unitId, 'allocated_at' => $now,
+            ])->all()
+        );
+        DB::table('accessory_units')->whereIn('unit_id', $validIds)->update(['status' => 'allocated']);
+    }
+
     /** Accessory equivalent of allocate() above — same idea, accessory_units/booking_accessory_units. */
     public static function allocateAccessory(int $baId, int $accessoryId, int $qty): void
     {

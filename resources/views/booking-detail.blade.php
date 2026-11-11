@@ -377,8 +377,13 @@
 @php
   $crewCount = $crewLines->count();
   $equipCount = $equipmentLines->count();
+  $accCount = $accessoryLines->count();
   $crewOk = $crewCount > 0;
-  $equipOk = $equipCount > 0;
+  // "Ready" now means every equipment/accessory line has its release unit(s) manually
+  // confirmed on the Cost Estimate tab — not merely that a line exists. A booking with zero
+  // lines at all is never "ready" either (nothing to release isn't the same as release-ready).
+  $equipUnconfirmedCount = $equipmentLines->where('unit_confirmed', 0)->count() + $accessoryLines->where('unit_confirmed', 0)->count();
+  $equipOk = ($equipCount + $accCount) > 0 && $equipUnconfirmedCount === 0;
   $driverOk = ! $driverNeeded || $driverCount > 0;
   // The client must have actually approved the cost estimate — staff confirming the CE only
   // sends it to the client (cost_approval_status becomes 'pending_client'); it does not mean
@@ -408,7 +413,10 @@
   // just an unfinalized fee. The row/banner text says "setup incomplete" rather than singling
   // out the driver as if that's always the specific thing missing.
   $rows = [
-      ['label' => 'Equipment', 'ok' => $equipOk, 'detail' => $equipOk ? "$equipCount item" . ($equipCount != 1 ? 's' : '') . ' added' : 'No equipment added'],
+      ['label' => 'Equipment', 'ok' => $equipOk, 'detail' => $equipOk
+          ? ($equipCount + $accCount) . ' item' . (($equipCount + $accCount) != 1 ? 's' : '') . ' confirmed'
+          : (($equipCount + $accCount) === 0 ? 'No equipment added' : "$equipUnconfirmedCount item" . ($equipUnconfirmedCount != 1 ? 's' : '') . ' awaiting unit confirmation'),
+      ],
       ['label' => 'Crew', 'ok' => $crewOk, 'clickable' => true, 'onclick' => 'openAddCrewModal()', 'title' => 'Open Add Crew',
           'detail' => $crewOk ? "$crewCount member" . ($crewCount != 1 ? 's' : '') . ' assigned' : 'No crew assigned',
       ],
@@ -1577,9 +1585,13 @@
           <input type="hidden" name="equipment_id" id="selectedEquipId">
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Quantity</label><input type="number" name="quantity" class="form-control" value="1" min="1" required></div>
+          <div class="form-group"><label>Quantity</label><input type="number" name="quantity" id="addEquipQty" class="form-control" value="1" min="1" required oninput="renderAddEquipUnitSlots()"></div>
           <div class="form-group"><label>Days</label><input type="number" name="days" class="form-control" value="1" min="1" required></div>
           <div class="form-group"><label>Daily Rate (₱)</label><input type="number" name="daily_rate" id="equipRate" class="form-control" step="0.01" min="0" required></div>
+        </div>
+        <div class="form-group">
+          <label>Release Unit(s) <span style="font-weight:400;color:var(--muted)">(optional — can also confirm later on the Cost Estimate tab)</span></label>
+          <div id="addEquipUnitsWrap"></div>
         </div>
         <div class="form-group"><label>Notes</label><input type="text" name="notes" class="form-control" placeholder="e.g. with tripod, no battery"></div>
       </div>
@@ -3140,6 +3152,30 @@ function prepareReject() {
 // ── Searchable equipment/crew lists ──────────────────────────────────────────
 const equipData = {!! $availEquip->values()->toJson() !!};
 const crewData  = {!! $availCrew->values()->toJson() !!};
+// Available (unallocated) physical units per equipment model — powers the Add Equipment
+// modal's optional Release Unit picker, so staff can pin a specific unit down right at
+// add-time instead of only confirming it later on the Cost Estimate tab.
+const EQUIP_AVAIL_UNITS = {!! $availUnitsByEquipId->map(fn ($g) => $g->map(fn ($u) => ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag])->values())->toJson() !!};
+
+function renderAddEquipUnitSlots() {
+  const wrap = document.getElementById('addEquipUnitsWrap');
+  if (!wrap) return;
+  const eid = document.getElementById('selectedEquipId').value;
+  const qty = Math.max(1, parseInt(document.getElementById('addEquipQty').value) || 1);
+  const units = EQUIP_AVAIL_UNITS[eid] || [];
+  if (!eid || !units.length) {
+    wrap.innerHTML = '<div style="font-size:11.5px;color:var(--muted)">' + (eid ? 'No individually-tracked units available for this item.' : 'Select equipment first.') + '</div>';
+    return;
+  }
+  let html = '';
+  for (let i = 0; i < qty; i++) {
+    html += '<select name="unit_ids[]" class="form-control" style="margin-bottom:6px">'
+      + '<option value="">— pick unit (optional) —</option>'
+      + units.map(u => '<option value="' + u.unit_id + '">' + _escH(u.asset_tag) + '</option>').join('')
+      + '</select>';
+  }
+  wrap.innerHTML = html;
+}
 
 function _escH(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -3168,12 +3204,15 @@ function selectEquip(el) {
   document.getElementById('equipSearch').value = el.querySelector('.si-name').textContent;
   document.querySelectorAll('#equipList .srch-item').forEach(i => i.classList.remove('sel'));
   el.classList.add('sel');
+  renderAddEquipUnitSlots();
 }
 function openAddEquipModal() {
   document.getElementById('equipSearch').value = '';
   document.getElementById('selectedEquipId').value = '';
   document.getElementById('equipRate').value = '';
+  document.getElementById('addEquipQty').value = '1';
   renderEquipList(equipData);
+  renderAddEquipUnitSlots();
   openModal('modalAddEquip');
 }
 

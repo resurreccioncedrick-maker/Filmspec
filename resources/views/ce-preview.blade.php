@@ -1051,19 +1051,32 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="ecard-body">
         <div style="overflow-x:auto">
         <table class="etbl">
-          <thead><tr><th style="width:44px">Qty</th><th>Item</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
+          <thead><tr><th style="width:44px">Qty</th><th>Item</th><th style="width:170px">Release Unit</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
           <tbody>
           @php $anyEquip = false; @endphp
           @foreach ($equipGroups as $catLines)
           @foreach ($catLines as $eq)
-          @php $anyEquip = true; $rowAmt = (float) $eq->quantity * (float) $eq->daily_rate; @endphp
+          @php
+            $anyEquip = true;
+            $rowAmt = (float) $eq->quantity * (float) $eq->daily_rate;
+            $eqOpts = $equipUnitOptions[$eq->bk_equip_id] ?? collect();
+            $eqAllocatedHere = array_values($allocatedEqUnitIds[$eq->bk_equip_id] ?? []);
+          @endphp
           <tr>
             <td>{{ $eq->quantity }}</td>
+            <td>{{ $eq->equipment_name }}{{ $eq->brand ? ' ('.$eq->brand.')' : '' }}</td>
             <td>
-              {{ $eq->equipment_name }}{{ $eq->brand ? ' ('.$eq->brand.')' : '' }}
-              @if (! empty($eq->bk_equip_id) && $equipUnitTags->get($eq->bk_equip_id))
-              <div style="font-size:11px;color:var(--muted);font-family:var(--font-m, monospace)">Unit: {{ $equipUnitTags->get($eq->bk_equip_id) }}</div>
-              @endif
+              @include('partials.ce-unit-picker', [
+                'confirmed' => (bool) $eq->unit_confirmed,
+                'tags' => $equipUnitTags->get($eq->bk_equip_id),
+                'opts' => $eqOpts,
+                'allocatedHere' => $eqAllocatedHere,
+                'quantity' => (int) $eq->quantity,
+                'rowKey' => 'eq' . $eq->bk_equip_id,
+                'action' => 'assign_equipment_unit',
+                'idField' => 'bk_equip_id',
+                'idValue' => $eq->bk_equip_id,
+              ])
             </td>
             <td class="r">{{ $eq->days }}</td>
             <td class="r amt">₱{{ number_format($eq->daily_rate, 2) }}</td>
@@ -1072,7 +1085,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           @endforeach
           @endforeach
           @if (! $anyEquip)
-          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px;font-style:italic">No equipment items</td></tr>
+          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px;font-style:italic">No equipment items</td></tr>
           @endif
           </tbody>
         </table>
@@ -1128,28 +1141,40 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
     <div class="ecard">
       <div class="ecard-head"><h3><i data-feather="package" style="width:14px;height:14px"></i> Accessories &amp; Add-ons</h3>
-        @if ($canManage)<button type="button" class="addline-btn" onclick="openDocMo('moAddAcc')"><i data-feather="plus" style="width:12px;height:12px"></i> Add Accessories</button>@endif
+        @if ($canManage)<button type="button" class="addline-btn" onclick="ceOpenAddAcc()"><i data-feather="plus" style="width:12px;height:12px"></i> Add Accessories</button>@endif
       </div>
       <div class="ecard-body">
         <div style="overflow-x:auto">
         <table class="etbl">
-          <thead><tr><th style="width:44px">Qty</th><th>Item</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
+          <thead><tr><th style="width:44px">Qty</th><th>Item</th><th style="width:170px">Release Unit</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
           <tbody>
           @forelse ($accLines as $ac)
+          @php
+            $acOpts = $accUnitOptions[$ac->ba_id] ?? collect();
+            $acAllocatedHere = array_values($allocatedAccUnitIds[$ac->ba_id] ?? []);
+          @endphp
           <tr>
             <td>{{ $ac->quantity }}</td>
+            <td>{{ $ac->accessory_name }}{{ $ac->is_included ? ' (Included)' : '' }}</td>
             <td>
-              {{ $ac->accessory_name }}{{ $ac->is_included ? ' (Included)' : '' }}
-              @if ($accUnitTags->get($ac->ba_id))
-              <div style="font-size:11px;color:var(--muted);font-family:var(--font-m, monospace)">Unit: {{ $accUnitTags->get($ac->ba_id) }}</div>
-              @endif
+              @include('partials.ce-unit-picker', [
+                'confirmed' => (bool) $ac->unit_confirmed,
+                'tags' => $accUnitTags->get($ac->ba_id),
+                'opts' => $acOpts,
+                'allocatedHere' => $acAllocatedHere,
+                'quantity' => (int) $ac->quantity,
+                'rowKey' => 'ac' . $ac->ba_id,
+                'action' => 'assign_accessory_unit',
+                'idField' => 'ba_id',
+                'idValue' => $ac->ba_id,
+              ])
             </td>
             <td class="r">{{ $ac->days }}</td>
             <td class="r amt">₱{{ number_format($ac->daily_rate, 2) }}</td>
             <td class="r amt">₱{{ number_format($ac->subtotal, 2) }}</td>
           </tr>
           @empty
-          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px;font-style:italic">No accessories added</td></tr>
+          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px;font-style:italic">No accessories added</td></tr>
           @endforelse
           </tbody>
         </table>
@@ -1301,9 +1326,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         <div id="ceEquipList" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1.5px solid #e2e8f0;border-radius:6px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(15,23,42,.12)"></div>
       </div>
       <div style="display:flex;gap:8px">
-        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Qty</label><input type="number" name="quantity" value="1" min="1" required style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Qty</label><input type="number" name="quantity" id="ceEquipQty" value="1" min="1" required oninput="ceRenderAddEquipUnitSlots()" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
         <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Days</label><input type="number" name="days" value="1" min="1" required style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
         <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Rate/Day</label><input type="number" name="daily_rate" id="ceEquipRate" step="0.01" min="0" required style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Release Unit(s) <span style="font-weight:400;text-transform:none">(optional)</span></label>
+        <div id="ceAddEquipUnitsWrap"></div>
       </div>
       <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Notes</label><input type="text" name="notes" placeholder="Optional" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
     </div>
@@ -1355,20 +1384,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <input type="hidden" name="action" value="add_booking_accessory">
     <input type="hidden" name="return_to" value="ce_preview"><input type="hidden" name="return_ce_id" value="{{ $ceId }}"><input type="hidden" name="return_view" value="{{ $isClientView ? 'client' : 'internal' }}">
     <div class="doc-body" style="display:flex;flex-direction:column;gap:10px">
-      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Accessory *</label>
-        <select name="accessory_id" required style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px">
-          <option value="">— Select accessory —</option>
-          @foreach ($allAccessoriesList as $acc)
-          @php $avail = max(0, (int) $acc->quantity - (int) $acc->qty_in_use); @endphp
-          <option value="{{ $acc->accessory_id }}" {{ $avail < 1 ? 'disabled' : '' }}>
-            {{ $acc->accessory_name }} {{ $acc->is_included ? '(Included)' : '(₱'.number_format($acc->daily_rate,2).'/day)' }} {{ $avail < 1 ? '— Out of stock' : "— $avail avail." }}
-          </option>
-          @endforeach
-        </select>
+      <input type="hidden" name="accessory_id" id="ceAccId">
+      <div style="position:relative">
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Accessory *</label>
+        <input type="text" id="ceAccSearch" autocomplete="off" oninput="ceFilterAcc(this.value)" placeholder="Search by name…"
+               style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px">
+        <div id="ceAccList" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1.5px solid #e2e8f0;border-radius:6px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(15,23,42,.12)"></div>
       </div>
       <div style="display:flex;gap:8px">
-        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Qty</label><input type="number" name="quantity" value="1" min="1" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Qty</label><input type="number" name="quantity" id="ceAccQty" value="1" min="1" oninput="ceRenderAddAccUnitSlots()" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
         <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Days</label><input type="number" name="days" value="{{ $accDays }}" min="1" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Release Unit(s) <span style="font-weight:400;text-transform:none">(optional)</span></label>
+        <div id="ceAddAccUnitsWrap"></div>
       </div>
       <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Notes</label><input type="text" name="notes" placeholder="Optional" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
     </div>
@@ -1660,7 +1689,93 @@ function ceSelectEquip(i) {
     document.getElementById('ceEquipRate').value = i.daily_rate;
     document.getElementById('ceEquipSearch').value = i.equipment_name + (i.brand ? ' (' + i.brand + ')' : '');
     document.getElementById('ceEquipList').style.display = 'none';
+    ceRenderAddEquipUnitSlots();
 }
+// Available (unallocated) physical units per equipment model — standalone-page equivalent of
+// booking-detail.blade.php's EQUIP_AVAIL_UNITS, for this page's own Add Equipment modal.
+const CE_AVAIL_UNITS = {!! $availUnitsByEquipId->map(fn ($g) => $g->map(fn ($u) => ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag])->values())->toJson() !!};
+function ceRenderAddEquipUnitSlots() {
+    const wrap = document.getElementById('ceAddEquipUnitsWrap');
+    if (!wrap) return;
+    const eid = document.getElementById('ceEquipId').value;
+    const qty = Math.max(1, parseInt(document.getElementById('ceEquipQty').value) || 1);
+    const units = CE_AVAIL_UNITS[eid] || [];
+    if (!eid || !units.length) {
+        wrap.innerHTML = '<div style="font-size:11px;color:var(--muted)">' + (eid ? 'No individually-tracked units available for this item.' : 'Select equipment first.') + '</div>';
+        return;
+    }
+    let html = '';
+    for (let i = 0; i < qty; i++) {
+        html += '<select name="unit_ids[]" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px;margin-bottom:6px">'
+            + '<option value="">— pick unit (optional) —</option>'
+            + units.map(u => '<option value="' + u.unit_id + '">' + u.asset_tag + '</option>').join('')
+            + '</select>';
+    }
+    wrap.innerHTML = html;
+}
+
+// ── Accessory search-select (Add Accessories modal) — same pattern as equipment above ──────
+const ceAccData = {!! $allAccessoriesList->map(fn ($a) => [
+    'accessory_id' => $a->accessory_id, 'accessory_name' => $a->accessory_name,
+    'daily_rate' => $a->daily_rate, 'is_included' => $a->is_included,
+    'avail' => max(0, (int) $a->quantity - (int) $a->qty_in_use),
+])->values()->toJson() !!};
+function ceRenderAccList(items) {
+    const box = document.getElementById('ceAccList');
+    box.innerHTML = '';
+    if (! items.length) { box.style.display = 'none'; return; }
+    items.slice(0, 30).forEach(i => {
+        const row = document.createElement('div');
+        const oos = i.avail < 1;
+        row.style.cssText = 'padding:8px 12px;cursor:' + (oos ? 'not-allowed' : 'pointer') + ';font-size:12.5px;border-bottom:1px solid #f1f5f9' + (oos ? ';color:#94a3b8' : '');
+        if (!oos) {
+            row.addEventListener('mousedown', () => ceSelectAcc(i));
+            row.addEventListener('mouseover', () => row.style.background = '#f0f7ff');
+            row.addEventListener('mouseout', () => row.style.background = '');
+        }
+        row.textContent = i.accessory_name + ' ' + (i.is_included ? '(Included)' : '(₱' + Number(i.daily_rate).toLocaleString('en-PH', {minimumFractionDigits:2}) + '/day)') + (oos ? ' — Out of stock' : ' — ' + i.avail + ' avail.');
+        box.appendChild(row);
+    });
+    box.style.display = 'block';
+}
+function ceFilterAcc(q) {
+    const lq = q.toLowerCase();
+    ceRenderAccList(ceAccData.filter(i => i.accessory_name.toLowerCase().includes(lq)));
+}
+function ceSelectAcc(i) {
+    document.getElementById('ceAccId').value = i.accessory_id;
+    document.getElementById('ceAccSearch').value = i.accessory_name;
+    document.getElementById('ceAccList').style.display = 'none';
+    ceRenderAddAccUnitSlots();
+}
+const CE_AVAIL_ACC_UNITS = {!! $availAccessoryUnitsByAccId->map(fn ($g) => $g->map(fn ($u) => ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag])->values())->toJson() !!};
+function ceRenderAddAccUnitSlots() {
+    const wrap = document.getElementById('ceAddAccUnitsWrap');
+    if (!wrap) return;
+    const aid = document.getElementById('ceAccId').value;
+    const qty = Math.max(1, parseInt(document.getElementById('ceAccQty').value) || 1);
+    const units = CE_AVAIL_ACC_UNITS[aid] || [];
+    if (!aid || !units.length) {
+        wrap.innerHTML = '<div style="font-size:11px;color:var(--muted)">' + (aid ? 'No individually-tracked units available for this item.' : 'Select an accessory first.') + '</div>';
+        return;
+    }
+    let html = '';
+    for (let i = 0; i < qty; i++) {
+        html += '<select name="unit_ids[]" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px;margin-bottom:6px">'
+            + '<option value="">— pick unit (optional) —</option>'
+            + units.map(u => '<option value="' + u.unit_id + '">' + u.asset_tag + '</option>').join('')
+            + '</select>';
+    }
+    wrap.innerHTML = html;
+}
+function ceOpenAddAcc() {
+    document.getElementById('ceAccSearch').value = '';
+    document.getElementById('ceAccId').value = '';
+    document.getElementById('ceAccQty').value = '1';
+    ceRenderAddAccUnitSlots();
+    openDocMo('moAddAcc');
+}
+
 // When this page is embedded (the Booking Detail "Cost Estimate" tab), Add Equipment /
 // Add Crew / Assign Transport delegate back to Booking Detail's own modals via postMessage
 // instead of opening a second, separately-styled copy of the same form — one real
@@ -1675,6 +1790,8 @@ function ceOpenAddEquip() {
     document.getElementById('ceEquipSearch').value = '';
     document.getElementById('ceEquipId').value = '';
     document.getElementById('ceEquipRate').value = '';
+    document.getElementById('ceEquipQty').value = '1';
+    ceRenderAddEquipUnitSlots();
     openDocMo('moAddEquip');
 }
 

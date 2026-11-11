@@ -280,6 +280,47 @@ class CePreviewController extends Controller
             ->get()->groupBy('ba_id')->map(fn ($g) => $g->pluck('asset_tag')->implode(', '));
         $accTotal = (float) $accLines->sum('subtotal');
 
+        // Per-line selectable units for the manual assign/confirm picker: every non-retired unit
+        // of that equipment/accessory model that's either 'available' right now, or already
+        // allocated to THIS specific line (so re-opening an already-confirmed line still shows
+        // its current picks as valid options, not just whatever else happens to be free).
+        $allEquipLines = collect($equipGroups)->flatten(1);
+        $equipUnitsByEquipId = DB::table('equipment_units')
+            ->whereIn('equipment_id', $allEquipLines->pluck('equipment_id')->unique()->all() ?: [0])
+            ->where('status', '!=', 'retired')
+            ->orderBy('asset_tag')
+            ->get(['unit_id', 'equipment_id', 'asset_tag', 'status']);
+        $allocatedEqUnitIds = DB::table('booking_equipment_units')
+            ->whereIn('bk_equip_id', $allEquipLines->pluck('bk_equip_id')->all() ?: [0])
+            ->get(['bk_equip_id', 'equipment_unit_id'])
+            ->groupBy('bk_equip_id')->map(fn ($g) => $g->pluck('equipment_unit_id')->all());
+        $equipUnitOptions = [];
+        foreach ($allEquipLines as $eqLine) {
+            $allocatedHere = $allocatedEqUnitIds[$eqLine->bk_equip_id] ?? [];
+            $equipUnitOptions[$eqLine->bk_equip_id] = $equipUnitsByEquipId
+                ->where('equipment_id', $eqLine->equipment_id)
+                ->filter(fn ($u) => $u->status === 'available' || in_array($u->unit_id, $allocatedHere, true))
+                ->values();
+        }
+
+        $accUnitsByAccId = DB::table('accessory_units')
+            ->whereIn('accessory_id', $accLines->pluck('accessory_id')->unique()->all() ?: [0])
+            ->where('status', '!=', 'retired')
+            ->orderBy('asset_tag')
+            ->get(['unit_id', 'accessory_id', 'asset_tag', 'status']);
+        $allocatedAccUnitIds = DB::table('booking_accessory_units')
+            ->whereIn('ba_id', $accLines->pluck('ba_id')->all() ?: [0])
+            ->get(['ba_id', 'accessory_unit_id'])
+            ->groupBy('ba_id')->map(fn ($g) => $g->pluck('accessory_unit_id')->all());
+        $accUnitOptions = [];
+        foreach ($accLines as $acLine) {
+            $allocatedHere = $allocatedAccUnitIds[$acLine->ba_id] ?? [];
+            $accUnitOptions[$acLine->ba_id] = $accUnitsByAccId
+                ->where('accessory_id', $acLine->accessory_id)
+                ->filter(fn ($u) => $u->status === 'available' || in_array($u->unit_id, $allocatedHere, true))
+                ->values();
+        }
+
         $equipBaseTotal = 0.0;
         foreach ($equipGroups as $catLines) {
             foreach ($catLines as $eq) {
@@ -404,6 +445,8 @@ class CePreviewController extends Controller
         $canDiscount = $canManage && in_array($role, ['super_admin', 'operations_manager'], true);
 
         $availEquip = collect();
+        $availUnitsByEquipId = collect();
+        $availAccessoryUnitsByAccId = collect();
         $availCrew = collect();
         $positions = collect();
         $vehicleRates = collect();
@@ -426,6 +469,16 @@ class CePreviewController extends Controller
                 ->select('e.equipment_id', 'e.equipment_name', 'e.brand', 'e.daily_rate', 'ec.category_name')
                 ->orderBy('e.equipment_name')
                 ->get();
+
+            // Powers the standalone (non-iframe) Add Equipment/Add Accessories modals' optional
+            // Release Unit picker — same idea as BookingDetailController's own copy for when CE
+            // is viewed embedded in the booking page.
+            $availUnitsByEquipId = DB::table('equipment_units')
+                ->whereIn('equipment_id', $availEquip->pluck('equipment_id'))
+                ->where('status', 'available')
+                ->orderBy('asset_tag')
+                ->get(['unit_id', 'equipment_id', 'asset_tag'])
+                ->groupBy('equipment_id');
 
             $availCrew = DB::table('crew_members as cm')
                 ->leftJoin('crew_positions as cp', 'cm.primary_position_id', '=', 'cp.position_id')
@@ -453,6 +506,13 @@ class CePreviewController extends Controller
                     AND ba2.booking_id != ?),0) AS qty_in_use', [$bid])
                 ->get();
 
+            $availAccessoryUnitsByAccId = DB::table('accessory_units')
+                ->whereIn('accessory_id', $allAccessoriesList->pluck('accessory_id'))
+                ->where('status', 'available')
+                ->orderBy('asset_tag')
+                ->get(['unit_id', 'accessory_id', 'asset_tag'])
+                ->groupBy('accessory_id');
+
             $accDays = max(1, (int) ((strtotime($de) - strtotime($ds)) / 86400) + 1);
         }
 
@@ -460,6 +520,9 @@ class CePreviewController extends Controller
             'mode' => $mode, 'bid' => $bid, 'ceId' => $ce->ce_id ?? 0, 'role' => $role, 'isClientView' => $isClientView,
             'equipGroups' => $equipGroups, 'crewLines' => $crewLines, 'accLines' => $accLines, 'accTotal' => $accTotal,
             'equipUnitTags' => $equipUnitTags, 'accUnitTags' => $accUnitTags,
+            'equipUnitOptions' => $equipUnitOptions, 'accUnitOptions' => $accUnitOptions,
+            'allocatedEqUnitIds' => $allocatedEqUnitIds, 'allocatedAccUnitIds' => $allocatedAccUnitIds,
+            'availUnitsByEquipId' => $availUnitsByEquipId, 'availAccessoryUnitsByAccId' => $availAccessoryUnitsByAccId,
             'equipBaseTotal' => $equipBaseTotal, 'equipTotal' => $equipTotal, 'crewTotal' => $crewTotal,
             'transCost' => $transCost, 'transZone' => $transZone, 'transMult' => $transMult, 'zoneLabels' => $zoneLabels,
             'cePricingMode' => $cePricingMode, 'cePricingInput' => $cePricingInput, 'ceVatExempt' => $ceVatExempt,

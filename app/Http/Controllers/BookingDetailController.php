@@ -79,6 +79,15 @@ class BookingDetailController extends Controller
             ->selectRaw("(SELECT et.condition_in FROM equipment_transactions et WHERE et.booking_id=be.booking_id AND et.equipment_id=be.equipment_id AND et.transaction_type='checkin' ORDER BY et.transaction_id DESC LIMIT 1) AS return_condition")
             ->get();
 
+        // Release Readiness's Equipment step needs to know every accessory line too (not just
+        // equipment), since both need their release unit(s) manually confirmed before the step
+        // can go green — see booking-detail.blade.php's $equipOk.
+        $accessoryLines = DB::table('booking_accessories as ba')
+            ->join('accessories as a', 'ba.accessory_id', '=', 'a.accessory_id')
+            ->where('ba.booking_id', $id)
+            ->select('ba.*', 'a.accessory_name')
+            ->get();
+
         $crewLines = DB::table('booking_crew as bc')
             ->join('crew_members as cm', 'bc.crew_id', '=', 'cm.crew_id')
             ->leftJoin('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
@@ -309,6 +318,16 @@ class BookingDetailController extends Controller
             ->select('e.equipment_id', 'e.equipment_name', 'e.brand', 'e.daily_rate', 'ec.category_name')
             ->get();
 
+        // Lets the Add Equipment modal offer a Unit picker right at add-time — staff who already
+        // know which physical unit they're releasing don't have to add the line blind and
+        // confirm units separately afterward on the Cost Estimate tab.
+        $availUnitsByEquipId = DB::table('equipment_units')
+            ->whereIn('equipment_id', $availEquip->pluck('equipment_id'))
+            ->where('status', 'available')
+            ->orderBy('asset_tag')
+            ->get(['unit_id', 'equipment_id', 'asset_tag'])
+            ->groupBy('equipment_id');
+
         $availCrew = DB::table('crew_members as cm')
             ->leftJoin('crew_positions as cp', 'cm.primary_position_id', '=', 'cp.position_id')
             ->where('cm.status', 'active')
@@ -339,7 +358,7 @@ class BookingDetailController extends Controller
         return view('booking-detail', [
             'booking' => $booking, 'id' => $id, 'isAdmin' => $isAdmin, 'role' => $role, 'canRecord' => $canRecord,
             'pendingPaymentSubmissions' => $pendingPaymentSubmissions, 'paymentSubmissionHistory' => $paymentSubmissionHistory,
-            'equipmentLines' => $equipmentLines, 'crewLines' => $crewLines, 'equipAssignedCrew' => $equipAssignedCrew,
+            'equipmentLines' => $equipmentLines, 'accessoryLines' => $accessoryLines, 'crewLines' => $crewLines, 'equipAssignedCrew' => $equipAssignedCrew,
             'equipCoverage' => $equipCoverage, 'equipOpRequirements' => $equipOpRequirements,
             'catalogEquipment' => $catalogEquipment,
             'assignedCrewIds' => $assignedCrewIds, 'ce' => $ce, 'ceHistory' => $ceHistory, 'ceBreakdown' => $ceBreakdown,
@@ -356,7 +375,7 @@ class BookingDetailController extends Controller
             'equipRequestsCount' => $equipRequestsCount, 'pendingEquipRequestsCount' => $pendingEquipRequestsCount,
             'fieldAdditions' => $fieldAdditions,
             'feedback' => $feedback,
-            'availEquip' => $availEquip, 'availCrew' => $availCrew, 'positions' => $positions, 'vehicleRates' => $vehicleRates,
+            'availEquip' => $availEquip, 'availUnitsByEquipId' => $availUnitsByEquipId, 'availCrew' => $availCrew, 'positions' => $positions, 'vehicleRates' => $vehicleRates,
             'driverNeeded' => $driverNeeded, 'driverCount' => $driverCount,
             'statusBadge' => $this->statusBadge, 'payBadge' => $this->payBadge, 'payLabel' => $this->payLabel,
             'incTypeBadge' => ['damaged' => 'badge-red', 'missing' => 'badge-red', 'malfunction' => 'badge-orange', 'late_return' => 'badge-yellow'],
@@ -456,6 +475,10 @@ class BookingDetailController extends Controller
             $msg = $this->addBookingAccessory($request, $id);
         } elseif ($action === 'remove_booking_accessory' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->removeBookingAccessory($request, $id);
+        } elseif ($action === 'assign_equipment_unit' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
+            $msg = $this->assignEquipmentUnit($request, $id);
+        } elseif ($action === 'assign_accessory_unit' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
+            $msg = $this->assignAccessoryUnit($request, $id);
         } elseif ($action === 'request_cancellation' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
             $msg = $this->requestCancellation($request, $id, $booking, $role, $uid);
         } elseif ($action === 'approve_cancellation' && in_array($role, ['super_admin', 'operations_manager'], true)) {
@@ -549,7 +572,21 @@ class BookingDetailController extends Controller
         $bkEquipId = DB::table('booking_equipment')->insertGetId([
             'booking_id' => $id, 'equipment_id' => $eid, 'quantity' => $qty, 'days' => $days, 'daily_rate' => $rate, 'notes' => $notes,
         ], 'bk_equip_id');
-        \App\Support\EquipmentUnitAllocator::allocate($bkEquipId, $eid, $qty);
+
+        // Staff can pick the specific release unit(s) right here at add-time instead of only
+        // confirming later on the Cost Estimate tab — if they did, that choice is immediately
+        // authoritative (and already confirmed); otherwise fall back to the auto-pick, left
+        // unconfirmed until someone reviews/confirms it on the CE page.
+        $pickedUnitIds = array_values(array_filter(array_map('intval', (array) $request->input('unit_ids', []))));
+        if ($pickedUnitIds && count($pickedUnitIds) >= $qty) {
+            \App\Support\EquipmentUnitAllocator::allocateSpecific($bkEquipId, $pickedUnitIds);
+            if (DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->count() >= $qty) {
+                DB::table('booking_equipment')->where('bk_equip_id', $bkEquipId)->update(['unit_confirmed' => 1]);
+            }
+        } else {
+            \App\Support\EquipmentUnitAllocator::allocate($bkEquipId, $eid, $qty);
+        }
+
         BookingCosting::updateBookingTotal($id);
         BookingCosting::generateCostEstimate($id, Auth::id());
 
@@ -1962,7 +1999,18 @@ class BookingDetailController extends Controller
             'booking_id' => $id, 'accessory_id' => $aid, 'quantity' => $qty, 'days' => $days,
             'daily_rate' => $rate, 'is_included' => (int) $acc->is_included, 'subtotal' => $sub, 'notes' => $notes,
         ], 'ba_id');
-        \App\Support\EquipmentUnitAllocator::allocateAccessory($baId, $aid, $qty);
+
+        // Same immediate-pick-or-fall-back-to-auto pattern as addEquipment() above.
+        $pickedUnitIds = array_values(array_filter(array_map('intval', (array) $request->input('unit_ids', []))));
+        if ($pickedUnitIds && count($pickedUnitIds) >= $qty) {
+            \App\Support\EquipmentUnitAllocator::allocateSpecificAccessory($baId, $pickedUnitIds);
+            if (DB::table('booking_accessory_units')->where('ba_id', $baId)->count() >= $qty) {
+                DB::table('booking_accessories')->where('ba_id', $baId)->update(['unit_confirmed' => 1]);
+            }
+        } else {
+            \App\Support\EquipmentUnitAllocator::allocateAccessory($baId, $aid, $qty);
+        }
+
         BookingCosting::updateBookingTotal($id);
         BookingCosting::generateCostEstimate($id, Auth::id());
 
@@ -1971,6 +2019,72 @@ class BookingDetailController extends Controller
         }
 
         return ['type' => 'success', 'text' => '<strong>' . e($acc->accessory_name) . '</strong> added to booking. Cost estimate updated.'];
+    }
+
+    /**
+     * Staff manually picks/confirms which specific physical unit(s) will actually be released
+     * for an equipment line — overrides EquipmentUnitAllocator::allocate()'s auto-pick (made the
+     * instant the line was added) and marks the line `unit_confirmed`, which is what the Release
+     * Readiness widget now actually gates on for the Equipment step (see booking-detail.blade.php),
+     * instead of merely "a line exists".
+     */
+    private function assignEquipmentUnit(Request $request, int $id): array
+    {
+        $bkEquipId = (int) $request->input('bk_equip_id', 0);
+        $line = DB::table('booking_equipment')->where('bk_equip_id', $bkEquipId)->where('booking_id', $id)->first();
+        if (! $line) {
+            return ['type' => 'error', 'text' => 'Equipment line not found on this booking.'];
+        }
+
+        $unitIds = array_values(array_filter(array_map('intval', (array) $request->input('unit_ids', []))));
+        $tracksUnits = DB::table('equipment_units')->where('equipment_id', $line->equipment_id)->exists();
+
+        if ($tracksUnits) {
+            if (count($unitIds) < (int) $line->quantity) {
+                return ['type' => 'error', 'text' => 'Please pick a unit for every one of the ' . $line->quantity . ' item(s) on this line before confirming.'];
+            }
+            \App\Support\EquipmentUnitAllocator::allocateSpecific($bkEquipId, $unitIds);
+            $actuallyAllocated = DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->count();
+            if ($actuallyAllocated < (int) $line->quantity) {
+                return ['type' => 'error', 'text' => 'One or more selected units are no longer available — please re-check your selection.'];
+            }
+        }
+
+        DB::table('booking_equipment')->where('bk_equip_id', $bkEquipId)->update(['unit_confirmed' => 1]);
+        $eqName = DB::table('equipment')->where('equipment_id', $line->equipment_id)->value('equipment_name');
+        ActivityLog::record(Auth::id(), 'confirm', 'booking', 'Confirmed release unit(s) for ' . ($eqName ?? 'equipment') . " on booking $id", $id);
+
+        return ['type' => 'success', 'text' => '<strong>' . e($eqName ?? 'Equipment') . '</strong> unit assignment confirmed.'];
+    }
+
+    /** Accessory equivalent of assignEquipmentUnit() above. */
+    private function assignAccessoryUnit(Request $request, int $id): array
+    {
+        $baId = (int) $request->input('ba_id', 0);
+        $line = DB::table('booking_accessories')->where('ba_id', $baId)->where('booking_id', $id)->first();
+        if (! $line) {
+            return ['type' => 'error', 'text' => 'Accessory line not found on this booking.'];
+        }
+
+        $unitIds = array_values(array_filter(array_map('intval', (array) $request->input('unit_ids', []))));
+        $tracksUnits = DB::table('accessory_units')->where('accessory_id', $line->accessory_id)->exists();
+
+        if ($tracksUnits) {
+            if (count($unitIds) < (int) $line->quantity) {
+                return ['type' => 'error', 'text' => 'Please pick a unit for every one of the ' . $line->quantity . ' item(s) on this line before confirming.'];
+            }
+            \App\Support\EquipmentUnitAllocator::allocateSpecificAccessory($baId, $unitIds);
+            $actuallyAllocated = DB::table('booking_accessory_units')->where('ba_id', $baId)->count();
+            if ($actuallyAllocated < (int) $line->quantity) {
+                return ['type' => 'error', 'text' => 'One or more selected units are no longer available — please re-check your selection.'];
+            }
+        }
+
+        DB::table('booking_accessories')->where('ba_id', $baId)->update(['unit_confirmed' => 1]);
+        $accName = DB::table('accessories')->where('accessory_id', $line->accessory_id)->value('accessory_name');
+        ActivityLog::record(Auth::id(), 'confirm', 'booking', 'Confirmed release unit(s) for ' . ($accName ?? 'accessory') . " on booking $id", $id);
+
+        return ['type' => 'success', 'text' => '<strong>' . e($accName ?? 'Accessory') . '</strong> unit assignment confirmed.'];
     }
 
     private function removeBookingAccessory(Request $request, int $id): ?array
