@@ -280,15 +280,18 @@ class CePreviewController extends Controller
             ->get()->groupBy('ba_id')->map(fn ($g) => $g->pluck('asset_tag')->implode(', '));
         $accTotal = (float) $accLines->sum('subtotal');
 
-        // Per-line selectable units for the manual assign/confirm picker: every non-retired unit
-        // of that equipment/accessory model that's either 'available' right now, or already
-        // allocated to THIS specific line (so re-opening an already-confirmed line still shows
-        // its current picks as valid options, not just whatever else happens to be free).
+        // Per-line unit picker options for the manual assign/confirm UI: EVERY non-retired unit
+        // of that equipment/accessory model, not just the ones currently free — staff need to
+        // see the whole pool and exactly why a given unit isn't selectable (in the field, under
+        // maintenance, etc.), not have busy units silently vanish and leave an unexplained empty
+        // dropdown. Each option carries its real status; only 'available' units (or one already
+        // allocated to THIS specific line, so reopening an already-confirmed line still shows its
+        // current pick) are left enabled — everything else renders disabled with its status.
         $allEquipLines = collect($equipGroups)->flatten(1);
         $equipUnitsByEquipId = DB::table('equipment_units')
             ->whereIn('equipment_id', $allEquipLines->pluck('equipment_id')->unique()->all() ?: [0])
             ->where('status', '!=', 'retired')
-            ->orderBy('asset_tag')
+            ->orderByRaw("status = 'available' desc")->orderBy('asset_tag')
             ->get(['unit_id', 'equipment_id', 'asset_tag', 'status']);
         $allocatedEqUnitIds = DB::table('booking_equipment_units')
             ->whereIn('bk_equip_id', $allEquipLines->pluck('bk_equip_id')->all() ?: [0])
@@ -299,14 +302,16 @@ class CePreviewController extends Controller
             $allocatedHere = $allocatedEqUnitIds[$eqLine->bk_equip_id] ?? [];
             $equipUnitOptions[$eqLine->bk_equip_id] = $equipUnitsByEquipId
                 ->where('equipment_id', $eqLine->equipment_id)
-                ->filter(fn ($u) => $u->status === 'available' || in_array($u->unit_id, $allocatedHere, true))
-                ->values();
+                ->map(fn ($u) => (object) [
+                    'unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag, 'status' => $u->status,
+                    'selectable' => $u->status === 'available' || in_array($u->unit_id, $allocatedHere, true),
+                ])->values();
         }
 
         $accUnitsByAccId = DB::table('accessory_units')
             ->whereIn('accessory_id', $accLines->pluck('accessory_id')->unique()->all() ?: [0])
             ->where('status', '!=', 'retired')
-            ->orderBy('asset_tag')
+            ->orderByRaw("status = 'available' desc")->orderBy('asset_tag')
             ->get(['unit_id', 'accessory_id', 'asset_tag', 'status']);
         $allocatedAccUnitIds = DB::table('booking_accessory_units')
             ->whereIn('ba_id', $accLines->pluck('ba_id')->all() ?: [0])
@@ -317,8 +322,10 @@ class CePreviewController extends Controller
             $allocatedHere = $allocatedAccUnitIds[$acLine->ba_id] ?? [];
             $accUnitOptions[$acLine->ba_id] = $accUnitsByAccId
                 ->where('accessory_id', $acLine->accessory_id)
-                ->filter(fn ($u) => $u->status === 'available' || in_array($u->unit_id, $allocatedHere, true))
-                ->values();
+                ->map(fn ($u) => (object) [
+                    'unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag, 'status' => $u->status,
+                    'selectable' => $u->status === 'available' || in_array($u->unit_id, $allocatedHere, true),
+                ])->values();
         }
 
         $equipBaseTotal = 0.0;

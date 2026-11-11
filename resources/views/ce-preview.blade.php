@@ -1049,6 +1049,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         @if ($canManage)<button type="button" class="addline-btn" onclick="ceOpenAddEquip()"><i data-feather="plus" style="width:12px;height:12px"></i> Add Equipment</button>@endif
       </div>
       <div class="ecard-body">
+        @if ($canManage)<form method="POST" action="{{ $actionUrl }}" id="formConfirmEquipUnits">@csrf
+        <input type="hidden" name="action" value="confirm_equipment_units">
+        <input type="hidden" name="return_to" value="ce_preview"><input type="hidden" name="return_ce_id" value="{{ $ceId }}"><input type="hidden" name="return_view" value="{{ $isClientView ? 'client' : 'internal' }}">
+        @endif
         <div style="overflow-x:auto">
         <table class="etbl">
           <thead><tr><th style="width:44px">Qty</th><th>Item</th><th style="width:170px">Release Unit</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
@@ -1073,8 +1077,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
                 'allocatedHere' => $eqAllocatedHere,
                 'quantity' => (int) $eq->quantity,
                 'rowKey' => 'eq' . $eq->bk_equip_id,
-                'action' => 'assign_equipment_unit',
-                'idField' => 'bk_equip_id',
+                'lineField' => 'bk_equip_id',
                 'idValue' => $eq->bk_equip_id,
               ])
             </td>
@@ -1090,6 +1093,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           </tbody>
         </table>
         </div>
+        @if ($canManage && $anyEquip)
+        <div style="padding:10px 0 0;text-align:right">
+          <button type="submit" class="btn btn-primary btn-sm">Confirm All Units</button>
+        </div>
+        @endif
+        @if ($canManage)</form>@endif
       </div>
     </div>
 
@@ -1144,6 +1153,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         @if ($canManage)<button type="button" class="addline-btn" onclick="ceOpenAddAcc()"><i data-feather="plus" style="width:12px;height:12px"></i> Add Accessories</button>@endif
       </div>
       <div class="ecard-body">
+        @if ($canManage)<form method="POST" action="{{ $actionUrl }}" id="formConfirmAccUnits">@csrf
+        <input type="hidden" name="action" value="confirm_accessory_units">
+        <input type="hidden" name="return_to" value="ce_preview"><input type="hidden" name="return_ce_id" value="{{ $ceId }}"><input type="hidden" name="return_view" value="{{ $isClientView ? 'client' : 'internal' }}">
+        @endif
         <div style="overflow-x:auto">
         <table class="etbl">
           <thead><tr><th style="width:44px">Qty</th><th>Item</th><th style="width:170px">Release Unit</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
@@ -1164,8 +1177,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
                 'allocatedHere' => $acAllocatedHere,
                 'quantity' => (int) $ac->quantity,
                 'rowKey' => 'ac' . $ac->ba_id,
-                'action' => 'assign_accessory_unit',
-                'idField' => 'ba_id',
+                'lineField' => 'ba_id',
                 'idValue' => $ac->ba_id,
               ])
             </td>
@@ -1179,6 +1191,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
           </tbody>
         </table>
         </div>
+        @if ($canManage && $accLines->isNotEmpty())
+        <div style="padding:10px 0 0;text-align:right">
+          <button type="submit" class="btn btn-primary btn-sm">Confirm All Units</button>
+        </div>
+        @endif
+        @if ($canManage)</form>@endif
       </div>
     </div>
 
