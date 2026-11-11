@@ -403,7 +403,7 @@
   $metConds = ($equipOk ? 1 : 0) + ($crewOk ? 1 : 0) + ($costApprovalOk ? 1 : 0) + ($transportOk ? 1 : 0);
 
   $steps = [
-      ['label' => 'Equipment', 'ok' => $equipOk],
+      ['label' => 'Equipment/Accessories', 'ok' => $equipOk],
       ['label' => 'Crew', 'ok' => $crewOk],
       ['label' => 'Transport', 'ok' => $transportOk],
       ['label' => 'Cost Approval', 'ok' => $costApprovalOk],
@@ -413,9 +413,12 @@
   // just an unfinalized fee. The row/banner text says "setup incomplete" rather than singling
   // out the driver as if that's always the specific thing missing.
   $rows = [
-      ['label' => 'Equipment', 'ok' => $equipOk, 'detail' => $equipOk
+      // Labeled "Equipment/Accessories" (not just "Equipment") since this step is only ready
+      // once EVERY line of both — accessories included, whenever the booking has any — has its
+      // release unit manually confirmed, not equipment alone.
+      ['label' => 'Equipment/Accessories', 'ok' => $equipOk, 'detail' => $equipOk
           ? ($equipCount + $accCount) . ' item' . (($equipCount + $accCount) != 1 ? 's' : '') . ' confirmed'
-          : (($equipCount + $accCount) === 0 ? 'No equipment added' : "$equipUnconfirmedCount item" . ($equipUnconfirmedCount != 1 ? 's' : '') . ' awaiting unit confirmation'),
+          : (($equipCount + $accCount) === 0 ? 'No equipment/accessories added' : "$equipUnconfirmedCount item" . ($equipUnconfirmedCount != 1 ? 's' : '') . ' awaiting unit confirmation'),
       ],
       ['label' => 'Crew', 'ok' => $crewOk, 'clickable' => true, 'onclick' => 'openAddCrewModal()', 'title' => 'Open Add Crew',
           'detail' => $crewOk ? "$crewCount member" . ($crewCount != 1 ? 's' : '') . ' assigned' : 'No crew assigned',
