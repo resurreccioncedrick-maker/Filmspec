@@ -19,7 +19,7 @@
 --}}
 @php
     $statusLabel = ['available' => 'Available', 'allocated' => 'Allocated elsewhere', 'in_field' => 'In the Field',
-        'inspection_pending' => 'Pending Inspection', 'under_maintenance' => 'Under Maintenance'];
+        'inspection_pending' => 'Pending Inspection', 'under_maintenance' => 'Under Maintenance', 'booked_overlap' => 'Booked on overlapping dates'];
     $selectStyle = 'width:100%;padding:7px 9px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12.5px;font-family:"DM Sans",sans-serif;background:#fff;color:#0B1A33;margin-bottom:4px';
 @endphp
 @if ($confirmed)

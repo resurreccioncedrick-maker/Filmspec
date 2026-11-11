@@ -28,7 +28,7 @@ class AccessoryAvailability
 
         $unitAvailCounts = DB::table('accessory_units')
             ->whereIn('accessory_id', $accessoryIds)
-            ->where('status', 'available')
+            ->whereIn('status', ['available', 'allocated'])
             ->select('accessory_id', DB::raw('COUNT(*) as c'))
             ->groupBy('accessory_id')
             ->pluck('c', 'accessory_id');

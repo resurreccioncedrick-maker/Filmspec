@@ -159,7 +159,7 @@ class CartController extends Controller
         // individual units tracked.
         $unitCount = (int) DB::table('equipment_units')->where('equipment_id', $eid)->where('status', '!=', 'retired')->count();
         $availableUnits = $unitCount > 0
-            ? (int) DB::table('equipment_units')->where('equipment_id', $eid)->where('status', 'available')->count()
+            ? (int) DB::table('equipment_units')->where('equipment_id', $eid)->whereIn('status', ['available', 'allocated'])->count()
             : ($equipment->availability_status === 'available' ? max(1, (int) $equipment->stock_quantity) : 0);
         if ($availableUnits <= 0) {
             return response()->json(['error' => 'Equipment is not available for booking']);

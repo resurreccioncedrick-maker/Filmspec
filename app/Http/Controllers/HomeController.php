@@ -185,7 +185,7 @@ class HomeController extends Controller
                           JOIN crew_positions cp ON eo.position_id = cp.position_id
                           WHERE eo.equipment_id = e.equipment_id) AS operator_positions")
             ->selectRaw("(SELECT COUNT(*) FROM equipment_units eu WHERE eu.equipment_id = e.equipment_id AND eu.status != 'retired') AS unit_count")
-            ->selectRaw("(SELECT COUNT(*) FROM equipment_units eu WHERE eu.equipment_id = e.equipment_id AND eu.status = 'available') AS units_available")
+            ->selectRaw("(SELECT COUNT(*) FROM equipment_units eu WHERE eu.equipment_id = e.equipment_id AND eu.status IN ('available','allocated')) AS units_available")
             ->get();
 
         // "Available units right now" — for equipment with physical units tracked, the real

@@ -14,6 +14,99 @@ use Illuminate\Support\Facades\DB;
 class EquipmentUnitAllocator
 {
     /**
+     * Unit statuses that can still be reserved for a booking. 'allocated' is included on purpose:
+     * a unit held by one booking is still free for a different booking whose dates don't
+     * overlap — the date check in busy*UnitIds() is what actually decides. in_field /
+     * inspection_pending / under_maintenance / retired are real physical states and always block.
+     */
+    public const RESERVABLE_STATUSES = ['available', 'allocated'];
+
+    /** [booking_id, shoot_date_start, shoot_date_end] for the booking that owns a line. */
+    private static function lineBooking(string $table, string $key, int $lineId): array
+    {
+        $row = DB::table($table . ' as l')
+            ->join('bookings as b', 'b.booking_id', '=', 'l.booking_id')
+            ->where('l.' . $key, $lineId)
+            ->first(['b.booking_id', 'b.shoot_date_start', 'b.shoot_date_end']);
+
+        return $row ? [(int) $row->booking_id, $row->shoot_date_start, $row->shoot_date_end] : [0, null, null];
+    }
+
+    /**
+     * Unit IDs already held by some OTHER line whose booking is either this same booking or an
+     * active (not completed/cancelled) booking with overlapping shoot dates — the same overlap
+     * rule EquipmentAvailability::check() uses. Missing dates count as overlapping everything
+     * (conservative). Pass $excludeLineId = 0 when there's no line yet (the Add modals).
+     */
+    private static function busyUnitIds(string $pivot, string $lineTable, string $lineKey, string $unitCol,
+        int $excludeLineId, int $bookingId, $start, $end): array
+    {
+        return DB::table($pivot . ' as p')
+            ->join($lineTable . ' as l', 'l.' . $lineKey, '=', 'p.' . $lineKey)
+            ->join('bookings as b', 'b.booking_id', '=', 'l.booking_id')
+            ->where('p.' . $lineKey, '!=', $excludeLineId)
+            ->where(function ($w) use ($bookingId, $start, $end) {
+                $w->where('b.booking_id', $bookingId)
+                    ->orWhere(function ($o) use ($start, $end) {
+                        $o->whereNotIn('b.booking_status', ['cancelled', 'completed']);
+                        if ($start && $end) {
+                            $o->where('b.shoot_date_start', '<=', $end)->where('b.shoot_date_end', '>=', $start);
+                        }
+                    });
+            })
+            ->distinct()->pluck('p.' . $unitCol)->map(fn ($v) => (int) $v)->all();
+    }
+
+    public static function busyEquipmentUnitIds(int $excludeLineId, int $bookingId, $start, $end): array
+    {
+        return self::busyUnitIds('booking_equipment_units', 'booking_equipment', 'bk_equip_id', 'equipment_unit_id', $excludeLineId, $bookingId, $start, $end);
+    }
+
+    public static function busyAccessoryUnitIds(int $excludeLineId, int $bookingId, $start, $end): array
+    {
+        return self::busyUnitIds('booking_accessory_units', 'booking_accessories', 'ba_id', 'accessory_unit_id', $excludeLineId, $bookingId, $start, $end);
+    }
+
+    /** Units of the given equipment models free for this booking's dates (for the Add modals). */
+    public static function reservableEquipmentUnits(array $equipmentIds, int $bookingId, $start, $end)
+    {
+        return DB::table('equipment_units')
+            ->whereIn('equipment_id', $equipmentIds ?: [0])
+            ->whereIn('status', self::RESERVABLE_STATUSES)
+            ->whereNotIn('unit_id', self::busyEquipmentUnitIds(0, $bookingId, $start, $end) ?: [0])
+            ->orderBy('asset_tag')
+            ->get(['unit_id', 'equipment_id', 'asset_tag']);
+    }
+
+    /** Accessory equivalent of reservableEquipmentUnits(). */
+    public static function reservableAccessoryUnits(array $accessoryIds, int $bookingId, $start, $end)
+    {
+        return DB::table('accessory_units')
+            ->whereIn('accessory_id', $accessoryIds ?: [0])
+            ->whereIn('status', self::RESERVABLE_STATUSES)
+            ->whereNotIn('unit_id', self::busyAccessoryUnitIds(0, $bookingId, $start, $end) ?: [0])
+            ->orderBy('asset_tag')
+            ->get(['unit_id', 'accessory_id', 'asset_tag']);
+    }
+
+    /**
+     * After pivot rows are removed: flip a unit from 'allocated' back to 'available' only when it
+     * no longer sits on any active booking — a unit can be reserved by several bookings on
+     * different dates, so releasing one must not mark it free while another still holds it.
+     */
+    private static function settleStatus(string $unitTable, string $pivot, string $lineTable, string $lineKey, string $unitCol, $unitIds): void
+    {
+        $stillHeld = DB::table($pivot . ' as p')
+            ->join($lineTable . ' as l', 'l.' . $lineKey, '=', 'p.' . $lineKey)
+            ->join('bookings as b', 'b.booking_id', '=', 'l.booking_id')
+            ->whereIn('p.' . $unitCol, $unitIds)
+            ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
+            ->pluck('p.' . $unitCol)->all();
+        DB::table($unitTable)->whereIn('unit_id', $unitIds)->whereNotIn('unit_id', $stillHeld ?: [0])
+            ->where('status', 'allocated')->update(['status' => 'available']);
+    }
+
+    /**
      * Auto-assigns up to $qty currently-'available' units of $equipmentId to the given
      * booking_equipment row, flips each to 'allocated', and records the link in
      * booking_equipment_units. Silently allocates fewer than $qty if the catalog doesn't have
@@ -27,10 +120,12 @@ class EquipmentUnitAllocator
             return;
         }
 
+        [$bookingId, $start, $end] = self::lineBooking('booking_equipment', 'bk_equip_id', $bkEquipId);
         $units = DB::table('equipment_units')
             ->where('equipment_id', $equipmentId)
-            ->where('status', 'available')
-            ->orderBy('asset_tag')
+            ->whereIn('status', self::RESERVABLE_STATUSES)
+            ->whereNotIn('unit_id', self::busyEquipmentUnitIds($bkEquipId, $bookingId, $start, $end) ?: [0])
+            ->orderByRaw("status = 'available' desc")->orderBy('asset_tag')
             ->limit($qty)
             ->pluck('unit_id');
 
@@ -44,7 +139,7 @@ class EquipmentUnitAllocator
                 'bk_equip_id' => $bkEquipId, 'equipment_unit_id' => $unitId, 'allocated_at' => $now,
             ])->all()
         );
-        DB::table('equipment_units')->whereIn('unit_id', $units)->update(['status' => 'allocated']);
+        DB::table('equipment_units')->whereIn('unit_id', $units)->where('status', 'available')->update(['status' => 'allocated']);
     }
 
     /**
@@ -60,8 +155,8 @@ class EquipmentUnitAllocator
             return;
         }
 
-        DB::table('equipment_units')->whereIn('unit_id', $unitIds)->where('status', 'allocated')->update(['status' => 'available']);
         DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->delete();
+        self::settleStatus('equipment_units', 'booking_equipment_units', 'booking_equipment', 'bk_equip_id', 'equipment_unit_id', $unitIds);
     }
 
     /**
@@ -84,9 +179,12 @@ class EquipmentUnitAllocator
             return false;
         }
 
+        [$bookingId, $start, $end] = self::lineBooking('booking_equipment', 'bk_equip_id', $bkEquipId);
+        $busy = self::busyEquipmentUnitIds($bkEquipId, $bookingId, $start, $end);
         $validIds = DB::table('equipment_units')
             ->whereIn('unit_id', $unitIds)
-            ->where(fn ($w) => $w->where('status', 'available')->orWhereIn('unit_id', $alreadyOnThisLine))
+            ->where(fn ($w) => $w->where(fn ($f) => $f->whereIn('status', self::RESERVABLE_STATUSES)->whereNotIn('unit_id', $busy ?: [0]))
+                ->orWhereIn('unit_id', $alreadyOnThisLine ?: [0]))
             ->pluck('unit_id');
         if ($validIds->count() !== count($unitIds)) {
             return false;
@@ -99,7 +197,7 @@ class EquipmentUnitAllocator
                 'bk_equip_id' => $bkEquipId, 'equipment_unit_id' => $unitId, 'allocated_at' => $now,
             ])->all()
         );
-        DB::table('equipment_units')->whereIn('unit_id', $validIds)->update(['status' => 'allocated']);
+        DB::table('equipment_units')->whereIn('unit_id', $validIds)->where('status', 'available')->update(['status' => 'allocated']);
 
         return true;
     }
@@ -115,9 +213,12 @@ class EquipmentUnitAllocator
             return false;
         }
 
+        [$bookingId, $start, $end] = self::lineBooking('booking_accessories', 'ba_id', $baId);
+        $busy = self::busyAccessoryUnitIds($baId, $bookingId, $start, $end);
         $validIds = DB::table('accessory_units')
             ->whereIn('unit_id', $unitIds)
-            ->where(fn ($w) => $w->where('status', 'available')->orWhereIn('unit_id', $alreadyOnThisLine))
+            ->where(fn ($w) => $w->where(fn ($f) => $f->whereIn('status', self::RESERVABLE_STATUSES)->whereNotIn('unit_id', $busy ?: [0]))
+                ->orWhereIn('unit_id', $alreadyOnThisLine ?: [0]))
             ->pluck('unit_id');
         if ($validIds->count() !== count($unitIds)) {
             return false;
@@ -130,7 +231,7 @@ class EquipmentUnitAllocator
                 'ba_id' => $baId, 'accessory_unit_id' => $unitId, 'allocated_at' => $now,
             ])->all()
         );
-        DB::table('accessory_units')->whereIn('unit_id', $validIds)->update(['status' => 'allocated']);
+        DB::table('accessory_units')->whereIn('unit_id', $validIds)->where('status', 'available')->update(['status' => 'allocated']);
 
         return true;
     }
@@ -170,10 +271,12 @@ class EquipmentUnitAllocator
             return;
         }
 
+        [$bookingId, $start, $end] = self::lineBooking('booking_accessories', 'ba_id', $baId);
         $units = DB::table('accessory_units')
             ->where('accessory_id', $accessoryId)
-            ->where('status', 'available')
-            ->orderBy('asset_tag')
+            ->whereIn('status', self::RESERVABLE_STATUSES)
+            ->whereNotIn('unit_id', self::busyAccessoryUnitIds($baId, $bookingId, $start, $end) ?: [0])
+            ->orderByRaw("status = 'available' desc")->orderBy('asset_tag')
             ->limit($qty)
             ->pluck('unit_id');
 
@@ -187,7 +290,7 @@ class EquipmentUnitAllocator
                 'ba_id' => $baId, 'accessory_unit_id' => $unitId, 'allocated_at' => $now,
             ])->all()
         );
-        DB::table('accessory_units')->whereIn('unit_id', $units)->update(['status' => 'allocated']);
+        DB::table('accessory_units')->whereIn('unit_id', $units)->where('status', 'available')->update(['status' => 'allocated']);
     }
 
     /** Accessory equivalent of release() above. */
@@ -198,8 +301,8 @@ class EquipmentUnitAllocator
             return;
         }
 
-        DB::table('accessory_units')->whereIn('unit_id', $unitIds)->where('status', 'allocated')->update(['status' => 'available']);
         DB::table('booking_accessory_units')->where('ba_id', $baId)->delete();
+        self::settleStatus('accessory_units', 'booking_accessory_units', 'booking_accessories', 'ba_id', 'accessory_unit_id', $unitIds);
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Support\BookingCosting;
 use App\Support\DataExporter;
+use App\Support\EquipmentUnitAllocator;
 use App\Support\Money;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -297,15 +298,26 @@ class CePreviewController extends Controller
             ->whereIn('bk_equip_id', $allEquipLines->pluck('bk_equip_id')->all() ?: [0])
             ->get(['bk_equip_id', 'equipment_unit_id'])
             ->groupBy('bk_equip_id')->map(fn ($g) => $g->pluck('equipment_unit_id')->all());
+        // Date-aware: a unit held by another booking only blocks this one when their shoot dates
+        // overlap — reported as 'booked_overlap' so the picker can say why it's disabled.
+        $unitOption = function ($u, array $allocatedHere, array $busy) {
+            $here = in_array((int) $u->unit_id, array_map('intval', $allocatedHere), true);
+            $reservable = in_array($u->status, EquipmentUnitAllocator::RESERVABLE_STATUSES, true);
+            $isBusy = in_array((int) $u->unit_id, $busy, true);
+
+            return (object) [
+                'unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag,
+                'status' => (! $here && $reservable && $isBusy) ? 'booked_overlap' : $u->status,
+                'selectable' => $here || ($reservable && ! $isBusy),
+            ];
+        };
         $equipUnitOptions = [];
         foreach ($allEquipLines as $eqLine) {
             $allocatedHere = $allocatedEqUnitIds[$eqLine->bk_equip_id] ?? [];
+            $busy = EquipmentUnitAllocator::busyEquipmentUnitIds((int) $eqLine->bk_equip_id, $bid, $booking->shoot_date_start, $booking->shoot_date_end);
             $equipUnitOptions[$eqLine->bk_equip_id] = $equipUnitsByEquipId
                 ->where('equipment_id', $eqLine->equipment_id)
-                ->map(fn ($u) => (object) [
-                    'unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag, 'status' => $u->status,
-                    'selectable' => $u->status === 'available' || in_array($u->unit_id, $allocatedHere, true),
-                ])->values();
+                ->map(fn ($u) => $unitOption($u, $allocatedHere, $busy))->values();
         }
 
         $accUnitsByAccId = DB::table('accessory_units')
@@ -320,12 +332,10 @@ class CePreviewController extends Controller
         $accUnitOptions = [];
         foreach ($accLines as $acLine) {
             $allocatedHere = $allocatedAccUnitIds[$acLine->ba_id] ?? [];
+            $busy = EquipmentUnitAllocator::busyAccessoryUnitIds((int) $acLine->ba_id, $bid, $booking->shoot_date_start, $booking->shoot_date_end);
             $accUnitOptions[$acLine->ba_id] = $accUnitsByAccId
                 ->where('accessory_id', $acLine->accessory_id)
-                ->map(fn ($u) => (object) [
-                    'unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag, 'status' => $u->status,
-                    'selectable' => $u->status === 'available' || in_array($u->unit_id, $allocatedHere, true),
-                ])->values();
+                ->map(fn ($u) => $unitOption($u, $allocatedHere, $busy))->values();
         }
 
         $equipBaseTotal = 0.0;
@@ -480,11 +490,7 @@ class CePreviewController extends Controller
             // Powers the standalone (non-iframe) Add Equipment/Add Accessories modals' optional
             // Release Unit picker — same idea as BookingDetailController's own copy for when CE
             // is viewed embedded in the booking page.
-            $availUnitsByEquipId = DB::table('equipment_units')
-                ->whereIn('equipment_id', $availEquip->pluck('equipment_id'))
-                ->where('status', 'available')
-                ->orderBy('asset_tag')
-                ->get(['unit_id', 'equipment_id', 'asset_tag'])
+            $availUnitsByEquipId = EquipmentUnitAllocator::reservableEquipmentUnits($availEquip->pluck('equipment_id')->all(), $bid, $ds, $de)
                 ->groupBy('equipment_id');
 
             $availCrew = DB::table('crew_members as cm')
@@ -513,11 +519,7 @@ class CePreviewController extends Controller
                     AND ba2.booking_id != ?),0) AS qty_in_use', [$bid])
                 ->get();
 
-            $availAccessoryUnitsByAccId = DB::table('accessory_units')
-                ->whereIn('accessory_id', $allAccessoriesList->pluck('accessory_id'))
-                ->where('status', 'available')
-                ->orderBy('asset_tag')
-                ->get(['unit_id', 'accessory_id', 'asset_tag'])
+            $availAccessoryUnitsByAccId = EquipmentUnitAllocator::reservableAccessoryUnits($allAccessoriesList->pluck('accessory_id')->all(), $bid, $ds, $de)
                 ->groupBy('accessory_id');
 
             $accDays = max(1, (int) ((strtotime($de) - strtotime($ds)) / 86400) + 1);

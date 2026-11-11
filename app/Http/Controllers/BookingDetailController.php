@@ -321,11 +321,7 @@ class BookingDetailController extends Controller
         // Lets the Add Equipment modal offer a Unit picker right at add-time — staff who already
         // know which physical unit they're releasing don't have to add the line blind and
         // confirm units separately afterward on the Cost Estimate tab.
-        $availUnitsByEquipId = DB::table('equipment_units')
-            ->whereIn('equipment_id', $availEquip->pluck('equipment_id'))
-            ->where('status', 'available')
-            ->orderBy('asset_tag')
-            ->get(['unit_id', 'equipment_id', 'asset_tag'])
+        $availUnitsByEquipId = \App\Support\EquipmentUnitAllocator::reservableEquipmentUnits($availEquip->pluck('equipment_id')->all(), (int) $id, $ds, $de)
             ->groupBy('equipment_id');
 
         $availCrew = DB::table('crew_members as cm')
