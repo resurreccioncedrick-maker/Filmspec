@@ -530,6 +530,15 @@ class CePreviewController extends Controller
             'equipUnitOptions' => $equipUnitOptions, 'accUnitOptions' => $accUnitOptions,
             'allocatedEqUnitIds' => $allocatedEqUnitIds, 'allocatedAccUnitIds' => $allocatedAccUnitIds,
             'availUnitsByEquipId' => $availUnitsByEquipId, 'availAccessoryUnitsByAccId' => $availAccessoryUnitsByAccId,
+            // Set whenever BookingDetailController::act() just processed a form submitted from
+            // THIS page (every action redirects back here with return_to=ce_preview and flashes
+            // 'bd_flash' regardless of target). When this page is embedded as the parent's Cost
+            // Estimate iframe, the parent's own Release Readiness widget (crew/equipment counts,
+            // etc.) is rendered once, server-side, when booking-detail itself loaded — it has no
+            // way to know an iframe-submitted action just changed that data. Confirmed real:
+            // confirming units here left the parent's widget showing stale unconfirmed counts
+            // until a full page reload. Reload the parent whenever something was just submitted.
+            'justActed' => $request->session()->has('bd_flash'),
             'equipBaseTotal' => $equipBaseTotal, 'equipTotal' => $equipTotal, 'crewTotal' => $crewTotal,
             'transCost' => $transCost, 'transZone' => $transZone, 'transMult' => $transMult, 'zoneLabels' => $zoneLabels,
             'cePricingMode' => $cePricingMode, 'cePricingInput' => $cePricingInput, 'ceVatExempt' => $ceVatExempt,

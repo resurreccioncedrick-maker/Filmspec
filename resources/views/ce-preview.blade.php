@@ -1103,52 +1103,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     </div>
 
     <div class="ecard">
-      <div class="ecard-head"><h3><i data-feather="users" style="width:14px;height:14px"></i> Crew Talent Fee</h3>
-        @if ($canManage)<button type="button" class="addline-btn" onclick="ceOpenAddCrew()"><i data-feather="plus" style="width:12px;height:12px"></i> Add Crew</button>@endif
-      </div>
-      <div class="ecard-body">
-        <div style="overflow-x:auto">
-        <table class="etbl">
-          <thead><tr><th>Position / Name</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / 12H</th><th class="r" style="width:110px">Amount</th></tr></thead>
-          <tbody>
-          @forelse ($crewLines as $cl)
-          @php $clAmt = (float) $cl->rate_used * (float) $cl->hours_worked; @endphp
-          <tr>
-            <td>
-              <div style="font-weight:600">{{ $cl->position_name ?? 'Crew' }}</div>
-              <div style="font-size:11px;color:var(--muted)">{{ $cl->crew_name }}</div>
-              {{-- Head Crew mark: internal view only (never in FOR CLIENT view, CE PDF or print). --}}
-              @if (! $isClientView)
-              <div class="no-print" style="margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                @if (! empty($cl->is_head_crew))
-                <span title="Head Crew — the only crew member with Attendance and Checklist access in the crew portal" style="display:inline-flex;align-items:center;gap:4px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:20px;padding:1px 8px;font-size:10.5px;font-weight:700"><i data-feather="star" style="width:10px;height:10px;fill:#f59e0b;stroke:#b45309"></i> HEAD CREW</span>
-                @endif
-                @if ($canManage && isset($cl->bk_crew_id) && ! in_array($cl->assignment_status ?? '', ['declined', 'back_out', 'no_show', 'replaced'], true))
-                <form method="POST" action="{{ $actionUrl }}" style="display:inline;margin:0">
-                  @csrf
-                  <input type="hidden" name="action" value="set_head_crew">
-                  <input type="hidden" name="bk_crew_id" value="{{ (int) $cl->bk_crew_id }}">
-                  <input type="hidden" name="return_to" value="ce_preview"><input type="hidden" name="return_ce_id" value="{{ $ceId }}"><input type="hidden" name="return_view" value="internal">
-                  <button type="submit" style="background:none;border:none;padding:0;font-size:11px;font-weight:600;color:var(--accent);cursor:pointer;text-decoration:underline">{{ ! empty($cl->is_head_crew) ? 'Remove head mark' : 'Set as Head' }}</button>
-                </form>
-                @endif
-              </div>
-              @endif
-            </td>
-            <td class="r">{{ $cl->hours_worked }}</td>
-            <td class="r amt">₱{{ number_format($cl->rate_used, 2) }}</td>
-            <td class="r amt">₱{{ number_format($clAmt, 2) }}</td>
-          </tr>
-          @empty
-          <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px;font-style:italic">No crew assigned</td></tr>
-          @endforelse
-          </tbody>
-        </table>
-        </div>
-      </div>
-    </div>
-
-    <div class="ecard">
       <div class="ecard-head"><h3><i data-feather="package" style="width:14px;height:14px"></i> Accessories &amp; Add-ons</h3>
         @if ($canManage)<button type="button" class="addline-btn" onclick="ceOpenAddAcc()"><i data-feather="plus" style="width:12px;height:12px"></i> Add Accessories</button>@endif
       </div>
@@ -1197,6 +1151,52 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         </div>
         @endif
         @if ($canManage)</form>@endif
+      </div>
+    </div>
+
+    <div class="ecard">
+      <div class="ecard-head"><h3><i data-feather="users" style="width:14px;height:14px"></i> Crew Talent Fee</h3>
+        @if ($canManage)<button type="button" class="addline-btn" onclick="ceOpenAddCrew()"><i data-feather="plus" style="width:12px;height:12px"></i> Add Crew</button>@endif
+      </div>
+      <div class="ecard-body">
+        <div style="overflow-x:auto">
+        <table class="etbl">
+          <thead><tr><th>Position / Name</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / 12H</th><th class="r" style="width:110px">Amount</th></tr></thead>
+          <tbody>
+          @forelse ($crewLines as $cl)
+          @php $clAmt = (float) $cl->rate_used * (float) $cl->hours_worked; @endphp
+          <tr>
+            <td>
+              <div style="font-weight:600">{{ $cl->position_name ?? 'Crew' }}</div>
+              <div style="font-size:11px;color:var(--muted)">{{ $cl->crew_name }}</div>
+              {{-- Head Crew mark: internal view only (never in FOR CLIENT view, CE PDF or print). --}}
+              @if (! $isClientView)
+              <div class="no-print" style="margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                @if (! empty($cl->is_head_crew))
+                <span title="Head Crew — the only crew member with Attendance and Checklist access in the crew portal" style="display:inline-flex;align-items:center;gap:4px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:20px;padding:1px 8px;font-size:10.5px;font-weight:700"><i data-feather="star" style="width:10px;height:10px;fill:#f59e0b;stroke:#b45309"></i> HEAD CREW</span>
+                @endif
+                @if ($canManage && isset($cl->bk_crew_id) && ! in_array($cl->assignment_status ?? '', ['declined', 'back_out', 'no_show', 'replaced'], true))
+                <form method="POST" action="{{ $actionUrl }}" style="display:inline;margin:0">
+                  @csrf
+                  <input type="hidden" name="action" value="set_head_crew">
+                  <input type="hidden" name="bk_crew_id" value="{{ (int) $cl->bk_crew_id }}">
+                  <input type="hidden" name="return_to" value="ce_preview"><input type="hidden" name="return_ce_id" value="{{ $ceId }}"><input type="hidden" name="return_view" value="internal">
+                  <button type="submit" style="background:none;border:none;padding:0;font-size:11px;font-weight:600;color:var(--accent);cursor:pointer;text-decoration:underline">{{ ! empty($cl->is_head_crew) ? 'Remove head mark' : 'Set as Head' }}</button>
+                </form>
+                @endif
+              </div>
+              @endif
+            </td>
+            <td class="r">{{ $cl->hours_worked }}</td>
+            <td class="r amt">₱{{ number_format($cl->rate_used, 2) }}</td>
+            <td class="r amt">₱{{ number_format($clAmt, 2) }}</td>
+          </tr>
+          @empty
+          <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px;font-style:italic">No crew assigned</td></tr>
+          @endforelse
+          </tbody>
+        </table>
+        </div>
       </div>
     </div>
 
@@ -1802,6 +1802,14 @@ function ceOpenAddAcc() {
 function ceInIframe() {
     try { return window.self !== window.top; } catch (e) { return true; }
 }
+
+@if ($justActed ?? false)
+// A form on this page (Confirm All Units, Add Equipment, etc.) was just submitted and redirected
+// back here. When embedded as the parent's Cost Estimate iframe, the parent's own Release
+// Readiness widget was rendered once, server-side, before this change — it has no other way to
+// find out. Reload the parent so it recomputes with current data instead of showing stale counts.
+if (ceInIframe()) { window.top.location.reload(); }
+@endif
 
 function ceOpenAddEquip() {
     if (ceInIframe()) { window.parent.postMessage({source: 'ce-editor', action: 'openAddEquip'}, '*'); return; }
