@@ -28,9 +28,14 @@ class BackfillUnitAllocations extends Command
         }
 
         $eqDone = 0;
+        // Only bookings still in play — allocating units to an already-completed/cancelled
+        // booking would lock them away for good (nothing ever releases a finished booking again).
+        $activeBookingIds = DB::table('bookings')->whereNotIn('booking_status', ['completed', 'cancelled'])->pluck('booking_id');
+
         $rows = DB::table('booking_equipment as be')
             ->leftJoin('booking_equipment_units as beu', 'be.bk_equip_id', '=', 'beu.bk_equip_id')
             ->whereNull('beu.id')
+            ->whereIn('be.booking_id', $activeBookingIds)
             ->select('be.bk_equip_id', 'be.booking_id', 'be.equipment_id', 'be.quantity')
             ->distinct()
             ->get();
@@ -62,6 +67,7 @@ class BackfillUnitAllocations extends Command
         $accRows = DB::table('booking_accessories as ba')
             ->leftJoin('booking_accessory_units as bau', 'ba.ba_id', '=', 'bau.ba_id')
             ->whereNull('bau.id')
+            ->whereIn('ba.booking_id', $activeBookingIds)
             ->select('ba.ba_id', 'ba.booking_id', 'ba.accessory_id', 'ba.quantity')
             ->distinct()
             ->get();

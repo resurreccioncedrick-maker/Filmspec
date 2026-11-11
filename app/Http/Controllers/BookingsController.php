@@ -250,6 +250,9 @@ class BookingsController extends Controller
             if (in_array($newStatus, $allowed, true)) {
                 $old = Booking::where('booking_id', $id)->value('booking_status');
                 Booking::where('booking_id', $id)->update(['booking_status' => $newStatus, 'updated_at' => now()]);
+                if ($newStatus === 'cancelled') {
+                    \App\Support\EquipmentUnitAllocator::releaseAllForBooking($id);
+                }
                 DB::table('quotation_log')->insert([
                     'booking_id' => $id, 'log_type' => $newStatus === 'cancelled' ? 'cancelled' : 'confirmed',
                     'logged_by' => $uid, 'previous_status' => $old, 'new_status' => $newStatus, 'log_date' => now(),

@@ -580,9 +580,11 @@ class BookingDetailController extends Controller
         // unconfirmed until someone reviews/confirms it on the CE page.
         $pickedUnitIds = array_values(array_filter(array_map('intval', (array) $request->input('unit_ids', []))));
         if ($pickedUnitIds && count($pickedUnitIds) >= $qty) {
-            \App\Support\EquipmentUnitAllocator::allocateSpecific($bkEquipId, $pickedUnitIds);
-            if (DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->count() >= $qty) {
+            if (\App\Support\EquipmentUnitAllocator::allocateSpecific($bkEquipId, $pickedUnitIds)
+                && DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->count() >= $qty) {
                 DB::table('booking_equipment')->where('bk_equip_id', $bkEquipId)->update(['unit_confirmed' => 1]);
+            } else {
+                \App\Support\EquipmentUnitAllocator::allocate($bkEquipId, $eid, $qty);
             }
         } else {
             \App\Support\EquipmentUnitAllocator::allocate($bkEquipId, $eid, $qty);
@@ -2007,9 +2009,11 @@ class BookingDetailController extends Controller
         // Same immediate-pick-or-fall-back-to-auto pattern as addEquipment() above.
         $pickedUnitIds = array_values(array_filter(array_map('intval', (array) $request->input('unit_ids', []))));
         if ($pickedUnitIds && count($pickedUnitIds) >= $qty) {
-            \App\Support\EquipmentUnitAllocator::allocateSpecificAccessory($baId, $pickedUnitIds);
-            if (DB::table('booking_accessory_units')->where('ba_id', $baId)->count() >= $qty) {
+            if (\App\Support\EquipmentUnitAllocator::allocateSpecificAccessory($baId, $pickedUnitIds)
+                && DB::table('booking_accessory_units')->where('ba_id', $baId)->count() >= $qty) {
                 DB::table('booking_accessories')->where('ba_id', $baId)->update(['unit_confirmed' => 1]);
+            } else {
+                \App\Support\EquipmentUnitAllocator::allocateAccessory($baId, $aid, $qty);
             }
         } else {
             \App\Support\EquipmentUnitAllocator::allocateAccessory($baId, $aid, $qty);
@@ -2064,9 +2068,9 @@ class BookingDetailController extends Controller
                     $errors[] = "$eqName: pick a unit for every one of the {$line->quantity} item(s).";
                     continue;
                 }
-                \App\Support\EquipmentUnitAllocator::allocateSpecific($bkEquipId, $unitIds);
-                if (DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->count() < (int) $line->quantity) {
-                    $errors[] = "$eqName: one or more selected units are no longer available.";
+                if (! \App\Support\EquipmentUnitAllocator::allocateSpecific($bkEquipId, $unitIds)
+                    || DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->count() < (int) $line->quantity) {
+                    $errors[] = "$eqName: a selected unit is no longer available, or the same unit was picked twice.";
                     continue;
                 }
             }
@@ -2115,9 +2119,9 @@ class BookingDetailController extends Controller
                     $errors[] = "$accName: pick a unit for every one of the {$line->quantity} item(s).";
                     continue;
                 }
-                \App\Support\EquipmentUnitAllocator::allocateSpecificAccessory($baId, $unitIds);
-                if (DB::table('booking_accessory_units')->where('ba_id', $baId)->count() < (int) $line->quantity) {
-                    $errors[] = "$accName: one or more selected units are no longer available.";
+                if (! \App\Support\EquipmentUnitAllocator::allocateSpecificAccessory($baId, $unitIds)
+                    || DB::table('booking_accessory_units')->where('ba_id', $baId)->count() < (int) $line->quantity) {
+                    $errors[] = "$accName: a selected unit is no longer available, or the same unit was picked twice.";
                     continue;
                 }
             }

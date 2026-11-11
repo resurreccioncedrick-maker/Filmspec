@@ -70,27 +70,29 @@ class EquipmentUnitAllocator
      * Estimate page, overriding allocate()'s auto-pick. Releases the line's current allocation
      * first (so a unit dropped from the selection goes back to 'available'), then assigns
      * exactly the given unit IDs, which must already be 'available' (or already allocated to
-     * THIS same line — re-saving the same choice must not fail). Silently ignores any unit ID
-     * that fails that check rather than throwing, so a stale/raced selection can't corrupt data.
+     * THIS same line — re-saving the same choice must not fail). All-or-nothing: if any picked
+     * unit is invalid or picked twice, nothing changes and false is returned — the line keeps
+     * its existing allocation instead of being released and left with nothing.
      */
-    public static function allocateSpecific(int $bkEquipId, array $unitIds): void
+    public static function allocateSpecific(int $bkEquipId, array $unitIds): bool
     {
         $alreadyOnThisLine = DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->pluck('equipment_unit_id')->all();
-        self::release($bkEquipId);
 
-        $unitIds = array_values(array_unique(array_filter($unitIds)));
-        if (! $unitIds) {
-            return;
+        $picked = array_values(array_filter(array_map('intval', $unitIds)));
+        $unitIds = array_values(array_unique($picked));
+        if (! $unitIds || count($unitIds) !== count($picked)) {
+            return false;
         }
 
         $validIds = DB::table('equipment_units')
             ->whereIn('unit_id', $unitIds)
             ->where(fn ($w) => $w->where('status', 'available')->orWhereIn('unit_id', $alreadyOnThisLine))
             ->pluck('unit_id');
-        if ($validIds->isEmpty()) {
-            return;
+        if ($validIds->count() !== count($unitIds)) {
+            return false;
         }
 
+        self::release($bkEquipId);
         $now = now();
         DB::table('booking_equipment_units')->insert(
             $validIds->map(fn ($unitId) => [
@@ -98,27 +100,30 @@ class EquipmentUnitAllocator
             ])->all()
         );
         DB::table('equipment_units')->whereIn('unit_id', $validIds)->update(['status' => 'allocated']);
+
+        return true;
     }
 
     /** Accessory equivalent of allocateSpecific() above. */
-    public static function allocateSpecificAccessory(int $baId, array $unitIds): void
+    public static function allocateSpecificAccessory(int $baId, array $unitIds): bool
     {
         $alreadyOnThisLine = DB::table('booking_accessory_units')->where('ba_id', $baId)->pluck('accessory_unit_id')->all();
-        self::releaseAccessory($baId);
 
-        $unitIds = array_values(array_unique(array_filter($unitIds)));
-        if (! $unitIds) {
-            return;
+        $picked = array_values(array_filter(array_map('intval', $unitIds)));
+        $unitIds = array_values(array_unique($picked));
+        if (! $unitIds || count($unitIds) !== count($picked)) {
+            return false;
         }
 
         $validIds = DB::table('accessory_units')
             ->whereIn('unit_id', $unitIds)
             ->where(fn ($w) => $w->where('status', 'available')->orWhereIn('unit_id', $alreadyOnThisLine))
             ->pluck('unit_id');
-        if ($validIds->isEmpty()) {
-            return;
+        if ($validIds->count() !== count($unitIds)) {
+            return false;
         }
 
+        self::releaseAccessory($baId);
         $now = now();
         DB::table('booking_accessory_units')->insert(
             $validIds->map(fn ($unitId) => [
@@ -126,6 +131,36 @@ class EquipmentUnitAllocator
             ])->all()
         );
         DB::table('accessory_units')->whereIn('unit_id', $validIds)->update(['status' => 'allocated']);
+
+        return true;
+    }
+
+    /**
+     * Pulls a unit off whatever booking line it's allocated to — for when the unit itself goes
+     * out of service (marked for maintenance, or retired). Without this, the line stays
+     * "Confirmed" with a unit that can't actually go out, and returning the unit from
+     * maintenance flips it to 'available' while it's still linked to that booking, letting a
+     * second booking grab it too. The affected line is un-confirmed so Release Readiness flags it.
+     */
+    public static function detachEquipmentUnit(int $unitId): void
+    {
+        $lineIds = DB::table('booking_equipment_units')->where('equipment_unit_id', $unitId)->pluck('bk_equip_id');
+        if ($lineIds->isEmpty()) {
+            return;
+        }
+        DB::table('booking_equipment_units')->where('equipment_unit_id', $unitId)->delete();
+        DB::table('booking_equipment')->whereIn('bk_equip_id', $lineIds)->update(['unit_confirmed' => 0]);
+    }
+
+    /** Accessory equivalent of detachEquipmentUnit() above. */
+    public static function detachAccessoryUnit(int $unitId): void
+    {
+        $lineIds = DB::table('booking_accessory_units')->where('accessory_unit_id', $unitId)->pluck('ba_id');
+        if ($lineIds->isEmpty()) {
+            return;
+        }
+        DB::table('booking_accessory_units')->where('accessory_unit_id', $unitId)->delete();
+        DB::table('booking_accessories')->whereIn('ba_id', $lineIds)->update(['unit_confirmed' => 0]);
     }
 
     /** Accessory equivalent of allocate() above — same idea, accessory_units/booking_accessory_units. */

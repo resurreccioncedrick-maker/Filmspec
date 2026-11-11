@@ -407,9 +407,16 @@ class AccessoriesController extends Controller
                 return response()->json(['success' => false, 'error' => 'Unit not found.']);
             }
 
+            $newStatus = in_array($request->input('status'), array_keys($this->unitStatusLabel), true) ? $request->input('status') : $unit->status;
+            // Manually setting an allocated unit back to available/maintenance/retired takes it
+            // off its booking line — otherwise it stays linked there while also being free to
+            // book again.
+            if ($newStatus !== $unit->status && in_array($newStatus, ['available', 'under_maintenance', 'retired'], true)) {
+                \App\Support\EquipmentUnitAllocator::detachAccessoryUnit($unitId);
+            }
             DB::table('accessory_units')->where('unit_id', $unitId)->update([
                 'condition' => in_array($request->input('condition'), array_keys($this->unitCondLabel), true) ? $request->input('condition') : $unit->condition,
-                'status' => in_array($request->input('status'), array_keys($this->unitStatusLabel), true) ? $request->input('status') : $unit->status,
+                'status' => $newStatus,
                 'location' => trim($request->input('location', '')) ?: null,
                 'updated_at' => now(),
             ]);
@@ -425,6 +432,7 @@ class AccessoriesController extends Controller
             if (! $unit) {
                 return response()->json(['success' => false, 'error' => 'Unit not found.']);
             }
+            \App\Support\EquipmentUnitAllocator::detachAccessoryUnit($unitId);
             DB::table('accessory_units')->where('unit_id', $unitId)->update(['status' => 'retired', 'updated_at' => now()]);
             ActivityLog::record($request->user()->user_id, 'update', 'accessory', "Retired physical unit {$unit->asset_tag}", $unit->accessory_id);
             $this->recalcAccUnits($unit->accessory_id);

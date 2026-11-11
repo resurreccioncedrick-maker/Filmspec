@@ -1,0 +1,1908 @@
+diff --git a/app/Console/Commands/BackfillUnitAllocations.php b/app/Console/Commands/BackfillUnitAllocations.php
+new file mode 100644
+index 0000000..34a9393
+--- /dev/null
++++ b/app/Console/Commands/BackfillUnitAllocations.php
+@@ -0,0 +1,91 @@
++<?php
++
++namespace App\Console\Commands;
++
++use App\Support\EquipmentUnitAllocator;
++use Illuminate\Console\Command;
++use Illuminate\Support\Facades\DB;
++
++/**
++ * One-time (but safe to re-run) backfill: allocates specific equipment_units/accessory_units to
++ * every existing booking_equipment/booking_accessories row that predates EquipmentUnitAllocator
++ * (introduced to run at insert-time going forward) and has no pivot row yet. Without this,
++ * every booking created before the feature shipped keeps showing "every unit of this model"
++ * in the Incident Report Unit picker instead of the one(s) actually on that booking.
++ */
++class BackfillUnitAllocations extends Command
++{
++    protected $signature = 'demo:backfill-unit-allocations {--force : Skip the confirmation prompt}';
++
++    protected $description = 'Allocate specific units to existing booking_equipment/booking_accessories rows that have none yet';
++
++    public function handle(): int
++    {
++        if (! $this->option('force') && ! $this->confirm('Backfill unit allocation for every existing booking equipment/accessory line that has none?')) {
++            $this->warn('Cancelled.');
++
++            return self::FAILURE;
++        }
++
++        $eqDone = 0;
++        $rows = DB::table('booking_equipment as be')
++            ->leftJoin('booking_equipment_units as beu', 'be.bk_equip_id', '=', 'beu.bk_equip_id')
++            ->whereNull('beu.id')
++            ->select('be.bk_equip_id', 'be.booking_id', 'be.equipment_id', 'be.quantity')
++            ->distinct()
++            ->get();
++        foreach ($rows as $r) {
++            // Prefer the Equipment Checklist's actually-recorded unit (ground truth — real
++            // check-out happened against a specific unit) over guessing fresh from whatever's
++            // 'available' right now. Just link the pivot without touching status: the
++            // checklist's own unit already reflects that unit's true current state (in_field,
++            // back to available, etc.) — this backfill shouldn't override it.
++            $checklistUnits = DB::table('equipment_checklist')
++                ->where('booking_id', $r->booking_id)->where('equipment_id', $r->equipment_id)
++                ->where('direction', 'out')->whereNotNull('equipment_unit_id')
++                ->distinct()->pluck('equipment_unit_id');
++
++            if ($checklistUnits->isNotEmpty()) {
++                $now = now();
++                DB::table('booking_equipment_units')->insertOrIgnore(
++                    $checklistUnits->take($r->quantity)->map(fn ($unitId) => [
++                        'bk_equip_id' => $r->bk_equip_id, 'equipment_unit_id' => $unitId, 'allocated_at' => $now,
++                    ])->all()
++                );
++            } else {
++                EquipmentUnitAllocator::allocate((int) $r->bk_equip_id, (int) $r->equipment_id, (int) $r->quantity);
++            }
++            $eqDone++;
++        }
++
++        $accDone = 0;
++        $accRows = DB::table('booking_accessories as ba')
++            ->leftJoin('booking_accessory_units as bau', 'ba.ba_id', '=', 'bau.ba_id')
++            ->whereNull('bau.id')
++            ->select('ba.ba_id', 'ba.booking_id', 'ba.accessory_id', 'ba.quantity')
++            ->distinct()
++            ->get();
++        foreach ($accRows as $r) {
++            $checklistUnits = DB::table('equipment_checklist')
++                ->where('booking_id', $r->booking_id)->where('accessory_id', $r->accessory_id)
++                ->where('direction', 'out')->whereNotNull('accessory_unit_id')
++                ->distinct()->pluck('accessory_unit_id');
++
++            if ($checklistUnits->isNotEmpty()) {
++                $now = now();
++                DB::table('booking_accessory_units')->insertOrIgnore(
++                    $checklistUnits->take($r->quantity)->map(fn ($unitId) => [
++                        'ba_id' => $r->ba_id, 'accessory_unit_id' => $unitId, 'allocated_at' => $now,
++                    ])->all()
++                );
++            } else {
++                EquipmentUnitAllocator::allocateAccessory((int) $r->ba_id, (int) $r->accessory_id, (int) $r->quantity);
++            }
++            $accDone++;
++        }
++
++        $this->info("Processed {$eqDone} equipment line(s), {$accDone} accessory line(s). (Lines for gear with no individually-tracked units, or none currently 'available', are left unallocated — same as the live insert-time behavior.)");
++
++        return self::SUCCESS;
++    }
++}
+diff --git a/app/Console/Commands/ReleaseStaleUnitAllocations.php b/app/Console/Commands/ReleaseStaleUnitAllocations.php
+new file mode 100644
+index 0000000..fe59989
+--- /dev/null
++++ b/app/Console/Commands/ReleaseStaleUnitAllocations.php
+@@ -0,0 +1,55 @@
++<?php
++
++namespace App\Console\Commands;
++
++use App\Support\EquipmentUnitAllocator;
++use Illuminate\Console\Command;
++use Illuminate\Support\Facades\DB;
++
++/**
++ * One-time (but safe to re-run) cleanup: releases equipment_units/accessory_units that are
++ * still stuck 'allocated' to a booking that's already completed/cancelled. Nothing released
++ * units on those transitions before this fix shipped, so a unit tied to e.g. a booking from
++ * months ago stayed permanently 'allocated' — confirmed for real: Sennheiser Wireless
++ * Microphone System's 2 units were both locked to a single 'completed' booking from June 2026,
++ * blocking every other booking from ever getting one even though the real shoot was long over.
++ */
++class ReleaseStaleUnitAllocations extends Command
++{
++    protected $signature = 'demo:release-stale-unit-allocations {--force : Skip the confirmation prompt}';
++
++    protected $description = 'Release equipment/accessory units still allocated to an already-completed/cancelled booking';
++
++    public function handle(): int
++    {
++        if (! $this->option('force') && ! $this->confirm('Release units still allocated to completed/cancelled bookings?')) {
++            $this->warn('Cancelled.');
++
++            return self::FAILURE;
++        }
++
++        $staleBookingIds = DB::table('bookings')->whereIn('booking_status', ['completed', 'cancelled'])->pluck('booking_id');
++
++        $eqDone = 0;
++        DB::table('booking_equipment')->whereIn('booking_id', $staleBookingIds)
++            ->whereIn('bk_equip_id', DB::table('booking_equipment_units')->select('bk_equip_id'))
++            ->pluck('bk_equip_id')
++            ->each(function ($bkEquipId) use (&$eqDone) {
++                EquipmentUnitAllocator::release($bkEquipId);
++                $eqDone++;
++            });
++
++        $accDone = 0;
++        DB::table('booking_accessories')->whereIn('booking_id', $staleBookingIds)
++            ->whereIn('ba_id', DB::table('booking_accessory_units')->select('ba_id'))
++            ->pluck('ba_id')
++            ->each(function ($baId) use (&$accDone) {
++                EquipmentUnitAllocator::releaseAccessory($baId);
++                $accDone++;
++            });
++
++        $this->info("Released units for {$eqDone} equipment line(s) and {$accDone} accessory line(s) tied to completed/cancelled bookings.");
++
++        return self::SUCCESS;
++    }
++}
+diff --git a/app/Http/Controllers/BookingDetailController.php b/app/Http/Controllers/BookingDetailController.php
+index 54e8c4a..0c64810 100644
+--- a/app/Http/Controllers/BookingDetailController.php
++++ b/app/Http/Controllers/BookingDetailController.php
+@@ -79,6 +79,15 @@ public function show(Request $request, int $id): View|RedirectResponse|JsonRespo
+             ->selectRaw("(SELECT et.condition_in FROM equipment_transactions et WHERE et.booking_id=be.booking_id AND et.equipment_id=be.equipment_id AND et.transaction_type='checkin' ORDER BY et.transaction_id DESC LIMIT 1) AS return_condition")
+             ->get();
+ 
++        // Release Readiness's Equipment step needs to know every accessory line too (not just
++        // equipment), since both need their release unit(s) manually confirmed before the step
++        // can go green — see booking-detail.blade.php's $equipOk.
++        $accessoryLines = DB::table('booking_accessories as ba')
++            ->join('accessories as a', 'ba.accessory_id', '=', 'a.accessory_id')
++            ->where('ba.booking_id', $id)
++            ->select('ba.*', 'a.accessory_name')
++            ->get();
++
+         $crewLines = DB::table('booking_crew as bc')
+             ->join('crew_members as cm', 'bc.crew_id', '=', 'cm.crew_id')
+             ->leftJoin('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
+@@ -309,6 +318,16 @@ public function show(Request $request, int $id): View|RedirectResponse|JsonRespo
+             ->select('e.equipment_id', 'e.equipment_name', 'e.brand', 'e.daily_rate', 'ec.category_name')
+             ->get();
+ 
++        // Lets the Add Equipment modal offer a Unit picker right at add-time — staff who already
++        // know which physical unit they're releasing don't have to add the line blind and
++        // confirm units separately afterward on the Cost Estimate tab.
++        $availUnitsByEquipId = DB::table('equipment_units')
++            ->whereIn('equipment_id', $availEquip->pluck('equipment_id'))
++            ->where('status', 'available')
++            ->orderBy('asset_tag')
++            ->get(['unit_id', 'equipment_id', 'asset_tag'])
++            ->groupBy('equipment_id');
++
+         $availCrew = DB::table('crew_members as cm')
+             ->leftJoin('crew_positions as cp', 'cm.primary_position_id', '=', 'cp.position_id')
+             ->where('cm.status', 'active')
+@@ -339,7 +358,7 @@ public function show(Request $request, int $id): View|RedirectResponse|JsonRespo
+         return view('booking-detail', [
+             'booking' => $booking, 'id' => $id, 'isAdmin' => $isAdmin, 'role' => $role, 'canRecord' => $canRecord,
+             'pendingPaymentSubmissions' => $pendingPaymentSubmissions, 'paymentSubmissionHistory' => $paymentSubmissionHistory,
+-            'equipmentLines' => $equipmentLines, 'crewLines' => $crewLines, 'equipAssignedCrew' => $equipAssignedCrew,
++            'equipmentLines' => $equipmentLines, 'accessoryLines' => $accessoryLines, 'crewLines' => $crewLines, 'equipAssignedCrew' => $equipAssignedCrew,
+             'equipCoverage' => $equipCoverage, 'equipOpRequirements' => $equipOpRequirements,
+             'catalogEquipment' => $catalogEquipment,
+             'assignedCrewIds' => $assignedCrewIds, 'ce' => $ce, 'ceHistory' => $ceHistory, 'ceBreakdown' => $ceBreakdown,
+@@ -356,7 +375,7 @@ public function show(Request $request, int $id): View|RedirectResponse|JsonRespo
+             'equipRequestsCount' => $equipRequestsCount, 'pendingEquipRequestsCount' => $pendingEquipRequestsCount,
+             'fieldAdditions' => $fieldAdditions,
+             'feedback' => $feedback,
+-            'availEquip' => $availEquip, 'availCrew' => $availCrew, 'positions' => $positions, 'vehicleRates' => $vehicleRates,
++            'availEquip' => $availEquip, 'availUnitsByEquipId' => $availUnitsByEquipId, 'availCrew' => $availCrew, 'positions' => $positions, 'vehicleRates' => $vehicleRates,
+             'driverNeeded' => $driverNeeded, 'driverCount' => $driverCount,
+             'statusBadge' => $this->statusBadge, 'payBadge' => $this->payBadge, 'payLabel' => $this->payLabel,
+             'incTypeBadge' => ['damaged' => 'badge-red', 'missing' => 'badge-red', 'malfunction' => 'badge-orange', 'late_return' => 'badge-yellow'],
+@@ -456,6 +475,10 @@ public function act(Request $request, int $id): RedirectResponse
+             $msg = $this->addBookingAccessory($request, $id);
+         } elseif ($action === 'remove_booking_accessory' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
+             $msg = $this->removeBookingAccessory($request, $id);
++        } elseif ($action === 'confirm_equipment_units' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
++            $msg = $this->confirmEquipmentUnits($request, $id);
++        } elseif ($action === 'confirm_accessory_units' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
++            $msg = $this->confirmAccessoryUnits($request, $id);
+         } elseif ($action === 'request_cancellation' && in_array($role, ['super_admin', 'operations_manager', 'traffic'], true)) {
+             $msg = $this->requestCancellation($request, $id, $booking, $role, $uid);
+         } elseif ($action === 'approve_cancellation' && in_array($role, ['super_admin', 'operations_manager'], true)) {
+@@ -497,6 +520,7 @@ public function act(Request $request, int $id): RedirectResponse
+             DB::table('equipment')->whereIn('equipment_id', function ($q) use ($id) {
+                 $q->select('equipment_id')->from('booking_equipment')->where('booking_id', $id);
+             })->update(['availability_status' => 'available']);
++            \App\Support\EquipmentUnitAllocator::releaseAllForBooking($id);
+             DB::table('bookings')->where('booking_id', $id)->update([
+                 'booking_status' => 'cancelled', 'approval_status' => 'rejected', 'cancelled_by' => $uid,
+                 'cancellation_reason' => $reason, 'updated_at' => now(),
+@@ -549,7 +573,21 @@ private function addEquipment(Request $request, int $id, $booking): ?array
+         $bkEquipId = DB::table('booking_equipment')->insertGetId([
+             'booking_id' => $id, 'equipment_id' => $eid, 'quantity' => $qty, 'days' => $days, 'daily_rate' => $rate, 'notes' => $notes,
+         ], 'bk_equip_id');
+-        \App\Support\EquipmentUnitAllocator::allocate($bkEquipId, $eid, $qty);
++
++        // Staff can pick the specific release unit(s) right here at add-time instead of only
++        // confirming later on the Cost Estimate tab — if they did, that choice is immediately
++        // authoritative (and already confirmed); otherwise fall back to the auto-pick, left
++        // unconfirmed until someone reviews/confirms it on the CE page.
++        $pickedUnitIds = array_values(array_filter(array_map('intval', (array) $request->input('unit_ids', []))));
++        if ($pickedUnitIds && count($pickedUnitIds) >= $qty) {
++            \App\Support\EquipmentUnitAllocator::allocateSpecific($bkEquipId, $pickedUnitIds);
++            if (DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->count() >= $qty) {
++                DB::table('booking_equipment')->where('bk_equip_id', $bkEquipId)->update(['unit_confirmed' => 1]);
++            }
++        } else {
++            \App\Support\EquipmentUnitAllocator::allocate($bkEquipId, $eid, $qty);
++        }
++
+         BookingCosting::updateBookingTotal($id);
+         BookingCosting::generateCostEstimate($id, Auth::id());
+ 
+@@ -964,6 +1002,7 @@ private function completeBooking(int $id, $booking, int $uid): array
+ 
+         $prevStatus = $booking->booking_status;
+         DB::table('bookings')->where('booking_id', $id)->update(['booking_status' => 'completed', 'updated_at' => now()]);
++        \App\Support\EquipmentUnitAllocator::releaseAllForBooking($id);
+         DB::table('crew_members as cm')
+             ->join('booking_crew as bc', 'cm.crew_id', '=', 'bc.crew_id')
+             ->where('bc.booking_id', $id)->where('bc.assignment_status', 'confirmed')
+@@ -1504,6 +1543,7 @@ private function requestCancellation(Request $request, int $id, $booking, string
+             DB::table('equipment')->whereIn('equipment_id', function ($q) use ($id) {
+                 $q->select('equipment_id')->from('booking_equipment')->where('booking_id', $id);
+             })->update(['availability_status' => 'available']);
++            \App\Support\EquipmentUnitAllocator::releaseAllForBooking($id);
+             DB::table('quotation_log')->insert([
+                 'booking_id' => $id, 'log_type' => 'cancelled', 'logged_by' => $uid,
+                 'previous_status' => $booking->booking_status, 'new_status' => 'cancelled',
+@@ -1549,6 +1589,7 @@ private function approveCancellation(Request $request, int $id, $booking, int $u
+         DB::table('equipment')->whereIn('equipment_id', function ($q) use ($id) {
+             $q->select('equipment_id')->from('booking_equipment')->where('booking_id', $id);
+         })->update(['availability_status' => 'available']);
++        \App\Support\EquipmentUnitAllocator::releaseAllForBooking($id);
+         DB::table('quotation_log')->insert([
+             'booking_id' => $id, 'log_type' => 'cancelled', 'logged_by' => $uid,
+             'previous_status' => $booking->booking_status, 'new_status' => 'cancelled',
+@@ -1958,10 +1999,22 @@ private function addBookingAccessory(Request $request, int $id): array
+ 
+         $rate = (float) $acc->daily_rate;
+         $sub = round($rate * $qty * $days, 2);
+-        DB::table('booking_accessories')->insert([
++        $baId = DB::table('booking_accessories')->insertGetId([
+             'booking_id' => $id, 'accessory_id' => $aid, 'quantity' => $qty, 'days' => $days,
+             'daily_rate' => $rate, 'is_included' => (int) $acc->is_included, 'subtotal' => $sub, 'notes' => $notes,
+-        ]);
++        ], 'ba_id');
++
++        // Same immediate-pick-or-fall-back-to-auto pattern as addEquipment() above.
++        $pickedUnitIds = array_values(array_filter(array_map('intval', (array) $request->input('unit_ids', []))));
++        if ($pickedUnitIds && count($pickedUnitIds) >= $qty) {
++            \App\Support\EquipmentUnitAllocator::allocateSpecificAccessory($baId, $pickedUnitIds);
++            if (DB::table('booking_accessory_units')->where('ba_id', $baId)->count() >= $qty) {
++                DB::table('booking_accessories')->where('ba_id', $baId)->update(['unit_confirmed' => 1]);
++            }
++        } else {
++            \App\Support\EquipmentUnitAllocator::allocateAccessory($baId, $aid, $qty);
++        }
++
+         BookingCosting::updateBookingTotal($id);
+         BookingCosting::generateCostEstimate($id, Auth::id());
+ 
+@@ -1972,6 +2025,121 @@ private function addBookingAccessory(Request $request, int $id): array
+         return ['type' => 'success', 'text' => '<strong>' . e($acc->accessory_name) . '</strong> added to booking. Cost estimate updated.'];
+     }
+ 
++    /**
++     * Staff manually picks/confirms which specific physical unit(s) will actually be released
++     * for one or more equipment lines in a single submit (one "Confirm All Units" button per
++     * table, not one click per row) — overrides EquipmentUnitAllocator::allocate()'s auto-pick
++     * (made the instant each line was added) and marks every submitted line `unit_confirmed`,
++     * which is what the Release Readiness widget now actually gates on for the Equipment step
++     * (see booking-detail.blade.php), instead of merely "a line exists".
++     *
++     * $request->input('lines') shape: [bk_equip_id => ['bk_equip_id' => ..., 'unit_ids' => [...]]]
++     * — only lines actually present in the submitted form (i.e. every row in the table, since
++     * the whole table shares one form) are processed; a line whose own unit picker was left in
++     * its read-only "Confirmed" state still resubmits its hidden bk_equip_id with no unit_ids
++     * change, which is a harmless no-op re-confirm.
++     */
++    private function confirmEquipmentUnits(Request $request, int $id): array
++    {
++        $lines = (array) $request->input('lines', []);
++        $confirmedNames = [];
++        $errors = [];
++
++        foreach ($lines as $lineInput) {
++            $bkEquipId = (int) ($lineInput['bk_equip_id'] ?? 0);
++            if (! $bkEquipId) {
++                continue;
++            }
++            $line = DB::table('booking_equipment')->where('bk_equip_id', $bkEquipId)->where('booking_id', $id)->first();
++            if (! $line) {
++                continue;
++            }
++
++            $unitIds = array_values(array_filter(array_map('intval', (array) ($lineInput['unit_ids'] ?? []))));
++            $tracksUnits = DB::table('equipment_units')->where('equipment_id', $line->equipment_id)->exists();
++            $eqName = DB::table('equipment')->where('equipment_id', $line->equipment_id)->value('equipment_name') ?? 'Equipment';
++
++            if ($tracksUnits) {
++                if (count($unitIds) < (int) $line->quantity) {
++                    $errors[] = "$eqName: pick a unit for every one of the {$line->quantity} item(s).";
++                    continue;
++                }
++                \App\Support\EquipmentUnitAllocator::allocateSpecific($bkEquipId, $unitIds);
++                if (DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->count() < (int) $line->quantity) {
++                    $errors[] = "$eqName: one or more selected units are no longer available.";
++                    continue;
++                }
++            }
++
++            DB::table('booking_equipment')->where('bk_equip_id', $bkEquipId)->update(['unit_confirmed' => 1]);
++            $confirmedNames[] = $eqName;
++        }
++
++        if ($confirmedNames) {
++            ActivityLog::record(Auth::id(), 'confirm', 'booking', 'Confirmed release unit(s) for ' . implode(', ', $confirmedNames) . " on booking $id", $id);
++        }
++
++        if ($errors && ! $confirmedNames) {
++            return ['type' => 'error', 'text' => implode('<br>', array_map('e', $errors))];
++        }
++        if ($errors) {
++            return ['type' => 'danger', 'text' => count($confirmedNames) . ' line(s) confirmed. Not confirmed: ' . implode('<br>', array_map('e', $errors))];
++        }
++
++        return ['type' => 'success', 'text' => count($confirmedNames) . ' equipment line(s) confirmed.'];
++    }
++
++    /** Accessory equivalent of confirmEquipmentUnits() above. */
++    private function confirmAccessoryUnits(Request $request, int $id): array
++    {
++        $lines = (array) $request->input('lines', []);
++        $confirmedNames = [];
++        $errors = [];
++
++        foreach ($lines as $lineInput) {
++            $baId = (int) ($lineInput['ba_id'] ?? 0);
++            if (! $baId) {
++                continue;
++            }
++            $line = DB::table('booking_accessories')->where('ba_id', $baId)->where('booking_id', $id)->first();
++            if (! $line) {
++                continue;
++            }
++
++            $unitIds = array_values(array_filter(array_map('intval', (array) ($lineInput['unit_ids'] ?? []))));
++            $tracksUnits = DB::table('accessory_units')->where('accessory_id', $line->accessory_id)->exists();
++            $accName = DB::table('accessories')->where('accessory_id', $line->accessory_id)->value('accessory_name') ?? 'Accessory';
++
++            if ($tracksUnits) {
++                if (count($unitIds) < (int) $line->quantity) {
++                    $errors[] = "$accName: pick a unit for every one of the {$line->quantity} item(s).";
++                    continue;
++                }
++                \App\Support\EquipmentUnitAllocator::allocateSpecificAccessory($baId, $unitIds);
++                if (DB::table('booking_accessory_units')->where('ba_id', $baId)->count() < (int) $line->quantity) {
++                    $errors[] = "$accName: one or more selected units are no longer available.";
++                    continue;
++                }
++            }
++
++            DB::table('booking_accessories')->where('ba_id', $baId)->update(['unit_confirmed' => 1]);
++            $confirmedNames[] = $accName;
++        }
++
++        if ($confirmedNames) {
++            ActivityLog::record(Auth::id(), 'confirm', 'booking', 'Confirmed release unit(s) for ' . implode(', ', $confirmedNames) . " on booking $id", $id);
++        }
++
++        if ($errors && ! $confirmedNames) {
++            return ['type' => 'error', 'text' => implode('<br>', array_map('e', $errors))];
++        }
++        if ($errors) {
++            return ['type' => 'danger', 'text' => count($confirmedNames) . ' line(s) confirmed. Not confirmed: ' . implode('<br>', array_map('e', $errors))];
++        }
++
++        return ['type' => 'success', 'text' => count($confirmedNames) . ' accessory line(s) confirmed.'];
++    }
++
+     private function removeBookingAccessory(Request $request, int $id): ?array
+     {
+         $baid = (int) $request->input('ba_id', 0);
+@@ -1984,6 +2152,7 @@ private function removeBookingAccessory(Request $request, int $id): ?array
+             ->where('ba.ba_id', $baid)->where('ba.booking_id', $id)
+             ->value('a.accessory_name');
+ 
++        \App\Support\EquipmentUnitAllocator::releaseAccessory($baid);
+         DB::table('booking_accessories')->where('ba_id', $baid)->where('booking_id', $id)->delete();
+         BookingCosting::updateBookingTotal($id);
+         BookingCosting::generateCostEstimate($id, Auth::id());
+diff --git a/app/Http/Controllers/BookingsController.php b/app/Http/Controllers/BookingsController.php
+index 241dc13..48248e3 100644
+--- a/app/Http/Controllers/BookingsController.php
++++ b/app/Http/Controllers/BookingsController.php
+@@ -334,6 +334,7 @@ private function handleAction(Request $request, $user, string $role): ?array
+             DB::table('equipment')->whereIn('equipment_id', function ($q) use ($bid) {
+                 $q->select('equipment_id')->from('booking_equipment')->where('booking_id', $bid);
+             })->update(['availability_status' => 'available']);
++            \App\Support\EquipmentUnitAllocator::releaseAllForBooking($bid);
+             Booking::where('booking_id', $bid)->update([
+                 'approval_status' => 'rejected', 'approval_notes' => $notes,
+                 'booking_status' => 'cancelled', 'cancelled_by' => $uid,
+diff --git a/app/Http/Controllers/CartController.php b/app/Http/Controllers/CartController.php
+index c282057..c3cb4c9 100644
+--- a/app/Http/Controllers/CartController.php
++++ b/app/Http/Controllers/CartController.php
+@@ -552,6 +552,15 @@ private function submitBooking(Request $request, $user): JsonResponse
+                 }
+             }
+ 
++            // Everything from here on writes real booking data across several tables — wrapped
++            // in a transaction so a failure partway through (e.g. the equipment-unit allocator,
++            // or any other step) can never leave a half-created booking visible to the admin
++            // queue while the client sees an error and retries, creating a duplicate. Confirmed
++            // this exact failure mode happened for real: a migration gap mid-deploy threw from
++            // inside this method after the booking row had already committed, and the client's
++            // retry produced two near-identical "Pending Approval" bookings for the same project.
++            DB::beginTransaction();
++
+             $year = date('Y');
+             $lastNum = (int) DB::table('bookings')
+                 ->where('booking_reference', 'like', "FS-$year-%")
+@@ -634,6 +643,10 @@ private function submitBooking(Request $request, $user): JsonResponse
+                                 'daily_rate' => $accRate, 'is_included' => 0, 'subtotal' => $accSub,
+                                 'notes' => 'Added with equipment: ' . $real->accessory_name,
+                             ]);
++                            $baId = DB::table('booking_accessories')->where('booking_id', $bid)->where('accessory_id', $cartAcc->accessory_id)->value('ba_id');
++                            if ($baId) {
++                                \App\Support\EquipmentUnitAllocator::allocateAccessory($baId, $cartAcc->accessory_id, $accQty);
++                            }
+                         }
+                     }
+                 }
+@@ -658,8 +671,14 @@ private function submitBooking(Request $request, $user): JsonResponse
+ 
+             DB::table('booking_cart')->where('user_id', $uid)->delete();
+ 
++            DB::commit();
++
+             return response()->json(['ok' => true, 'booking_reference' => $ref, 'booking_id' => $bid, 'total' => $equipTotal]);
+         } catch (\Throwable $e) {
++            if (DB::transactionLevel() > 0) {
++                DB::rollBack();
++            }
++
+             return response()->json(['error' => 'Booking failed: ' . $e->getMessage()]);
+         }
+     }
+diff --git a/app/Http/Controllers/CePreviewController.php b/app/Http/Controllers/CePreviewController.php
+index 315cd63..427c545 100644
+--- a/app/Http/Controllers/CePreviewController.php
++++ b/app/Http/Controllers/CePreviewController.php
+@@ -262,8 +262,72 @@ private function bookingMode(Request $request, bool $asData = false)
+             ->orderBy('a.accessory_name')
+             ->select('ba.*', 'a.accessory_name')
+             ->get();
++
++        // Which specific unit(s) are allocated to each equipment/accessory line — same
++        // EquipmentUnitAllocator data the Checklist and Incident Report pages already read,
++        // so the CE editor shows the same real asset tag(s) instead of staff having to guess
++        // or look it up elsewhere.
++        $equipUnitTags = DB::table('booking_equipment_units as beu')
++            ->join('equipment_units as eu', 'beu.equipment_unit_id', '=', 'eu.unit_id')
++            ->where('beu.bk_equip_id', '>', 0)
++            ->whereIn('beu.bk_equip_id', DB::table('booking_equipment')->where('booking_id', $bid)->pluck('bk_equip_id'))
++            ->select('beu.bk_equip_id', 'eu.asset_tag')
++            ->get()->groupBy('bk_equip_id')->map(fn ($g) => $g->pluck('asset_tag')->implode(', '));
++        $accUnitTags = DB::table('booking_accessory_units as bau')
++            ->join('accessory_units as au', 'bau.accessory_unit_id', '=', 'au.unit_id')
++            ->whereIn('bau.ba_id', $accLines->pluck('ba_id'))
++            ->select('bau.ba_id', 'au.asset_tag')
++            ->get()->groupBy('ba_id')->map(fn ($g) => $g->pluck('asset_tag')->implode(', '));
+         $accTotal = (float) $accLines->sum('subtotal');
+ 
++        // Per-line unit picker options for the manual assign/confirm UI: EVERY non-retired unit
++        // of that equipment/accessory model, not just the ones currently free — staff need to
++        // see the whole pool and exactly why a given unit isn't selectable (in the field, under
++        // maintenance, etc.), not have busy units silently vanish and leave an unexplained empty
++        // dropdown. Each option carries its real status; only 'available' units (or one already
++        // allocated to THIS specific line, so reopening an already-confirmed line still shows its
++        // current pick) are left enabled — everything else renders disabled with its status.
++        $allEquipLines = collect($equipGroups)->flatten(1);
++        $equipUnitsByEquipId = DB::table('equipment_units')
++            ->whereIn('equipment_id', $allEquipLines->pluck('equipment_id')->unique()->all() ?: [0])
++            ->where('status', '!=', 'retired')
++            ->orderByRaw("status = 'available' desc")->orderBy('asset_tag')
++            ->get(['unit_id', 'equipment_id', 'asset_tag', 'status']);
++        $allocatedEqUnitIds = DB::table('booking_equipment_units')
++            ->whereIn('bk_equip_id', $allEquipLines->pluck('bk_equip_id')->all() ?: [0])
++            ->get(['bk_equip_id', 'equipment_unit_id'])
++            ->groupBy('bk_equip_id')->map(fn ($g) => $g->pluck('equipment_unit_id')->all());
++        $equipUnitOptions = [];
++        foreach ($allEquipLines as $eqLine) {
++            $allocatedHere = $allocatedEqUnitIds[$eqLine->bk_equip_id] ?? [];
++            $equipUnitOptions[$eqLine->bk_equip_id] = $equipUnitsByEquipId
++                ->where('equipment_id', $eqLine->equipment_id)
++                ->map(fn ($u) => (object) [
++                    'unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag, 'status' => $u->status,
++                    'selectable' => $u->status === 'available' || in_array($u->unit_id, $allocatedHere, true),
++                ])->values();
++        }
++
++        $accUnitsByAccId = DB::table('accessory_units')
++            ->whereIn('accessory_id', $accLines->pluck('accessory_id')->unique()->all() ?: [0])
++            ->where('status', '!=', 'retired')
++            ->orderByRaw("status = 'available' desc")->orderBy('asset_tag')
++            ->get(['unit_id', 'accessory_id', 'asset_tag', 'status']);
++        $allocatedAccUnitIds = DB::table('booking_accessory_units')
++            ->whereIn('ba_id', $accLines->pluck('ba_id')->all() ?: [0])
++            ->get(['ba_id', 'accessory_unit_id'])
++            ->groupBy('ba_id')->map(fn ($g) => $g->pluck('accessory_unit_id')->all());
++        $accUnitOptions = [];
++        foreach ($accLines as $acLine) {
++            $allocatedHere = $allocatedAccUnitIds[$acLine->ba_id] ?? [];
++            $accUnitOptions[$acLine->ba_id] = $accUnitsByAccId
++                ->where('accessory_id', $acLine->accessory_id)
++                ->map(fn ($u) => (object) [
++                    'unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag, 'status' => $u->status,
++                    'selectable' => $u->status === 'available' || in_array($u->unit_id, $allocatedHere, true),
++                ])->values();
++        }
++
+         $equipBaseTotal = 0.0;
+         foreach ($equipGroups as $catLines) {
+             foreach ($catLines as $eq) {
+@@ -388,6 +452,8 @@ private function bookingMode(Request $request, bool $asData = false)
+         $canDiscount = $canManage && in_array($role, ['super_admin', 'operations_manager'], true);
+ 
+         $availEquip = collect();
++        $availUnitsByEquipId = collect();
++        $availAccessoryUnitsByAccId = collect();
+         $availCrew = collect();
+         $positions = collect();
+         $vehicleRates = collect();
+@@ -411,6 +477,16 @@ private function bookingMode(Request $request, bool $asData = false)
+                 ->orderBy('e.equipment_name')
+                 ->get();
+ 
++            // Powers the standalone (non-iframe) Add Equipment/Add Accessories modals' optional
++            // Release Unit picker — same idea as BookingDetailController's own copy for when CE
++            // is viewed embedded in the booking page.
++            $availUnitsByEquipId = DB::table('equipment_units')
++                ->whereIn('equipment_id', $availEquip->pluck('equipment_id'))
++                ->where('status', 'available')
++                ->orderBy('asset_tag')
++                ->get(['unit_id', 'equipment_id', 'asset_tag'])
++                ->groupBy('equipment_id');
++
+             $availCrew = DB::table('crew_members as cm')
+                 ->leftJoin('crew_positions as cp', 'cm.primary_position_id', '=', 'cp.position_id')
+                 ->where('cm.status', 'active')
+@@ -437,12 +513,32 @@ private function bookingMode(Request $request, bool $asData = false)
+                     AND ba2.booking_id != ?),0) AS qty_in_use', [$bid])
+                 ->get();
+ 
++            $availAccessoryUnitsByAccId = DB::table('accessory_units')
++                ->whereIn('accessory_id', $allAccessoriesList->pluck('accessory_id'))
++                ->where('status', 'available')
++                ->orderBy('asset_tag')
++                ->get(['unit_id', 'accessory_id', 'asset_tag'])
++                ->groupBy('accessory_id');
++
+             $accDays = max(1, (int) ((strtotime($de) - strtotime($ds)) / 86400) + 1);
+         }
+ 
+         $viewData = [
+             'mode' => $mode, 'bid' => $bid, 'ceId' => $ce->ce_id ?? 0, 'role' => $role, 'isClientView' => $isClientView,
+             'equipGroups' => $equipGroups, 'crewLines' => $crewLines, 'accLines' => $accLines, 'accTotal' => $accTotal,
++            'equipUnitTags' => $equipUnitTags, 'accUnitTags' => $accUnitTags,
++            'equipUnitOptions' => $equipUnitOptions, 'accUnitOptions' => $accUnitOptions,
++            'allocatedEqUnitIds' => $allocatedEqUnitIds, 'allocatedAccUnitIds' => $allocatedAccUnitIds,
++            'availUnitsByEquipId' => $availUnitsByEquipId, 'availAccessoryUnitsByAccId' => $availAccessoryUnitsByAccId,
++            // Set whenever BookingDetailController::act() just processed a form submitted from
++            // THIS page (every action redirects back here with return_to=ce_preview and flashes
++            // 'bd_flash' regardless of target). When this page is embedded as the parent's Cost
++            // Estimate iframe, the parent's own Release Readiness widget (crew/equipment counts,
++            // etc.) is rendered once, server-side, when booking-detail itself loaded — it has no
++            // way to know an iframe-submitted action just changed that data. Confirmed real:
++            // confirming units here left the parent's widget showing stale unconfirmed counts
++            // until a full page reload. Reload the parent whenever something was just submitted.
++            'justActed' => $request->session()->has('bd_flash'),
+             'equipBaseTotal' => $equipBaseTotal, 'equipTotal' => $equipTotal, 'crewTotal' => $crewTotal,
+             'transCost' => $transCost, 'transZone' => $transZone, 'transMult' => $transMult, 'zoneLabels' => $zoneLabels,
+             'cePricingMode' => $cePricingMode, 'cePricingInput' => $cePricingInput, 'ceVatExempt' => $ceVatExempt,
+diff --git a/app/Http/Controllers/ChecklistController.php b/app/Http/Controllers/ChecklistController.php
+index 4903dfc..289cc42 100644
+--- a/app/Http/Controllers/ChecklistController.php
++++ b/app/Http/Controllers/ChecklistController.php
+@@ -300,6 +300,23 @@ private function hydrateChecklistState($equipLines, int $bid): void
+             ->get()
+             ->keyBy(fn ($r) => 'u' . ($r->equipment_unit_id ?: $r->accessory_unit_id));
+ 
++        // Which specific unit(s) are actually allocated to THIS booking's equipment/accessory
++        // lines (EquipmentUnitAllocator, set the moment the item was added to the booking) —
++        // the checklist should show/offer these, not an independent "whatever's available"
++        // guess, so a line's Unit here always agrees with the Incident Report form's Unit field.
++        $allocatedEq = DB::table('booking_equipment_units as beu')
++            ->join('booking_equipment as be', 'beu.bk_equip_id', '=', 'be.bk_equip_id')
++            ->join('equipment_units as eu', 'beu.equipment_unit_id', '=', 'eu.unit_id')
++            ->where('be.booking_id', $bid)
++            ->select('be.equipment_id', 'eu.unit_id', 'eu.asset_tag', 'eu.serial_no')
++            ->get()->groupBy('equipment_id');
++        $allocatedAcc = DB::table('booking_accessory_units as bau')
++            ->join('booking_accessories as ba', 'bau.ba_id', '=', 'ba.ba_id')
++            ->join('accessory_units as au', 'bau.accessory_unit_id', '=', 'au.unit_id')
++            ->where('ba.booking_id', $bid)
++            ->select('ba.accessory_id', 'au.unit_id', 'au.asset_tag', 'au.serial_no')
++            ->get()->groupBy('accessory_id');
++
+         foreach ($equipLines as $eq) {
+             $isAcc = $eq->item_type === 'accessory';
+             $base = ($isAcc ? 'acc_' : 'eq_') . $eq->ref_id;
+@@ -319,11 +336,18 @@ private function hydrateChecklistState($equipLines, int $bid): void
+                 $eq->condition_in = $in->condition_in ?? null;
+                 $eq->ci_notes = $in->notes ?? null;
+                 $eq->slots = [];
++                $allocatedOne = ($isAcc ? ($allocatedAcc[$eq->ref_id] ?? collect()) : ($allocatedEq[$eq->ref_id] ?? collect()))->first();
++                $eq->unit_tag = $allocatedOne->asset_tag ?? null;
+                 continue;
+             }
+ 
+-            $realUnits = ($isAcc ? ($accUnitRows[$eq->ref_id] ?? collect()) : ($unitRows[$eq->ref_id] ?? collect()))
+-                ->take($eq->quantity);
++            $allocated = $isAcc ? ($allocatedAcc[$eq->ref_id] ?? collect()) : ($allocatedEq[$eq->ref_id] ?? collect());
++            $fallbackUnits = ($isAcc ? ($accUnitRows[$eq->ref_id] ?? collect()) : ($unitRows[$eq->ref_id] ?? collect()))
++                ->reject(fn ($u) => $allocated->contains('unit_id', $u->unit_id));
++            // Allocated units first (what's actually recorded against this booking), topped up
++            // with any other real unit of that model if the booking needs more slots than it has
++            // allocations for (e.g. allocated before stock ran out, or predates allocation).
++            $realUnits = $allocated->concat($fallbackUnits)->take($eq->quantity);
+             $slots = [];
+             foreach ($realUnits as $u) {
+                 $slots[] = (object) [
+diff --git a/app/Http/Controllers/CrewPortalController.php b/app/Http/Controllers/CrewPortalController.php
+index 6b682c3..6e529bd 100644
+--- a/app/Http/Controllers/CrewPortalController.php
++++ b/app/Http/Controllers/CrewPortalController.php
+@@ -140,6 +140,7 @@ public function index(Request $request)
+         $bookingEquipMap = [];
+         $equipmentUnitMap = [];
+         $bookingEquipmentUnitMap = [];
++        $bookingAccessoryUnitMap = [];
+         $bookingAccMap = [];
+         $accessoryUnitMap = [];
+         $myAttendance = collect();
+@@ -289,6 +290,20 @@ public function index(Request $request)
+                         $accessoryUnitMap[$u->accessory_id][] = ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag];
+                     }
+                 }
++
++                // Booking-scoped accessory unit map — same idea as $bookingEquipmentUnitMap
++                // above, sourced from booking_accessory_units (allocated the moment the
++                // accessory is added to a booking).
++                $bookingAccessoryUnitMap = [];
++                $allocatedAccUnits = DB::table('booking_accessory_units as bau')
++                    ->join('booking_accessories as ba', 'bau.ba_id', '=', 'ba.ba_id')
++                    ->join('accessory_units as au', 'bau.accessory_unit_id', '=', 'au.unit_id')
++                    ->whereIn('ba.booking_id', $activeBookingIds)
++                    ->select('ba.booking_id', 'ba.accessory_id', 'au.unit_id', 'au.asset_tag')
++                    ->get();
++                foreach ($allocatedAccUnits as $row) {
++                    $bookingAccessoryUnitMap[$row->booking_id . '_' . $row->accessory_id][] = ['unit_id' => $row->unit_id, 'asset_tag' => $row->asset_tag];
++                }
+             }
+ 
+             // Fix 5 — attendance/timesheet history, never previously surfaced to the crew member.
+@@ -358,8 +373,27 @@ public function index(Request $request)
+                         'ci.checked as ci_checked', 'ci.quantity_actual as ci_qty', 'ci.condition_in', 'ci.notes as ci_notes')
+                     ->get();
+ 
++                // Which specific unit(s) are allocated to each line, so crew sees the real asset
++                // tag(s) instead of just an anonymous "Qty N" — same source of truth as the
++                // admin Checklist page and the Incident Report form's Unit field.
++                $allocEqTags = DB::table('booking_equipment_units as beu')
++                    ->join('booking_equipment as be', 'beu.bk_equip_id', '=', 'be.bk_equip_id')
++                    ->join('equipment_units as eu', 'beu.equipment_unit_id', '=', 'eu.unit_id')
++                    ->whereIn('be.booking_id', $checklistBookingIds)
++                    ->select('be.booking_id', 'be.equipment_id', 'eu.asset_tag')
++                    ->get()->groupBy(fn ($r) => $r->booking_id . '_' . $r->equipment_id);
++                $allocAccTags = DB::table('booking_accessory_units as bau')
++                    ->join('booking_accessories as ba', 'bau.ba_id', '=', 'ba.ba_id')
++                    ->join('accessory_units as au', 'bau.accessory_unit_id', '=', 'au.unit_id')
++                    ->whereIn('ba.booking_id', $checklistBookingIds)
++                    ->select('ba.booking_id', 'ba.accessory_id', 'au.asset_tag')
++                    ->get()->groupBy(fn ($r) => $r->booking_id . '_' . $r->accessory_id);
++
+                 $itemsByBooking = [];
+                 foreach ($equipRows->concat($accRows) as $row) {
++                    $tagMap = $row->item_type === 'accessory' ? $allocAccTags : $allocEqTags;
++                    $tags = $tagMap->get($row->booking_id . '_' . $row->ref_id, collect())->pluck('asset_tag');
++                    $row->unit_tags = $tags->isNotEmpty() ? $tags->implode(', ') : null;
+                     $itemsByBooking[$row->booking_id][] = $row;
+                 }
+                 foreach ($checklistBookings as $bk) {
+@@ -480,7 +514,7 @@ public function index(Request $request)
+             'isHeadCrew' => $isHeadCrew, 'headBookingIds' => $headBookingIds,
+             'myBookings' => $myBookings, 'myIncidents' => $myIncidents, 'myMaintenances' => $myMaintenances,
+             'myActiveBookings' => $myActiveBookings, 'bookingEquipMap' => $bookingEquipMap, 'equipmentUnitMap' => $equipmentUnitMap,
+-            'bookingEquipmentUnitMap' => $bookingEquipmentUnitMap,
++            'bookingEquipmentUnitMap' => $bookingEquipmentUnitMap, 'bookingAccessoryUnitMap' => $bookingAccessoryUnitMap,
+             'bookingAccMap' => $bookingAccMap, 'accessoryUnitMap' => $accessoryUnitMap,
+             'myAttendance' => $myAttendance, 'myTimesheets' => $myTimesheets,
+             'myChecklistBookings' => $myChecklistBookings, 'myTeamBookings' => $myTeamBookings, 'allActiveCrew' => $allActiveCrew,
+diff --git a/app/Http/Controllers/FieldRequestsController.php b/app/Http/Controllers/FieldRequestsController.php
+index 6061259..ecfd332 100644
+--- a/app/Http/Controllers/FieldRequestsController.php
++++ b/app/Http/Controllers/FieldRequestsController.php
+@@ -315,12 +315,14 @@ private function dispatch(Request $request, int $uid): array
+                     'quantity' => DB::raw("quantity + $addQty"),
+                     'subtotal' => DB::raw("subtotal + $addSubtotal"),
+                 ]);
++                \App\Support\EquipmentUnitAllocator::allocateAccessory($existing->ba_id, $req->accessory_id, $addQty);
+             } else {
+-                DB::table('booking_accessories')->insert([
++                $baId = DB::table('booking_accessories')->insertGetId([
+                     'booking_id' => $req->booking_id, 'accessory_id' => $req->accessory_id, 'quantity' => $req->quantity,
+                     'days' => $numDays, 'daily_rate' => $req->daily_rate, 'is_included' => 0, 'subtotal' => $subtotal,
+                     'notes' => 'Field request dispatch',
+-                ]);
++                ], 'ba_id');
++                \App\Support\EquipmentUnitAllocator::allocateAccessory($baId, $req->accessory_id, (int) $req->quantity);
+             }
+             DB::table('equipment_checklist')->insertOrIgnore([
+                 'booking_id' => $req->booking_id, 'accessory_id' => $req->accessory_id, 'direction' => 'out',
+diff --git a/app/Http/Controllers/IncidentsController.php b/app/Http/Controllers/IncidentsController.php
+index 4db9379..62b862f 100644
+--- a/app/Http/Controllers/IncidentsController.php
++++ b/app/Http/Controllers/IncidentsController.php
+@@ -202,7 +202,7 @@ public function index(Request $request): View|StreamedResponse|Response|JsonResp
+         $maintQuery = $this->filteredMaintenanceQuery($request);
+         $maintenances = $maintQuery
+             ->orderBy('ms.scheduled_date')->orderByDesc('ms.created_at')
+-            ->select('ms.*', 'e.equipment_name', 'e.brand', 'e.serial_number as equip_serial',
++            ->select('ms.*', 'e.equipment_name', 'e.brand', 'e.serial_number as equip_serial', 'eu.asset_tag as unit_asset_tag',
+                 DB::raw("CONCAT(cm.first_name,' ',cm.last_name) AS assigned_crew_name"), 'ir.incident_number')
+             ->limit(100)
+             ->get();
+@@ -278,6 +278,7 @@ private function filteredMaintenanceQuery(Request $request)
+ 
+         $maintQuery = DB::table('maintenance_schedules as ms')
+             ->join('equipment as e', 'ms.equipment_id', '=', 'e.equipment_id')
++            ->leftJoin('equipment_units as eu', 'ms.equipment_unit_id', '=', 'eu.unit_id')
+             ->leftJoin('crew_members as cm', 'ms.assigned_crew_id', '=', 'cm.crew_id')
+             ->leftJoin('incident_reports as ir', 'ms.incident_id', '=', 'ir.incident_id');
+         if ($maintTab !== 'all') {
+@@ -485,8 +486,9 @@ private function handleAction(Request $request, int $uid, bool $canManage): ?arr
+             }
+ 
+             if ($eid && $date) {
++                $equipmentUnitId = $this->parseUnitInput($request->input('equipment_unit', ''), $eid);
+                 $scheduleId = DB::table('maintenance_schedules')->insertGetId([
+-                    'equipment_id' => $eid, 'scheduled_date' => $date, 'maintenance_type' => $mtype,
++                    'equipment_id' => $eid, 'equipment_unit_id' => $equipmentUnitId, 'scheduled_date' => $date, 'maintenance_type' => $mtype,
+                     'assigned_crew_id' => $cmId ?: null, 'description' => $desc, 'incident_id' => $iid ?: null,
+                     'photo_path' => $photoUpload['success'] ? $photoUpload['path'] : null,
+                     'created_by' => $uid,
+diff --git a/app/Support/BookingCosting.php b/app/Support/BookingCosting.php
+index 0606a23..e23f089 100644
+--- a/app/Support/BookingCosting.php
++++ b/app/Support/BookingCosting.php
+@@ -192,7 +192,7 @@ public static function lines(int $bookingId): array
+             ->join('equipment as e', 'be.equipment_id', '=', 'e.equipment_id')
+             ->leftJoin('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
+             ->where('be.booking_id', $bookingId)
+-            ->select('be.quantity', 'be.days', 'be.daily_rate', 'e.equipment_name', 'e.brand', 'ec.category_name')
++            ->select('be.bk_equip_id', 'be.equipment_id', 'be.quantity', 'be.days', 'be.daily_rate', 'be.unit_confirmed', 'e.equipment_name', 'e.brand', 'ec.category_name')
+             ->get();
+ 
+         $groups = [];
+diff --git a/app/Support/EquipmentUnitAllocator.php b/app/Support/EquipmentUnitAllocator.php
+index bfc6c51..1a2532a 100644
+--- a/app/Support/EquipmentUnitAllocator.php
++++ b/app/Support/EquipmentUnitAllocator.php
+@@ -63,4 +63,123 @@ public static function release(int $bkEquipId): void
+         DB::table('equipment_units')->whereIn('unit_id', $unitIds)->where('status', 'allocated')->update(['status' => 'available']);
+         DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->delete();
+     }
++
++    /**
++     * Staff-picked replacement for whatever's currently allocated to this booking_equipment
++     * line — used when a staff member manually assigns/confirms specific unit(s) on the Cost
++     * Estimate page, overriding allocate()'s auto-pick. Releases the line's current allocation
++     * first (so a unit dropped from the selection goes back to 'available'), then assigns
++     * exactly the given unit IDs, which must already be 'available' (or already allocated to
++     * THIS same line — re-saving the same choice must not fail). Silently ignores any unit ID
++     * that fails that check rather than throwing, so a stale/raced selection can't corrupt data.
++     */
++    public static function allocateSpecific(int $bkEquipId, array $unitIds): void
++    {
++        $alreadyOnThisLine = DB::table('booking_equipment_units')->where('bk_equip_id', $bkEquipId)->pluck('equipment_unit_id')->all();
++        self::release($bkEquipId);
++
++        $unitIds = array_values(array_unique(array_filter($unitIds)));
++        if (! $unitIds) {
++            return;
++        }
++
++        $validIds = DB::table('equipment_units')
++            ->whereIn('unit_id', $unitIds)
++            ->where(fn ($w) => $w->where('status', 'available')->orWhereIn('unit_id', $alreadyOnThisLine))
++            ->pluck('unit_id');
++        if ($validIds->isEmpty()) {
++            return;
++        }
++
++        $now = now();
++        DB::table('booking_equipment_units')->insert(
++            $validIds->map(fn ($unitId) => [
++                'bk_equip_id' => $bkEquipId, 'equipment_unit_id' => $unitId, 'allocated_at' => $now,
++            ])->all()
++        );
++        DB::table('equipment_units')->whereIn('unit_id', $validIds)->update(['status' => 'allocated']);
++    }
++
++    /** Accessory equivalent of allocateSpecific() above. */
++    public static function allocateSpecificAccessory(int $baId, array $unitIds): void
++    {
++        $alreadyOnThisLine = DB::table('booking_accessory_units')->where('ba_id', $baId)->pluck('accessory_unit_id')->all();
++        self::releaseAccessory($baId);
++
++        $unitIds = array_values(array_unique(array_filter($unitIds)));
++        if (! $unitIds) {
++            return;
++        }
++
++        $validIds = DB::table('accessory_units')
++            ->whereIn('unit_id', $unitIds)
++            ->where(fn ($w) => $w->where('status', 'available')->orWhereIn('unit_id', $alreadyOnThisLine))
++            ->pluck('unit_id');
++        if ($validIds->isEmpty()) {
++            return;
++        }
++
++        $now = now();
++        DB::table('booking_accessory_units')->insert(
++            $validIds->map(fn ($unitId) => [
++                'ba_id' => $baId, 'accessory_unit_id' => $unitId, 'allocated_at' => $now,
++            ])->all()
++        );
++        DB::table('accessory_units')->whereIn('unit_id', $validIds)->update(['status' => 'allocated']);
++    }
++
++    /** Accessory equivalent of allocate() above — same idea, accessory_units/booking_accessory_units. */
++    public static function allocateAccessory(int $baId, int $accessoryId, int $qty): void
++    {
++        if ($qty < 1) {
++            return;
++        }
++
++        $units = DB::table('accessory_units')
++            ->where('accessory_id', $accessoryId)
++            ->where('status', 'available')
++            ->orderBy('asset_tag')
++            ->limit($qty)
++            ->pluck('unit_id');
++
++        if ($units->isEmpty()) {
++            return;
++        }
++
++        $now = now();
++        DB::table('booking_accessory_units')->insert(
++            $units->map(fn ($unitId) => [
++                'ba_id' => $baId, 'accessory_unit_id' => $unitId, 'allocated_at' => $now,
++            ])->all()
++        );
++        DB::table('accessory_units')->whereIn('unit_id', $units)->update(['status' => 'allocated']);
++    }
++
++    /** Accessory equivalent of release() above. */
++    public static function releaseAccessory(int $baId): void
++    {
++        $unitIds = DB::table('booking_accessory_units')->where('ba_id', $baId)->pluck('accessory_unit_id');
++        if ($unitIds->isEmpty()) {
++            return;
++        }
++
++        DB::table('accessory_units')->whereIn('unit_id', $unitIds)->where('status', 'allocated')->update(['status' => 'available']);
++        DB::table('booking_accessory_units')->where('ba_id', $baId)->delete();
++    }
++
++    /**
++     * Releases every unit (equipment and accessory) allocated anywhere on this booking — call
++     * this whenever a booking reaches a terminal state (completed, cancelled, rejected). Without
++     * it, a unit allocated to a booking stays 'allocated' forever even after that booking is long
++     * over, permanently taking it out of the pool for every future booking — confirmed as a real
++     * bug: units tied to a 'completed' booking from months ago were still blocking new requests
++     * for the same gear because nothing had ever released them back to 'available'.
++     */
++    public static function releaseAllForBooking(int $bookingId): void
++    {
++        DB::table('booking_equipment')->where('booking_id', $bookingId)->pluck('bk_equip_id')
++            ->each(fn ($bkEquipId) => self::release($bkEquipId));
++        DB::table('booking_accessories')->where('booking_id', $bookingId)->pluck('ba_id')
++            ->each(fn ($baId) => self::releaseAccessory($baId));
++    }
+ }
+diff --git a/database/migrations/2026_11_07_020000_create_booking_accessory_units_table.php b/database/migrations/2026_11_07_020000_create_booking_accessory_units_table.php
+new file mode 100644
+index 0000000..a9ec523
+--- /dev/null
++++ b/database/migrations/2026_11_07_020000_create_booking_accessory_units_table.php
+@@ -0,0 +1,35 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++return new class extends Migration
++{
++    /**
++     * Run the migrations.
++     */
++    public function up(): void
++    {
++        Schema::create('booking_accessory_units', function (Blueprint $table) {
++            $table->id('id');
++            // ba_id is booking_accessories' PK — mirrors booking_equipment_units for equipment.
++            $table->integer('ba_id');
++            $table->unsignedBigInteger('accessory_unit_id');
++            $table->timestamp('allocated_at')->useCurrent();
++
++            $table->unique(['ba_id', 'accessory_unit_id']);
++            $table->index('accessory_unit_id');
++            $table->foreign('ba_id')->references('ba_id')->on('booking_accessories')->onDelete('cascade');
++            $table->foreign('accessory_unit_id')->references('unit_id')->on('accessory_units')->onDelete('cascade');
++        });
++    }
++
++    /**
++     * Reverse the migrations.
++     */
++    public function down(): void
++    {
++        Schema::dropIfExists('booking_accessory_units');
++    }
++};
+diff --git a/database/migrations/2026_11_11_000000_add_unit_confirmed_to_booking_items.php b/database/migrations/2026_11_11_000000_add_unit_confirmed_to_booking_items.php
+new file mode 100644
+index 0000000..8656678
+--- /dev/null
++++ b/database/migrations/2026_11_11_000000_add_unit_confirmed_to_booking_items.php
+@@ -0,0 +1,34 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++return new class extends Migration
++{
++    /**
++     * Run the migrations.
++     */
++    public function up(): void
++    {
++        Schema::table('booking_equipment', function (Blueprint $table) {
++            $table->boolean('unit_confirmed')->default(false)->after('notes');
++        });
++        Schema::table('booking_accessories', function (Blueprint $table) {
++            $table->boolean('unit_confirmed')->default(false)->after('notes');
++        });
++    }
++
++    /**
++     * Reverse the migrations.
++     */
++    public function down(): void
++    {
++        Schema::table('booking_equipment', function (Blueprint $table) {
++            $table->dropColumn('unit_confirmed');
++        });
++        Schema::table('booking_accessories', function (Blueprint $table) {
++            $table->dropColumn('unit_confirmed');
++        });
++    }
++};
+diff --git a/database/migrations/2026_11_11_010000_add_unit_to_maintenance_schedules.php b/database/migrations/2026_11_11_010000_add_unit_to_maintenance_schedules.php
+new file mode 100644
+index 0000000..ff60a75
+--- /dev/null
++++ b/database/migrations/2026_11_11_010000_add_unit_to_maintenance_schedules.php
+@@ -0,0 +1,33 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++return new class extends Migration
++{
++    /**
++     * Run the migrations.
++     */
++    public function up(): void
++    {
++        Schema::table('maintenance_schedules', function (Blueprint $table) {
++            // Nullable — maintenance can still be scheduled against the equipment model alone
++            // for gear with no individually-tracked units, same convention incident_reports
++            // already uses for equipment_unit_id.
++            $table->unsignedBigInteger('equipment_unit_id')->nullable()->after('equipment_id');
++            $table->foreign('equipment_unit_id')->references('unit_id')->on('equipment_units')->nullOnDelete();
++        });
++    }
++
++    /**
++     * Reverse the migrations.
++     */
++    public function down(): void
++    {
++        Schema::table('maintenance_schedules', function (Blueprint $table) {
++            $table->dropForeign(['equipment_unit_id']);
++            $table->dropColumn('equipment_unit_id');
++        });
++    }
++};
+diff --git a/resources/views/booking-detail.blade.php b/resources/views/booking-detail.blade.php
+index 9184879..d1f3d7b 100644
+--- a/resources/views/booking-detail.blade.php
++++ b/resources/views/booking-detail.blade.php
+@@ -377,8 +377,13 @@
+ @php
+   $crewCount = $crewLines->count();
+   $equipCount = $equipmentLines->count();
++  $accCount = $accessoryLines->count();
+   $crewOk = $crewCount > 0;
+-  $equipOk = $equipCount > 0;
++  // "Ready" now means every equipment/accessory line has its release unit(s) manually
++  // confirmed on the Cost Estimate tab — not merely that a line exists. A booking with zero
++  // lines at all is never "ready" either (nothing to release isn't the same as release-ready).
++  $equipUnconfirmedCount = $equipmentLines->where('unit_confirmed', 0)->count() + $accessoryLines->where('unit_confirmed', 0)->count();
++  $equipOk = ($equipCount + $accCount) > 0 && $equipUnconfirmedCount === 0;
+   $driverOk = ! $driverNeeded || $driverCount > 0;
+   // The client must have actually approved the cost estimate — staff confirming the CE only
+   // sends it to the client (cost_approval_status becomes 'pending_client'); it does not mean
+@@ -398,7 +403,7 @@
+   $metConds = ($equipOk ? 1 : 0) + ($crewOk ? 1 : 0) + ($costApprovalOk ? 1 : 0) + ($transportOk ? 1 : 0);
+ 
+   $steps = [
+-      ['label' => 'Equipment', 'ok' => $equipOk],
++      ['label' => 'Equipment/Accessories', 'ok' => $equipOk],
+       ['label' => 'Crew', 'ok' => $crewOk],
+       ['label' => 'Transport', 'ok' => $transportOk],
+       ['label' => 'Cost Approval', 'ok' => $costApprovalOk],
+@@ -408,7 +413,13 @@
+   // just an unfinalized fee. The row/banner text says "setup incomplete" rather than singling
+   // out the driver as if that's always the specific thing missing.
+   $rows = [
+-      ['label' => 'Equipment', 'ok' => $equipOk, 'detail' => $equipOk ? "$equipCount item" . ($equipCount != 1 ? 's' : '') . ' added' : 'No equipment added'],
++      // Labeled "Equipment/Accessories" (not just "Equipment") since this step is only ready
++      // once EVERY line of both — accessories included, whenever the booking has any — has its
++      // release unit manually confirmed, not equipment alone.
++      ['label' => 'Equipment/Accessories', 'ok' => $equipOk, 'detail' => $equipOk
++          ? ($equipCount + $accCount) . ' item' . (($equipCount + $accCount) != 1 ? 's' : '') . ' confirmed'
++          : (($equipCount + $accCount) === 0 ? 'No equipment/accessories added' : "$equipUnconfirmedCount item" . ($equipUnconfirmedCount != 1 ? 's' : '') . ' awaiting unit confirmation'),
++      ],
+       ['label' => 'Crew', 'ok' => $crewOk, 'clickable' => true, 'onclick' => 'openAddCrewModal()', 'title' => 'Open Add Crew',
+           'detail' => $crewOk ? "$crewCount member" . ($crewCount != 1 ? 's' : '') . ' assigned' : 'No crew assigned',
+       ],
+@@ -1577,10 +1588,14 @@ class="btn btn-danger btn-sm" style="font-size:.72rem;padding:4px 10px">Reject</
+           <input type="hidden" name="equipment_id" id="selectedEquipId">
+         </div>
+         <div class="form-row">
+-          <div class="form-group"><label>Quantity</label><input type="number" name="quantity" class="form-control" value="1" min="1" required></div>
++          <div class="form-group"><label>Quantity</label><input type="number" name="quantity" id="addEquipQty" class="form-control" value="1" min="1" required oninput="renderAddEquipUnitSlots()"></div>
+           <div class="form-group"><label>Days</label><input type="number" name="days" class="form-control" value="1" min="1" required></div>
+           <div class="form-group"><label>Daily Rate (₱)</label><input type="number" name="daily_rate" id="equipRate" class="form-control" step="0.01" min="0" required></div>
+         </div>
++        <div class="form-group">
++          <label>Release Unit(s) <span style="font-weight:400;color:var(--muted)">(optional — can also confirm later on the Cost Estimate tab)</span></label>
++          <div id="addEquipUnitsWrap"></div>
++        </div>
+         <div class="form-group"><label>Notes</label><input type="text" name="notes" class="form-control" placeholder="e.g. with tripod, no battery"></div>
+       </div>
+       <div class="modal-footer">
+@@ -3140,6 +3155,30 @@ function prepareReject() {
+ // ── Searchable equipment/crew lists ──────────────────────────────────────────
+ const equipData = {!! $availEquip->values()->toJson() !!};
+ const crewData  = {!! $availCrew->values()->toJson() !!};
++// Available (unallocated) physical units per equipment model — powers the Add Equipment
++// modal's optional Release Unit picker, so staff can pin a specific unit down right at
++// add-time instead of only confirming it later on the Cost Estimate tab.
++const EQUIP_AVAIL_UNITS = {!! $availUnitsByEquipId->map(fn ($g) => $g->map(fn ($u) => ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag])->values())->toJson() !!};
++
++function renderAddEquipUnitSlots() {
++  const wrap = document.getElementById('addEquipUnitsWrap');
++  if (!wrap) return;
++  const eid = document.getElementById('selectedEquipId').value;
++  const qty = Math.max(1, parseInt(document.getElementById('addEquipQty').value) || 1);
++  const units = EQUIP_AVAIL_UNITS[eid] || [];
++  if (!eid || !units.length) {
++    wrap.innerHTML = '<div style="font-size:11.5px;color:var(--muted)">' + (eid ? 'No individually-tracked units available for this item.' : 'Select equipment first.') + '</div>';
++    return;
++  }
++  let html = '';
++  for (let i = 0; i < qty; i++) {
++    html += '<select name="unit_ids[]" class="form-control" style="margin-bottom:6px">'
++      + '<option value="">— pick unit (optional) —</option>'
++      + units.map(u => '<option value="' + u.unit_id + '">' + _escH(u.asset_tag) + '</option>').join('')
++      + '</select>';
++  }
++  wrap.innerHTML = html;
++}
+ 
+ function _escH(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+ 
+@@ -3168,12 +3207,15 @@ function selectEquip(el) {
+   document.getElementById('equipSearch').value = el.querySelector('.si-name').textContent;
+   document.querySelectorAll('#equipList .srch-item').forEach(i => i.classList.remove('sel'));
+   el.classList.add('sel');
++  renderAddEquipUnitSlots();
+ }
+ function openAddEquipModal() {
+   document.getElementById('equipSearch').value = '';
+   document.getElementById('selectedEquipId').value = '';
+   document.getElementById('equipRate').value = '';
++  document.getElementById('addEquipQty').value = '1';
+   renderEquipList(equipData);
++  renderAddEquipUnitSlots();
+   openModal('modalAddEquip');
+ }
+ 
+diff --git a/resources/views/ce-preview.blade.php b/resources/views/ce-preview.blade.php
+index 342b46e..96fa349 100644
+--- a/resources/views/ce-preview.blade.php
++++ b/resources/views/ce-preview.blade.php
+@@ -1049,17 +1049,38 @@
+         @if ($canManage)<button type="button" class="addline-btn" onclick="ceOpenAddEquip()"><i data-feather="plus" style="width:12px;height:12px"></i> Add Equipment</button>@endif
+       </div>
+       <div class="ecard-body">
++        @if ($canManage)<form method="POST" action="{{ $actionUrl }}" id="formConfirmEquipUnits">@csrf
++        <input type="hidden" name="action" value="confirm_equipment_units">
++        <input type="hidden" name="return_to" value="ce_preview"><input type="hidden" name="return_ce_id" value="{{ $ceId }}"><input type="hidden" name="return_view" value="{{ $isClientView ? 'client' : 'internal' }}">
++        @endif
+         <div style="overflow-x:auto">
+         <table class="etbl">
+-          <thead><tr><th style="width:44px">Qty</th><th>Item</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
++          <thead><tr><th style="width:44px">Qty</th><th>Item</th><th style="width:230px">Release Unit</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
+           <tbody>
+           @php $anyEquip = false; @endphp
+           @foreach ($equipGroups as $catLines)
+           @foreach ($catLines as $eq)
+-          @php $anyEquip = true; $rowAmt = (float) $eq->quantity * (float) $eq->daily_rate; @endphp
++          @php
++            $anyEquip = true;
++            $rowAmt = (float) $eq->quantity * (float) $eq->daily_rate;
++            $eqOpts = $equipUnitOptions[$eq->bk_equip_id] ?? collect();
++            $eqAllocatedHere = array_values($allocatedEqUnitIds[$eq->bk_equip_id] ?? []);
++          @endphp
+           <tr>
+             <td>{{ $eq->quantity }}</td>
+             <td>{{ $eq->equipment_name }}{{ $eq->brand ? ' ('.$eq->brand.')' : '' }}</td>
++            <td>
++              @include('partials.ce-unit-picker', [
++                'confirmed' => (bool) $eq->unit_confirmed,
++                'tags' => $equipUnitTags->get($eq->bk_equip_id),
++                'opts' => $eqOpts,
++                'allocatedHere' => $eqAllocatedHere,
++                'quantity' => (int) $eq->quantity,
++                'rowKey' => 'eq' . $eq->bk_equip_id,
++                'lineField' => 'bk_equip_id',
++                'idValue' => $eq->bk_equip_id,
++              ])
++            </td>
+             <td class="r">{{ $eq->days }}</td>
+             <td class="r amt">₱{{ number_format($eq->daily_rate, 2) }}</td>
+             <td class="r amt">₱{{ number_format($rowAmt, 2) }}</td>
+@@ -1067,11 +1088,69 @@
+           @endforeach
+           @endforeach
+           @if (! $anyEquip)
+-          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px;font-style:italic">No equipment items</td></tr>
++          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px;font-style:italic">No equipment items</td></tr>
+           @endif
+           </tbody>
+         </table>
+         </div>
++        @if ($canManage && $anyEquip)
++        <div style="padding:10px 0 0;text-align:right">
++          <button type="submit" class="addline-btn" style="margin-left:auto"><i data-feather="check" style="width:12px;height:12px"></i> Confirm All Units</button>
++        </div>
++        @endif
++        @if ($canManage)</form>@endif
++      </div>
++    </div>
++
++    <div class="ecard">
++      <div class="ecard-head"><h3><i data-feather="package" style="width:14px;height:14px"></i> Accessories &amp; Add-ons</h3>
++        @if ($canManage)<button type="button" class="addline-btn" onclick="ceOpenAddAcc()"><i data-feather="plus" style="width:12px;height:12px"></i> Add Accessories</button>@endif
++      </div>
++      <div class="ecard-body">
++        @if ($canManage)<form method="POST" action="{{ $actionUrl }}" id="formConfirmAccUnits">@csrf
++        <input type="hidden" name="action" value="confirm_accessory_units">
++        <input type="hidden" name="return_to" value="ce_preview"><input type="hidden" name="return_ce_id" value="{{ $ceId }}"><input type="hidden" name="return_view" value="{{ $isClientView ? 'client' : 'internal' }}">
++        @endif
++        <div style="overflow-x:auto">
++        <table class="etbl">
++          <thead><tr><th style="width:44px">Qty</th><th>Item</th><th style="width:230px">Release Unit</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
++          <tbody>
++          @forelse ($accLines as $ac)
++          @php
++            $acOpts = $accUnitOptions[$ac->ba_id] ?? collect();
++            $acAllocatedHere = array_values($allocatedAccUnitIds[$ac->ba_id] ?? []);
++          @endphp
++          <tr>
++            <td>{{ $ac->quantity }}</td>
++            <td>{{ $ac->accessory_name }}{{ $ac->is_included ? ' (Included)' : '' }}</td>
++            <td>
++              @include('partials.ce-unit-picker', [
++                'confirmed' => (bool) $ac->unit_confirmed,
++                'tags' => $accUnitTags->get($ac->ba_id),
++                'opts' => $acOpts,
++                'allocatedHere' => $acAllocatedHere,
++                'quantity' => (int) $ac->quantity,
++                'rowKey' => 'ac' . $ac->ba_id,
++                'lineField' => 'ba_id',
++                'idValue' => $ac->ba_id,
++              ])
++            </td>
++            <td class="r">{{ $ac->days }}</td>
++            <td class="r amt">₱{{ number_format($ac->daily_rate, 2) }}</td>
++            <td class="r amt">₱{{ number_format($ac->subtotal, 2) }}</td>
++          </tr>
++          @empty
++          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px;font-style:italic">No accessories added</td></tr>
++          @endforelse
++          </tbody>
++        </table>
++        </div>
++        @if ($canManage && $accLines->isNotEmpty())
++        <div style="padding:10px 0 0;text-align:right">
++          <button type="submit" class="addline-btn" style="margin-left:auto"><i data-feather="check" style="width:12px;height:12px"></i> Confirm All Units</button>
++        </div>
++        @endif
++        @if ($canManage)</form>@endif
+       </div>
+     </div>
+ 
+@@ -1121,32 +1200,6 @@
+       </div>
+     </div>
+ 
+-    <div class="ecard">
+-      <div class="ecard-head"><h3><i data-feather="package" style="width:14px;height:14px"></i> Accessories &amp; Add-ons</h3>
+-        @if ($canManage)<button type="button" class="addline-btn" onclick="openDocMo('moAddAcc')"><i data-feather="plus" style="width:12px;height:12px"></i> Add Accessories</button>@endif
+-      </div>
+-      <div class="ecard-body">
+-        <div style="overflow-x:auto">
+-        <table class="etbl">
+-          <thead><tr><th style="width:44px">Qty</th><th>Item</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
+-          <tbody>
+-          @forelse ($accLines as $ac)
+-          <tr>
+-            <td>{{ $ac->quantity }}</td>
+-            <td>{{ $ac->accessory_name }}{{ $ac->is_included ? ' (Included)' : '' }}</td>
+-            <td class="r">{{ $ac->days }}</td>
+-            <td class="r amt">₱{{ number_format($ac->daily_rate, 2) }}</td>
+-            <td class="r amt">₱{{ number_format($ac->subtotal, 2) }}</td>
+-          </tr>
+-          @empty
+-          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px;font-style:italic">No accessories added</td></tr>
+-          @endforelse
+-          </tbody>
+-        </table>
+-        </div>
+-      </div>
+-    </div>
+-
+     <div class="ecard">
+       <div class="ecard-head"><h3><i data-feather="truck" style="width:14px;height:14px"></i> Transportation</h3>
+         @if ($canManage)<button type="button" class="addline-btn" onclick="ceOpenTransport()"><i data-feather="edit-2" style="width:12px;height:12px"></i> {{ $transCost > 0 ? 'Edit' : 'Add' }} Transport</button>@endif
+@@ -1291,10 +1344,14 @@
+         <div id="ceEquipList" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1.5px solid #e2e8f0;border-radius:6px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(15,23,42,.12)"></div>
+       </div>
+       <div style="display:flex;gap:8px">
+-        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Qty</label><input type="number" name="quantity" value="1" min="1" required style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
++        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Qty</label><input type="number" name="quantity" id="ceEquipQty" value="1" min="1" required oninput="ceRenderAddEquipUnitSlots()" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+         <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Days</label><input type="number" name="days" value="1" min="1" required style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+         <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Rate/Day</label><input type="number" name="daily_rate" id="ceEquipRate" step="0.01" min="0" required style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+       </div>
++      <div>
++        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Release Unit(s) <span style="font-weight:400;text-transform:none">(optional)</span></label>
++        <div id="ceAddEquipUnitsWrap"></div>
++      </div>
+       <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Notes</label><input type="text" name="notes" placeholder="Optional" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+     </div>
+     <div class="doc-foot"><button type="button" class="tbtn" style="background:#f1f5f9;color:#334155" onclick="closeDocMo('moAddEquip')">Cancel</button><button type="submit" class="doc-accept-btn">Add Line</button></div>
+@@ -1345,21 +1402,21 @@
+     <input type="hidden" name="action" value="add_booking_accessory">
+     <input type="hidden" name="return_to" value="ce_preview"><input type="hidden" name="return_ce_id" value="{{ $ceId }}"><input type="hidden" name="return_view" value="{{ $isClientView ? 'client' : 'internal' }}">
+     <div class="doc-body" style="display:flex;flex-direction:column;gap:10px">
+-      <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Accessory *</label>
+-        <select name="accessory_id" required style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px">
+-          <option value="">— Select accessory —</option>
+-          @foreach ($allAccessoriesList as $acc)
+-          @php $avail = max(0, (int) $acc->quantity - (int) $acc->qty_in_use); @endphp
+-          <option value="{{ $acc->accessory_id }}" {{ $avail < 1 ? 'disabled' : '' }}>
+-            {{ $acc->accessory_name }} {{ $acc->is_included ? '(Included)' : '(₱'.number_format($acc->daily_rate,2).'/day)' }} {{ $avail < 1 ? '— Out of stock' : "— $avail avail." }}
+-          </option>
+-          @endforeach
+-        </select>
++      <input type="hidden" name="accessory_id" id="ceAccId">
++      <div style="position:relative">
++        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Accessory *</label>
++        <input type="text" id="ceAccSearch" autocomplete="off" oninput="ceFilterAcc(this.value)" placeholder="Search by name…"
++               style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px">
++        <div id="ceAccList" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1.5px solid #e2e8f0;border-radius:6px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(15,23,42,.12)"></div>
+       </div>
+       <div style="display:flex;gap:8px">
+-        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Qty</label><input type="number" name="quantity" value="1" min="1" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
++        <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Qty</label><input type="number" name="quantity" id="ceAccQty" value="1" min="1" oninput="ceRenderAddAccUnitSlots()" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+         <div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Days</label><input type="number" name="days" value="{{ $accDays }}" min="1" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+       </div>
++      <div>
++        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Release Unit(s) <span style="font-weight:400;text-transform:none">(optional)</span></label>
++        <div id="ceAddAccUnitsWrap"></div>
++      </div>
+       <div><label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase">Notes</label><input type="text" name="notes" placeholder="Optional" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px"></div>
+     </div>
+     <div class="doc-foot"><button type="button" class="tbtn" style="background:#f1f5f9;color:#334155" onclick="closeDocMo('moAddAcc')">Cancel</button><button type="submit" class="doc-accept-btn">Add</button></div>
+@@ -1650,7 +1707,93 @@ function ceSelectEquip(i) {
+     document.getElementById('ceEquipRate').value = i.daily_rate;
+     document.getElementById('ceEquipSearch').value = i.equipment_name + (i.brand ? ' (' + i.brand + ')' : '');
+     document.getElementById('ceEquipList').style.display = 'none';
++    ceRenderAddEquipUnitSlots();
++}
++// Available (unallocated) physical units per equipment model — standalone-page equivalent of
++// booking-detail.blade.php's EQUIP_AVAIL_UNITS, for this page's own Add Equipment modal.
++const CE_AVAIL_UNITS = {!! $availUnitsByEquipId->map(fn ($g) => $g->map(fn ($u) => ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag])->values())->toJson() !!};
++function ceRenderAddEquipUnitSlots() {
++    const wrap = document.getElementById('ceAddEquipUnitsWrap');
++    if (!wrap) return;
++    const eid = document.getElementById('ceEquipId').value;
++    const qty = Math.max(1, parseInt(document.getElementById('ceEquipQty').value) || 1);
++    const units = CE_AVAIL_UNITS[eid] || [];
++    if (!eid || !units.length) {
++        wrap.innerHTML = '<div style="font-size:11px;color:var(--muted)">' + (eid ? 'No individually-tracked units available for this item.' : 'Select equipment first.') + '</div>';
++        return;
++    }
++    let html = '';
++    for (let i = 0; i < qty; i++) {
++        html += '<select name="unit_ids[]" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px;margin-bottom:6px">'
++            + '<option value="">— pick unit (optional) —</option>'
++            + units.map(u => '<option value="' + u.unit_id + '">' + u.asset_tag + '</option>').join('')
++            + '</select>';
++    }
++    wrap.innerHTML = html;
++}
++
++// ── Accessory search-select (Add Accessories modal) — same pattern as equipment above ──────
++const ceAccData = {!! $allAccessoriesList->map(fn ($a) => [
++    'accessory_id' => $a->accessory_id, 'accessory_name' => $a->accessory_name,
++    'daily_rate' => $a->daily_rate, 'is_included' => $a->is_included,
++    'avail' => max(0, (int) $a->quantity - (int) $a->qty_in_use),
++])->values()->toJson() !!};
++function ceRenderAccList(items) {
++    const box = document.getElementById('ceAccList');
++    box.innerHTML = '';
++    if (! items.length) { box.style.display = 'none'; return; }
++    items.slice(0, 30).forEach(i => {
++        const row = document.createElement('div');
++        const oos = i.avail < 1;
++        row.style.cssText = 'padding:8px 12px;cursor:' + (oos ? 'not-allowed' : 'pointer') + ';font-size:12.5px;border-bottom:1px solid #f1f5f9' + (oos ? ';color:#94a3b8' : '');
++        if (!oos) {
++            row.addEventListener('mousedown', () => ceSelectAcc(i));
++            row.addEventListener('mouseover', () => row.style.background = '#f0f7ff');
++            row.addEventListener('mouseout', () => row.style.background = '');
++        }
++        row.textContent = i.accessory_name + ' ' + (i.is_included ? '(Included)' : '(₱' + Number(i.daily_rate).toLocaleString('en-PH', {minimumFractionDigits:2}) + '/day)') + (oos ? ' — Out of stock' : ' — ' + i.avail + ' avail.');
++        box.appendChild(row);
++    });
++    box.style.display = 'block';
+ }
++function ceFilterAcc(q) {
++    const lq = q.toLowerCase();
++    ceRenderAccList(ceAccData.filter(i => i.accessory_name.toLowerCase().includes(lq)));
++}
++function ceSelectAcc(i) {
++    document.getElementById('ceAccId').value = i.accessory_id;
++    document.getElementById('ceAccSearch').value = i.accessory_name;
++    document.getElementById('ceAccList').style.display = 'none';
++    ceRenderAddAccUnitSlots();
++}
++const CE_AVAIL_ACC_UNITS = {!! $availAccessoryUnitsByAccId->map(fn ($g) => $g->map(fn ($u) => ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag])->values())->toJson() !!};
++function ceRenderAddAccUnitSlots() {
++    const wrap = document.getElementById('ceAddAccUnitsWrap');
++    if (!wrap) return;
++    const aid = document.getElementById('ceAccId').value;
++    const qty = Math.max(1, parseInt(document.getElementById('ceAccQty').value) || 1);
++    const units = CE_AVAIL_ACC_UNITS[aid] || [];
++    if (!aid || !units.length) {
++        wrap.innerHTML = '<div style="font-size:11px;color:var(--muted)">' + (aid ? 'No individually-tracked units available for this item.' : 'Select an accessory first.') + '</div>';
++        return;
++    }
++    let html = '';
++    for (let i = 0; i < qty; i++) {
++        html += '<select name="unit_ids[]" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:13px;margin-bottom:6px">'
++            + '<option value="">— pick unit (optional) —</option>'
++            + units.map(u => '<option value="' + u.unit_id + '">' + u.asset_tag + '</option>').join('')
++            + '</select>';
++    }
++    wrap.innerHTML = html;
++}
++function ceOpenAddAcc() {
++    document.getElementById('ceAccSearch').value = '';
++    document.getElementById('ceAccId').value = '';
++    document.getElementById('ceAccQty').value = '1';
++    ceRenderAddAccUnitSlots();
++    openDocMo('moAddAcc');
++}
++
+ // When this page is embedded (the Booking Detail "Cost Estimate" tab), Add Equipment /
+ // Add Crew / Assign Transport delegate back to Booking Detail's own modals via postMessage
+ // instead of opening a second, separately-styled copy of the same form — one real
+@@ -1660,11 +1803,21 @@ function ceInIframe() {
+     try { return window.self !== window.top; } catch (e) { return true; }
+ }
+ 
++@if ($justActed ?? false)
++// A form on this page (Confirm All Units, Add Equipment, etc.) was just submitted and redirected
++// back here. When embedded as the parent's Cost Estimate iframe, the parent's own Release
++// Readiness widget was rendered once, server-side, before this change — it has no other way to
++// find out. Reload the parent so it recomputes with current data instead of showing stale counts.
++if (ceInIframe()) { window.top.location.reload(); }
++@endif
++
+ function ceOpenAddEquip() {
+     if (ceInIframe()) { window.parent.postMessage({source: 'ce-editor', action: 'openAddEquip'}, '*'); return; }
+     document.getElementById('ceEquipSearch').value = '';
+     document.getElementById('ceEquipId').value = '';
+     document.getElementById('ceEquipRate').value = '';
++    document.getElementById('ceEquipQty').value = '1';
++    ceRenderAddEquipUnitSlots();
+     openDocMo('moAddEquip');
+ }
+ 
+diff --git a/resources/views/checklist.blade.php b/resources/views/checklist.blade.php
+index 6fc303b..44aec99 100644
+--- a/resources/views/checklist.blade.php
++++ b/resources/views/checklist.blade.php
+@@ -189,6 +189,7 @@
+         <tr>
+           @if ($canManage)<th style="width:40px">#</th>@endif
+           <th>Equipment</th>
++          <th>Unit</th>
+           <th>Category</th>
+           <th>Qty</th>
+           @if ($dir === 'out')
+@@ -249,6 +250,15 @@ class="checklist-cb" style="width:18px;height:18px;accent-color:var(--accent);cu
+             <input type="hidden" name="items[{{ $lineKey }}][quantity_expected]" value="{{ $eq->quantity }}">
+             @endif
+           </td>
++          <td style="font-family:var(--font-mono);font-size:.82rem">
++            @if ($eq->is_multi)
++            <span style="color:var(--muted)">see units below</span>
++            @elseif ($eq->unit_tag)
++            <span class="badge badge-gray">{{ $eq->unit_tag }}</span>
++            @else
++            <span style="color:var(--muted)">—</span>
++            @endif
++          </td>
+           <td><span class="badge badge-blue">{{ $eq->category_name }}</span></td>
+           <td style="font-weight:600;font-family:var(--font-mono)">
+             @if ($eq->is_multi)
+@@ -384,6 +394,7 @@ class="checklist-cb" style="width:18px;height:18px;accent-color:var(--accent);cu
+           <td>—</td>
+           <td>—</td>
+           <td>—</td>
++          <td>—</td>
+           <td>
+             <select name="items[{{ $slotBase }}][condition_{{ $dir }}]"
+                     @if (! $isOut) onchange="highlightDamaged(this)" @endif
+diff --git a/resources/views/client-booking-detail.blade.php b/resources/views/client-booking-detail.blade.php
+index 40e65a5..9fdfa31 100644
+--- a/resources/views/client-booking-detail.blade.php
++++ b/resources/views/client-booking-detail.blade.php
+@@ -967,6 +967,7 @@ function setRating(val) {
+ 
+ </div><!-- /container -->
+ 
++@if (false) {{-- temporarily hidden: support chat still buggy (matches home.blade.php) --}}
+ <!-- Support chat — this booking's own thread, same component as the general one on Home -->
+ <button class="sup-fab" onclick="toggleSupportChat()" aria-label="Message FilmSpec about this booking">
+   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
+@@ -1098,6 +1099,7 @@ function setRating(val) {
+   </form>
+   @endforeach
+ </div>
++@endif
+ <script>
+ var CHAT_DEPT_LABELS = {!! json_encode($chatDepartments) !!};
+ 
+diff --git a/resources/views/crew-portal.blade.php b/resources/views/crew-portal.blade.php
+index d3250bb..0e83ddd 100644
+--- a/resources/views/crew-portal.blade.php
++++ b/resources/views/crew-portal.blade.php
+@@ -723,6 +723,9 @@
+             <span style="flex:1">
+               <span class="it-title" style="margin-top:0">{{ $it->item_name }}{{ $it->item_type === 'accessory' ? ' (Accessory)' : '' }}</span>
+               <span class="it-meta">{{ trim($it->brand.' '.$it->model) ?: '—' }}</span>
++              @if ($it->unit_tags)
++              <span class="it-meta" style="font-family:var(--font-m)">Unit: {{ $it->unit_tags }}</span>
++              @endif
+             </span>
+           </label>
+           <span class="it-side">
+@@ -769,6 +772,9 @@
+             <span style="flex:1">
+               <span class="it-title" style="margin-top:0">{{ $it->item_name }}{{ $it->item_type === 'accessory' ? ' (Accessory)' : '' }}</span>
+               <span class="it-meta">{{ trim($it->brand.' '.$it->model) ?: '—' }}</span>
++              @if ($it->unit_tags)
++              <span class="it-meta" style="font-family:var(--font-m)">Unit: {{ $it->unit_tags }}</span>
++              @endif
+             </span>
+             <span class="it-side" style="font-family:var(--font-m);font-size:11.5px;color:var(--muted)">Qty {{ $it->quantity }}</span>
+           </label>
+@@ -1143,6 +1149,7 @@
+             <select name="equipment_unit" id="crewIR_unit" disabled>
+               <option value="">— Select equipment first —</option>
+             </select>
++            <div id="crewIR_unitReadonly" style="display:none;font-weight:700;font-size:13px;padding:10px 12px;background:var(--s2);border-radius:8px"></div>
+             <div id="crewIR_unitHint" style="font-size:11px;color:var(--muted);margin-top:4px">Pick the specific one if it's tagged — otherwise use "Not sure which unit."</div>
+           </div>
+         </div>
+@@ -1154,12 +1161,13 @@
+               <option value="">— Select a booking first —</option>
+             </select>
+           </div>
+-          <div class="fg">
++          <div class="fg" id="crewIR_accunitWrap">
+             <label>Unit</label>
+             <select name="accessory_unit" id="crewIR_accunit" disabled>
+               <option value="">— Select accessory first —</option>
+             </select>
+-            <div style="font-size:11px;color:var(--muted);margin-top:4px">Pick the specific one if it's tagged — otherwise use "Not sure which unit."</div>
++            <div id="crewIR_accunitReadonly" style="display:none;font-weight:700;font-size:13px;padding:10px 12px;background:var(--s2);border-radius:8px"></div>
++            <div id="crewIR_accunitHint" style="font-size:11px;color:var(--muted);margin-top:4px">Pick the specific one if it's tagged — otherwise use "Not sure which unit."</div>
+           </div>
+         </div>
+         <div style="display:flex;gap:10px">
+@@ -1349,6 +1357,10 @@
+ const BOOKING_ACC_IR = {!! json_encode($bookingAccMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
+ const ACCESSORY_UNITS = {!! json_encode($accessoryUnitMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
+ 
++// Which unit was actually allocated to THIS booking's accessory — same idea as
++// BOOKING_EQUIPMENT_UNITS, sourced from booking_accessory_units.
++const BOOKING_ACCESSORY_UNITS = {!! json_encode($bookingAccessoryUnitMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
++
+ // Field-request pickers — the OPPOSITE list from BOOKING_EQUIP above: equipment/accessories
+ // NOT yet on the booking (available to request), keyed by booking_id, same shape ClientBookingDetailController
+ // builds server-side for the client's own request form.
+@@ -1417,6 +1429,7 @@ function filterEquipmentByBooking(bookingId) {
+ function filterUnitsByEquipment(equipmentId) {
+   const sel = document.getElementById('crewIR_unit');
+   const wrap = document.getElementById('crewIR_unitWrap');
++  const readonly = document.getElementById('crewIR_unitReadonly');
+   // Which unit(s) are actually on THIS booking for this equipment — from booking-time
+   // allocation first, falling back to the Checklist, falling back to "every unit of this
+   // model" (BOOKING_EQUIPMENT_UNITS already carries that tiered result server-side).
+@@ -1427,6 +1440,8 @@ function filterUnitsByEquipment(equipmentId) {
+   if (!equipmentId || !units.length) {
+     sel.innerHTML = '<option value="">Not sure which unit</option>';
+     sel.disabled = false;
++    sel.style.display = '';
++    if (readonly) readonly.style.display = 'none';
+     if (wrap) wrap.style.display = '';
+     return;
+   }
+@@ -1435,10 +1450,21 @@ function filterUnitsByEquipment(equipmentId) {
+     + '<option value="">Not sure which unit</option>';
+   sel.disabled = false;
+ 
+-  // Only one unit is actually on this booking for this equipment — nothing to ask, so just
+-  // carry that single value silently and hide the field instead of making crew pick from a
+-  // list of one. Only show the picker when there's genuine ambiguity (2+ units booked).
+-  if (wrap) wrap.style.display = (autoFilled && bookedUnits.length === 1) ? 'none' : '';
++  // The field itself always stays visible — crew need to SEE which physical unit is involved
++  // even when there's only one candidate. Only a genuine ambiguity (2+ units actually booked)
++  // gets the dropdown; a single booked unit shows as plain read-only text instead, since
++  // there's nothing to actually choose.
++  if (wrap) wrap.style.display = '';
++  const showPicker = !(autoFilled && bookedUnits.length === 1);
++  sel.style.display = showPicker ? '' : 'none';
++  if (readonly) {
++    if (! showPicker) {
++      readonly.textContent = units[0].asset_tag;
++      readonly.style.display = 'block';
++    } else {
++      readonly.style.display = 'none';
++    }
++  }
+ 
+   const hint = document.getElementById('crewIR_unitHint');
+   if (hint) hint.textContent = autoFilled
+@@ -1463,15 +1489,43 @@ function filterAccessoryByBooking(bookingId) {
+ 
+ function filterUnitsByAccessory(accessoryId) {
+   const sel = document.getElementById('crewIR_accunit');
+-  const units = ACCESSORY_UNITS[accessoryId] || [];
++  const wrap = document.getElementById('crewIR_accunitWrap');
++  const readonly = document.getElementById('crewIR_accunitReadonly');
++  const bookedUnits = BOOKING_ACCESSORY_UNITS[crewIR_currentBookingId + '_' + accessoryId] || [];
++  const units = bookedUnits.length ? bookedUnits : (ACCESSORY_UNITS[accessoryId] || []);
++  const autoFilled = bookedUnits.length > 0;
++
+   if (!accessoryId || !units.length) {
+     sel.innerHTML = '<option value="">Not sure which unit</option>';
+     sel.disabled = false;
++    sel.style.display = '';
++    if (readonly) readonly.style.display = 'none';
++    if (wrap) wrap.style.display = '';
+     return;
+   }
+-  sel.innerHTML = units.map(u => `<option value="u${u.unit_id}">${escCrew(u.asset_tag)}</option>`).join('')
++
++  sel.innerHTML = units.map((u, i) => `<option value="u${u.unit_id}"${autoFilled && i === 0 ? ' selected' : ''}>${escCrew(u.asset_tag)}</option>`).join('')
+     + '<option value="">Not sure which unit</option>';
+   sel.disabled = false;
++
++  // Field always stays visible — see the equipment Unit field's comment above. Only a real
++  // ambiguity (2+ units booked) gets the dropdown; one booked unit shows as read-only text.
++  if (wrap) wrap.style.display = '';
++  const showPicker = !(autoFilled && bookedUnits.length === 1);
++  sel.style.display = showPicker ? '' : 'none';
++  if (readonly) {
++    if (! showPicker) {
++      readonly.textContent = units[0].asset_tag;
++      readonly.style.display = 'block';
++    } else {
++      readonly.style.display = 'none';
++    }
++  }
++
++  const hint = document.getElementById('crewIR_accunitHint');
++  if (hint) hint.textContent = autoFilled
++    ? 'Auto-filled from this booking\'s allocated unit — change it if that\'s not the unit you had.'
++    : 'Pick the specific one if it\'s tagged — otherwise use "Not sure which unit."';
+ }
+ 
+ function crewIRSwitch(type, btn) {
+diff --git a/resources/views/incidents.blade.php b/resources/views/incidents.blade.php
+index ebae283..4ab1cd3 100644
+--- a/resources/views/incidents.blade.php
++++ b/resources/views/incidents.blade.php
+@@ -220,6 +220,9 @@ class="btn btn-sm {{ $p === $page ? 'btn-primary' : 'btn-outline' }}">{{ $p }}</
+           <td>
+             <div style="font-weight:600">{{ $mt->equipment_name }}</div>
+             <div style="font-size:.75rem;color:var(--muted)">{{ $mt->brand }}{{ $mt->equip_serial ? ' · '.$mt->equip_serial : '' }}</div>
++            @if ($mt->unit_asset_tag)
++            <div style="font-size:.72rem;font-family:monospace;color:var(--accent);margin-top:2px">Unit: {{ $mt->unit_asset_tag }}</div>
++            @endif
+           </td>
+           <td><span class="badge {{ $maintTypeBadge[$mt->maintenance_type] ?? 'badge-gray' }}">{{ $maintTypeLabel[$mt->maintenance_type] ?? $mt->maintenance_type }}</span></td>
+           <td style="font-size:.85rem;white-space:nowrap;font-family:monospace">
+@@ -278,6 +281,14 @@ class="btn btn-sm btn-outline" title="Update Status"><i data-feather="edit-2"></
+             <div class="crew-slot-drop" id="nm_equipDrop"></div>
+           </div>
+         </div>
++        <div class="form-group" id="nm_unitWrap" style="display:none">
++          <label>Unit</label>
++          <select name="equipment_unit" id="nm_unit" class="form-control">
++            <option value="">Not sure which unit</option>
++          </select>
++          <div id="nm_unitReadonly" class="form-control" style="display:none;background:var(--s2);color:var(--text);font-weight:600"></div>
++          <div style="font-size:.75rem;color:var(--muted);margin-top:4px">Which specific unit needs maintenance — only a dropdown when this equipment has more than one registered unit.</div>
++        </div>
+         <div class="form-row">
+           <div class="form-group">
+             <label>Maintenance Type *</label>
+@@ -411,7 +422,8 @@ class="btn btn-sm btn-outline" title="Update Status"><i data-feather="edit-2"></
+             <select name="equipment_unit" id="newIR_unit" class="form-control" disabled>
+               <option value="">Not sure which unit</option>
+             </select>
+-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Auto-filled when exactly one unit is allocated to this booking — only shown here when there are two or more to choose from.</div>
++            <div id="newIR_unitReadonly" class="form-control" style="display:none;background:var(--s2);color:var(--text);font-weight:600"></div>
++            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">The specific unit checked out for this booking — only a dropdown when there's more than one to choose from.</div>
+           </div>
+         </div>
+ 
+@@ -551,7 +563,8 @@ class="btn btn-sm btn-outline" title="Update Status"><i data-feather="edit-2"></
+             <select name="equipment_unit" id="editIR_unit" class="form-control" disabled style="display:none">
+               <option value="">Not sure which unit</option>
+             </select>
+-            <div id="editIR_unitHint" style="font-size:11px;color:var(--text-muted);margin-top:4px;display:none">Auto-filled when exactly one unit is allocated to this booking — only shown here when there are two or more to choose from.</div>
++            <div id="editIR_unitReadonly" class="form-control" style="display:none;background:var(--s2);color:var(--text);font-weight:600"></div>
++            <div id="editIR_unitHint" style="font-size:11px;color:var(--text-muted);margin-top:4px;display:none">The specific unit checked out for this booking — only a dropdown when there's more than one to choose from.</div>
+           </div>
+         </div>
+ 
+@@ -752,6 +765,7 @@ function populateIRUnitSelect(equipmentId, selectId, preselect, bookingId) {
+   if (!sel) return;
+   const wrap = document.getElementById(selectId + 'Wrap'); // e.g. newIR_unitWrap (edit modal has none)
+   const hint = document.getElementById(selectId.replace('_unit', '_unitHint'));
++  const readonly = document.getElementById(selectId.replace('_unit', '_unitReadonly'));
+   const bookedUnits = (bookingId && BOOKING_EQUIPMENT_UNITS[bookingId + '_' + equipmentId]) || [];
+   const units = bookedUnits.length ? bookedUnits : (EQUIPMENT_UNITS[equipmentId] || []);
+ 
+@@ -759,6 +773,7 @@ function populateIRUnitSelect(equipmentId, selectId, preselect, bookingId) {
+     sel.innerHTML = '<option value="">Not sure which unit</option>';
+     sel.disabled = true;
+     sel.style.display = 'none';
++    if (readonly) readonly.style.display = 'none';
+     if (wrap) wrap.style.display = 'none';
+     if (hint) hint.style.display = 'none';
+     return;
+@@ -768,17 +783,28 @@ function populateIRUnitSelect(equipmentId, selectId, preselect, bookingId) {
+     + '<option value="">Not sure which unit</option>';
+   // An explicit preselect (editing an incident that already has a unit saved) always wins;
+   // otherwise auto-fill from the booking-allocated unit when there's exactly one candidate.
+-  sel.value = preselect ? 'u' + preselect : (!preselect && bookedUnits.length === 1 ? 'u' + bookedUnits[0].unit_id : '');
++  const effectiveUnitId = preselect || (!preselect && bookedUnits.length === 1 ? bookedUnits[0].unit_id : null);
++  sel.value = effectiveUnitId ? 'u' + effectiveUnitId : '';
+   sel.disabled = false;
+ 
+-  // Only ask when there's genuine ambiguity — 2+ units actually booked for this equipment.
+-  // A single booked unit is carried silently via the preselected value above instead of making
+-  // staff pick from a list of one; the fallback (no booking-allocation data at all, bookedUnits
+-  // empty) still shows the full list since we genuinely don't know which one it is.
++  // Always show the wrap itself — staff filing/reviewing a report need to see which physical
++  // unit is involved even when there's only one candidate and nothing to actually choose. Only
++  // the control WITHIN it differs: a dropdown when there's genuine ambiguity (2+ units actually
++  // booked, or the fallback full-catalog list when we don't know which one at all), otherwise a
++  // plain read-only tag for the one unit that's already decided.
++  if (wrap) wrap.style.display = '';
+   const showPicker = bookedUnits.length === 0 || bookedUnits.length >= 2;
+   sel.style.display = showPicker ? '' : 'none';
+-  if (wrap) wrap.style.display = showPicker ? '' : 'none';
+   if (hint) hint.style.display = showPicker ? '' : 'none';
++  if (readonly) {
++    if (! showPicker && effectiveUnitId) {
++      const matched = units.find((u) => String(u.unit_id) === String(effectiveUnitId));
++      readonly.textContent = matched ? matched.asset_tag : '';
++      readonly.style.display = 'block';
++    } else {
++      readonly.style.display = 'none';
++    }
++  }
+ }
+ 
+ // Active bookings, for the New Incident booking search (pre-loaded)
+@@ -955,15 +981,52 @@ function openNMEquipSearch(q) {
+       document.getElementById('nm_equipment').value = el.dataset.id;
+       document.getElementById('nm_equipSearch').value = el.dataset.label;
+       drop.style.display = 'none';
++      nm_populateUnitSelect(el.dataset.id);
+     });
+   });
+ }
+ function closeNMEquipSearch(ms) {
+   setTimeout(() => { const d = document.getElementById('nm_equipDrop'); if (d) d.style.display = 'none'; }, ms);
+ }
++// Maintenance isn't tied to one specific booking (unlike an Incident Report) — it's scheduled
++// against the equipment model itself — so this just asks "how many units does this model have
++// registered at all": exactly one auto-fills silently (nothing to choose), two or more show a
++// dropdown. Reuses EQUIPMENT_UNITS, the same global equipment_id -> units map already built for
++// the Incident Report form's own fallback case.
++function nm_populateUnitSelect(equipmentId) {
++  const wrap = document.getElementById('nm_unitWrap');
++  const sel = document.getElementById('nm_unit');
++  const readonly = document.getElementById('nm_unitReadonly');
++  const units = EQUIPMENT_UNITS[equipmentId] || [];
++
++  if (!equipmentId || !units.length) {
++    wrap.style.display = 'none';
++    sel.innerHTML = '<option value="">Not sure which unit</option>';
++    readonly.style.display = 'none';
++    return;
++  }
++
++  wrap.style.display = '';
++  sel.innerHTML = units.map((u) => `<option value="u${u.unit_id}">${esc(u.asset_tag)}</option>`).join('')
++    + '<option value="">Not sure which unit</option>';
++
++  if (units.length === 1) {
++    sel.value = 'u' + units[0].unit_id;
++    sel.style.display = 'none';
++    readonly.textContent = units[0].asset_tag;
++    readonly.style.display = 'block';
++  } else {
++    sel.value = '';
++    sel.style.display = '';
++    readonly.style.display = 'none';
++  }
++}
+ function resetNewMaintenanceForm() {
+   document.getElementById('nm_equipment').value = '';
+   document.getElementById('nm_equipSearch').value = '';
++  document.getElementById('nm_unitWrap').style.display = 'none';
++  document.getElementById('nm_unit').innerHTML = '<option value="">Not sure which unit</option>';
++  document.getElementById('nm_unitReadonly').style.display = 'none';
+ }
+ 
+ function prepNewIncident() {
+diff --git a/resources/views/partials/ce-unit-picker.blade.php b/resources/views/partials/ce-unit-picker.blade.php
+new file mode 100644
+index 0000000..335507d
+--- /dev/null
++++ b/resources/views/partials/ce-unit-picker.blade.php
+@@ -0,0 +1,64 @@
++{{--
++  Shared per-line "Release Unit" cell for the Cost Estimate editor's Equipment Rental and
++  Accessories & Add-ons tables. Renders ONLY the cell content — the enclosing <form> and the
++  single "Confirm All Units" submit button live once per table (see ce-preview.blade.php), not
++  per row, so confirming several lines' picks is one action instead of one click per row.
++
++  Expected variables:
++    confirmed bool    whether this line's unit_confirmed flag is already set
++    tags      ?string comma-joined asset tags currently allocated to this line, or null
++    opts      Collection  every non-retired unit of this model, each {unit_id, asset_tag,
++                          status, selectable} — 'selectable' means available or already on
++                          this exact line; everything else renders disabled so staff can see
++                          the whole pool and why a given unit can't be picked right now.
++    allocatedHere array  unit_id(s) currently allocated to this line, in no particular order
++    quantity  int     how many unit slots this line needs
++    rowKey    string  unique per-row DOM id prefix (e.g. "eq123" / "ac45")
++    lineField string  the array key under "lines[...]" identifying this line (bk_equip_id / ba_id)
++    idValue   int     the line's own id value
++--}}
++@php
++    $statusLabel = ['available' => 'Available', 'allocated' => 'Allocated elsewhere', 'in_field' => 'In the Field',
++        'inspection_pending' => 'Pending Inspection', 'under_maintenance' => 'Under Maintenance'];
++    $selectStyle = 'width:100%;padding:7px 9px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12.5px;font-family:"DM Sans",sans-serif;background:#fff;color:#0B1A33;margin-bottom:4px';
++@endphp
++@if ($confirmed)
++<div id="{{ $rowKey }}_view">
++  <span class="badge badge-green" style="font-size:10px">Confirmed</span>
++  @if ($tags)
++  <div style="font-size:11.5px;font-family:monospace;margin-top:4px;color:#334155">{{ $tags }}</div>
++  @endif
++  @if ($canManage)
++  <button type="button" class="edit-mini-btn" style="margin-top:6px;padding:3px 9px;font-size:10.5px"
++          onclick="document.getElementById('{{ $rowKey }}_view').style.display='none';document.getElementById('{{ $rowKey }}_form').style.display='block'">
++    <i data-feather="rotate-ccw" style="width:11px;height:11px"></i> Reopen
++  </button>
++  @endif
++</div>
++@elseif (! $canManage)
++<span style="color:var(--muted);font-size:11px">Not yet confirmed</span>
++@endif
++
++@if ($canManage)
++<div id="{{ $rowKey }}_form" style="{{ $confirmed ? 'display:none' : '' }}">
++  <input type="hidden" name="lines[{{ $idValue }}][{{ $lineField }}]" value="{{ $idValue }}">
++  @if ($opts->isEmpty())
++  <div style="font-size:10.5px;color:var(--red)">No units registered for this item at all — contact Super Admin.</div>
++  @else
++  @for ($slot = 0; $slot < $quantity; $slot++)
++  @php $preselect = $allocatedHere[$slot] ?? null; @endphp
++  <select name="lines[{{ $idValue }}][unit_ids][]" style="{{ $selectStyle }}">
++    <option value="">— pick unit —</option>
++    @foreach ($opts as $u)
++    <option value="{{ $u->unit_id }}" {{ (string) $preselect === (string) $u->unit_id ? 'selected' : '' }} {{ ! $u->selectable ? 'disabled' : '' }}>
++      {{ $u->asset_tag }}{{ $u->selectable ? '' : ' — ' . ($statusLabel[$u->status] ?? ucfirst($u->status)) }}
++    </option>
++    @endforeach
++  </select>
++  @endfor
++  @if ($opts->where('selectable', true)->isEmpty())
++  <div style="font-size:10.5px;color:var(--orange);line-height:1.4">All {{ $opts->count() }} unit(s) of this item are currently committed elsewhere.</div>
++  @endif
++  @endif
++</div>
++@endif
