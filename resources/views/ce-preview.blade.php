@@ -1055,7 +1055,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         @endif
         <div style="overflow-x:auto">
         <table class="etbl">
-          <thead><tr><th style="width:44px">Qty</th><th>Item</th><th style="width:170px">Release Unit</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
+          <thead><tr><th style="width:44px">Qty</th><th>Item</th><th style="width:230px">Release Unit</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
           <tbody>
           @php $anyEquip = false; @endphp
           @foreach ($equipGroups as $catLines)
@@ -1095,7 +1095,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         </div>
         @if ($canManage && $anyEquip)
         <div style="padding:10px 0 0;text-align:right">
-          <button type="submit" class="btn btn-primary btn-sm">Confirm All Units</button>
+          <button type="submit" class="addline-btn" style="margin-left:auto"><i data-feather="check" style="width:12px;height:12px"></i> Confirm All Units</button>
         </div>
         @endif
         @if ($canManage)</form>@endif
@@ -1159,7 +1159,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         @endif
         <div style="overflow-x:auto">
         <table class="etbl">
-          <thead><tr><th style="width:44px">Qty</th><th>Item</th><th style="width:170px">Release Unit</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
+          <thead><tr><th style="width:44px">Qty</th><th>Item</th><th style="width:230px">Release Unit</th><th class="r" style="width:70px">Days</th><th class="r" style="width:100px">Rate / Day</th><th class="r" style="width:110px">Amount</th></tr></thead>
           <tbody>
           @forelse ($accLines as $ac)
           @php
@@ -1193,7 +1193,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         </div>
         @if ($canManage && $accLines->isNotEmpty())
         <div style="padding:10px 0 0;text-align:right">
-          <button type="submit" class="btn btn-primary btn-sm">Confirm All Units</button>
+          <button type="submit" class="addline-btn" style="margin-left:auto"><i data-feather="check" style="width:12px;height:12px"></i> Confirm All Units</button>
         </div>
         @endif
         @if ($canManage)</form>@endif

@@ -520,6 +520,7 @@ class BookingDetailController extends Controller
             DB::table('equipment')->whereIn('equipment_id', function ($q) use ($id) {
                 $q->select('equipment_id')->from('booking_equipment')->where('booking_id', $id);
             })->update(['availability_status' => 'available']);
+            \App\Support\EquipmentUnitAllocator::releaseAllForBooking($id);
             DB::table('bookings')->where('booking_id', $id)->update([
                 'booking_status' => 'cancelled', 'approval_status' => 'rejected', 'cancelled_by' => $uid,
                 'cancellation_reason' => $reason, 'updated_at' => now(),
@@ -1001,6 +1002,7 @@ class BookingDetailController extends Controller
 
         $prevStatus = $booking->booking_status;
         DB::table('bookings')->where('booking_id', $id)->update(['booking_status' => 'completed', 'updated_at' => now()]);
+        \App\Support\EquipmentUnitAllocator::releaseAllForBooking($id);
         DB::table('crew_members as cm')
             ->join('booking_crew as bc', 'cm.crew_id', '=', 'bc.crew_id')
             ->where('bc.booking_id', $id)->where('bc.assignment_status', 'confirmed')
@@ -1541,6 +1543,7 @@ class BookingDetailController extends Controller
             DB::table('equipment')->whereIn('equipment_id', function ($q) use ($id) {
                 $q->select('equipment_id')->from('booking_equipment')->where('booking_id', $id);
             })->update(['availability_status' => 'available']);
+            \App\Support\EquipmentUnitAllocator::releaseAllForBooking($id);
             DB::table('quotation_log')->insert([
                 'booking_id' => $id, 'log_type' => 'cancelled', 'logged_by' => $uid,
                 'previous_status' => $booking->booking_status, 'new_status' => 'cancelled',
@@ -1586,6 +1589,7 @@ class BookingDetailController extends Controller
         DB::table('equipment')->whereIn('equipment_id', function ($q) use ($id) {
             $q->select('equipment_id')->from('booking_equipment')->where('booking_id', $id);
         })->update(['availability_status' => 'available']);
+        \App\Support\EquipmentUnitAllocator::releaseAllForBooking($id);
         DB::table('quotation_log')->insert([
             'booking_id' => $id, 'log_type' => 'cancelled', 'logged_by' => $uid,
             'previous_status' => $booking->booking_status, 'new_status' => 'cancelled',

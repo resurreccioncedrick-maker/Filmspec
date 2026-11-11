@@ -166,4 +166,20 @@ class EquipmentUnitAllocator
         DB::table('accessory_units')->whereIn('unit_id', $unitIds)->where('status', 'allocated')->update(['status' => 'available']);
         DB::table('booking_accessory_units')->where('ba_id', $baId)->delete();
     }
+
+    /**
+     * Releases every unit (equipment and accessory) allocated anywhere on this booking — call
+     * this whenever a booking reaches a terminal state (completed, cancelled, rejected). Without
+     * it, a unit allocated to a booking stays 'allocated' forever even after that booking is long
+     * over, permanently taking it out of the pool for every future booking — confirmed as a real
+     * bug: units tied to a 'completed' booking from months ago were still blocking new requests
+     * for the same gear because nothing had ever released them back to 'available'.
+     */
+    public static function releaseAllForBooking(int $bookingId): void
+    {
+        DB::table('booking_equipment')->where('booking_id', $bookingId)->pluck('bk_equip_id')
+            ->each(fn ($bkEquipId) => self::release($bkEquipId));
+        DB::table('booking_accessories')->where('booking_id', $bookingId)->pluck('ba_id')
+            ->each(fn ($baId) => self::releaseAccessory($baId));
+    }
 }

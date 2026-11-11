@@ -20,16 +20,19 @@
 @php
     $statusLabel = ['available' => 'Available', 'allocated' => 'Allocated elsewhere', 'in_field' => 'In the Field',
         'inspection_pending' => 'Pending Inspection', 'under_maintenance' => 'Under Maintenance'];
+    $selectStyle = 'width:100%;padding:7px 9px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:12.5px;font-family:"DM Sans",sans-serif;background:#fff;color:#0B1A33;margin-bottom:4px';
 @endphp
 @if ($confirmed)
 <div id="{{ $rowKey }}_view">
   <span class="badge badge-green" style="font-size:10px">Confirmed</span>
   @if ($tags)
-  <div style="font-size:11px;font-family:monospace;margin-top:3px">{{ $tags }}</div>
+  <div style="font-size:11.5px;font-family:monospace;margin-top:4px;color:#334155">{{ $tags }}</div>
   @endif
   @if ($canManage)
-  <button type="button" onclick="document.getElementById('{{ $rowKey }}_view').style.display='none';document.getElementById('{{ $rowKey }}_form').style.display='block'"
-          style="background:none;border:none;padding:0;color:var(--accent);font-size:10.5px;text-decoration:underline;cursor:pointer;margin-top:3px">Edit</button>
+  <button type="button" class="edit-mini-btn" style="margin-top:6px;padding:3px 9px;font-size:10.5px"
+          onclick="document.getElementById('{{ $rowKey }}_view').style.display='none';document.getElementById('{{ $rowKey }}_form').style.display='block'">
+    <i data-feather="rotate-ccw" style="width:11px;height:11px"></i> Reopen
+  </button>
   @endif
 </div>
 @elseif (! $canManage)
@@ -44,7 +47,7 @@
   @else
   @for ($slot = 0; $slot < $quantity; $slot++)
   @php $preselect = $allocatedHere[$slot] ?? null; @endphp
-  <select name="lines[{{ $idValue }}][unit_ids][]" style="width:100%;margin-bottom:3px;font-size:11.5px;padding:3px 5px">
+  <select name="lines[{{ $idValue }}][unit_ids][]" style="{{ $selectStyle }}">
     <option value="">— pick unit —</option>
     @foreach ($opts as $u)
     <option value="{{ $u->unit_id }}" {{ (string) $preselect === (string) $u->unit_id ? 'selected' : '' }} {{ ! $u->selectable ? 'disabled' : '' }}>
@@ -54,7 +57,7 @@
   </select>
   @endfor
   @if ($opts->where('selectable', true)->isEmpty())
-  <div style="font-size:10.5px;color:var(--orange)">All {{ $opts->count() }} unit(s) of this item are currently committed elsewhere.</div>
+  <div style="font-size:10.5px;color:var(--orange);line-height:1.4">All {{ $opts->count() }} unit(s) of this item are currently committed elsewhere.</div>
   @endif
   @endif
 </div>

@@ -334,6 +334,7 @@ class BookingsController extends Controller
             DB::table('equipment')->whereIn('equipment_id', function ($q) use ($bid) {
                 $q->select('equipment_id')->from('booking_equipment')->where('booking_id', $bid);
             })->update(['availability_status' => 'available']);
+            \App\Support\EquipmentUnitAllocator::releaseAllForBooking($bid);
             Booking::where('booking_id', $bid)->update([
                 'approval_status' => 'rejected', 'approval_notes' => $notes,
                 'booking_status' => 'cancelled', 'cancelled_by' => $uid,
