@@ -1149,6 +1149,7 @@ button{font-family:var(--font-b);cursor:pointer}
             <select name="equipment_unit" id="crewIR_unit" disabled>
               <option value="">— Select equipment first —</option>
             </select>
+            <div id="crewIR_unitReadonly" style="display:none;font-weight:700;font-size:13px;padding:10px 12px;background:var(--s2);border-radius:8px"></div>
             <div id="crewIR_unitHint" style="font-size:11px;color:var(--muted);margin-top:4px">Pick the specific one if it's tagged — otherwise use "Not sure which unit."</div>
           </div>
         </div>
@@ -1165,6 +1166,7 @@ button{font-family:var(--font-b);cursor:pointer}
             <select name="accessory_unit" id="crewIR_accunit" disabled>
               <option value="">— Select accessory first —</option>
             </select>
+            <div id="crewIR_accunitReadonly" style="display:none;font-weight:700;font-size:13px;padding:10px 12px;background:var(--s2);border-radius:8px"></div>
             <div id="crewIR_accunitHint" style="font-size:11px;color:var(--muted);margin-top:4px">Pick the specific one if it's tagged — otherwise use "Not sure which unit."</div>
           </div>
         </div>
@@ -1427,6 +1429,7 @@ function filterEquipmentByBooking(bookingId) {
 function filterUnitsByEquipment(equipmentId) {
   const sel = document.getElementById('crewIR_unit');
   const wrap = document.getElementById('crewIR_unitWrap');
+  const readonly = document.getElementById('crewIR_unitReadonly');
   // Which unit(s) are actually on THIS booking for this equipment — from booking-time
   // allocation first, falling back to the Checklist, falling back to "every unit of this
   // model" (BOOKING_EQUIPMENT_UNITS already carries that tiered result server-side).
@@ -1437,6 +1440,8 @@ function filterUnitsByEquipment(equipmentId) {
   if (!equipmentId || !units.length) {
     sel.innerHTML = '<option value="">Not sure which unit</option>';
     sel.disabled = false;
+    sel.style.display = '';
+    if (readonly) readonly.style.display = 'none';
     if (wrap) wrap.style.display = '';
     return;
   }
@@ -1445,10 +1450,21 @@ function filterUnitsByEquipment(equipmentId) {
     + '<option value="">Not sure which unit</option>';
   sel.disabled = false;
 
-  // Only one unit is actually on this booking for this equipment — nothing to ask, so just
-  // carry that single value silently and hide the field instead of making crew pick from a
-  // list of one. Only show the picker when there's genuine ambiguity (2+ units booked).
-  if (wrap) wrap.style.display = (autoFilled && bookedUnits.length === 1) ? 'none' : '';
+  // The field itself always stays visible — crew need to SEE which physical unit is involved
+  // even when there's only one candidate. Only a genuine ambiguity (2+ units actually booked)
+  // gets the dropdown; a single booked unit shows as plain read-only text instead, since
+  // there's nothing to actually choose.
+  if (wrap) wrap.style.display = '';
+  const showPicker = !(autoFilled && bookedUnits.length === 1);
+  sel.style.display = showPicker ? '' : 'none';
+  if (readonly) {
+    if (! showPicker) {
+      readonly.textContent = units[0].asset_tag;
+      readonly.style.display = 'block';
+    } else {
+      readonly.style.display = 'none';
+    }
+  }
 
   const hint = document.getElementById('crewIR_unitHint');
   if (hint) hint.textContent = autoFilled
@@ -1474,6 +1490,7 @@ function filterAccessoryByBooking(bookingId) {
 function filterUnitsByAccessory(accessoryId) {
   const sel = document.getElementById('crewIR_accunit');
   const wrap = document.getElementById('crewIR_accunitWrap');
+  const readonly = document.getElementById('crewIR_accunitReadonly');
   const bookedUnits = BOOKING_ACCESSORY_UNITS[crewIR_currentBookingId + '_' + accessoryId] || [];
   const units = bookedUnits.length ? bookedUnits : (ACCESSORY_UNITS[accessoryId] || []);
   const autoFilled = bookedUnits.length > 0;
@@ -1481,6 +1498,8 @@ function filterUnitsByAccessory(accessoryId) {
   if (!accessoryId || !units.length) {
     sel.innerHTML = '<option value="">Not sure which unit</option>';
     sel.disabled = false;
+    sel.style.display = '';
+    if (readonly) readonly.style.display = 'none';
     if (wrap) wrap.style.display = '';
     return;
   }
@@ -1489,8 +1508,20 @@ function filterUnitsByAccessory(accessoryId) {
     + '<option value="">Not sure which unit</option>';
   sel.disabled = false;
 
-  // Same rule as the equipment Unit field — only ask when 2+ units were actually allocated.
-  if (wrap) wrap.style.display = (autoFilled && bookedUnits.length === 1) ? 'none' : '';
+  // Field always stays visible — see the equipment Unit field's comment above. Only a real
+  // ambiguity (2+ units booked) gets the dropdown; one booked unit shows as read-only text.
+  if (wrap) wrap.style.display = '';
+  const showPicker = !(autoFilled && bookedUnits.length === 1);
+  sel.style.display = showPicker ? '' : 'none';
+  if (readonly) {
+    if (! showPicker) {
+      readonly.textContent = units[0].asset_tag;
+      readonly.style.display = 'block';
+    } else {
+      readonly.style.display = 'none';
+    }
+  }
+
   const hint = document.getElementById('crewIR_accunitHint');
   if (hint) hint.textContent = autoFilled
     ? 'Auto-filled from this booking\'s allocated unit — change it if that\'s not the unit you had.'

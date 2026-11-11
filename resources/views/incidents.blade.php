@@ -220,6 +220,9 @@
           <td>
             <div style="font-weight:600">{{ $mt->equipment_name }}</div>
             <div style="font-size:.75rem;color:var(--muted)">{{ $mt->brand }}{{ $mt->equip_serial ? ' · '.$mt->equip_serial : '' }}</div>
+            @if ($mt->unit_asset_tag)
+            <div style="font-size:.72rem;font-family:monospace;color:var(--accent);margin-top:2px">Unit: {{ $mt->unit_asset_tag }}</div>
+            @endif
           </td>
           <td><span class="badge {{ $maintTypeBadge[$mt->maintenance_type] ?? 'badge-gray' }}">{{ $maintTypeLabel[$mt->maintenance_type] ?? $mt->maintenance_type }}</span></td>
           <td style="font-size:.85rem;white-space:nowrap;font-family:monospace">
@@ -277,6 +280,14 @@
             <input type="hidden" name="equipment_id" id="nm_equipment">
             <div class="crew-slot-drop" id="nm_equipDrop"></div>
           </div>
+        </div>
+        <div class="form-group" id="nm_unitWrap" style="display:none">
+          <label>Unit</label>
+          <select name="equipment_unit" id="nm_unit" class="form-control">
+            <option value="">Not sure which unit</option>
+          </select>
+          <div id="nm_unitReadonly" class="form-control" style="display:none;background:var(--s2);color:var(--text);font-weight:600"></div>
+          <div style="font-size:.75rem;color:var(--muted);margin-top:4px">Which specific unit needs maintenance — only a dropdown when this equipment has more than one registered unit.</div>
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -411,7 +422,8 @@
             <select name="equipment_unit" id="newIR_unit" class="form-control" disabled>
               <option value="">Not sure which unit</option>
             </select>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Auto-filled when exactly one unit is allocated to this booking — only shown here when there are two or more to choose from.</div>
+            <div id="newIR_unitReadonly" class="form-control" style="display:none;background:var(--s2);color:var(--text);font-weight:600"></div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">The specific unit checked out for this booking — only a dropdown when there's more than one to choose from.</div>
           </div>
         </div>
 
@@ -551,7 +563,8 @@
             <select name="equipment_unit" id="editIR_unit" class="form-control" disabled style="display:none">
               <option value="">Not sure which unit</option>
             </select>
-            <div id="editIR_unitHint" style="font-size:11px;color:var(--text-muted);margin-top:4px;display:none">Auto-filled when exactly one unit is allocated to this booking — only shown here when there are two or more to choose from.</div>
+            <div id="editIR_unitReadonly" class="form-control" style="display:none;background:var(--s2);color:var(--text);font-weight:600"></div>
+            <div id="editIR_unitHint" style="font-size:11px;color:var(--text-muted);margin-top:4px;display:none">The specific unit checked out for this booking — only a dropdown when there's more than one to choose from.</div>
           </div>
         </div>
 
@@ -752,6 +765,7 @@ function populateIRUnitSelect(equipmentId, selectId, preselect, bookingId) {
   if (!sel) return;
   const wrap = document.getElementById(selectId + 'Wrap'); // e.g. newIR_unitWrap (edit modal has none)
   const hint = document.getElementById(selectId.replace('_unit', '_unitHint'));
+  const readonly = document.getElementById(selectId.replace('_unit', '_unitReadonly'));
   const bookedUnits = (bookingId && BOOKING_EQUIPMENT_UNITS[bookingId + '_' + equipmentId]) || [];
   const units = bookedUnits.length ? bookedUnits : (EQUIPMENT_UNITS[equipmentId] || []);
 
@@ -759,6 +773,7 @@ function populateIRUnitSelect(equipmentId, selectId, preselect, bookingId) {
     sel.innerHTML = '<option value="">Not sure which unit</option>';
     sel.disabled = true;
     sel.style.display = 'none';
+    if (readonly) readonly.style.display = 'none';
     if (wrap) wrap.style.display = 'none';
     if (hint) hint.style.display = 'none';
     return;
@@ -768,17 +783,28 @@ function populateIRUnitSelect(equipmentId, selectId, preselect, bookingId) {
     + '<option value="">Not sure which unit</option>';
   // An explicit preselect (editing an incident that already has a unit saved) always wins;
   // otherwise auto-fill from the booking-allocated unit when there's exactly one candidate.
-  sel.value = preselect ? 'u' + preselect : (!preselect && bookedUnits.length === 1 ? 'u' + bookedUnits[0].unit_id : '');
+  const effectiveUnitId = preselect || (!preselect && bookedUnits.length === 1 ? bookedUnits[0].unit_id : null);
+  sel.value = effectiveUnitId ? 'u' + effectiveUnitId : '';
   sel.disabled = false;
 
-  // Only ask when there's genuine ambiguity — 2+ units actually booked for this equipment.
-  // A single booked unit is carried silently via the preselected value above instead of making
-  // staff pick from a list of one; the fallback (no booking-allocation data at all, bookedUnits
-  // empty) still shows the full list since we genuinely don't know which one it is.
+  // Always show the wrap itself — staff filing/reviewing a report need to see which physical
+  // unit is involved even when there's only one candidate and nothing to actually choose. Only
+  // the control WITHIN it differs: a dropdown when there's genuine ambiguity (2+ units actually
+  // booked, or the fallback full-catalog list when we don't know which one at all), otherwise a
+  // plain read-only tag for the one unit that's already decided.
+  if (wrap) wrap.style.display = '';
   const showPicker = bookedUnits.length === 0 || bookedUnits.length >= 2;
   sel.style.display = showPicker ? '' : 'none';
-  if (wrap) wrap.style.display = showPicker ? '' : 'none';
   if (hint) hint.style.display = showPicker ? '' : 'none';
+  if (readonly) {
+    if (! showPicker && effectiveUnitId) {
+      const matched = units.find((u) => String(u.unit_id) === String(effectiveUnitId));
+      readonly.textContent = matched ? matched.asset_tag : '';
+      readonly.style.display = 'block';
+    } else {
+      readonly.style.display = 'none';
+    }
+  }
 }
 
 // Active bookings, for the New Incident booking search (pre-loaded)
@@ -955,15 +981,52 @@ function openNMEquipSearch(q) {
       document.getElementById('nm_equipment').value = el.dataset.id;
       document.getElementById('nm_equipSearch').value = el.dataset.label;
       drop.style.display = 'none';
+      nm_populateUnitSelect(el.dataset.id);
     });
   });
 }
 function closeNMEquipSearch(ms) {
   setTimeout(() => { const d = document.getElementById('nm_equipDrop'); if (d) d.style.display = 'none'; }, ms);
 }
+// Maintenance isn't tied to one specific booking (unlike an Incident Report) — it's scheduled
+// against the equipment model itself — so this just asks "how many units does this model have
+// registered at all": exactly one auto-fills silently (nothing to choose), two or more show a
+// dropdown. Reuses EQUIPMENT_UNITS, the same global equipment_id -> units map already built for
+// the Incident Report form's own fallback case.
+function nm_populateUnitSelect(equipmentId) {
+  const wrap = document.getElementById('nm_unitWrap');
+  const sel = document.getElementById('nm_unit');
+  const readonly = document.getElementById('nm_unitReadonly');
+  const units = EQUIPMENT_UNITS[equipmentId] || [];
+
+  if (!equipmentId || !units.length) {
+    wrap.style.display = 'none';
+    sel.innerHTML = '<option value="">Not sure which unit</option>';
+    readonly.style.display = 'none';
+    return;
+  }
+
+  wrap.style.display = '';
+  sel.innerHTML = units.map((u) => `<option value="u${u.unit_id}">${esc(u.asset_tag)}</option>`).join('')
+    + '<option value="">Not sure which unit</option>';
+
+  if (units.length === 1) {
+    sel.value = 'u' + units[0].unit_id;
+    sel.style.display = 'none';
+    readonly.textContent = units[0].asset_tag;
+    readonly.style.display = 'block';
+  } else {
+    sel.value = '';
+    sel.style.display = '';
+    readonly.style.display = 'none';
+  }
+}
 function resetNewMaintenanceForm() {
   document.getElementById('nm_equipment').value = '';
   document.getElementById('nm_equipSearch').value = '';
+  document.getElementById('nm_unitWrap').style.display = 'none';
+  document.getElementById('nm_unit').innerHTML = '<option value="">Not sure which unit</option>';
+  document.getElementById('nm_unitReadonly').style.display = 'none';
 }
 
 function prepNewIncident() {

@@ -202,7 +202,7 @@ class IncidentsController extends Controller
         $maintQuery = $this->filteredMaintenanceQuery($request);
         $maintenances = $maintQuery
             ->orderBy('ms.scheduled_date')->orderByDesc('ms.created_at')
-            ->select('ms.*', 'e.equipment_name', 'e.brand', 'e.serial_number as equip_serial',
+            ->select('ms.*', 'e.equipment_name', 'e.brand', 'e.serial_number as equip_serial', 'eu.asset_tag as unit_asset_tag',
                 DB::raw("CONCAT(cm.first_name,' ',cm.last_name) AS assigned_crew_name"), 'ir.incident_number')
             ->limit(100)
             ->get();
@@ -278,6 +278,7 @@ class IncidentsController extends Controller
 
         $maintQuery = DB::table('maintenance_schedules as ms')
             ->join('equipment as e', 'ms.equipment_id', '=', 'e.equipment_id')
+            ->leftJoin('equipment_units as eu', 'ms.equipment_unit_id', '=', 'eu.unit_id')
             ->leftJoin('crew_members as cm', 'ms.assigned_crew_id', '=', 'cm.crew_id')
             ->leftJoin('incident_reports as ir', 'ms.incident_id', '=', 'ir.incident_id');
         if ($maintTab !== 'all') {
@@ -485,8 +486,9 @@ class IncidentsController extends Controller
             }
 
             if ($eid && $date) {
+                $equipmentUnitId = $this->parseUnitInput($request->input('equipment_unit', ''), $eid);
                 $scheduleId = DB::table('maintenance_schedules')->insertGetId([
-                    'equipment_id' => $eid, 'scheduled_date' => $date, 'maintenance_type' => $mtype,
+                    'equipment_id' => $eid, 'equipment_unit_id' => $equipmentUnitId, 'scheduled_date' => $date, 'maintenance_type' => $mtype,
                     'assigned_crew_id' => $cmId ?: null, 'description' => $desc, 'incident_id' => $iid ?: null,
                     'photo_path' => $photoUpload['success'] ? $photoUpload['path'] : null,
                     'created_by' => $uid,
