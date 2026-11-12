@@ -83,9 +83,6 @@
               'crew' => ($r->crew_name && trim($r->crew_name) !== '') ? ($r->crew_name . ' (' . $r->position_name . ')') : ($r->position_name . ' — unassigned'),
               default => $r->equipment_name,
           };
-          // "Approved" is a decision state, not fulfillment readiness — show what's actually
-          // still needed instead of the same flat label for every item type. Purely a display
-          // label; the underlying request_status column is untouched.
           $isOverdue = $r->status === 'dispatched' && $r->eta && \Illuminate\Support\Carbon::parse($r->eta)->isPast();
           if ($isOverdue) {
               $rowStatusLabel = 'Delivery Overdue';
@@ -143,7 +140,6 @@
   @endif
 </div>
 
-<!-- DISPATCH MODAL — styled to match Booking Detail's own Assign Transport modal -->
 <div class="modal-overlay" id="modalDispatch">
   <div class="modal" style="max-width:480px">
     <div class="modal-header" style="background:#f0f9ff;border-bottom:1px solid #bae6fd">
@@ -197,7 +193,6 @@
   </div>
 </div>
 
-<!-- DELIVER CONFIRMATION MODAL — replaces the native browser confirm() -->
 <div class="modal-overlay" id="modalDeliverConfirm">
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
@@ -225,8 +220,6 @@
 
 @push('scripts')
 <script>
-// Same list the Driver dropdown uses — re-sorted client-side to put crew matching the
-// requested position first when a crew request needs an actual assignment.
 const ALL_ACTIVE_CREW = {!! $activeDrivers->values()->toJson() !!};
 
 function openDispatch(reqId, desc, itemType, crewId, positionId) {

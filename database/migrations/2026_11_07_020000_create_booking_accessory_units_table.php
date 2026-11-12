@@ -6,14 +6,10 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('booking_accessory_units', function (Blueprint $table) {
             $table->id('id');
-            // ba_id is booking_accessories' PK — mirrors booking_equipment_units for equipment.
             $table->integer('ba_id');
             $table->unsignedBigInteger('accessory_unit_id');
             $table->timestamp('allocated_at')->useCurrent();
@@ -25,9 +21,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('booking_accessory_units');

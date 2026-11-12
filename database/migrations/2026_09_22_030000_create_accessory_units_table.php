@@ -8,8 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Same shape as equipment_units — genuinely new, no prior per-unit accessory tracking
-        // existed (only the aggregate accessories.quantity).
         Schema::create('accessory_units', function (Blueprint $table) {
             $table->id('unit_id');
             $table->integer('accessory_id');

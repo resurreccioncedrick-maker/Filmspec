@@ -8,10 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Genuinely new — nothing in the app currently tracks crew certifications/licenses.
-        // Backs the Crew Management detail panel's Qualifications tab; the History tab needs no
-        // new table since activity_logs already records every crew action with module='crew' /
-        // record_id=crew_id (CrewController::handleAction() has been writing these all along).
         Schema::create('crew_qualifications', function (Blueprint $table) {
             $table->id('qualification_id');
             $table->integer('crew_id');

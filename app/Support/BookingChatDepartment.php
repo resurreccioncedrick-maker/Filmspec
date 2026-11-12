@@ -2,12 +2,6 @@
 
 namespace App\Support;
 
-/**
- * The client-facing departments a booking's (or the general support widget's) chat can be
- * routed to. Crew and super_admin deliberately have no department of their own here — crew have
- * no inbox for these messages at all (separate crew portal), and super_admin folds into 'staff'
- * since it shares the same general-admin relationship to a client as 'admin' does.
- */
 class BookingChatDepartment
 {
     public const LABELS = [
@@ -23,7 +17,6 @@ class BookingChatDepartment
         'operations_manager' => 'operations_manager',
     ];
 
-    /** Which department bucket a STAFF reply auto-lands in, based on the replying user's own role. */
     public static function bucketForRole(?string $roleName): string
     {
         return self::ROLE_BUCKETS[(string) $roleName] ?? 'staff';

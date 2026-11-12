@@ -24,7 +24,6 @@
       box-shadow: 0 2px 16px rgba(0,0,0,.12);
     }
 
-    /* ── Header ── */
     .doc-header {
       display: flex;
       align-items: center;
@@ -68,7 +67,6 @@
       margin-top: 3px;
     }
 
-    /* ── Sections ── */
     .section {
       margin-bottom: 18px;
     }
@@ -83,7 +81,6 @@
       margin-bottom: 10px;
     }
 
-    /* ── Field grid ── */
     .field-grid {
       display: grid;
       gap: 8px 20px;
@@ -111,7 +108,6 @@
       font-size: 9.5pt;
     }
 
-    /* ── Damage checkboxes ── */
     .damage-list {
       display: flex;
       flex-wrap: wrap;
@@ -157,7 +153,6 @@
       font-style: italic;
     }
 
-    /* ── Written report / notes ── */
     .text-block {
       border: 1px solid #bbb;
       min-height: 80px;
@@ -167,7 +162,6 @@
       white-space: pre-wrap;
     }
 
-    /* ── Signature lines ── */
     .sig-grid {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -195,7 +189,6 @@
       margin-top: 4px;
     }
 
-    /* ── Crew lineup table ── */
     .crew-table {
       width: 100%;
       border-collapse: collapse;
@@ -224,7 +217,6 @@
       font-weight: 600;
     }
 
-    /* ── Resolution box ── */
     .resolution-box {
       border: 1.5px solid #c00;
       padding: 10px 14px;
@@ -239,7 +231,6 @@
       margin-bottom: 8px;
     }
 
-    /* ── Print controls ── */
     .print-controls {
       text-align: center;
       margin-bottom: 24px;
@@ -266,7 +257,6 @@
       margin: 0 6px;
     }
 
-    /* ── Footer ── */
     .doc-footer {
       border-top: 1px solid #bbb;
       padding-top: 8px;
@@ -300,7 +290,6 @@
 
 <div class="print-page">
 
-  <!-- ── Document Header ── -->
   <div class="doc-header">
     <div class="doc-header-left">
       <img src="{{ asset('assets/images/logo.png') }}" alt="FilmSpec">
@@ -321,7 +310,6 @@
     </div>
   </div>
 
-  <!-- ── Section A: Project Shoot Details ── -->
   <div class="section">
     <div class="section-title">A — Project Shoot Details</div>
     <div class="field-grid cols-2" style="margin-bottom:14px">
@@ -358,7 +346,6 @@
     </div>
   </div>
 
-  <!-- ── Section B: Item Details ── -->
   <div class="section">
     <div class="section-title">B — {{ $ir->equipment_name ? 'Equipment' : 'Accessory' }} Details</div>
     <div class="field-grid cols-3">
@@ -391,7 +378,6 @@
     </div>
   </div>
 
-  <!-- ── Section C: Damage Description ── -->
   <div class="section">
     <div class="section-title">C — Damage Description</div>
     <div class="damage-list">
@@ -419,13 +405,11 @@
     @endif
   </div>
 
-  <!-- ── Section D: Incident Written Report ── -->
   <div class="section">
     <div class="section-title">D — Incident Written Report</div>
     <div class="text-block">{{ $ir->description }}</div>
   </div>
 
-  <!-- ── Section E: Crew Line-Up ── -->
   <div class="section">
     <div class="section-title">E — Crew Line-Up</div>
     <table class="crew-table">
@@ -448,7 +432,6 @@
     </table>
   </div>
 
-  <!-- ── Resolution block (if resolved/closed) ── -->
   @if (!empty($ir->resolution) && $ir->resolution !== 'pending')
   <div class="resolution-box">
     <div class="res-title">Resolution / Outcome</div>
@@ -475,7 +458,6 @@
   </div>
   @endif
 
-  <!-- ── Section F: Notes ── -->
   <div class="section">
     <div class="section-title">F — Additional Notes</div>
     <div class="text-block" style="min-height:60px">
@@ -487,13 +469,12 @@
     </div>
   </div>
 
-  <!-- ── Document Footer ── -->
   <div class="doc-footer">
     <span>FilmSpec Operations Platform &mdash; FilmSpec</span>
     <span>Reported by: {{ $ir->reported_by_name ?? 'System' }} &nbsp;|&nbsp; Filed: {{ date('M j, Y g:i A', strtotime($ir->created_at)) }}</span>
     <span>Printed: {{ date('M j, Y g:i A') }}</span>
   </div>
 
-</div><!-- /.print-page -->
+</div>
 </body>
 </html>

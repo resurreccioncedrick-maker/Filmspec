@@ -5,13 +5,6 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
-/**
- * Read-only diagnostic for the Billing "Overdue" count-vs-list mismatch — prints every
- * statement_of_accounts row that matches the overdue predicate (due_date < today, status !=
- * paid, balance > 0) alongside whether its booking_id/client_id actually joins to a real row,
- * since filteredOverdueQuery() inner-joins bookings/clients and would silently drop an
- * orphaned reference that the plain count query (no join) still counts.
- */
 class DiagnoseOverdue extends Command
 {
     protected $signature = 'billing:diagnose-overdue {--delete-orphans : Delete SOA rows whose booking_id no longer exists in bookings}';

@@ -105,10 +105,6 @@ body{
 .dpa-row a,.dpa-row strong.link{color:#0060C7;cursor:pointer;font-weight:600;text-decoration:underline;text-underline-offset:2px}
 
 @media(max-width:880px){
-  /* Centering against 100vh/100dvh traps a focused input under the keyboard once the
-     card is taller than the visible (keyboard-shrunk) viewport — align to the top instead
-     so the page scrolls normally and the browser's own "scroll focused field into view"
-     behavior can do its job. */
   body{align-items:flex-start}
   .shell{flex-direction:column;max-width:480px;min-height:unset;border-radius:14px}
   .panel{flex:none;padding:36px 32px 28px}
@@ -162,7 +158,6 @@ body{
       <button type="button" class="tbtn {{ $activeTab === 'signup' ? 'on' : '' }}" onclick="switchTab('signup')">Client Registration</button>
     </div>
 
-    <!-- LOGIN -->
     <div class="fs {{ $activeTab === 'login' ? 'on' : '' }}" id="fsLogin">
       <div class="form-title">Welcome back</div>
       <div class="form-sub">Sign in to access your account</div>
@@ -195,7 +190,6 @@ body{
       <div class="note">All accounts require a one-time email verification code on every sign-in.</div>
     </div>
 
-    <!-- SIGNUP -->
     <div class="fs {{ $activeTab === 'signup' ? 'on' : '' }}" id="fsSignup">
       <div class="form-title">Client registration</div>
       <div class="form-sub">Fill in your details to get started — staff accounts are created internally</div>
@@ -339,7 +333,7 @@ function openDpaModal(e){
   const body = document.getElementById('dpaScrollBody');
   body.scrollTop = 0;
   setDpaAgreeEnabled(false);
-  checkDpaScrolledToBottom(); // in case the content is short enough to not need scrolling at all
+  checkDpaScrolledToBottom();
 }
 function closeDpaModal(){ document.getElementById('dpaMo').style.display='none'; }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDpaModal(); });
@@ -349,9 +343,6 @@ function updateSignupBtn(){
 }
 let dpaRead = false;
 function onDpaCheckboxChange(e){
-  // Checking the box is only honored once they've actually opened the terms and scrolled
-  // through them via the modal's own "I Understand & Agree" button — ticking the box directly
-  // (without reading) gets reverted and sent into the modal instead.
   if (e.target.checked && !dpaRead) {
     e.target.checked = false;
     openDpaModal(e);
@@ -371,7 +362,6 @@ function setDpaAgreeEnabled(enabled){
 function checkDpaScrolledToBottom(){
   const body = document.getElementById('dpaScrollBody');
   if (!body) return;
-  // 4px slack for sub-pixel scroll rounding across browsers.
   if (body.scrollTop + body.clientHeight >= body.scrollHeight - 4) {
     setDpaAgreeEnabled(true);
   }

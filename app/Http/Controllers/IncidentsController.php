@@ -76,9 +76,6 @@ class IncidentsController extends Controller
             ->forPage($page, $perPage)
             ->get();
 
-        // damage_types now lives in incident_damage_types; re-attach it to each row as the
-        // same JSON-string shape the edit-modal JS (openEditIncident -> JSON.parse) expects,
-        // so the page's own Js::from($ir) embed keeps working unchanged.
         $incidentIds = $incidents->pluck('incident_id')->all();
         $damageTypesByIncident = [];
         if ($incidentIds) {
@@ -149,9 +146,6 @@ class IncidentsController extends Controller
                 $bookingEquipMap[$row->booking_id][] = $row;
             }
 
-            // Powers the New/Edit Incident modals' Unit select — same cascade (Booking ->
-            // Equipment -> Unit) CrewPortalController's own incident form already uses, so staff
-            // can pin down which physical unit when an equipment model has more than one.
             $equipIdsForUnits = $equipRows->pluck('equipment_id')->unique()->all();
             if ($equipIdsForUnits) {
                 foreach (DB::table('equipment_units')->whereIn('equipment_id', $equipIdsForUnits)->orderBy('asset_tag')->get() as $u) {
@@ -160,12 +154,6 @@ class IncidentsController extends Controller
             }
         }
 
-        // Booking-scoped unit map: which specific unit(s) are on THIS booking's equipment.
-        // Primary source is booking_equipment_units — allocated the moment equipment is added
-        // to a booking (EquipmentUnitAllocator), not just at Checklist check-out time. Falls
-        // back to the Checklist (direction='out') for bookings created before this table
-        // existed, then to $equipmentUnitMap (every unit of that model) as a last resort — the
-        // JS tries each in order.
         $bookingEquipmentUnitMap = [];
         if ($bookingIds) {
             $allocatedUnits = DB::table('booking_equipment_units as beu')
@@ -238,7 +226,6 @@ class IncidentsController extends Controller
         ]);
     }
 
-    /** Same filters index() applies to the incidents table, shared with export(). */
     private function filteredIncidentsQuery(Request $request)
     {
         $tab = $request->query('tab', 'all');
@@ -246,12 +233,8 @@ class IncidentsController extends Controller
 
         $incQuery = DB::table('incident_reports as ir')
             ->join('bookings as b', 'ir.booking_id', '=', 'b.booking_id')
-            // Left, not inner — an accessory-only incident (ir.equipment_id null) must still
-            // show up here, not silently vanish from every incidents listing.
             ->leftJoin('equipment as e', 'ir.equipment_id', '=', 'e.equipment_id')
             ->leftJoin('accessories as ac', 'ir.accessory_id', '=', 'ac.accessory_id')
-            // Left — not every incident has a specific unit pinned down (older rows, or
-            // "Not sure which unit" at report time), so this must never drop a row.
             ->leftJoin('equipment_units as eu', 'ir.equipment_unit_id', '=', 'eu.unit_id')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id');
         if ($tab !== 'all') {
@@ -271,7 +254,6 @@ class IncidentsController extends Controller
         return $incQuery;
     }
 
-    /** Same filter index() applies to the maintenance table, shared with export(). */
     private function filteredMaintenanceQuery(Request $request)
     {
         $maintTab = $request->query('mtab', 'pending');
@@ -288,13 +270,6 @@ class IncidentsController extends Controller
         return $maintQuery;
     }
 
-    /**
-     * A single physical unit's full history — incidents, checklist check-in/out, and
-     * maintenance — combined in one place. Reached by clicking a Unit cell in the Incidents
-     * table; no equivalent combined view existed before this (the Equipment Units page only
-     * ever showed maintenance-log history, via EquipmentController's own
-     * ?get_unit_maintenance_history= branch).
-     */
     private function unitHistory(int $unitId): \Illuminate\Http\JsonResponse
     {
         $unit = DB::table('equipment_units as eu')
@@ -323,10 +298,6 @@ class IncidentsController extends Controller
                 'ec.notes', 'ec.checked_at', 'b.booking_reference')
             ->get();
 
-        // maintenance_schedules tracks a whole equipment MODEL, not an individual unit — the
-        // only unit-level maintenance record is equipment_unit_maintenance_log (mark/return
-        // under-maintenance events), the same table EquipmentController's own
-        // ?get_unit_maintenance_history= branch already reads for the Equipment Units page.
         $maintenance = DB::table('equipment_unit_maintenance_log as l')
             ->leftJoin('users as u', 'l.performed_by', '=', 'u.user_id')
             ->where('l.unit_id', $unitId)
@@ -343,7 +314,6 @@ class IncidentsController extends Controller
         ]);
     }
 
-    /** Export ▾ — two independent datasets (incidents list, maintenance schedule), each unbounded. */
     private function export(Request $request): StreamedResponse|Response
     {
         $type = $request->query('export', 'incidents');
@@ -427,7 +397,6 @@ class IncidentsController extends Controller
         ]);
     }
 
-    /** Gated by the 'incidents' route middleware, same as print() above — no extra check needed. */
     public function incidentPhoto(int $id): StreamedResponse
     {
         $path = DB::table('incident_reports')->where('incident_id', $id)->value('photo_path');
@@ -436,7 +405,6 @@ class IncidentsController extends Controller
         return Storage::disk('local')->response($path);
     }
 
-    /** Same gate as incidentPhoto() above. */
     public function maintenancePhoto(int $id): StreamedResponse
     {
         $path = DB::table('maintenance_schedules')->where('schedule_id', $id)->value('photo_path');
@@ -558,12 +526,6 @@ class IncidentsController extends Controller
             }
 
             if ($bid && $eid) {
-                // Same resend-guard as CrewPortalController::crew_file_incident — a slow photo
-                // upload can make the browser/network retry the same POST before the first
-                // attempt's response arrives, which previously produced a second, orphaned
-                // incident_reports row (and an uncaught 500 if its damage-types insert then
-                // collided with the first attempt's). Treat an identical submission landing
-                // within the last 20s as that resend instead of filing it twice.
                 $dupe = DB::table('incident_reports')
                     ->where('reported_by', $uid)->where('booking_id', $bid)->where('equipment_id', $eid)
                     ->where('description', $desc)
@@ -597,11 +559,6 @@ class IncidentsController extends Controller
 
                     return [$irNum, $incidentId];
                 });
-                // A charge set at filing time (staff/auto-filed paths, unlike the
-                // always-zero crew self-report) must land in the booking's real total —
-                // this was previously only wired up on BookingDetailController's separate
-                // incident editor, never here. Always recompute, not just when charge > 0,
-                // to stay correct regardless of what else changed the booking's total since.
                 BookingCosting::updateBookingTotal($bid);
                 $printUrl = route('incident-print', $incidentId);
 
@@ -632,8 +589,6 @@ class IncidentsController extends Controller
             $equipmentUnitId = $this->parseUnitInput($request->input('equipment_unit', ''), $existingEid);
             $bookingId = (int) DB::table('incident_reports')->where('incident_id', $iid)->value('booking_id');
 
-            // A new photo REPLACES the old one; leaving the field blank on edit keeps whatever
-            // was already there rather than clearing it.
             $updateData = [
                 'equipment_unit_id' => $equipmentUnitId,
                 'incident_type' => $itype, 'incident_date' => $idate, 'incident_time' => $itime ?: null,
@@ -693,10 +648,6 @@ class IncidentsController extends Controller
         return null;
     }
 
-    // Same "u<equipment_unit_id>" / empty convention CrewPortalController's crew_file_incident
-    // already uses — empty or "not sure" leaves the report unit-less, same as before this field
-    // existed. Re-validates server-side that the unit actually belongs to this equipment, rather
-    // than trusting whatever the (same-origin, cascading) <select> posted.
     private function parseUnitInput(string $unitInput, int $equipmentId): ?int
     {
         if (! str_starts_with($unitInput, 'u')) {

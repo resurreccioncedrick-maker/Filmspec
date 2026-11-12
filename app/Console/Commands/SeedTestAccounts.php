@@ -6,13 +6,6 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
-/**
- * Creates (or updates) one login per role, all addressed to the same real inbox via Gmail's
- * "+tag" sub-addressing — jolomallare148+admin@gmail.com etc. all deliver to
- * jolomallare148@gmail.com, so one person can receive the OTP for any role without juggling
- * separate inboxes. Idempotent: safe to re-run, upserts by email. --email lets this run for
- * more than one person's inbox without editing the command each time.
- */
 class SeedTestAccounts extends Command
 {
     protected $signature = 'test-accounts:seed {--email=resurreccioncedrick@gmail.com : Base inbox all +tag logins deliver to}';

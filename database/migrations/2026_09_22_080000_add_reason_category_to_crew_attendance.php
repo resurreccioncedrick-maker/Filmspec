@@ -8,7 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Additive, alongside the existing free-text 'reason' column (kept as-is).
         Schema::table('crew_attendance', function (Blueprint $table) {
             $table->string('reason_category', 50)->nullable()->after('reason');
         });

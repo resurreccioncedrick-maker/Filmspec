@@ -4,7 +4,6 @@ namespace App\Support;
 
 use Illuminate\Support\Facades\DB;
 
-/** Tiny key/value settings store backed by the `settings` table. */
 class Settings
 {
     public static function get(string $key, ?string $default = null): ?string

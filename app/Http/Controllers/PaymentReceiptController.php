@@ -8,11 +8,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-/**
- * Part 10 — a print-friendly receipt per payment. No PDF library in this project (see
- * ce-preview.blade.php's "CE-PDF" — that's print-CSS + window.print(), not a server-rendered
- * PDF); this reuses that exact pattern rather than adding a new dependency.
- */
 class PaymentReceiptController extends Controller
 {
     public function show(Request $request, int $id): View
@@ -32,7 +27,6 @@ class PaymentReceiptController extends Controller
             )
             ->first();
 
-        // 404, not 403 — same don't-reveal-existence discipline as DocumentController.
         abort_unless($payment, 404);
 
         $allowed = $role === 'client'
@@ -50,7 +44,6 @@ class PaymentReceiptController extends Controller
         ]);
     }
 
-    /** Same access contract as show() above — view-only, no download-rename needed. */
     public function proof(Request $request, int $id): StreamedResponse
     {
         $user = $request->user();
@@ -75,11 +68,6 @@ class PaymentReceiptController extends Controller
         return Storage::disk('local')->response($payment->proof_of_payment_path);
     }
 
-    /**
-     * A client_payment_submissions row isn't a payment yet — staff reviewing it for
-     * approve/reject need to see the uploaded proof before deciding, so this is gated to
-     * billing-access staff only (the client already has their own copy; no client branch).
-     */
     public function submissionProof(Request $request, int $id): StreamedResponse
     {
         $user = $request->user();

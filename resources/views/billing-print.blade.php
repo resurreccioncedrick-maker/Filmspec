@@ -57,9 +57,6 @@
 </div>
 
 <script>
-  // window.close() is silently refused by the browser unless this tab was opened by script
-  // (window.open()/target="_blank"). Most links into this page are plain same-tab navigation,
-  // so fall back to going back — or to the booking itself if there's no history to return to.
   function closePrintView() {
     if (window.opener) { window.close(); return; }
     if (window.history.length > 1) { window.history.back(); return; }
@@ -89,7 +86,6 @@
   </div>
 
   @if ($printReceipt)
-  <!-- RECEIPT -->
   <div class="meta-grid">
     <div class="meta-block"><label>Received From</label><value>{{ $pay->company_name ?: $pay->contact_person }}</value></div>
     <div class="meta-block"><label>Booking Reference</label><value>{{ $pay->booking_reference }}</value></div>
@@ -121,7 +117,6 @@
   @endif
 
   @else
-  <!-- SOA -->
   <div class="meta-grid">
     <div class="meta-block"><label>Client</label><value>{{ $soa->company_name ?: $soa->contact_person }}</value></div>
     <div class="meta-block"><label>Booking Reference</label><value>{{ $soa->booking_reference }}</value></div>

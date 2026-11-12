@@ -63,7 +63,6 @@
 
 <div style="font-size:1.1rem;font-weight:700;color:var(--blue-700);margin-bottom:14px">{{ $period['label'] }}</div>
 
-<!-- KPIs -->
 <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:22px">
   <div class="stat-card">
     @include('partials.stat-comparison', ['delta' => $calDelta])
@@ -96,7 +95,6 @@
 </div>
 
 @if ($grid)
-<!-- Month grid + day-detail side panel -->
 <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:22px" class="cal-grid-layout">
   <div class="card" style="margin-bottom:0">
     <div class="card-header">
@@ -151,7 +149,6 @@
     </div>
   </div>
 
-  <!-- Day-detail side panel -->
   <div class="card" style="margin-bottom:0">
     <div class="card-header">
       <h2 class="card-title">{{ date('M j, Y', strtotime($selectedDay)) }}</h2>
@@ -193,8 +190,6 @@
   </div>
 </div>
 
-<!-- Day-click modals — one per in-month day, so clicking a cell shows that day's bookings
-     instantly without a page reload. -->
 @foreach ($grid as $week)
   @foreach ($week as $day)
   @continue(! $day['in_month'])
@@ -244,7 +239,6 @@
   @endforeach
 @endforeach
 
-<!-- This Month at a Glance -->
 <div class="card" style="margin-bottom:22px">
   <div class="card-header"><h2 class="card-title">This Month at a Glance</h2></div>
   <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);padding:16px 20px">
@@ -279,7 +273,6 @@
 @endif
 
 @if ($monthlySummary)
-<!-- Monthly summary (non-month periods) -->
 <div class="card" style="margin-bottom:22px">
   <div class="card-header"><h2 class="card-title">Monthly Summary</h2></div>
   <div class="table-wrap">
@@ -301,7 +294,6 @@
 </div>
 @endif
 
-<!-- Upcoming shoots -->
 <div class="card">
   <div class="card-header">
     <h2 class="card-title">Upcoming Shoots <span class="badge badge-gray" style="margin-left:4px">{{ $upcoming->count() }}</span></h2>

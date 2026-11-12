@@ -18,16 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'can_access' => \App\Http\Middleware\EnsureCanAccess::class,
         ]);
 
-        // Railway's edge proxy terminates HTTPS and forwards plain HTTP
-        // internally; without this, Laravel thinks every request is HTTP,
-        // generating http:// form actions/redirects behind an https:// proxy.
         $middleware->trustProxies(at: '*');
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('support-chat:prune')->daily();
-        // Hourly, not dailyAt() — the command itself checks Settings for whether it's enabled
-        // and which hour to actually run at, so the admin panel's toggle/time dropdown take
-        // effect immediately instead of needing a redeploy to change a hardcoded schedule time.
         $schedule->command('backup:run')->hourly();
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -28,10 +28,6 @@ class EquipmentDataController extends Controller
             ? $request->query('sort') : 'pesos';
         $showAll = (bool) $request->query('all', false);
         $category = trim((string) $request->query('category', ''));
-        // Every equipment row in the catalog is FilmSpec-owned — outsourced/partner equipment
-        // was retired as a feature (see BookingCosting::generateCostEstimate()'s $oTotal note),
-        // so this filter has only one real value. Kept as a dropdown (rather than removed) so
-        // the control matches the reference and is honest that "Partner" has no data behind it.
         $ownership = $request->query('ownership', '') === 'filmspec' ? 'filmspec' : '';
         $search = trim((string) $request->query('q', ''));
         $page = max(1, (int) $request->query('p', 1));
@@ -58,8 +54,6 @@ class EquipmentDataController extends Controller
             ->select('e.equipment_id', 'e.equipment_name', 'e.brand', 'ec.category_name')
             ->get();
 
-        // Bookings on the calendar with no confirmed CE — the reference calls these out so
-        // staff know why the numbers don't cover everything.
         $missingCe = DB::table('bookings as b')
             ->whereNotIn('b.booking_id', $bookingIds)
             ->whereNotIn('b.booking_status', ['cancelled'])
@@ -79,9 +73,6 @@ class EquipmentDataController extends Controller
         $pastShootsPages = max(1, (int) ceil($pastShootsTotal / self::BOOKINGS_PER_PAGE));
         $pastShoots = $allPastShoots->forPage($page, self::BOOKINGS_PER_PAGE)->values();
 
-        // Confirmed Equipment Value Trend — same shape as Cost Estimates' and Crew Data's recap
-        // charts: the chart window is independent of the table period (see ReportPeriod), so an
-        // August table can sit beside a Mar–Aug trend without those two ranges fighting.
         $chartMonths = $period['chart_months'];
         $chartKeys = ReportPeriod::chartMonthKeys($chartMonths);
         $chartCes = CeAnalytics::confirmedCes(
@@ -108,9 +99,6 @@ class EquipmentDataController extends Controller
             ];
         });
 
-        // "vs last period" pills on Confirmed Equipment Value/Shoots — not Equipment Models
-        // Quoted, which is a catalog breadth count more than a trend anyone tracks period over
-        // period.
         $prevPeriod = ReportPeriod::previous($period);
         $equipDeltas = ['fs_earned' => null, 'shoots' => null];
         if ($prevPeriod) {
@@ -149,11 +137,6 @@ class EquipmentDataController extends Controller
         ]);
     }
 
-    /**
-     * Owned gear: what each item earned at CE rates, plus the quantity and day counts the
-     * reference shows as "Qty: 16 · Quoted Days: 5". Shared by index() and export() so both
-     * stay identical.
-     */
     private function computeUsage(string $sort, $bookingIds, string $category = '')
     {
         $usage = DB::table('booking_equipment as be')
@@ -174,7 +157,6 @@ class EquipmentDataController extends Controller
         return $usage->sortByDesc(fn ($r) => (float) $r->{$sortKey})->values();
     }
 
-    /** Export ▾ — always the full unbounded usage list, same as "Show all" on screen. */
     private function export(Request $request): StreamedResponse|Response
     {
         $period = ReportPeriod::resolve($request);
@@ -210,15 +192,6 @@ class EquipmentDataController extends Controller
         ], 'equipment-analytics-export');
     }
 
-    /**
-     * One row per confirmed shoot: what the CE matched to the catalog.
-     *
-     * FS equipment lines carry an equipment_id foreign key so they are matched by
-     * construction — see booking_equipment's FK to equipment, which makes an "unmatched" line
-     * impossible rather than merely unlikely.
-     *
-     * One grouped query, not one per shoot.
-     */
     private function pastShoots($confirmedCes, $bookingIds, string $category = '')
     {
         if ($bookingIds->isEmpty()) {

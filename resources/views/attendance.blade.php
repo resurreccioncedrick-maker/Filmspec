@@ -29,7 +29,6 @@
 </div>
 @endif
 
-<!-- Stats -->
 <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:22px">
   <div class="stat-card green">
     <div class="stat-icon" style="background:#f0fdf4;color:#16a34a"><i data-feather="user-check"></i></div>
@@ -48,7 +47,6 @@
   </div>
 </div>
 
-<!-- TABS -->
 <div class="tabs" style="margin-bottom:22px">
   <button class="tab-btn active" data-tab="tab-log">Log Attendance</button>
   <button class="tab-btn" data-tab="tab-history">Attendance History</button>
@@ -57,7 +55,6 @@
 
 <div data-tab-panes>
 
-<!-- LOG ATTENDANCE -->
 <div id="tab-log" class="tab-pane active">
   @if (! $canManage)
   <div class="alert alert-info"><i data-feather="info"></i> You have view-only access to attendance records.</div>
@@ -251,7 +248,6 @@
   </div>
   @endif
 
-  <!-- Quick booking selector buttons -->
   @if ($activeBookings->isNotEmpty())
   <div class="card">
     <div class="card-header"><h2 class="card-title">Active Bookings</h2></div>
@@ -281,7 +277,6 @@
   @endif
 </div>
 
-<!-- ATTENDANCE HISTORY -->
 <div id="tab-history" class="tab-pane">
   <div class="card">
     <div class="card-header">
@@ -365,7 +360,6 @@
   </div>
 </div>
 
-<!-- TIMESHEETS -->
 <div id="tab-timesheet" class="tab-pane">
   @if ($canManage)
   <div class="card" style="margin-bottom:22px">
@@ -468,7 +462,7 @@
   </div>
 </div>
 
-</div><!-- /tab-panes -->
+</div>
 
 @push('scripts')
 <script>

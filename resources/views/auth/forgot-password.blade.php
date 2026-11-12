@@ -25,9 +25,6 @@ h2{font-size:16px;font-weight:700;color:#0B1A33;margin-bottom:6px}
 .back{display:block;text-align:center;margin-top:14px;font-size:12px;color:#7695B0;text-decoration:none;transition:color .15s}
 .back:hover{color:#0060C7}
 @media(max-width:880px){
-  /* Centering against 100vh traps a focused input under the keyboard once the
-     card is taller than the visible (keyboard-shrunk) viewport — align to the top
-     instead so the page scrolls normally. */
   body{align-items:flex-start}
 }
 </style>

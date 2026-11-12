@@ -9,8 +9,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Add the replacement index before dropping the old one — the FK on booking_id
-        // needs a supporting index at all times, so MySQL refuses to drop the only one.
         DB::statement('ALTER TABLE cost_estimates ADD INDEX cost_estimates_booking_id_idx (booking_id)');
         DB::statement('ALTER TABLE cost_estimates DROP INDEX booking_id');
         DB::statement("ALTER TABLE cost_estimates MODIFY COLUMN status ENUM('draft','submitted','approved','revised','confirmed') DEFAULT 'draft'");
@@ -29,8 +27,6 @@ return new class extends Migration
             $table->dropColumn(['confirmed_by', 'confirmed_at']);
         });
         DB::statement("ALTER TABLE cost_estimates MODIFY COLUMN status ENUM('draft','submitted','approved','revised') DEFAULT 'draft'");
-        // Same ordering requirement as up(): add the unique index back before dropping
-        // the plain one that's currently backing the FK.
         DB::statement('ALTER TABLE cost_estimates ADD UNIQUE KEY booking_id (booking_id)');
         DB::statement('ALTER TABLE cost_estimates DROP INDEX cost_estimates_booking_id_idx');
     }

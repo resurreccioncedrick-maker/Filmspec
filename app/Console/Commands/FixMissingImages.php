@@ -7,12 +7,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-/**
- * Fills in ONLY missing equipment/accessory/crew images — never touches a row that already has
- * one. A distinct icon-on-gradient card per row (can't fetch real product photos or photos of
- * real people), varied by name so a grid of similar items doesn't look like the same image
- * repeated.
- */
 class FixMissingImages extends Command
 {
     protected $signature = 'demo:fix-missing-images {--force : Skip the confirmation prompt}';
@@ -56,10 +50,6 @@ class FixMissingImages extends Command
         return self::SUCCESS;
     }
 
-    // "Missing" means either the column is empty, OR it points at a path with no real file
-    // behind it — the ordinary case here, since uploaded photos lived on the app container's
-    // ephemeral filesystem before a persistent volume existed and were lost on redeploy, while
-    // the database (restored separately from a SQL-only backup) still references the old paths.
     private function broken($rows, string $col)
     {
         return $rows->filter(fn ($r) => ! $r->{$col} || ! Storage::disk('public')->exists($r->{$col}));

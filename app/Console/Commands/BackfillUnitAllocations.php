@@ -6,13 +6,6 @@ use App\Support\EquipmentUnitAllocator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
-/**
- * One-time (but safe to re-run) backfill: allocates specific equipment_units/accessory_units to
- * every existing booking_equipment/booking_accessories row that predates EquipmentUnitAllocator
- * (introduced to run at insert-time going forward) and has no pivot row yet. Without this,
- * every booking created before the feature shipped keeps showing "every unit of this model"
- * in the Incident Report Unit picker instead of the one(s) actually on that booking.
- */
 class BackfillUnitAllocations extends Command
 {
     protected $signature = 'demo:backfill-unit-allocations {--force : Skip the confirmation prompt}';
@@ -28,8 +21,6 @@ class BackfillUnitAllocations extends Command
         }
 
         $eqDone = 0;
-        // Only bookings still in play — allocating units to an already-completed/cancelled
-        // booking would lock them away for good (nothing ever releases a finished booking again).
         $activeBookingIds = DB::table('bookings')->whereNotIn('booking_status', ['completed', 'cancelled'])->pluck('booking_id');
 
         $rows = DB::table('booking_equipment as be')
@@ -40,11 +31,6 @@ class BackfillUnitAllocations extends Command
             ->distinct()
             ->get();
         foreach ($rows as $r) {
-            // Prefer the Equipment Checklist's actually-recorded unit (ground truth — real
-            // check-out happened against a specific unit) over guessing fresh from whatever's
-            // 'available' right now. Just link the pivot without touching status: the
-            // checklist's own unit already reflects that unit's true current state (in_field,
-            // back to available, etc.) — this backfill shouldn't override it.
             $checklistUnits = DB::table('equipment_checklist')
                 ->where('booking_id', $r->booking_id)->where('equipment_id', $r->equipment_id)
                 ->where('direction', 'out')->whereNotNull('equipment_unit_id')

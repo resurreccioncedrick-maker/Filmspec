@@ -4,27 +4,8 @@ namespace App\Support;
 
 use Illuminate\Support\Facades\DB;
 
-/**
- * Shared by BookingDetailController (addEquipment/fieldAddEquipment) and
- * FieldRequestsController (dispatch) — decides whether $qty more of a given equipment can be
- * committed to a booking's date range, without duplicating the same query three times.
- *
- * Single-unit equipment (stock_quantity===1, the overwhelming majority) keeps this app's
- * original behavior exactly: availability_status is a meaningful whole-item flag, and a
- * conflict names the one other booking holding it.
- *
- * Multi-unit equipment can't be gated on availability_status at all — every checkout path
- * unconditionally sets it to 'rented' the moment ANY unit is checked out (there's no per-unit
- * counter), so treating that as a hard block would refuse a booking that only needs one of
- * several spare units still genuinely free. Decided purely by summing what's already committed
- * to OTHER active, date-overlapping bookings against real stock_quantity.
- */
 class EquipmentAvailability
 {
-    /**
-     * @param  object  $booking  must expose shoot_date_start/shoot_date_end
-     * @return array{type: string, text: string}|null null means available
-     */
     public static function check(int $equipmentId, int $qty, int $excludeBookingId, object $booking): ?array
     {
         $equip = DB::table('equipment')->where('equipment_id', $equipmentId)->first();
@@ -33,11 +14,6 @@ class EquipmentAvailability
         }
         $stock = max(1, (int) $equip->stock_quantity);
 
-        // Equipment with physical units tracked (equipment_units) must exclude any unit
-        // currently marked under_maintenance from available capacity — previously, marking a
-        // unit for maintenance had zero effect here, so a unit could still be allocated to a
-        // new booking while physically out of service. stock_quantity (recalcFromUnits()) counts
-        // every non-retired unit including under_maintenance ones, so subtract those out.
         $underMaintenance = (int) DB::table('equipment_units')
             ->where('equipment_id', $equipmentId)
             ->where('status', 'under_maintenance')

@@ -9,15 +9,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-/**
- * Full demo dataset for FilmSpec — realistic Philippine film-production catalog, staff, crew,
- * clients and a multi-month history of bookings carried through their whole lifecycle (CE ->
- * confirm -> crew/equipment/transport -> attendance -> payments -> completion), so the app
- * looks like a company has actually been running it rather than a handful of disconnected rows.
- *
- * Deliberately NOT idempotent — run once against a freshly-truncated database (see
- * database/seeders/ResetDatabase.php), never appended to an already-seeded one.
- */
 class DemoDataSeeder extends Seeder
 {
     private Carbon $today;
@@ -38,7 +29,6 @@ class DemoDataSeeder extends Seeder
         $this->command?->info('Demo data seeded.');
     }
 
-    // ---------------------------------------------------------------- images
 
     private function putImage(string $path, string $svg): void
     {
@@ -71,7 +61,6 @@ SVG;
 SVG;
     }
 
-    // ---------------------------------------------------------------- roles/users
 
     private function seedRolesAndUsers(): void
     {
@@ -117,11 +106,9 @@ SVG;
         ];
     }
 
-    // ---------------------------------------------------------------- catalog
 
     private function seedCatalog(): void
     {
-        // Categories already exist (Camera/Lens/Lighting/Audio/Grip/Electrical/Other) — reuse.
         $cats = DB::table('equipment_categories')->pluck('category_id', 'category_name');
         if ($cats->isEmpty()) {
             foreach (['Camera', 'Lens', 'Lighting', 'Audio', 'Grip', 'Electrical', 'Other'] as $name) {
@@ -142,7 +129,6 @@ SVG;
         }
 
         $equipment = [
-            // name, brand, model, category, daily_rate, requires_operator, condition
             ['ARRI Alexa Mini LF', 'ARRI', 'Alexa Mini LF', 'Camera', 18000, 1, 'excellent'],
             ['RED Komodo 6K', 'RED', 'Komodo 6K', 'Camera', 14000, 1, 'excellent'],
             ['Sony FX6', 'Sony', 'FX6', 'Camera', 9500, 0, 'excellent'],
@@ -194,9 +180,6 @@ SVG;
             ]);
             $equipIds[$name] = $eid;
 
-            // Per-unit tracking for a subset (the ones with stock_quantity > 1 get real unit rows).
-            // equipment_units.condition uses a narrower vocabulary than equipment.condition_status
-            // (no 'fair'/'under_repair'/'retired'), so map onto the closest equivalent.
             $unitCond = ['excellent' => 'excellent', 'good' => 'good', 'fair' => 'serviceable', 'under_repair' => 'damaged', 'retired' => 'damaged'][$cond] ?? 'good';
             $qty = DB::table('equipment')->where('equipment_id', $eid)->value('stock_quantity');
             for ($u = 1; $u <= $qty; $u++) {
@@ -220,7 +203,6 @@ SVG;
         }
 
         $accessories = [
-            // name, rate, type, tracking, linked equipment names (or null)
             ['V-Mount Battery 190Wh', 300, 'package_inclusion', 'individual', ['ARRI Alexa Mini LF', 'RED Komodo 6K', 'Sony FX6']],
             ['Battery Charger (Dual)', 0, 'package_inclusion', 'quantity', null],
             ['256GB CFexpress Card', 400, 'optional_addon', 'individual', ['ARRI Alexa Mini LF', 'RED Komodo 6K']],
@@ -278,7 +260,6 @@ SVG;
         $this->ids['accessories'] = $accIds;
     }
 
-    // ---------------------------------------------------------------- crew
 
     private function seedCrew(): void
     {
@@ -337,14 +318,12 @@ SVG;
         }
         $this->ids['crew'] = $crewIds;
 
-        // A couple of qualifications for realism.
         DB::table('crew_qualifications')->insert([
             ['crew_id' => $crewIds['Allen Mallare'], 'title' => 'Certified Drone Pilot (CAAP)', 'issuing_body' => 'CAAP', 'issue_date' => $this->today->copy()->subYear(), 'expiry_date' => $this->today->copy()->addYear(), 'created_at' => $this->today, 'updated_at' => $this->today],
             ['crew_id' => $crewIds['Ramon Aquino'], 'title' => 'Certified Drone Pilot (CAAP)', 'issuing_body' => 'CAAP', 'issue_date' => $this->today->copy()->subMonths(6), 'expiry_date' => $this->today->copy()->addMonths(18), 'created_at' => $this->today, 'updated_at' => $this->today],
             ['crew_id' => $crewIds['Samantha Cruz'], 'title' => 'Basic Occupational Safety Training', 'issuing_body' => 'DOLE', 'issue_date' => $this->today->copy()->subMonths(10), 'expiry_date' => null, 'created_at' => $this->today, 'updated_at' => $this->today],
         ]);
 
-        // One unavailability block for realism.
         DB::table('crew_unavailability')->insert([
             'crew_id' => $crewIds['Paolo Ignacio'], 'date_from' => $this->today->copy()->addDays(10)->toDateString(),
             'date_to' => $this->today->copy()->addDays(14)->toDateString(), 'reason' => 'Prior commitment on another production',
@@ -352,7 +331,6 @@ SVG;
         ]);
     }
 
-    // ---------------------------------------------------------------- fleet
 
     private function seedFleet(): void
     {
@@ -400,7 +378,6 @@ SVG;
         $this->ids['fleet'] = $fleetIds;
     }
 
-    // ---------------------------------------------------------------- clients
 
     private function seedClients(): void
     {
@@ -447,7 +424,6 @@ SVG;
         $this->ids['clients'] = $clientIds;
     }
 
-    // ---------------------------------------------------------------- bookings + transactions
 
     private function seedBookingsAndTransactions(): void
     {
@@ -464,8 +440,6 @@ SVG;
         $positions = $this->ids['positions'];
         $fleetPlates = array_keys($this->ids['fleet']);
 
-        // Timeline: 5 months of history (mostly completed) + this month (mixed) + 2 months
-        // ahead (confirmed/pending upcoming) — a realistic operational spread.
         $bookingSpecs = [];
         $seq = 1;
         for ($m = -5; $m <= 2; $m++) {
@@ -479,9 +453,8 @@ SVG;
                 $dayOffset = random_int(0, 26);
                 $start = $monthStart->copy()->addDays($dayOffset);
                 if ($m === 0 && $start->gt($this->today)) {
-                    // future days this month are fine (upcoming), no adjustment needed
                 }
-                $duration = random_int(0, 2); // 1-3 day shoots
+                $duration = random_int(0, 2);
                 $end = $start->copy()->addDays($duration);
 
                 $status = $this->pickStatus($m, $start);
@@ -530,10 +503,9 @@ SVG;
                     'cancellation_reason' => 'Client rescheduled to a later date',
                     'cancelled_by' => $this->ids['uid']['traffic1'],
                 ]);
-                continue; // no CE/crew/payments for a cancelled booking
+                continue;
             }
 
-            // ---- Equipment + accessory lines ----
             $lineEquip = (array) array_rand(array_flip($equipNames), random_int(2, 5));
             $equipTotal = 0.0;
             foreach ($lineEquip as $eqName) {
@@ -564,7 +536,6 @@ SVG;
                 $accTotal += $rate * $qty * $days;
             }
 
-            // ---- Crew assignments ----
             $lineCrew = (array) array_rand(array_flip($crewNames), random_int(3, 6));
             $crewTotal = 0.0;
             $days = $spec['start']->diffInDays($spec['end']) + 1;
@@ -586,7 +557,6 @@ SVG;
             $vat = round($subtotal * 0.12, 2);
             $grand = $subtotal + $vat;
 
-            // ---- Cost Estimate ----
             $ceRef = $yearPrefix . '-' . str_pad($ceSeq++, 4, '0', STR_PAD_LEFT);
             $ceStatus = in_array($spec['status'], ['pending'], true) ? 'draft' : 'confirmed';
             $ceId = DB::table('cost_estimates')->insertGetId([
@@ -607,10 +577,9 @@ SVG;
             ]);
 
             if ($ceStatus !== 'confirmed') {
-                continue; // still a draft/pending booking — no transport, payments, attendance yet
+                continue;
             }
 
-            // ---- Transport ----
             if (random_int(1, 100) <= 70) {
                 $plate = $fleetPlates[array_rand($fleetPlates)];
                 $driverName = $crewNames[array_rand($crewNames)];
@@ -622,10 +591,8 @@ SVG;
                 ]);
             }
 
-            // ---- Payments (proper transactions) ----
             $this->seedPayments($bookingId, $grand, $spec['status'], $spec['created'], $spec['start']);
 
-            // ---- Attendance (for shoots that have happened) ----
             if (in_array($spec['status'], ['completed', 'returned', 'ongoing'], true)) {
                 $this->seedAttendance($bookingId, $lineCrew, $spec['start'], $spec['end']);
             }
@@ -707,7 +674,6 @@ SVG;
         }
     }
 
-    // ---------------------------------------------------------------- supporting data
 
     private function seedSupportingData(): void
     {
@@ -716,7 +682,6 @@ SVG;
         $anyEquipment = array_values($this->ids['equipment']);
         $anyCrew = array_values($this->ids['crew']);
 
-        // Incident reports — a handful, tied to real completed bookings.
         $incidentTypes = ['damaged', 'malfunction', 'late_return'];
         $causes = ['accident', 'lifespan', 'negligence', 'unknown'];
         $completedIds = $completedBookings->values();
@@ -735,7 +700,6 @@ SVG;
             ]);
         }
 
-        // Booking discounts — a few approved requests.
         $regularClientBookings = DB::table('bookings')->inRandomOrder()->limit(4)->pluck('booking_id');
         foreach ($regularClientBookings as $bid) {
             DB::table('booking_discounts')->insert([
@@ -747,7 +711,6 @@ SVG;
             ]);
         }
 
-        // Reminders.
         $reminders = [
             ['todo', 'high', 'Confirm generator rental for next week\'s shoots', 3],
             ['todo', 'normal', 'Follow up on pending client approvals', 1],
@@ -765,7 +728,6 @@ SVG;
             ]);
         }
 
-        // FAQs (only if empty).
         if (DB::table('faqs')->count() === 0) {
             $faqs = [
                 ['How far in advance should I book equipment?', 'We recommend booking at least 5-7 business days in advance to guarantee availability.', 'Booking'],
@@ -778,7 +740,6 @@ SVG;
             }
         }
 
-        // Feedback for a handful of completed bookings.
         $feedbackBookings = $completedIds->shuffle()->take(min(8, $completedIds->count()));
         $comments = [
             'Great service, crew was professional and on time.',
@@ -800,7 +761,6 @@ SVG;
             ]);
         }
 
-        // A couple of field/resource requests still open.
         foreach ($confirmedBookings->take(3) as $bid) {
             DB::table('booking_equipment_requests')->insert([
                 'booking_id' => $bid, 'equipment_id' => $anyEquipment[array_rand($anyEquipment)],

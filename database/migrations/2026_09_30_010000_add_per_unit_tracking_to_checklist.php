@@ -4,21 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * Per-unit checklist tracking. Today equipment_checklist has exactly one row per
- * (booking, equipment/accessory, direction) — a booking with quantity>1 of the same model has
- * no way to tell its units apart, so one damaged unit's condition silently overwrites/represents
- * all of them. This adds an optional unit identity to each checklist/incident row:
- * equipment_unit_id / accessory_unit_id for genuinely serialized items (equipment_units /
- * accessory_units), or unit_seq (1, 2, 3…) for a multi-quantity item that has no registered
- * physical units at all. A row with all three null is the pre-existing whole-line aggregate
- * behavior, kept for quantity=1 items.
- *
- * Every step is guarded with hasColumn/hasForeign-style checks so this migration can resume
- * cleanly if it ever partially applies (each ALTER TABLE auto-commits in MySQL — this isn't
- * transactional DDL) — that happened once in local development from a users.user_id type
- * mismatch below, before the fix.
- */
 return new class extends Migration
 {
     public function up(): void
@@ -65,19 +50,12 @@ return new class extends Migration
         }
 
         Schema::table('bookings', function (Blueprint $table) {
-            // Crew's own confirmation that released equipment actually arrived on field —
-            // surfaced to office roles on the Checklist page, set only via the Crew Portal.
             if (! Schema::hasColumn('bookings', 'field_arrival_confirmed_at')) {
                 $table->timestamp('field_arrival_confirmed_at')->nullable()->after('transport_confirmed_at');
             }
             if (! Schema::hasColumn('bookings', 'field_arrival_confirmed_by')) {
-                // users.user_id is a plain (signed) int, not unsigned — matching that exactly,
-                // the same way every other *_by/*_id FK onto users in this schema already does.
                 $table->integer('field_arrival_confirmed_by')->nullable()->after('field_arrival_confirmed_at');
             } else {
-                // A first attempt at this migration (before this signed/unsigned fix) may have
-                // already created the column as unsignedBigInteger — correct it in place rather
-                // than skip it, or the foreign key below fails again with the same type clash.
                 $table->integer('field_arrival_confirmed_by')->nullable()->change();
             }
         });

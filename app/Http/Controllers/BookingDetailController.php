@@ -59,12 +59,6 @@ class BookingDetailController extends Controller
 
         $role = $request->user()->role->role_name ?? '';
         $isAdmin = in_array($role, ['super_admin', 'operations_manager', 'traffic'], true);
-        // Matches BillingController's $canRecord exactly (role_permissions.*.billing: super_admin/
-        // admin/operations_manager/accounting) — $isAdmin above wrongly includes traffic (no
-        // billing permission) and wrongly excludes accounting (has it), which previously let an
-        // accounting user see the Record Payment button here but have their POST silently
-        // dropped by act()'s role check. Payment-related gating on this page now uses this one
-        // set consistently instead of three different role lists.
         $canRecord = in_array($role, ['super_admin', 'operations_manager', 'accounting'], true);
 
         $equipmentLines = DB::table('booking_equipment as be')
@@ -79,9 +73,6 @@ class BookingDetailController extends Controller
             ->selectRaw("(SELECT et.condition_in FROM equipment_transactions et WHERE et.booking_id=be.booking_id AND et.equipment_id=be.equipment_id AND et.transaction_type='checkin' ORDER BY et.transaction_id DESC LIMIT 1) AS return_condition")
             ->get();
 
-        // Release Readiness's Equipment step needs to know every accessory line too (not just
-        // equipment), since both need their release unit(s) manually confirmed before the step
-        // can go green — see booking-detail.blade.php's $equipOk.
         $accessoryLines = DB::table('booking_accessories as ba')
             ->join('accessories as a', 'ba.accessory_id', '=', 'a.accessory_id')
             ->where('ba.booking_id', $id)
@@ -120,8 +111,6 @@ class BookingDetailController extends Controller
             ->selectRaw('COUNT(DISTINCT eo.position_id) AS req_count')
             ->get();
 
-        // Catalog rows, shared by Part 9's
-        // quick-add panel on the Equipment tab.
         $catalogEquipment = DB::table('equipment')
             ->where('condition_status', '!=', 'retired')
             ->orderBy('equipment_name')
@@ -136,8 +125,6 @@ class BookingDetailController extends Controller
         $ce = $ceHistory->first();
         $ceBreakdown = BookingCosting::breakdown($id, $ce);
 
-        // Origin (client vs staff) resolved via proposed_by -> users -> roles, the same
-        // authorship join used for the comment feed below.
         $discounts = DB::table('booking_discounts as bd')
             ->join('users as pu', 'bd.proposed_by', '=', 'pu.user_id')
             ->join('roles as pr', 'pu.role_id', '=', 'pr.role_id')
@@ -162,7 +149,6 @@ class BookingDetailController extends Controller
         $unreadComments = MessageReadTracker::unreadCount(Auth::id(), 'booking', $id, 'booking_comments', 'booking_id');
         MessageReadTracker::markRead(Auth::id(), 'booking', $id, $comments->last()->created_at ?? null);
 
-        // Documents (Part 18) — IDs, permits, etc. attached to this booking.
         $documents = DB::table('documents as d')
             ->leftJoin('users as u', 'd.uploaded_by', '=', 'u.user_id')
             ->where('d.booking_id', $id)
@@ -184,10 +170,6 @@ class BookingDetailController extends Controller
             })
             ->orderBy('a.accessory_name')
             ->select('a.accessory_id', 'a.accessory_name', 'a.daily_rate', 'a.is_included')
-            // For an individually-tracked accessory, a.quantity is a nominal 1 (its real stock is
-            // in accessory_units) — same distinction addBookingAccessory() applies server-side —
-            // so the "available" count shown here must come from accessory_units, not a.quantity,
-            // or it wrongly caps display at 1 unit regardless of how many units actually exist.
             ->selectRaw("CASE WHEN a.tracking_method = 'individual'
                 THEN (SELECT COUNT(*) FROM accessory_units au WHERE au.accessory_id = a.accessory_id AND au.status != 'retired')
                 ELSE a.quantity END AS quantity")
@@ -198,9 +180,6 @@ class BookingDetailController extends Controller
                 AND ba2.booking_id != ?),0) AS qty_in_use', [$id])
             ->get();
         $payments = DB::table('payments')->where('booking_id', $id)->orderByDesc('payment_date')->get();
-        // Client-submitted payment claims awaiting approval, same data Billing's own "Client
-        // Payment Requests" tab shows (BillingController::index()) — scoped to just this
-        // booking so staff reviewing a specific booking don't have to go hunt for it elsewhere.
         $pendingPaymentSubmissions = DB::table('client_payment_submissions as cps')
             ->leftJoin('users as u', 'cps.submitted_by', '=', 'u.user_id')
             ->where('cps.booking_id', $id)->where('cps.status', 'pending')
@@ -277,9 +256,6 @@ class BookingDetailController extends Controller
         $equipRequestsCount = $equipRequests->count();
         $pendingEquipRequestsCount = $pendingEquipRequests->count();
 
-        // Field-added equipment/accessories — cost was actually added to the booking at
-        // Dispatch (see FieldRequestsController::dispatch()), so anything still 'approved'
-        // (awaiting dispatch) hasn't affected the total yet and is left out here.
         $fieldAddNumDays = max(1, (new \DateTime($booking->shoot_date_start))->diff(new \DateTime($booking->shoot_date_end))->days + 1);
         $fieldAdditions = $equipRequests
             ->whereIn('item_type', ['equipment', 'accessory'])
@@ -318,9 +294,6 @@ class BookingDetailController extends Controller
             ->select('e.equipment_id', 'e.equipment_name', 'e.brand', 'e.daily_rate', 'ec.category_name')
             ->get();
 
-        // Lets the Add Equipment modal offer a Unit picker right at add-time — staff who already
-        // know which physical unit they're releasing don't have to add the line blind and
-        // confirm units separately afterward on the Cost Estimate tab.
         $availUnitsByEquipId = \App\Support\EquipmentUnitAllocator::reservableEquipmentUnits($availEquip->pluck('equipment_id')->all(), (int) $id, $ds, $de)
             ->groupBy('equipment_id');
 
@@ -340,9 +313,6 @@ class BookingDetailController extends Controller
         $positions = DB::table('crew_positions')->orderBy('position_name')->get();
         $vehicleRates = DB::table('vehicle_rates')->where('is_active', 1)->orderBy('base_rate')->get();
 
-        // Transport being assigned doesn't automatically mean a driver is required — some
-        // transport is just a delivery/courier fee. Staff say so explicitly on the Assign
-        // Transport form (driver_required), matching ChecklistController's gate.
         $driverNeeded = ! empty($booking->vehicle_rate_id) && (bool) ($booking->driver_required ?? false);
         $driverCount = DB::table('booking_crew as bc')
             ->join('crew_positions as cp', 'bc.position_id', '=', 'cp.position_id')
@@ -385,8 +355,6 @@ class BookingDetailController extends Controller
         $role = $user->role->role_name ?? '';
         $uid = $user->user_id;
         $action = $request->input('action', '');
-        // Same role set as show()'s $canRecord — kept in sync manually, matching this
-        // controller's existing convention of inline role checks rather than middleware.
         $canRecord = in_array($role, ['super_admin', 'operations_manager', 'accounting'], true);
 
         $booking = DB::table('bookings as b')
@@ -420,8 +388,6 @@ class BookingDetailController extends Controller
             BookingCosting::generateCostEstimate($id, $uid);
             $msg = ['type' => 'success', 'text' => 'Cost estimate generated.'];
         } elseif ($action === 'confirm_ce' && in_array($role, ['super_admin', 'operations_manager'], true)) {
-            // The booking itself must be approved before its cost estimate can be confirmed —
-            // otherwise a project that was never approved could still have a confirmed CE.
             $msg = ($booking->approval_status ?? null) !== 'approved'
                 ? ['type' => 'danger', 'text' => 'Cannot confirm the cost estimate — approve the booking first.']
                 : BookingCosting::confirmCe($id, $uid, $request->input('confirmation_note'));
@@ -533,11 +499,6 @@ class BookingDetailController extends Controller
             $request->session()->flash('bd_flash', $msg);
         }
 
-        // Lets a form embedded on the CE page (ce-preview, mode=booking) reuse this exact same
-        // action set (add_equipment, batch_add_crew, add_booking_accessory, assign_transport,
-        // set_discount, update_project_details, ...) instead of duplicating the business logic
-        // there, and land back on the CE page instead of Booking Detail afterward. Deliberately
-        // a closed enum, not an arbitrary URL, to rule out an open redirect.
         if ($request->input('return_to') === 'ce_preview') {
             return redirect()->route('ce-preview', array_filter([
                 'booking_id' => $id,
@@ -570,10 +531,6 @@ class BookingDetailController extends Controller
             'booking_id' => $id, 'equipment_id' => $eid, 'quantity' => $qty, 'days' => $days, 'daily_rate' => $rate, 'notes' => $notes,
         ], 'bk_equip_id');
 
-        // Staff can pick the specific release unit(s) right here at add-time instead of only
-        // confirming later on the Cost Estimate tab — if they did, that choice is immediately
-        // authoritative (and already confirmed); otherwise fall back to the auto-pick, left
-        // unconfirmed until someone reviews/confirms it on the CE page.
         $pickedUnitIds = array_values(array_filter(array_map('intval', (array) $request->input('unit_ids', []))));
         if ($pickedUnitIds && count($pickedUnitIds) >= $qty) {
             if (\App\Support\EquipmentUnitAllocator::allocateSpecific($bkEquipId, $pickedUnitIds)
@@ -600,8 +557,6 @@ class BookingDetailController extends Controller
     {
         $zone = $request->input('location_zone', '');
         $vid = (int) $request->input('vehicle_rate_id', 0);
-        // Transport cost is manually entered by traffic/admin — the rate×multiplier figure
-        // below is only a reference suggestion shown in the UI, not the source of truth.
         $rawCost = $request->input('transport_cost');
         if ($rawCost === null || $rawCost === '' || ! is_numeric($rawCost) || (float) $rawCost < 0) {
             return ['type' => 'danger', 'text' => 'Enter a valid transport cost (0 or more).'];
@@ -609,13 +564,8 @@ class BookingDetailController extends Controller
         $transCost = round((float) $rawCost, 2);
         $driverCid = (int) $request->input('driver_crew_id', 0);
         $driverRate = (float) $request->input('driver_rate', 0);
-        // Not every transport arrangement needs a FilmSpec driver — some is just a delivery/
-        // courier fee. Staff say so explicitly here rather than the release gate assuming a
-        // driver is always required whenever transport is on the booking.
         $driverRequired = $request->boolean('driver_required');
 
-        // Still needed for transport_multiplier, which CePreviewController also uses to scale
-        // the equipment total on the CE document — not just the transport line itself.
         $zoneMultMap = ['manila' => 1.0, 'luzon' => 1.5, 'luzon_far' => 2.0];
         $mult = $zoneMultMap[$zone] ?? 1.0;
 
@@ -623,9 +573,6 @@ class BookingDetailController extends Controller
             'location_zone' => $zone ?: null, 'transport_multiplier' => $mult,
             'transportation_cost' => $transCost, 'vehicle_rate_id' => $vid ?: null,
             'driver_required' => $vid ? $driverRequired : false,
-            // Set on every save, whatever the outcome (a real vehicle or an explicit "no
-            // transport needed") — this is what the release gate actually checks, not whether
-            // a vehicle happens to be selected.
             'transport_confirmed_at' => now(),
         ]);
 
@@ -745,9 +692,6 @@ class BookingDetailController extends Controller
         if ($booking->booking_status === 'confirmed' && ! $ceConfirmed) {
             return ['type' => 'error', 'text' => 'Cannot release — the cost estimate must be <strong>confirmed</strong> first. Use Confirm CE, then try again.'];
         }
-        // Confirming the CE only sends it to the client (cost_approval_status becomes
-        // 'pending_client') — it is not the client's approval. Matches the gate already
-        // enforced on the Checklist OUT page (ChecklistController::index()).
         $costApproved = ($booking->cost_approval_status ?? null) === 'client_approved';
         if ($booking->booking_status === 'confirmed' && ! $costApproved) {
             return ['type' => 'error', 'text' => 'Cannot release — the client has not approved the cost estimate yet.'];
@@ -758,14 +702,9 @@ class BookingDetailController extends Controller
             return ['type' => 'error', 'text' => 'Cannot release — no crew assigned. Assign at least one crew member (operator, driver, etc.) before releasing equipment.'];
         }
 
-        // Transport must have been explicitly reviewed at least once (even if the answer was
-        // "no transport needed") — otherwise a booking nobody has looked at looks identical to
-        // one that genuinely doesn't need transport, and release would slip through unnoticed.
         if (empty($booking->transport_confirmed_at)) {
             return ['type' => 'error', 'text' => 'Cannot release — transport hasn\'t been reviewed yet. Open Add/Edit Transport, even to confirm none is needed.'];
         }
-        // Transport being assigned doesn't automatically mean a driver is required — staff mark
-        // that explicitly on the Assign Transport form (driver_required).
         $driverNeeded = ! empty($booking->vehicle_rate_id) && (bool) ($booking->driver_required ?? false);
         if ($driverNeeded) {
             $driverCount = DB::table('booking_crew as bc')
@@ -776,9 +715,6 @@ class BookingDetailController extends Controller
                 return ['type' => 'error', 'text' => 'Cannot release — a <strong>Driver</strong> must be assigned because this booking\'s transport requires one. Add a crew member with the Driver position, then release.'];
             }
         }
-
-        // Payment collection is accounting's own workspace (Billing & POS) — it no longer gates
-        // equipment release.
 
         DB::table('equipment_transactions')->insert([
             'booking_id' => $id, 'equipment_id' => $eid, 'transaction_type' => 'checkout', 'transaction_date' => now(),
@@ -863,8 +799,6 @@ class BookingDetailController extends Controller
         if ($booking->booking_status === 'confirmed' && ! $ceConfirmed) {
             return ['type' => 'error', 'text' => 'Cannot release — the cost estimate must be confirmed first.'];
         }
-        // Same client-approval gate as checkout() / ChecklistController::index() — confirming the
-        // CE only sends it to the client, it does not mean the client approved it.
         $costApproved = ($booking->cost_approval_status ?? null) === 'client_approved';
         if ($booking->booking_status === 'confirmed' && ! $costApproved) {
             return ['type' => 'error', 'text' => 'Cannot release — the client has not approved the cost estimate yet.'];
@@ -884,8 +818,6 @@ class BookingDetailController extends Controller
                 return ['type' => 'error', 'text' => 'Cannot release — a Driver must be assigned because this booking\'s transport requires one.'];
             }
         }
-        // Payment collection is accounting's own workspace (Billing & POS) — it no longer gates
-        // equipment release.
 
         $pendingItems = DB::table('booking_equipment as be')
             ->where('be.booking_id', $id)
@@ -962,8 +894,6 @@ class BookingDetailController extends Controller
 
         $newEnd = date('Y-m-d', strtotime($booking->shoot_date_end . " +$extraDays days"));
         DB::table('bookings')->where('booking_id', $id)->update(['shoot_date_end' => $newEnd, 'updated_at' => now()]);
-        // subtotal is a STORED GENERATED column (quantity*days*daily_rate) — only `days` is set explicitly.
-        // $extraDays is already forced through (int) above before interpolating into the raw expression.
         DB::table('booking_equipment')->where('booking_id', $id)->update(['days' => DB::raw("days + $extraDays")]);
         BookingCosting::generateCostEstimate($id, $uid);
         ActivityLog::record($uid, 'update', 'booking', "Extended rental by $extraDays day(s). New end: $newEnd", $id);
@@ -988,12 +918,6 @@ class BookingDetailController extends Controller
 
     private function completeBooking(int $id, $booking, int $uid): array
     {
-        // Only reachable once a booking has actually gone through inspection (confirmInspection()
-        // -> 'returned', which itself blocks on open incidents). There used to be a "Skip
-        // Inspection" shortcut straight from 'pending_inspection' with none of those checks —
-        // removed: completion must never jump ahead of inspection/incident resolution, and
-        // this also prevents a direct POST from completing a booking at an earlier stage
-        // (e.g. 'confirmed'/'ongoing') without equipment ever having been returned.
         if ($booking->booking_status !== 'returned') {
             return ['type' => 'danger', 'text' => 'Booking cannot be completed from its current status — confirm inspection first.'];
         }
@@ -1029,8 +953,6 @@ class BookingDetailController extends Controller
         if ($completedCount >= 5) {
             $currentType = DB::table('clients')->where('client_id', $clientId)->value('client_type');
             if ($currentType === 'first_time') {
-                // clients.payment_terms real enum is 50_downpayment/90_days/6_months/2_weeks_crew —
-                // '90_days' is the closest match to the deferred-payment terms this promotion intends
                 DB::table('clients')->where('client_id', $clientId)->update(['client_type' => 'regular', 'payment_terms' => '90_days']);
                 $promoted = true;
             }
@@ -1108,9 +1030,6 @@ class BookingDetailController extends Controller
             }
         }
 
-        // Matches BillingController::handleAction()'s record_payment branch — document type
-        // defaults to the client's own VAT registration but can be overridden per payment via
-        // the form's dropdown, for the rare case the client record's VAT flag is wrong or stale.
         $isVatRegistered = (int) DB::table('bookings as b')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
             ->where('b.booking_id', $id)->value('c.is_vat_registered');
@@ -1121,12 +1040,6 @@ class BookingDetailController extends Controller
         $isVat = $rctype === 'official_receipt' ? 1 : 0;
         $rcPrefix = $isVat ? 'OR' : 'AR';
 
-        // The remaining-balance check and the insert both happen inside the same
-        // booking-row-locked transaction — otherwise two near-simultaneous payment
-        // submissions for the same booking could each read the same stale "amount paid
-        // so far", both pass the "doesn't exceed the balance" check, and both insert,
-        // together overpaying the booking. Locking the bookings row for this id
-        // serializes any concurrent recordPayment() calls for the same booking.
         $error = DB::transaction(function () use ($rctype, $rcPrefix, $id, $ptype, $pmethod, $amount, $ref, $bankName, $proofPath, $pdate, $uid, $isVat, $notes) {
             $bkTotal = (float) (DB::table('bookings')->where('booking_id', $id)->lockForUpdate()->value('final_amount') ?? 0);
             $bkPaid = (float) DB::table('payments')->where('booking_id', $id)->sum('amount');
@@ -1134,10 +1047,6 @@ class BookingDetailController extends Controller
             if ($bkTotal > 0 && $amount > $remaining + 0.005) {
                 return ['type' => 'danger', 'text' => 'Payment of <strong>₱' . number_format($amount, 2) . '</strong> exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong>.'];
             }
-            // A payment that fully settles what's left IS the final payment, whatever type was
-            // picked — the Payment Type dropdown only auto-suggests this client-side and stops
-            // once staff touch it manually, so without this a downpayment-labeled payment could
-            // complete the booking and stay mislabeled forever.
             $ptype = $amount >= $remaining - 0.005 ? 'final' : $ptype;
 
             $rcSeq = (int) DB::table('payments')->where('receipt_type', $rctype)->lockForUpdate()->count() + 1;
@@ -1179,12 +1088,6 @@ class BookingDetailController extends Controller
         return ['type' => 'success', 'text' => 'Payment of <strong>₱' . number_format($amount, 2) . '</strong> recorded.'];
     }
 
-    /**
-     * Deliberately a near-exact copy of BillingController::approvePaymentSubmission() rather
-     * than a shared helper — same convention already established there (see its own comment)
-     * for keeping each entry point's payment-recording logic self-contained and easy to read
-     * in place, at the cost of the two having to be kept in sync by hand if this logic changes.
-     */
     private function approvePaymentSubmission(Request $request, int $uid): array
     {
         $subId = (int) $request->input('submission_id');
@@ -1379,9 +1282,6 @@ class BookingDetailController extends Controller
 
     private function addCrew(Request $request, int $id, $booking): array
     {
-        // Historical-analytics protection (Part 11 panelist revision): a completed shoot's crew
-        // roster is what Crew Analytics reports against — changing it after the fact would
-        // silently rewrite history for a shoot that already happened.
         if (($booking->booking_status ?? null) === 'completed') {
             return ['type' => 'error', 'text' => 'This booking is completed — its crew roster is locked to protect historical analytics.'];
         }
@@ -1447,11 +1347,6 @@ class BookingDetailController extends Controller
         return ['type' => 'success', 'text' => 'Crew status updated.'];
     }
 
-    // Marks (or un-marks) one crew assignment as the booking's Head Crew. Only one head per
-    // booking: setting a new one clears the previous; sending the current head again toggles
-    // the mark off. The head is the only crew member who gets Attendance and Equipment
-    // Checklist in the crew portal (see CrewPortalController). Internal-only — nothing
-    // client-facing ever reads is_head_crew.
     private function setHeadCrew(Request $request, int $id, int $uid): array
     {
         if (DB::table('bookings')->where('booking_id', $id)->value('booking_status') === 'completed') {
@@ -1491,7 +1386,6 @@ class BookingDetailController extends Controller
 
     private function removeCrew(Request $request, int $id, int $uid): array
     {
-        // Same historical-analytics protection as addCrew() — see its comment.
         if (DB::table('bookings')->where('booking_id', $id)->value('booking_status') === 'completed') {
             return ['type' => 'error', 'text' => 'This booking is completed — its crew roster is locked to protect historical analytics.'];
         }
@@ -1618,10 +1512,6 @@ class BookingDetailController extends Controller
             return ['type' => 'danger', 'text' => 'Comment cannot be empty.'];
         }
 
-        // Which client-facing department this reply counts under is derived from the replying
-        // staff member's own role, not picked manually — see BookingChatDepartment. Internal
-        // notes never reach a client, so the bucket is irrelevant for them, but we still set it
-        // for consistency/debugging rather than leaving it null.
         DB::table('booking_comments')->insert([
             'booking_id' => $id, 'user_id' => $uid, 'department' => \App\Support\BookingChatDepartment::bucketForRole($role), 'body' => $body,
             'is_internal' => $request->boolean('is_internal'), 'created_at' => now(),
@@ -1675,8 +1565,6 @@ class BookingDetailController extends Controller
         $zoneMultMap = ['manila' => 1.0, 'luzon' => 1.5, 'luzon_far' => 2.0];
         $multiplier = $zoneMultMap[$zone] ?? 1.0;
         $vid = $sourceBooking->vehicle_rate_id;
-        // Transport cost is manually entered, not derived — a duplicated booking carries over
-        // what the source booking was actually charged, not a freshly-recomputed guess.
         $transCost = (float) ($sourceBooking->transportation_cost ?? 0);
 
         $approvalSt = $role === 'traffic' ? 'pending_approval' : 'approved';
@@ -1789,7 +1677,6 @@ class BookingDetailController extends Controller
 
         $newDays = max(1, (new \DateTime($booking->shoot_date_start))->diff(new \DateTime($newEnd))->days + 1);
 
-        // subtotal is a STORED GENERATED column (quantity*days*daily_rate) — only `days` is set explicitly
         DB::table('booking_equipment')->where('booking_id', $id)->update(['days' => $newDays]);
 
         $accLines = DB::table('booking_accessories')->where('booking_id', $id)->get();
@@ -1821,15 +1708,6 @@ class BookingDetailController extends Controller
         return ['type' => 'success', 'text' => 'Extension request rejected.'];
     }
 
-    /**
-     * Approving an equipment/accessory field request only marks it approved — the actual
-     * booking_equipment/booking_accessories insert (and the physical checkout side-effects for
-     * equipment) happens at the Dispatch step on the cross-booking Field Requests queue
-     * (FieldRequestsController), matching fieldAddEquipment()'s "released to field" semantics.
-     * Crew is different: there's no physical inventory checkout for a person, so approving a
-     * crew request immediately books them (admin picks the real crew_id here — the client only
-     * requested a position/role) via booking_crew, same as approve elsewhere in this class.
-     */
     private function approveFieldRequest(Request $request, int $id, $booking, int $uid): ?array
     {
         $reqId = (int) $request->input('request_id');
@@ -1853,9 +1731,6 @@ class BookingDetailController extends Controller
             $rate = (float) $crew->base_rate_12hr;
             $exists = DB::table('booking_crew')->where('booking_id', $id)->where('crew_id', $crewId)->exists();
             if (! $exists) {
-                // Same double-booking + personal-unavailability checks as addCrew()/batchAddCrew() —
-                // approving a field request must not be able to book a crew member who is already
-                // committed elsewhere on overlapping dates.
                 $crewConflictRef = DB::table('booking_crew as bc')
                     ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
                     ->where('bc.crew_id', $crewId)->where('bc.booking_id', '!=', $id)
@@ -1889,9 +1764,6 @@ class BookingDetailController extends Controller
                 'status' => 'approved', 'crew_id' => $crewId, 'approved_by' => $uid, 'approved_at' => now(), 'admin_notes' => $notes,
             ]);
             BookingCosting::generateCostEstimate($id, $uid);
-            // Same reset addCrew()/batchAddCrew() already do — this field-request path commits
-            // a new crew member to the booking just as directly, and without this the client's
-            // bill could silently grow past what they last approved.
             if (($booking->cost_approval_status ?? null) === 'client_approved') {
                 DB::table('bookings')->where('booking_id', $id)->update(['cost_approval_status' => 'pending_client', 'updated_at' => now()]);
             }
@@ -1901,7 +1773,6 @@ class BookingDetailController extends Controller
             return ['type' => 'success', 'text' => e($crewName) . ' assigned. Costs recalculated.'];
         }
 
-        // equipment / accessory — no insert yet, that happens at Dispatch
         DB::table('booking_equipment_requests')->where('request_id', $reqId)->update([
             'status' => 'approved', 'approved_by' => $uid, 'approved_at' => now(), 'admin_notes' => $notes,
         ]);
@@ -1981,11 +1852,6 @@ class BookingDetailController extends Controller
             ->whereNotIn('b.booking_status', ['cancelled', 'completed'])
             ->where('ba.booking_id', '!=', $id)
             ->sum('ba.quantity');
-        // accessories.quantity is only meaningful for tracking_method='quantity' — an
-        // individually-tracked accessory keeps quantity at a nominal 1 (its real stock lives in
-        // accessory_units), matching AccessoriesController::index()'s total_units logic. Using
-        // the raw quantity column here would wrongly cap an individually-tracked accessory at 1
-        // unit total regardless of how many accessory_units rows actually exist.
         $stock = ($acc->tracking_method ?? 'quantity') === 'individual'
             ? max(1, (int) DB::table('accessory_units')->where('accessory_id', $aid)->where('status', '!=', 'retired')->count())
             : max(1, (int) $acc->quantity);
@@ -2002,7 +1868,6 @@ class BookingDetailController extends Controller
             'daily_rate' => $rate, 'is_included' => (int) $acc->is_included, 'subtotal' => $sub, 'notes' => $notes,
         ], 'ba_id');
 
-        // Same immediate-pick-or-fall-back-to-auto pattern as addEquipment() above.
         $pickedUnitIds = array_values(array_filter(array_map('intval', (array) $request->input('unit_ids', []))));
         if ($pickedUnitIds && count($pickedUnitIds) >= $qty) {
             if (\App\Support\EquipmentUnitAllocator::allocateSpecificAccessory($baId, $pickedUnitIds)
@@ -2025,20 +1890,6 @@ class BookingDetailController extends Controller
         return ['type' => 'success', 'text' => '<strong>' . e($acc->accessory_name) . '</strong> added to booking. Cost estimate updated.'];
     }
 
-    /**
-     * Staff manually picks/confirms which specific physical unit(s) will actually be released
-     * for one or more equipment lines in a single submit (one "Confirm All Units" button per
-     * table, not one click per row) — overrides EquipmentUnitAllocator::allocate()'s auto-pick
-     * (made the instant each line was added) and marks every submitted line `unit_confirmed`,
-     * which is what the Release Readiness widget now actually gates on for the Equipment step
-     * (see booking-detail.blade.php), instead of merely "a line exists".
-     *
-     * $request->input('lines') shape: [bk_equip_id => ['bk_equip_id' => ..., 'unit_ids' => [...]]]
-     * — only lines actually present in the submitted form (i.e. every row in the table, since
-     * the whole table shares one form) are processed; a line whose own unit picker was left in
-     * its read-only "Confirmed" state still resubmits its hidden bk_equip_id with no unit_ids
-     * change, which is a harmless no-op re-confirm.
-     */
     private function confirmEquipmentUnits(Request $request, int $id): array
     {
         $lines = (array) $request->input('lines', []);
@@ -2089,7 +1940,6 @@ class BookingDetailController extends Controller
         return ['type' => 'success', 'text' => count($confirmedNames) . ' equipment line(s) confirmed.'];
     }
 
-    /** Accessory equivalent of confirmEquipmentUnits() above. */
     private function confirmAccessoryUnits(Request $request, int $id): array
     {
         $lines = (array) $request->input('lines', []);
@@ -2194,8 +2044,6 @@ class BookingDetailController extends Controller
         return ['type' => 'success', 'text' => 'Pricing updated: <strong>' . $labels[$mode] . '</strong>. Cost estimate recalculated.'];
     }
 
-    // CE project details (Part 7). The contact_* fields are per-booking overrides — a blank
-    // one is stored as NULL so the CE document falls back to the client record.
     private function updateProjectDetails(Request $request, int $id, int $uid): array
     {
         $ceType = (string) $request->input('ce_type', 'fs_front');
@@ -2229,10 +2077,6 @@ class BookingDetailController extends Controller
         return ['type' => 'success', 'text' => 'Project details updated.'];
     }
 
-    // ── CE workflow (Part 9) ───────────────────────────────────────────────────────────
-
-    // Streams the CE as CSV (opens in Excel). Same streamDownload + fputcsv pattern as the
-    // Reports exports; no spreadsheet library needed.
     public function ceExport(Request $request, int $id)
     {
         $booking = DB::table('bookings as b')
@@ -2247,7 +2091,6 @@ class BookingDetailController extends Controller
         $lines = BookingCosting::lines($id);
         $ceTypeLabels = ['fs_front' => 'FS Front', 'client_direct' => 'Client Direct', 'partner_front' => 'Partner Front'];
 
-        // Legacy references already start with "CE-"; the newer YY-MM-NN ones don't.
         $ref = $ce->ce_reference ?? $booking->booking_reference;
         $filename = (str_starts_with($ref, 'CE-') ? $ref : 'CE-' . $ref) . '-' . date('Ymd') . '.csv';
 
@@ -2305,8 +2148,6 @@ class BookingDetailController extends Controller
         }, $filename, ['Content-Type' => 'text/csv; charset=utf-8']);
     }
 
-    // Renders the CE as an HTML email body — the client reads the figures without clicking,
-    // and the link takes them to the portal to approve or reject.
     private function buildCeEmailHtml($booking, $ce, array $bd, array $lines, string $portalUrl, string $clientName): string
     {
         $peso = fn ($n) => '₱' . number_format((float) $n, 2);
@@ -2358,8 +2199,6 @@ class BookingDetailController extends Controller
         return $h;
     }
 
-    // Same shape as AuthController::sendMail() — a mail failure is logged and reported, never
-    // allowed to break the request.
     private function sendMail(string $to, string $subject, string $html): bool
     {
         try {
@@ -2382,12 +2221,9 @@ class BookingDetailController extends Controller
             return ['type' => 'danger', 'text' => 'Confirm the cost estimate before emailing it to the client.'];
         }
 
-        // act()'s shared $booking query doesn't carry the client columns, so load them here
-        // rather than widening a query every other action depends on.
         $client = DB::table('clients')->where('client_id', $booking->client_id)
             ->select('company_name', 'contact_person', 'email')->first();
 
-        // Part 7's per-booking override wins; otherwise the client record.
         $to = trim((string) ($booking->ce_contact_email ?: ($client->email ?? '')));
         if (! $to || ! filter_var($to, FILTER_VALIDATE_EMAIL)) {
             return ['type' => 'danger', 'text' => 'No valid client email on this booking. Add one under Project Details.'];
@@ -2421,7 +2257,6 @@ class BookingDetailController extends Controller
         if (! $ce) {
             return ['type' => 'danger', 'text' => 'Cost estimate not found on this booking.'];
         }
-        // Confirmed CEs are immutable history (Part 2a) — they may already be with a client.
         if ($ce->status === 'confirmed') {
             return ['type' => 'danger', 'text' => 'Confirmed cost estimates cannot be erased — they are a record of what was quoted.'];
         }
@@ -2455,9 +2290,6 @@ class BookingDetailController extends Controller
         return ['type' => 'danger', 'text' => 'Unknown close option.'];
     }
 
-    // Removes the FilmSpec equipment lines only. Refuses outright if anything has been checked
-    // out — deleting those lines would orphan their equipment_transactions rows and strand the
-    // gear as 'rented' with nothing explaining why.
     private function clearFsEquipment(int $id, int $uid): array
     {
         $checkedOut = DB::table('booking_equipment as be')

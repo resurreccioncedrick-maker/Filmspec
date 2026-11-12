@@ -1,5 +1,3 @@
-{{-- "Activity — recent changes" collapsible (Part 16). Expects $pageActivity and, optionally,
-     $activityModule so the footer can link through to the filtered full history. --}}
 <details style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
   <summary style="font-size:12px;color:var(--muted);cursor:pointer;display:flex;justify-content:space-between">
     <span>Activity ({{ $pageActivity->count() }})</span>

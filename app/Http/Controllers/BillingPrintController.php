@@ -78,10 +78,6 @@ class BillingPrintController extends Controller
                 ->get();
         }
 
-        // Close-button fallback: window.close() only works when this view was opened via
-        // window.open()/target="_blank" — most of the links into this page are plain same-tab
-        // <a href>, where close() is silently refused by the browser. Give the view a real
-        // booking to go back to instead.
         $fallbackBookingId = ($soa->booking_id ?? null) ?: ($pay->booking_id ?? null);
 
         return view('billing-print', [
@@ -93,13 +89,6 @@ class BillingPrintController extends Controller
         ]);
     }
 
-    /**
-     * The company's actual BIR-style VAT invoice, generated from an existing Statement of
-     * Account — same underlying charges (equipment/crew/transportation/incidents) as the SOA,
-     * just re-presented as a formal invoice: one Description line per nonzero charge category
-     * (ex-VAT), a Sub-Total/VAT/Invoice Total/Amount Due block, bank remittance details, and
-     * (when crew was billed) an ANNEX page listing crew headcount by position.
-     */
     private function invoice(Request $request, int $soaId)
     {
         $soa = DB::table('statement_of_accounts as s')
@@ -123,10 +112,6 @@ class BillingPrintController extends Controller
             ->where('booking_id', $bid)->where('charge_amount', '>', 0)->where('status', '!=', 'closed')
             ->sum('charge_amount');
 
-        // A VAT-exempt CE (cost_estimates.vat_exempt) prices with no VAT baked in at all — the
-        // same flag CePreviewController/BookingCosting honor when computing this booking's
-        // grand total in the first place. Extracting VAT at the standard rate regardless would
-        // fabricate a VAT line and understate Net Amount on a document that must show neither.
         $isVatExempt = (bool) DB::table('cost_estimates')
             ->where('booking_id', $bid)->where('status', 'confirmed')
             ->orderByDesc('ce_id')->value('vat_exempt');
@@ -145,9 +130,6 @@ class BillingPrintController extends Controller
         $net = $extractNet($grand);
         $vat = round($grand - $net, 2);
 
-        // total_charges (bookings.final_amount) can reflect package pricing/discounts that
-        // don't map linearly onto the category sums above — reconcile with an explicit line
-        // rather than let the printed lines silently not add up to the stated Sub-Total.
         $lineSum = round(array_sum(array_column($lines, 'amount')), 2);
         $gap = round($net - $lineSum, 2);
         if (abs($gap) >= 0.01) {
@@ -166,9 +148,6 @@ class BillingPrintController extends Controller
         }
         $crewCount = (int) DB::table('booking_crew')->where('booking_id', $bid)->count();
 
-        // The invoice number tracks the SOA it was generated from (same booking, same billing
-        // event) rather than a separate sequence — INV in place of FB keeps it recognizably
-        // paired with that Statement of Account.
         $invoiceNumber = str_replace('FB-', '', $soa->soa_reference ?: ('SOA-' . $bid));
 
         $data = [

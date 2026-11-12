@@ -1,13 +1,8 @@
-{{-- Documents card (Part 18). Included from booking-detail.blade.php (Documents tab) and
-     client-documents.blade.php, scoped by whichever of $booking/$client is in context.
-     Expects: $documents, $canManage, and exactly one of $booking / $client. --}}
 @php
   $docBookingId = isset($booking) ? $booking->booking_id : null;
   $docClientId = isset($client) ? $client->client_id : null;
   $docCatBadge = ['id' => 'badge-purple', 'permit' => 'badge-orange', 'other' => 'badge-gray'];
   $docCatLabel = ['id' => 'ID', 'permit' => 'Permit', 'other' => 'Other'];
-  // Computed here rather than requiring every host controller to pass it — delete is gated
-  // the same way everywhere Documents appears.
   $canManage = $canManage ?? in_array(auth()->user()->role->role_name ?? '', config('filmspec.manage_roles'), true);
 @endphp
 
@@ -86,7 +81,6 @@
   </div>
 </div>
 
-<!-- UPLOAD DOCUMENT MODAL -->
 <div class="modal-overlay" id="modalUploadDocument">
   <div class="modal" style="max-width:480px">
     <div class="modal-header">

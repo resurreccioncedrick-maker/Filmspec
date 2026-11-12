@@ -5,16 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * booking_equipment_requests has existed in the live schema with no migration (like several
- * other legacy tables — see 2026_09_05_000000_add_vehicle_rate_fk_to_bookings.php's note).
- * This evolves it from an equipment-only "extra item" request into a general field-request
- * table covering equipment, accessories, and crew, with a Dispatched/Delivered tail added to
- * its lifecycle — one request table, not three parallel ones.
- *
- * No doctrine/dbal in this project, so the existing status enum and equipment_id's NOT NULL
- * constraint are altered via raw SQL rather than Schema::table(...)->change().
- */
 return new class extends Migration
 {
     public function up(): void

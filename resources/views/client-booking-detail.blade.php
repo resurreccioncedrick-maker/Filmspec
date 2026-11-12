@@ -24,30 +24,18 @@
 body{font-family:var(--font-b);background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
 a{text-decoration:none;color:inherit}
 
-/* Nav */
 .nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px;height:58px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 6px rgba(0,30,80,.06)}
 .nav-logo{font-family:var(--font-d);font-size:22px;letter-spacing:2px;color:var(--blue)}
 .nav-back{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;color:var(--sub);border:1.5px solid var(--border2);background:var(--surface);cursor:pointer;transition:all .15s;margin-left:auto;white-space:nowrap}
 .nav-back:hover{border-color:var(--blue);color:var(--blue)}
 .nav-back-short{display:none}
 
-/* Layout */
 .container{max-width:1180px;margin:0 auto;padding:28px 20px;flex:1;width:100%}
 .layout-grid{display:grid;grid-template-columns:1fr 320px;gap:22px;align-items:start}
 @media (max-width:860px){ .layout-grid{grid-template-columns:1fr} .sidebar-col{position:static !important} }
-/* A grid item's min-width defaults to auto, which means it won't shrink past its widest
-   unwrapped child's min-content size — any one wide table/row anywhere inside main-col was
-   enough to force the whole page wider than the phone's viewport and scroll sideways, with
-   no visible cue that it was happening. min-width:0 makes main-col respect its actual grid
-   track instead, so overflow-x:auto on individual tables (.table-wrap) contains itself
-   properly rather than blowing out the page around it. */
 .main-col,.sidebar-col{min-width:0}
 
 @media (max-width:640px){
-  /* The support-chat FAB is fixed at bottom:22px/right:22px (52px) and sits on top of
-     whatever content happens to be underneath — without reserved space here, the last
-     card's own buttons/text could end up hidden behind it even though the page itself
-     scrolls fine, reading as "stuck"/"can't scroll past this" rather than what it is. */
   .container{padding:16px 14px 100px}
   .nav{padding:0 14px;height:auto;min-height:58px;flex-wrap:wrap;row-gap:6px}
   .nav img{height:26px}
@@ -56,9 +44,6 @@ a{text-decoration:none;color:inherit}
   .nav-back-short{display:inline}
   .side-btn{min-height:44px;padding:10px 14px;font-size:13.5px}
 
-  /* Progress tracker — 4 nowrap labels + fixed dots had no responsive
-     handling and risked clipping at phone width. Same $ptCurrent-driven
-     done/now/warn/active class logic, just smaller and allowed to wrap. */
   .pt-dot{width:9px;height:9px}
   .pt-dot.now{box-shadow:0 0 0 3px var(--bluelt)}
   .pt-dot.now.warn{box-shadow:0 0 0 3px #fef3c7}
@@ -68,20 +53,8 @@ a{text-decoration:none;color:inherit}
   .tbl th{font-size:.68rem;padding:9px 12px}
   .tbl td{font-size:.85rem;padding:10px 12px}
 
-  /* Equipment/Crew/Payment History's .table-wrap sits directly inside .card with no
-     .card-body wrapper around it (unlike most other cards), so it never got that wrapper's
-     16-18px side padding — harmless on desktop where .tbl td already carries its own
-     14px/side cell padding, but the mobile card-per-row rules below zero that cell padding
-     out (assuming a .card-body would still be providing the outer breathing room), leaving
-     values with nothing between them and the card's edge. */
   .card > .table-wrap{padding:0 14px}
 
-  /* Equipment table — 6 columns (Item, Category, Qty, Days, Rate/Day, Subtotal) was wide
-     enough that real item names forced horizontal scroll on phones, with no visual hint it
-     was scrollable — easy to miss and read as a cut-off/broken table. Converts to a stacked
-     card per row instead, same CSS-Grid-over-existing-<td>s approach as My Bookings' cards;
-     filterable/other JS untouched since no markup was removed, only data-label attributes
-     added for the three cells that need a caption once they're no longer in a labeled column. */
   .table-wrap:has(.tbl-equip){overflow-x:visible}
   .tbl-equip,.tbl-equip thead,.tbl-equip tbody{display:block;width:100%}
   .tbl-equip thead{display:none}
@@ -101,9 +74,6 @@ a{text-decoration:none;color:inherit}
   .tbl-equip tfoot,.tbl-equip tfoot tr{display:flex;width:100%;align-items:center;justify-content:space-between}
   .tbl-equip tfoot td{flex:none!important;width:auto!important}
 
-  /* Remaining data tables (Crew, Payment History, Extension/Field Requests) — same
-     card-per-row overflow fix as Equipment above, but as stacked label:value rows since
-     these don't need Equipment's asymmetric 3-column meta layout. */
   .table-wrap:has(.tbl:not(.tbl-equip)){overflow-x:visible}
   .tbl:not(.tbl-equip) thead{display:none}
   .tbl:not(.tbl-equip) tbody,.tbl:not(.tbl-equip) tbody tr{display:block}
@@ -121,7 +91,6 @@ a{text-decoration:none;color:inherit}
   .tbl:not(.tbl-equip) tfoot td{flex:none!important;width:auto!important;background:none!important}
   .tbl:not(.tbl-equip) tfoot td:empty{display:none}
 
-  /* Modals — 44px tap targets, 16px inputs (avoids Safari auto-zoom) */
   .modal-box{max-width:94vw!important}
   .modal-close{width:36px;height:36px;font-size:20px}
   .modal-overlay input,.modal-overlay select,.modal-overlay textarea{
@@ -131,17 +100,14 @@ a{text-decoration:none;color:inherit}
   .modal-overlay button[type=submit],.modal-overlay button[type=button]{min-height:44px}
   .freq-tab,.sig-tab{min-height:40px}
 
-  /* Inline discount-request box (not a modal — its own id-scoped fields) */
   #requestDiscountBox select,#requestDiscountBox input,#requestDiscountBox textarea{
     font-size:16px!important;min-height:44px;
   }
   #requestDiscountBox textarea{min-height:70px}
 
-  /* Star rating — glyph-sized tap target was well under 44px */
   .star-btn{font-size:2rem;padding:8px 6px;min-height:44px;min-width:36px}
 }
 
-/* Sidebar */
 .sidebar-col{position:sticky;top:20px}
 .side-ref{font-family:var(--font-d);font-size:1.5rem;letter-spacing:-.01em;color:var(--text);margin-bottom:6px}
 .side-client{font-size:.83rem;color:var(--sub);margin-bottom:12px}
@@ -157,13 +123,11 @@ a{text-decoration:none;color:inherit}
 .side-btn.danger{background:#fee2e2;color:#b91c1c;border-color:#fca5a5}
 .side-btn.pending{background:var(--s2);color:var(--muted);border-color:var(--border);cursor:default}
 
-/* Card */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:18px}
 .card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .card-title{font-weight:700;font-size:.95rem;color:var(--text)}
 .card-body{padding:16px 18px}
 
-/* Badges */
 .badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:.72rem;font-weight:600;letter-spacing:.02em}
 .badge-yellow{background:#fef9c3;color:#a16207}
 .badge-blue{background:var(--bluelt);color:var(--blue)}
@@ -173,7 +137,6 @@ a{text-decoration:none;color:inherit}
 .badge-orange{background:#ffedd5;color:#c2410c}
 .badge-purple{background:#f3e8ff;color:#7e22ce}
 
-/* Table */
 .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .tbl{width:100%;border-collapse:collapse}
 .tbl th{padding:10px 14px;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--border);text-align:left;font-weight:600}
@@ -183,7 +146,6 @@ a{text-decoration:none;color:inherit}
 
 .empty-msg{padding:32px;text-align:center;color:var(--muted);font-size:.875rem}
 
-/* Booking progress tracker */
 .progress-track{display:flex;align-items:center;margin:18px 0 4px}
 .pt-step{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0}
 .pt-dot{width:11px;height:11px;border-radius:50%;background:var(--border)}
@@ -195,10 +157,7 @@ a{text-decoration:none;color:inherit}
 .pt-line{flex:1;height:2px;background:var(--border);margin:0 8px 19px}
 .pt-line.done{background:var(--green)}
 
-/* Cancel modal */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(7,14,26,.55);z-index:1000;align-items:center;justify-content:center;padding:20px}
-/* var(--vvh) tracks the real visible height (keyboard-aware.js) so the modal shrinks
-   with the on-screen keyboard instead of staying sized to the full layout viewport. */
 .modal-box{background:#fff;border-radius:12px;width:100%;max-width:440px;max-height:calc(var(--vvh, 100vh) - 40px);overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}
 .modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .modal-head h3{font-size:.95rem;font-weight:700;color:var(--text)}
@@ -209,7 +168,6 @@ a{text-decoration:none;color:inherit}
 .form-textarea{width:100%;background:#f8fafc;border:1.5px solid var(--border);color:var(--text);padding:9px 12px;border-radius:7px;font-size:13px;font-family:var(--font-b);resize:vertical;outline:none;min-height:100px}
 .form-textarea:focus{border-color:var(--blue)}
 
-/* Footer */
 footer{background:#070e1a;border-top:1px solid #1e2d4a;padding:18px 28px;text-align:center;color:#5a7299;font-size:12px}
 footer .footer-brand{font-family:var(--font-d);color:var(--blue);font-size:14px;letter-spacing:2px}
 footer .footer-sep{margin:0 8px}
@@ -220,16 +178,10 @@ footer .footer-sep{margin:0 8px}
   footer .footer-line{display:block}
 }
 
-/* Support chat — same component/classes as home.blade.php, for a consistent look
-   everywhere. Here it's scoped to this booking's own thread instead of the general one. */
 .sup-fab{position:fixed;bottom:22px;right:22px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--blue2));border:none;box-shadow:0 6px 20px rgba(0,96,199,.35),0 2px 6px rgba(0,30,80,.15);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:900;transition:transform .2s,box-shadow .2s}
 .sup-fab:hover{transform:translateY(-2px) scale(1.04);box-shadow:0 10px 26px rgba(0,96,199,.4),0 2px 8px rgba(0,30,80,.18)}
 .sup-fab svg{width:22px;height:22px;color:#fff}
 .sup-fab-badge{position:absolute;top:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2.5px solid var(--bg)}
-/* pointer-events:none belt-and-suspenders alongside display:none — a couple of mobile
-   browser engines are known to still hit-test a display:none element that has
-   backdrop-filter set, which would silently eat scroll/tap gestures on the page behind
-   it even though nothing is visibly wrong. Re-enabled only once .open is actually applied. */
 .sup-overlay{display:none;pointer-events:none;position:fixed;inset:0;backdrop-filter:blur(6px) saturate(1.05);-webkit-backdrop-filter:blur(6px) saturate(1.05);background:rgba(11,26,51,.14);z-index:950}
 .sup-overlay.open{display:block;pointer-events:auto}
 .sup-panel{position:fixed;bottom:22px;right:22px;width:328px;max-height:min(70vh,540px);background:var(--surface);border-radius:18px;box-shadow:0 16px 48px rgba(0,30,80,.18),0 2px 10px rgba(0,30,80,.08);border:1px solid var(--border);display:none;pointer-events:none;flex-direction:column;overflow:hidden;z-index:960}
@@ -365,7 +317,6 @@ footer .footer-sep{margin:0 8px}
 <div class="main-col">
 
 @if ($extensionRequests->isNotEmpty() || $equipRequests->isNotEmpty())
-<!-- Requests History -->
 <div class="card" style="margin-bottom:18px">
   <div class="card-header">
     <div class="card-title">Your Requests</div>
@@ -462,7 +413,6 @@ footer .footer-sep{margin:0 8px}
 @php
   $discStatusBadge = ['pending' => 'badge-yellow', 'approved' => 'badge-green', 'rejected' => 'badge-red'];
 @endphp
-<!-- Discounts -->
 <div class="card" style="margin-bottom:18px">
   <div class="card-header">
     <div class="card-title">Discounts</div>
@@ -530,7 +480,6 @@ footer .footer-sep{margin:0 8px}
   </div>
 </div>
 
-<!-- Equipment -->
 <div class="card">
   <div class="card-header">
     <div class="card-title">Equipment</div>
@@ -568,7 +517,6 @@ footer .footer-sep{margin:0 8px}
   @endif
 </div>
 
-<!-- Crew -->
 <div class="card">
   <div class="card-header">
     <div class="card-title">Crew</div>
@@ -597,7 +545,6 @@ footer .footer-sep{margin:0 8px}
   @endif
 </div>
 
-<!-- Payments -->
 <div class="card">
   <div class="card-header">
     <div class="card-title">Payment History</div>
@@ -670,7 +617,6 @@ footer .footer-sep{margin:0 8px}
   @endif
 </div>
 
-<!-- Pay Now Modal -->
 <div id="modalPayNow" class="modal-overlay" onclick="if(event.target===this)closePayModal()">
   <div class="modal-box" style="max-width:480px">
     <div class="modal-head">
@@ -742,7 +688,6 @@ footer .footer-sep{margin:0 8px}
 </div>
 
 @if ($booking->booking_status === 'completed')
-<!-- Client Feedback -->
 <div class="card fb-card">
   <div class="card-header">
     <div class="card-title" style="color:var(--blue)">Rate Your Experience</div>
@@ -762,7 +707,6 @@ footer .footer-sep{margin:0 8px}
     @endif
 
     @if ($feedback)
-    <!-- Existing feedback display -->
     <div style="display:flex;gap:18px;align-items:flex-start;margin-bottom:{{ ($feedbackDeadline && time() < $feedbackDeadline) ? '18px' : '0' }}">
       <div style="text-align:center;min-width:70px">
         <div style="font-size:2.4rem;font-weight:800;color:var(--blue);line-height:1">{{ $feedback->rating }}</div>
@@ -816,7 +760,7 @@ footer .footer-sep{margin:0 8px}
 </div>
 @endif
 
-</div><!-- /main-col -->
+</div>
 
 <aside class="sidebar-col">
   <div class="card">
@@ -963,12 +907,11 @@ footer .footer-sep{margin:0 8px}
   </div>
 </aside>
 
-</div><!-- /layout-grid -->
+</div>
 
-</div><!-- /container -->
+</div>
 
-@if (false) {{-- temporarily hidden: support chat still buggy (matches home.blade.php) --}}
-<!-- Support chat — this booking's own thread, same component as the general one on Home -->
+@if (false)
 <button class="sup-fab" onclick="toggleSupportChat()" aria-label="Message FilmSpec about this booking">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
   @if ($comments->count() > 0)
@@ -1008,7 +951,6 @@ footer .footer-sep{margin:0 8px}
     $deptInitials = ['staff' => 'FS', 'accounting' => 'AC', 'traffic' => 'TR', 'operations_manager' => 'OM'];
   @endphp
 
-  <!-- DEPARTMENT PICKER -->
   <div class="sup-body sup-dept-list" id="deptPicker">
     @foreach ($chatDepartments as $deptKey => $deptLabel)
     @php
@@ -1028,7 +970,6 @@ footer .footer-sep{margin:0 8px}
     @endforeach
   </div>
 
-  <!-- ONE THREAD + FORM PER DEPARTMENT -->
   @foreach ($chatDepartments as $deptKey => $deptLabel)
   @php $deptMsgs = $comments->where('department', $deptKey)->values(); @endphp
   <div class="sup-body" id="thread-{{ $deptKey }}" style="display:none">
@@ -1166,7 +1107,6 @@ document.addEventListener('DOMContentLoaded', function () {
   <span class="footer-line">&copy; {{ date('Y') }} FilmSpec. All rights reserved.<span class="footer-sep">|</span></span>
   <span class="footer-line">Integrated Film Operations Platform</span>
 </footer>
-<!-- Cancellation Request Modal — Step 1: Policy -->
 <div id="modalCancelPolicy" class="modal-overlay" onclick="if(event.target===this)closeCancelModals()" style="align-items:flex-start;padding:30px 20px;overflow-y:auto">
   <div class="modal-box" style="max-width:560px;margin:auto">
     <div class="modal-head" style="background:#fef2f2;border-radius:12px 12px 0 0">
@@ -1179,7 +1119,6 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="modal-body" style="padding:22px 22px 18px">
       <p style="font-size:13px;color:var(--sub);margin-bottom:18px;line-height:1.6">Before proceeding, please read our cancellation and refund policy. Penalties are based on <strong>how far in advance</strong> the cancellation is made.</p>
 
-      <!-- Client-Requested -->
       <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:12px">
         <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:7px">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -1205,7 +1144,6 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
       </div>
 
-      <!-- On-Field -->
       <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:14px 16px;margin-bottom:12px">
         <div style="font-weight:700;font-size:13px;color:#c2410c;margin-bottom:6px;display:flex;align-items:center;gap:7px">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#c2410c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
@@ -1214,7 +1152,6 @@ document.addEventListener('DOMContentLoaded', function () {
         <p style="font-size:12px;color:#7c2d12;line-height:1.65">If cancelled <strong>after crew and equipment have been deployed</strong>, a flat <strong>50% penalty</strong> applies on the total booking amount. This covers mobilization, crew compensation, and equipment preparation.</p>
       </div>
 
-      <!-- Refund Process -->
       <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:14px 16px;margin-bottom:16px">
         <div style="font-weight:700;font-size:13px;color:#15803d;margin-bottom:8px">Refund Process</div>
         <ul style="margin:0 0 0 16px;font-size:12px;color:#166534;line-height:1.9">
@@ -1242,7 +1179,6 @@ document.addEventListener('DOMContentLoaded', function () {
   </div>
 </div>
 
-<!-- Cancellation Request Modal — Step 2: Reason Form -->
 <div id="modalCancelRequest" class="modal-overlay" onclick="if(event.target===this)closeCancelModals()">
   <div class="modal-box" style="max-width:460px">
     <div class="modal-head">
@@ -1286,7 +1222,6 @@ function closeCancelModals(){ document.getElementById('modalCancelPolicy').style
 document.addEventListener('keydown', e => { if(e.key==='Escape') { closeCancelModals(); closeRequestModals(); closeSupportChat(); } });
 </script>
 
-<!-- Extension Request Modal -->
 <div id="modalExtendRequest" class="modal-overlay" onclick="if(event.target===this)closeRequestModals()">
   <div class="modal-box" style="max-width:460px">
     <div class="modal-head">
@@ -1325,7 +1260,6 @@ document.addEventListener('keydown', e => { if(e.key==='Escape') { closeCancelMo
   </div>
 </div>
 
-<!-- Field Request Modal (Equipment / Accessory / Crew) -->
 <div id="modalEquipRequest" class="modal-overlay" onclick="if(event.target===this)closeRequestModals()">
   <div class="modal-box" style="max-width:520px">
     <div class="modal-head">
@@ -1447,9 +1381,6 @@ function closePayModal() {
   document.getElementById('modalPayNow').style.display = 'none';
 }
 
-// Blocks a second click (or a stale reopened modal) from firing another POST before the page
-// reloads with the real remaining balance — without this, a double-click could submit the same
-// full-balance amount twice and the second one would correctly, but confusingly, get rejected.
 function guardPayNowSubmit() {
   const btn = document.getElementById('payNowSubmitBtn');
   if (btn.disabled) return false;
@@ -1484,7 +1415,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('payNowMethod')) togglePayNowFields();
 });
 
-// ── Request Discount: only the field for the selected type is ever shown ───
 function toggleDiscReqInput() {
   const type = document.getElementById('discReqType').value;
   const input = document.getElementById('discReqValue');

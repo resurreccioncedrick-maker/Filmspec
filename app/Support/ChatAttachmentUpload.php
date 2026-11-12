@@ -6,12 +6,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-/**
- * Saves a file/image attached to a chat message (booking messages or the general support
- * chat) to the private `local` disk — these can carry client-supplied documents or photos,
- * so they live alongside DocumentController's uploads rather than the public disk, and only
- * ever leave it through an authenticated download route. Mirrors ImageUpload's shape.
- */
 class ChatAttachmentUpload
 {
     private const ALLOWED_MIMES = [

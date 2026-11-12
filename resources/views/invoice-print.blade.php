@@ -4,10 +4,6 @@
 <meta charset="UTF-8">
 <title>Invoice {{ $invoiceNumber }} — FilmSpec</title>
 <style>
-{{-- Table-based layout throughout (no CSS grid/flexbox) so this renders identically in a
-     normal browser (Print) and in dompdf (Export PDF) — same reasoning as
-     exports/ce-document-pdf.blade.php. Matches the company's actual invoice template exactly:
-     plain black text on white, no color accents except the FilmSpec logo. --}}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#000;background:#fff;padding:24px}
 .doc{max-width:720px;margin:0 auto}
@@ -60,8 +56,6 @@ table{border-collapse:collapse;width:100%}
 <body>
 
 @unless (request()->query('export') === 'pdf')
-{{-- dompdf doesn't reliably honor @media print, so the action bar is skipped server-side for
-     the actual PDF render rather than relying on CSS to hide it there. --}}
 <div class="no-print" style="margin-bottom:20px;display:flex;gap:10px">
   <button onclick="window.print()" style="padding:8px 18px;background:#003D80;color:white;border:none;border-radius:6px;cursor:pointer;font-family:inherit">Print</button>
   <a href="{{ request()->fullUrlWithQuery(['export' => 'pdf']) }}" style="padding:8px 18px;background:#c0392b;color:white;border:none;border-radius:6px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;text-decoration:none">

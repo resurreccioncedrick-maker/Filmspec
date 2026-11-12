@@ -21,54 +21,45 @@ body{font-family:var(--font-b);background:var(--bg);color:var(--text);min-height
 a{text-decoration:none;color:inherit}
 button{font-family:var(--font-b);cursor:pointer}
 
-/* ── SHELL (mobile-first, widens on larger phones instead of centering with dead space) ── */
 .shell{max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;padding-bottom:84px}
 @media(min-width:480px) and (max-width:599px){.shell{max-width:560px}}
 
-/* ── TOP BAR ── */
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
 .brand{font-family:var(--font-d);font-size:20px;letter-spacing:2px;color:var(--blue)}
 .av{width:40px;height:40px;border-radius:10px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0}
 .logout-btn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:var(--muted);border-radius:10px}
 .logout-btn:hover{background:var(--s2);color:var(--red)}
 
-/* ── PAGES ── */
 .pg{display:none}
 .pg.on{display:block}
 .ctr{padding:18px 16px 8px}
 
-/* ── ALERT ── */
 .alert{padding:13px 16px;border-radius:10px;margin:14px 16px 0;font-size:14px;font-weight:600}
 .alert-success{background:var(--greenlt);color:#15803d;border:1px solid #86efac}
 .alert-danger{background:var(--redlt);color:#b91c1c;border:1px solid #fca5a5}
 
-/* ── CALL SHEET ── */
 .callsheet{margin-bottom:16px;padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;position:relative;overflow:hidden}
 .callsheet::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 100% 0%,rgba(255,255,255,.14),transparent 60%)}
 .cs-label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;opacity:.8;margin-bottom:5px;position:relative}
 .cs-main{font-family:var(--font-d);font-size:19px;letter-spacing:.3px;line-height:1.15;position:relative}
 .cs-sub{font-family:var(--font-m);font-size:12.5px;opacity:.9;margin-top:6px;position:relative}
 
-/* ── KPI ── */
 .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
 .kpi{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:14px 15px}
 .kpi.wide{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between}
 .kpi b{font-family:var(--font-d);font-size:27px;color:var(--blue);display:block;line-height:1}
 .kpi span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;display:block;margin-top:5px;font-weight:700}
 
-/* ── CARD ── */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:13px;margin-bottom:14px;overflow:hidden}
 .ch{padding:14px 16px;border-bottom:1px solid var(--border);font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:48px}
 .ch-link{font-size:12.5px;color:var(--blue);font-weight:700}
 
-/* ── PROFILE ROW ── */
 .prow{display:flex;flex-wrap:wrap;gap:14px;padding:14px 16px}
 .pf{min-width:42%}
 .pf div:first-child{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;font-weight:700}
 .pf div:last-child{font-weight:700;font-size:14px}
 .pf.rate div:last-child{font-family:var(--font-m);color:var(--blue)}
 
-/* ── ITEM ROWS (replace tables — one hand, one thumb) ── */
 .item{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:10px;min-height:52px}
 .item:last-child{border-bottom:none}
 .it-ref{font-family:var(--font-m);color:var(--blue);font-size:12px;font-weight:700}
@@ -77,7 +68,6 @@ button{font-family:var(--font-b);cursor:pointer}
 .it-side{text-align:right;flex-shrink:0}
 .it-rate{font-family:var(--font-m);font-size:13px;color:var(--blue);font-weight:700;white-space:nowrap}
 
-/* ── SUB-TABS (within a page, e.g. Check-Out/Check-In, Attendance/Timesheets) ── */
 .subtabs{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto}
 .subtab-btn{font-family:var(--font-b);font-size:13.5px;font-weight:700;padding:10px 18px;border-radius:20px;border:1.5px solid var(--border2);background:var(--surface);color:var(--sub);white-space:nowrap;flex-shrink:0;min-height:40px}
 .subtab-btn.on{background:var(--blue);border-color:var(--blue);color:#fff}
@@ -92,12 +82,10 @@ button{font-family:var(--font-b);cursor:pointer}
 .booking-pick-item.active .bp-check{display:block}
 .bp-empty{padding:16px 14px;text-align:center;color:var(--muted);font-size:13px}
 
-/* ── FILTER PILLS ── */
 .filter-pills{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto}
 .filter-pill{font-family:var(--font-b);font-size:13px;font-weight:700;padding:9px 16px;border-radius:20px;border:1.5px solid var(--border2);background:var(--surface);color:var(--sub);white-space:nowrap;flex-shrink:0;min-height:40px;display:flex;align-items:center}
 .filter-pill.on{background:var(--blue);border-color:var(--blue);color:#fff}
 
-/* ── BADGE ── */
 .badge{display:inline-flex;align-items:center;padding:4px 11px;border-radius:20px;font-size:11.5px;font-weight:700;letter-spacing:.02em;white-space:nowrap;margin-top:6px}
 .badge-green{background:var(--greenlt);color:#15803d}
 .badge-blue{background:var(--bluelt);color:var(--blue)}
@@ -107,18 +95,14 @@ button{font-family:var(--font-b);cursor:pointer}
 .badge-gray{background:var(--s2);color:var(--muted)}
 .badge-purple{background:var(--purplelt);color:var(--purple)}
 
-/* ── EMPTY STATE ── */
 .empty{padding:34px 20px;text-align:center;color:var(--muted);font-size:14px}
 
-/* ── WARNING BANNER ── */
 .no-link-banner{background:var(--orangelt);border:1.5px solid #fdba74;border-radius:13px;padding:20px;text-align:center;margin-bottom:16px}
 
-/* ── SECTION HEADER ── */
 .sec-hd{margin-bottom:14px}
 .sec-title{font-family:var(--font-d);font-size:24px;letter-spacing:.5px}
 .sec-sub{font-size:13.5px;color:var(--sub);margin-top:2px}
 
-/* ── TODAY HERO (dashboard) ── */
 .today-hero{margin-bottom:14px;padding:24px 22px;border-radius:20px;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;position:relative;overflow:hidden;box-shadow:0 14px 34px rgba(0,96,199,.32)}
 .today-hero::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 100% 0%,rgba(255,255,255,.18),transparent 60%)}
 .th-eyebrow{position:relative;display:flex;align-items:center;gap:7px;margin-bottom:14px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;opacity:.9}
@@ -131,25 +115,21 @@ button{font-family:var(--font-b);cursor:pointer}
 .th-ref{font-family:var(--font-m);font-size:13px;opacity:.9}
 .th-status{padding:6px 13px;border-radius:20px;font-size:11.5px;font-weight:700;background:rgba(255,255,255,.18);white-space:nowrap}
 
-/* ── QUICK ACTIONS ── */
 .qa-row{display:flex;gap:10px;margin-bottom:16px}
 .qa-btn{flex:1;padding:13px 8px;border-radius:12px;background:var(--surface);border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:6px;font-family:var(--font-b);min-height:52px}
 .qa-btn svg{width:22px;height:22px}
 .qa-btn span{font-size:12px;font-weight:700;color:var(--text)}
 
-/* ── STAT STRIP ── */
 .stat-strip{display:flex;align-items:center;gap:16px;padding:13px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;flex-wrap:wrap}
 .stat-strip .stat{display:flex;align-items:baseline;gap:5px}
 .stat-strip .stat b{font-family:var(--font-m);font-size:17px;font-weight:700}
 .stat-strip .stat span{font-size:11px;color:var(--muted)}
 .stat-strip .stat-sep{width:1px;height:14px;background:var(--border)}
 
-/* ── SCHEDULE ITEM (secondary bookings on dashboard) ── */
 .sched-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:9px}
 .sched-item{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 14px;display:flex;justify-content:space-between;gap:10px;margin-bottom:10px;min-height:52px}
 .sched-item:last-child{margin-bottom:0}
 
-/* ── MORE SHEET ── */
 .more-group-label{padding:12px 16px 6px;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .more-divider{height:1px;background:var(--border);margin:4px 0}
 .more-item{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid var(--border);min-height:56px}
@@ -157,15 +137,12 @@ button{font-family:var(--font-b);cursor:pointer}
 .more-item-ico{width:44px;height:44px;border-radius:12px;background:var(--s2);color:var(--blue);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .more-item span{font-weight:700;font-size:15px}
 
-/* ── MAINTENANCE ICON ── */
 .maint-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .maint-icon svg{width:19px;height:19px}
 
-/* ── FAB ── */
 .fab{position:sticky;bottom:92px;margin-left:auto;margin-right:16px;width:fit-content;display:flex;justify-content:flex-end;padding-right:0;z-index:50}
 .fab button{background:var(--blue);color:#fff;border:none;border-radius:24px;padding:14px 22px;font-size:13.5px;font-weight:700;box-shadow:0 8px 20px rgba(0,96,199,.35);display:flex;align-items:center;gap:8px;min-height:48px}
 
-/* ── BOTTOM TAB BAR ── */
 .tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--surface);border-top:1px solid var(--border);display:flex;box-shadow:0 -4px 18px rgba(11,26,51,.06);z-index:200}
 @media(min-width:480px) and (max-width:599px){.tabbar{max-width:560px}}
 .tabbar button{flex:1;background:none;border:none;padding:8px 2px;text-align:center;color:var(--muted);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;font-family:var(--font-b);min-height:56px}
@@ -173,11 +150,8 @@ button{font-family:var(--font-b);cursor:pointer}
 .tabbar .ico{display:flex;align-items:center;justify-content:center;margin-bottom:3px}
 .tabbar .ico svg{width:20px;height:20px}
 
-/* ── MODAL ── */
 .mo{display:none;position:fixed;inset:0;background:rgba(11,26,51,.55);z-index:1000;align-items:flex-end;justify-content:center}
 .mo.on{display:flex}
-/* var(--vvh) tracks the real visible height (keyboard-aware.js) so the sheet shrinks
-   with the on-screen keyboard instead of staying sized to the full layout viewport. */
 .mo-box{background:var(--surface);border-radius:18px 18px 0 0;width:100%;max-width:480px;max-height:calc(var(--vvh, 92vh) - 16px);overflow-y:auto;box-shadow:0 -10px 40px rgba(0,0,0,.25)}
 @media(min-width:480px) and (max-width:599px){.mo-box{max-width:560px}}
 @media(min-width:600px){.mo{align-items:center}.mo-box{border-radius:16px;max-height:calc(var(--vvh, 88vh) - 40px)}}
@@ -187,7 +161,6 @@ button{font-family:var(--font-b);cursor:pointer}
 .mo-body{padding:18px}
 .mo-footer{padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
 
-/* ── FORM ── */
 .fg{margin-bottom:14px}
 .fg label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin-bottom:6px}
 .fg input,.fg select,.fg textarea{width:100%;background:var(--s2);border:1.5px solid var(--border);color:var(--text);padding:12px;border-radius:8px;font-size:14px;font-family:var(--font-b);outline:none;transition:border-color .15s;min-height:44px}
@@ -198,7 +171,6 @@ button{font-family:var(--font-b);cursor:pointer}
 .btn-outline{background:none;border:1.5px solid var(--border);color:var(--sub)}.btn-outline:hover{border-color:var(--blue);color:var(--blue)}
 .btn-sm{padding:9px 16px;font-size:12.5px;min-height:40px}
 
-/* ── ATTENDANCE: live status summary + per-member card ── */
 .att-summary{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 15px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:0 0 12px}
 .att-summary .stat{display:flex;align-items:baseline;gap:5px}
 .att-summary .stat b{font-family:var(--font-m);font-size:15px}
@@ -211,7 +183,6 @@ button{font-family:var(--font-b);cursor:pointer}
 .att-member-name{font-weight:700;font-size:14.5px}
 .att-member-role{font-size:12px;color:var(--muted);margin-top:1px}
 
-/* ── ATTENDANCE HISTORY: card-per-day ── */
 .att-day-card{border:1px solid var(--border);border-radius:10px;padding:13px 14px;margin-bottom:10px}
 .att-day-head{font-weight:700;font-size:14.5px;color:var(--text);margin-bottom:8px}
 .att-chip-row{display:flex;flex-wrap:wrap;gap:8px}
@@ -226,7 +197,6 @@ button{font-family:var(--font-b);cursor:pointer}
 
 <div class="shell">
 
-<!-- TOP BAR -->
 <div class="topbar">
   <div class="brand">FILMSPEC</div>
   <div style="display:flex;align-items:center;gap:10px">
@@ -262,7 +232,6 @@ button{font-family:var(--font-b);cursor:pointer}
   Checklist updated — tap to refresh
 </button>
 
-<!-- ═══════ DASHBOARD (Today-First) ═══════ -->
 <div id="pg-dashboard" class="pg {{ $activeTab === 'dashboard' ? 'on' : '' }}">
   <div class="ctr">
 
@@ -275,9 +244,6 @@ button{font-family:var(--font-b);cursor:pointer}
     @else
 
     @php
-      // Soonest-upcoming call, not latest — $myBookings itself stays ordered
-      // newest-first for the full My Bookings list, this is a display-only re-sort
-      // for "what's next" scoped to the dashboard.
       $todayStr = date('Y-m-d');
       $upcoming = $myBookings->whereIn('booking_status', ['confirmed', 'ongoing', 'pending_inspection'])
         ->filter(fn ($bk) => ($bk->shoot_date_end ?: $bk->shoot_date_start) >= $todayStr)
@@ -418,7 +384,6 @@ button{font-family:var(--font-b);cursor:pointer}
   </div>
 </div>
 
-<!-- ═══════ BOOKINGS ═══════ -->
 <div id="pg-bookings" class="pg {{ $activeTab === 'bookings' ? 'on' : '' }}">
   <div class="ctr">
     <div class="sec-hd">
@@ -460,7 +425,6 @@ button{font-family:var(--font-b);cursor:pointer}
   </div>
 </div>
 
-<!-- ═══════ ATTENDANCE ═══════ -->
 @if ($isHeadCrew)
 @php $headTeamBookings = $myTeamBookings->where('is_head', true)->values(); @endphp
 <div id="pg-attendance" class="pg {{ $activeTab === 'attendance' ? 'on' : '' }}">
@@ -562,7 +526,7 @@ button{font-family:var(--font-b);cursor:pointer}
         <button type="submit" class="btn btn-primary" style="width:100%;margin-top:4px">Save Attendance</button>
         @endif
       </form>
-      </div><!-- /att-booking-panel -->
+      </div>
       @endforeach
     </div>
     @endif
@@ -587,7 +551,7 @@ button{font-family:var(--font-b);cursor:pointer}
       @endforeach
       @endif
     </div>
-    </div><!-- /sub-attendance-attendance -->
+    </div>
 
     <div class="subpanel {{ $attSubTab === 'timesheets' ? 'on' : '' }}" data-group="attendance" id="sub-attendance-timesheets">
     <div class="card">
@@ -614,12 +578,11 @@ button{font-family:var(--font-b);cursor:pointer}
       @endforeach
       @endif
     </div>
-    </div><!-- /sub-attendance-timesheets -->
+    </div>
   </div>
 </div>
 @endif
 
-<!-- ═══════ EQUIPMENT CHECKLIST ═══════ -->
 @if ($isHeadCrew)
 <div id="pg-checklist" class="pg {{ $activeTab === 'checklist' ? 'on' : '' }}">
   <div class="ctr">
@@ -629,15 +592,8 @@ button{font-family:var(--font-b);cursor:pointer}
     </div>
 
     @php
-      // Confirm Arrival lists every checklist-eligible booking, not just ones still awaiting
-      // confirmation — a booking whose arrival is already confirmed still shows here (read-only,
-      // via the $arrivalConfirmed branch below) so crew can always find and review any of their
-      // bookings instead of the tab going to a dead end once nothing is left to act on. The tab
-      // badge still counts only what's actually awaiting action, so it stays a useful signal.
       $outBookings = $myChecklistBookings->values();
       $outPendingCount = $myChecklistBookings->where('direction', 'out')->count();
-      // Check-In stays gated to arrival-confirmed bookings only — checking equipment back in
-      // before confirming arrival doesn't make operational sense.
       $inBookings = $myChecklistBookings->where('direction', 'in')->values();
       $checklistSubTab = in_array($activeSubTab, ['out', 'in'], true) ? $activeSubTab : 'out';
     @endphp
@@ -708,12 +664,6 @@ button{font-family:var(--font-b);cursor:pointer}
         @if (empty($cb->items))
         <div class="empty">No equipment on this booking.</div>
         @elseif ($dir === 'out')
-        {{-- A checkbox per item, so crew physically verify each piece of equipment they've
-             received before the Confirm Field Arrival button unlocks (updateArrivalConfirmBtn
-             below) — this is crew's own "we've got it" verification, separate from and never
-             touching the office's own release/"Released" status (co_checked), which stays
-             read-only here and is still shown as its own badge. Releasing equipment is still
-             Traffic/Ops/Admin's job on the main Checklist page. --}}
         @foreach ($cb->items as $it)
         <div class="item">
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1">
@@ -793,7 +743,6 @@ button{font-family:var(--font-b);cursor:pointer}
 </div>
 @endif
 
-<!-- ═══════ INCIDENTS ═══════ -->
 <div id="pg-incidents" class="pg {{ $activeTab === 'incidents' ? 'on' : '' }}">
   <div class="ctr">
     <div class="sec-hd">
@@ -832,7 +781,6 @@ button{font-family:var(--font-b);cursor:pointer}
   <div class="fab"><button onclick="openMo('moFileIncident')">+ File Incident Report</button></div>
 </div>
 
-<!-- ═══════ FIELD REQUESTS ═══════ -->
 <div id="pg-fieldrequests" class="pg {{ $activeTab === 'fieldrequests' ? 'on' : '' }}">
   <div class="ctr">
     <div class="sec-hd">
@@ -867,7 +815,6 @@ button{font-family:var(--font-b);cursor:pointer}
   <div class="fab"><button onclick="openMo('moFieldRequest')">+ Request Item</button></div>
 </div>
 
-<!-- ═══════ MAINTENANCE ═══════ -->
 <div id="pg-maintenance" class="pg {{ $activeTab === 'maintenance' ? 'on' : '' }}">
   <div class="ctr">
     <div class="sec-hd">
@@ -1048,16 +995,14 @@ button{font-family:var(--font-b);cursor:pointer}
   </div>
 </div>
 
-<!-- BOTTOM TAB BAR (3 tabs — Time/Reports/Repairs live in the More sheet) -->
 <div class="tabbar">
   <button class="{{ $activeTab === 'dashboard' ? 'on' : '' }}" data-tab="dashboard" onclick="showPg('dashboard',this)"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg></span>Today</button>
   <button class="{{ $activeTab === 'bookings' ? 'on' : '' }}" data-tab="bookings" onclick="showPg('bookings',this)"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></span>Schedule</button>
   <button data-tab="more" onclick="openMo('moMore')"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></span>More</button>
 </div>
 
-</div><!-- /shell -->
+</div>
 
-<!-- ═══ SHEET: More ═══ -->
 <div class="mo" id="moMore" onclick="if(event.target===this)closeMo('moMore')">
   <div class="mo-box" style="max-width:420px">
     <div class="mo-head">
@@ -1107,7 +1052,6 @@ button{font-family:var(--font-b);cursor:pointer}
   </div>
 </div>
 
-<!-- ═══ MODAL: File Incident Report ═══ -->
 <div class="mo" id="moFileIncident" onclick="if(event.target===this)closeMo('moFileIncident')">
   <div class="mo-box">
     <div class="mo-head">
@@ -1223,7 +1167,6 @@ button{font-family:var(--font-b);cursor:pointer}
   </div>
 </div>
 
-<!-- ═══ MODAL: Request Field Item ═══ -->
 <div class="mo" id="moFieldRequest" onclick="if(event.target===this)closeMo('moFieldRequest')">
   <div class="mo-box">
     <div class="mo-head">
@@ -1299,7 +1242,6 @@ button{font-family:var(--font-b);cursor:pointer}
   </div>
 </div>
 
-<!-- ═══ MODAL: Update Maintenance ═══ -->
 <div class="mo" id="moUpdateMaint" onclick="if(event.target===this)closeMo('moUpdateMaint')">
   <div class="mo-box" style="max-width:420px">
     <div class="mo-head">
@@ -1338,32 +1280,18 @@ button{font-family:var(--font-b);cursor:pointer}
 </div>
 
 <script>
-// Equipment scoped per booking (Fix 3) — same pattern as IncidentsController.php's
-// $bookingEquipMap / incidents.blade.php's filterEquipmentByBooking().
 const BOOKING_EQUIP = {!! json_encode($bookingEquipMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 
-// Registered physical units per equipment model — powers the Incident Report modal's Unit
-// select, cascading a second level deeper than BOOKING_EQUIP (Booking -> Equipment -> Unit).
 const EQUIPMENT_UNITS = {!! json_encode($equipmentUnitMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 
-// Which unit was actually checked out for THIS booking's equipment, per the Equipment
-// Checklist — keyed "bookingId_equipmentId". Tried before the company-wide EQUIPMENT_UNITS
-// list above, so the Unit field can auto-fill with the real unit instead of making the crew
-// member guess among every unit of that model.
 const BOOKING_EQUIPMENT_UNITS = {!! json_encode($bookingEquipmentUnitMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 let crewIR_currentBookingId = '';
 
-// Same two-level cascade as equipment above, for the Incident Report modal's Accessory option.
 const BOOKING_ACC_IR = {!! json_encode($bookingAccMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 const ACCESSORY_UNITS = {!! json_encode($accessoryUnitMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 
-// Which unit was actually allocated to THIS booking's accessory — same idea as
-// BOOKING_EQUIPMENT_UNITS, sourced from booking_accessory_units.
 const BOOKING_ACCESSORY_UNITS = {!! json_encode($bookingAccessoryUnitMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 
-// Field-request pickers — the OPPOSITE list from BOOKING_EQUIP above: equipment/accessories
-// NOT yet on the booking (available to request), keyed by booking_id, same shape ClientBookingDetailController
-// builds server-side for the client's own request form.
 const FIELD_EQUIP = {!! json_encode($fieldEquipMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 const FIELD_ACC = {!! json_encode($fieldAccMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
 
@@ -1430,9 +1358,6 @@ function filterUnitsByEquipment(equipmentId) {
   const sel = document.getElementById('crewIR_unit');
   const wrap = document.getElementById('crewIR_unitWrap');
   const readonly = document.getElementById('crewIR_unitReadonly');
-  // Which unit(s) are actually on THIS booking for this equipment — from booking-time
-  // allocation first, falling back to the Checklist, falling back to "every unit of this
-  // model" (BOOKING_EQUIPMENT_UNITS already carries that tiered result server-side).
   const bookedUnits = BOOKING_EQUIPMENT_UNITS[crewIR_currentBookingId + '_' + equipmentId] || [];
   const units = bookedUnits.length ? bookedUnits : (EQUIPMENT_UNITS[equipmentId] || []);
   const autoFilled = bookedUnits.length > 0;
@@ -1450,10 +1375,6 @@ function filterUnitsByEquipment(equipmentId) {
     + '<option value="">Not sure which unit</option>';
   sel.disabled = false;
 
-  // The field itself always stays visible — crew need to SEE which physical unit is involved
-  // even when there's only one candidate. Only a genuine ambiguity (2+ units actually booked)
-  // gets the dropdown; a single booked unit shows as plain read-only text instead, since
-  // there's nothing to actually choose.
   if (wrap) wrap.style.display = '';
   const showPicker = !(autoFilled && bookedUnits.length === 1);
   sel.style.display = showPicker ? '' : 'none';
@@ -1508,8 +1429,6 @@ function filterUnitsByAccessory(accessoryId) {
     + '<option value="">Not sure which unit</option>';
   sel.disabled = false;
 
-  // Field always stays visible — see the equipment Unit field's comment above. Only a real
-  // ambiguity (2+ units booked) gets the dropdown; one booked unit shows as read-only text.
   if (wrap) wrap.style.display = '';
   const showPicker = !(autoFilled && bookedUnits.length === 1);
   sel.style.display = showPicker ? '' : 'none';
@@ -1553,12 +1472,8 @@ function showPg(id, btn) {
   document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
   document.getElementById('pg-' + id).classList.add('on');
   document.querySelectorAll('.tabbar button').forEach(b => b.classList.remove('on'));
-  // Only dashboard/bookings have a dedicated tab — attendance/incidents/maintenance are
-  // reached via the More sheet, so no tab lights up for those, which is fine.
   const match = btn || document.querySelector(`.tabbar button[data-tab="${id}"]`);
   if (match) match.classList.add('on');
-  // Whichever tab is current when "File Report" gets opened is where the incident form
-  // should land back on after submitting, since that modal opens from more than one tab.
   const irReturnTab = document.getElementById('incidentReturnTab');
   if (irReturnTab) irReturnTab.value = id;
   window.scrollTo(0, 0);
@@ -1573,9 +1488,6 @@ function showSubTab(group, name, btn) {
 function openMo(id) { document.getElementById(id).classList.add('on'); }
 function closeMo(id) { document.getElementById(id).classList.remove('on'); }
 
-// Guards the Submit Report / Submit Ticket / Submit Request forms against a duplicate
-// record from a double-tap — real risk on a touch UI, unlike the idempotent checklist/
-// attendance/arrival forms elsewhere on this page which don't need this.
 function guardCrewSubmit(form) {
   var btn = form.querySelector('button[type="submit"]');
   if (btn.disabled) return false;
@@ -1624,7 +1536,6 @@ function filterBookingList(kind, query) {
   });
   const emptyEl = kind === 'att' ? document.getElementById('attBookingEmpty') : document.getElementById('checklistBookingEmpty-' + kind.replace('checklist-', ''));
   if (emptyEl) emptyEl.style.display = anyVisible ? 'none' : 'block';
-  // If the currently active booking just got filtered out, clear its panel so a stale pick can't linger.
   if (activeHidden) {
     document.querySelectorAll(`.booking-pick-item[data-kind="${kind}"]`).forEach(it => it.classList.remove('active'));
     if (kind === 'att') {
@@ -1687,10 +1598,6 @@ function openUpdateMaint(schedId, currentStatus) {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.mo.on').forEach(m => m.classList.remove('on')); });
 
-// Equipment Checklist real-time-ish refresh — a newly-released or newly-arrival-confirmed
-// booking previously only ever appeared after a manual page reload. Polls a cheap signature
-// (not the full dataset) and surfaces a tap-to-refresh banner instead of silently reloading
-// out from under someone mid-form.
 @if ($isHeadCrew)
 (function () {
   let lastSignature = null;

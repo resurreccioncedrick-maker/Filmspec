@@ -10,8 +10,6 @@ use Illuminate\View\View;
 
 class ChecklistController extends Controller
 {
-    // Printable check-out/check-in record for a booking's equipment — same query shape as
-    // index()'s $equipLines so this record always matches what staff see/edit on-screen.
     public function print(Request $request): View|RedirectResponse
     {
         $bid = (int) $request->query('booking_id', 0);
@@ -53,11 +51,6 @@ class ChecklistController extends Controller
                 DB::raw("CONCAT(ui.first_name,' ',ui.last_name) as ci_by_name")
             );
 
-        // Accessories dispatched via Field Requests (or added directly) share the same
-        // equipment_checklist table (accessory_id column, equipment_id left null) so they show
-        // up on the same physical check-out/check-in record instead of a disconnected one.
-        // Only the legacy whole-line row (no unit identity) feeds this print sheet — a per-unit
-        // breakdown is a screen concern, not the printed record's.
         $accQuery = DB::table('booking_accessories as ba')
             ->join('accessories as a', 'ba.accessory_id', '=', 'a.accessory_id')
             ->leftJoin('equipment_checklist as co', function ($j) use ($bid) {
@@ -89,8 +82,6 @@ class ChecklistController extends Controller
         $inDone = $equipLines->filter(fn ($e) => $e->ci_checked)->count();
         $damaged = $equipLines->filter(fn ($e) => in_array($e->condition_in, ['damaged', 'missing'], true))->count();
 
-        // This print sheet uses its own self-contained badge classes (ok/warn/bad/none), distinct
-        // from the main Checklist screen's badge-green/badge-blue/... — not $this->condBadge.
         $printBadge = ['excellent' => 'ok', 'good' => 'ok', 'fair' => 'warn', 'damaged' => 'bad', 'missing' => 'bad'];
 
         return view('checklist-print', [
@@ -110,9 +101,6 @@ class ChecklistController extends Controller
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
-        // Scoped to this page: release/return still needs an office role, but Traffic staff are
-        // included here (config('filmspec.checklist_office_roles')) without touching the
-        // app-wide manage_roles grant used everywhere else.
         $canManage = in_array($role, config('filmspec.checklist_office_roles'), true);
 
         $bid = (int) $request->query('booking_id', 0);
@@ -132,9 +120,6 @@ class ChecklistController extends Controller
         }
 
         $ceConfirmed = DB::table('cost_estimates')->where('booking_id', $bid)->orderByDesc('ce_id')->value('status') === 'confirmed';
-        // Confirming the CE only sends it to the client (cost_approval_status becomes
-        // 'pending_client') — it is not the client's approval. Equipment must not be checked out
-        // until the client has actually approved, which is a separate, later event.
         $costApproved = ($booking->cost_approval_status ?? null) === 'client_approved';
         if ($dir === 'out' && $booking->booking_status === 'confirmed') {
             if (! $ceConfirmed) {
@@ -155,9 +140,6 @@ class ChecklistController extends Controller
 
                 return redirect()->route('booking-detail', $bid);
             }
-            // "No transport" and "nobody has decided about transport yet" used to look
-            // identical — this column is only ever set once the Assign Transport form is
-            // actually submitted, whatever the outcome.
             if (empty($booking->transport_confirmed_at)) {
                 $request->session()->flash('bd_flash', [
                     'type' => 'danger',
@@ -175,9 +157,6 @@ class ChecklistController extends Controller
             $dir = $request->input('direction', $dir);
         }
 
-        // Base line items only — deliberately no equipment_checklist join here. Once a
-        // multi-quantity item has several per-unit rows sharing the same equipment_id/direction,
-        // joining them onto this one-row-per-line-item query would fan it out into duplicates.
         $equipQuery = DB::table('booking_equipment as be')
             ->join('equipment as e', 'be.equipment_id', '=', 'e.equipment_id')
             ->join('equipment_categories as ec', 'e.category_id', '=', 'ec.category_id')
@@ -208,9 +187,6 @@ class ChecklistController extends Controller
             : in_array($e->condition_in, ['damaged', 'missing'], true))->count();
 
         $crewCount = (int) DB::table('booking_crew')->where('booking_id', $bid)->count();
-        // Transport being assigned doesn't automatically mean a driver is required — some
-        // transport is just a delivery/courier fee. Staff mark that explicitly on the Assign
-        // Transport form (driver_required).
         $driverNeeded = ! empty($booking->vehicle_rate_id) && (bool) ($booking->driver_required ?? false);
         $driverCount = 0;
         if ($driverNeeded) {
@@ -219,8 +195,6 @@ class ChecklistController extends Controller
                 ->where('bc.booking_id', $bid)->where(DB::raw('LOWER(cp.position_name)'), 'like', '%driver%')
                 ->count();
         }
-        // Payment collection is accounting's own workspace (Billing & POS) — it no longer gates
-        // equipment release.
         $transportConfirmed = ! empty($booking->transport_confirmed_at);
         $gateOk = $totalItems > 0 && $crewCount > 0 && $transportConfirmed && (! $driverNeeded || $driverCount > 0) && $costApproved;
 
@@ -237,13 +211,6 @@ class ChecklistController extends Controller
         ]);
     }
 
-    /**
-     * Mutates $equipLines in place, adding co_checked/ci_checked/condition_out/condition_in/etc
-     * to every line (quantity=1, from the legacy whole-line row) and a 'slots' array to every
-     * quantity>1 line (one entry per physical unit — a registered equipment_units/accessory_units
-     * row where one exists, otherwise a synthetic "Unit N of M" slot), so one damaged unit no
-     * longer hides its siblings' state.
-     */
     private function hydrateChecklistState($equipLines, int $bid): void
     {
         $eqIds = $equipLines->where('item_type', 'equipment')->pluck('ref_id')->all();
@@ -262,10 +229,6 @@ class ChecklistController extends Controller
             $aggLookup[$key] = $r;
         }
 
-        // Excludes retired units (same convention EquipmentController::recalcFromUnits() already
-        // uses) and orders 'available' first — without this, a retired/under_maintenance unit
-        // could get offered as one of the N checkable slots purely because it has a lower
-        // unit_id, silently hiding an actually-available unit of the same model instead.
         $unitRows = DB::table('equipment_units')->whereIn('equipment_id', $eqIds ?: [0])
             ->where('status', '!=', 'retired')
             ->orderByRaw("status = 'available' desc")->orderBy('unit_id')
@@ -300,10 +263,6 @@ class ChecklistController extends Controller
             ->get()
             ->keyBy(fn ($r) => 'u' . ($r->equipment_unit_id ?: $r->accessory_unit_id));
 
-        // Which specific unit(s) are actually allocated to THIS booking's equipment/accessory
-        // lines (EquipmentUnitAllocator, set the moment the item was added to the booking) —
-        // the checklist should show/offer these, not an independent "whatever's available"
-        // guess, so a line's Unit here always agrees with the Incident Report form's Unit field.
         $allocatedEq = DB::table('booking_equipment_units as beu')
             ->join('booking_equipment as be', 'beu.bk_equip_id', '=', 'be.bk_equip_id')
             ->join('equipment_units as eu', 'beu.equipment_unit_id', '=', 'eu.unit_id')
@@ -344,9 +303,6 @@ class ChecklistController extends Controller
             $allocated = $isAcc ? ($allocatedAcc[$eq->ref_id] ?? collect()) : ($allocatedEq[$eq->ref_id] ?? collect());
             $fallbackUnits = ($isAcc ? ($accUnitRows[$eq->ref_id] ?? collect()) : ($unitRows[$eq->ref_id] ?? collect()))
                 ->reject(fn ($u) => $allocated->contains('unit_id', $u->unit_id));
-            // Allocated units first (what's actually recorded against this booking), topped up
-            // with any other real unit of that model if the booking needs more slots than it has
-            // allocations for (e.g. allocated before stock ran out, or predates allocation).
             $realUnits = $allocated->concat($fallbackUnits)->take($eq->quantity);
             $slots = [];
             foreach ($realUnits as $u) {
@@ -406,9 +362,6 @@ class ChecklistController extends Controller
         $items = (array) $request->input('items', []);
 
         foreach ($items as $key => $item) {
-            // "eq_<id>" / "acc_<id>" — whole-line legacy key (quantity=1 items).
-            // "eq_<id>_u<unitId>" / "acc_<id>_u<unitId>" — a genuinely registered physical unit.
-            // "eq_<id>_s<seq>" / "acc_<id>_s<seq>" — an untracked multi-quantity item's Nth copy.
             if (! preg_match('/^(eq|acc)_(\d+)(?:_(u|s)(\d+))?$/', (string) $key, $m)) {
                 continue;
             }
@@ -494,11 +447,6 @@ class ChecklistController extends Controller
                         DB::table('equipment')->where('equipment_id', $refId)->update(['availability_status' => $newEquipStatus]);
                     }
 
-                    // Deliberately OUTSIDE the $existTx guard above — that guard only protects the
-                    // once-per-equipment-model transaction/availability-status side effect. A
-                    // second, third… physical unit of the SAME model coming back damaged still
-                    // needs its own incident; nesting this inside $existTx used to mean only the
-                    // first unit checked in for a given equipment_id could ever raise one.
                     if (in_array($cond, ['damaged', 'missing'], true)) {
                         $this->createReturnIncident(
                             $bid, $uid, $cond,
@@ -509,9 +457,6 @@ class ChecklistController extends Controller
                     }
                 }
 
-                // Accessories skip equipment_transactions/availability_status (they aren't
-                // serialized/tracked there), but a damaged/missing one is exactly as much an
-                // incident as damaged/missing equipment.
                 if ($checked && $isAcc && in_array($cond, ['damaged', 'missing'], true)) {
                     $this->createReturnIncident(
                         $bid, $uid, $cond,
@@ -533,9 +478,6 @@ class ChecklistController extends Controller
                 }
             }
         } else {
-            // Booking-status transitions stay gated on equipment only (matching the existing
-            // process). A line item now counts as "back" once ALL of its units are checked in —
-            // for a quantity=1 item that's still just the one legacy row, unchanged.
             $lines = DB::table('booking_equipment')->where('booking_id', $bid)->select('equipment_id', 'quantity')->get();
             $totalEquip = $lines->count();
             $returnedCount = 0;
@@ -550,10 +492,6 @@ class ChecklistController extends Controller
             if ($totalEquip > 0 && $returnedCount >= $totalEquip) {
                 $curStatus = DB::table('bookings')->where('booking_id', $bid)->value('booking_status');
                 if (in_array($curStatus, ['ongoing', 'confirmed'], true)) {
-                    // Matches BookingDetailController::checkin()'s per-item path: all equipment
-                    // back in moves the booking to pending_inspection, not straight to returned —
-                    // "returned" only happens once staff deliberately confirm the inspection (or
-                    // skip it via Complete Booking).
                     DB::table('bookings')->where('booking_id', $bid)->update(['booking_status' => 'pending_inspection', 'updated_at' => now()]);
                     ActivityLog::record($uid, 'status_change', 'booking', "Booking #$bid pending inspection — all equipment checked in via checklist", $bid);
                 }
@@ -589,11 +527,6 @@ class ChecklistController extends Controller
         ?int $accessoryUnitId = null,
         ?string $unitLabel = null
     ): void {
-        // A genuinely registered unit gets its own incident regardless of whether a sibling unit
-        // of the same model already has one open — that's the entire point of unit tracking.
-        // Only the legacy no-unit-identity case (or a synthetic, unregistered unit) falls back to
-        // "at most one open incident per line item," since there's no real record to distinguish
-        // a second synthetic copy beyond a text label.
         $dedupe = DB::table('incident_reports')->where('booking_id', $bid)->where('status', '!=', 'resolved');
         if ($equipmentUnitId) {
             $dedupe->where('equipment_unit_id', $equipmentUnitId);

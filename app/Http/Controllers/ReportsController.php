@@ -50,21 +50,10 @@ class ReportsController extends Controller
             ->limit(10)
             ->get();
 
-        // 'Sales' and 'Payments Collected' are deliberately two different figures from two
-        // different tables — sales is billed booking value (what was contracted), collected is
-        // actual cash received (from the payments table). Before this fix, "Period Sales" was
-        // silently SUM(payments.amount) — the exact same query as "Payment Collection" below,
-        // just grouped differently — so the two labels always showed the same number with no
-        // real "sales" concept behind either of them.
         $kpis = $this->periodKpis($dbFrom, $dbTo);
         $kpis['outstanding_bal'] = (float) DB::table('statement_of_accounts')->where('status', '!=', 'paid')->sum('balance');
         $kpis['open_incidents'] = (int) DB::table('incident_reports')->where('status', 'open')->count();
 
-        // Trend badges (↑12% vs previous period) — always computed against the same-length
-        // window immediately before the selected range, independent of the "vs Prev/vs Last
-        // Year" compare toggle below (that one overlays a second line on the chart; this is a
-        // simple always-on KPI comparison). Outstanding/Open Incidents are current snapshots,
-        // not period totals, so a "previous period" trend for them wouldn't mean anything real.
         $prevDiff = strtotime($dateTo) - strtotime($dateFrom);
         $prevTo = date('Y-m-d', strtotime($dateFrom) - 86400);
         $prevFrom = date('Y-m-d', strtotime($prevTo) - $prevDiff);
@@ -110,10 +99,6 @@ class ReportsController extends Controller
             ->limit(20)
             ->get();
 
-        // Monthly Sales + Collections, one continuous month-by-month axis for the whole selected
-        // range (not just months that happen to have data) — both series plot on the exact same
-        // X-axis this way, matching the panelist's example (Mar|Apr|May|Jun|...) instead of two
-        // series whose labels could silently drift apart when one has a month the other doesn't.
         $salesMonthly = $this->monthlySeries($dateFrom, $dateTo);
 
         $feedbackStats = DB::table('booking_feedback')
@@ -151,8 +136,6 @@ class ReportsController extends Controller
         ]);
     }
 
-    /** Sales/Bookings-count KPIs for one date range — shared by the main period and the
-     *  previous-period comparison used for the KPI trend badges. */
     private function periodKpis(string $dbFrom, string $dbTo): array
     {
         return [
@@ -165,15 +148,11 @@ class ReportsController extends Controller
         ];
     }
 
-    /** @return array{pct: int, dir: string, isNew?: bool}|null null when there's nothing to compare against. */
     private function pctChange(float $curr, float $prev): ?array
     {
         if ($curr == 0.0 && $prev == 0.0) {
             return null;
         }
-        // A near-zero (not necessarily exactly zero) previous period turns any real current
-        // value into a meaningless four/five-digit percentage — "New" reads honestly instead
-        // of implying a precision the underlying comparison doesn't have.
         if ($prev < ($curr * 0.02)) {
             return ['pct' => 0, 'dir' => 'up', 'isNew' => true];
         }
@@ -182,7 +161,6 @@ class ReportsController extends Controller
         return ['pct' => min(999, (int) round(abs($pct))), 'dir' => $pct >= 0 ? 'up' : 'down'];
     }
 
-    /** Continuous month-by-month Sales + Collections series covering $dateFrom–$dateTo. */
     private function monthlySeries(string $dateFrom, string $dateTo)
     {
         $dbFrom = $dateFrom;
@@ -259,9 +237,6 @@ class ReportsController extends Controller
             $compTo = date('Y-m-d', strtotime($dateTo . ' -1 year'));
         }
 
-        // Same monthly shape as the main period's series — overlaid on the Financial Trend
-        // chart by month POSITION (1st month vs 1st month, 2nd vs 2nd, ...), not by matching
-        // calendar month, same convention the daily version of this comparison used before.
         $compareMonthly = collect();
         if ($compFrom && $compTo) {
             $compareMonthly = $this->monthlySeries($compFrom, $compTo);
@@ -288,7 +263,6 @@ class ReportsController extends Controller
                 $data['topClients']->map(fn ($tc) => [$tc->company_name ?: $tc->contact_person, $tc->client_type, $tc->completed_count, $tc->total_bookings, $tc->total_spend])->all()],
             'incidents' => ['Incidents Report', ['Date', 'Equipment', 'Booking', 'Type', 'Charge (PHP)', 'Status'],
                 $data['damagedReport']->map(fn ($dr) => [date('Y-m-d', strtotime($dr->incident_date)), $dr->equipment_name, $dr->booking_reference, $dr->incident_type, $dr->charge_amount, $dr->status])->all()],
-            // 'ce_financials' moved to CostEstimatesController::exportFinancials() in Part 11.
             default => ['Monthly Financial Trend', ['Month', 'Bookings', 'Sales (PHP)', 'Payments', 'Collected (PHP)'],
                 $data['salesMonthly']->map(fn ($r) => [$r->label, $r->bookings_count, $r->sales_total, $r->transactions, $r->collected_total])->all()],
         };

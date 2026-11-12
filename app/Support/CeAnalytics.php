@@ -6,33 +6,14 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
-/**
- * Confirmed-CE analytics shared by the Cost Estimates, Crew Data and Equipment Data pages
- * (Part 11). Moved out of ReportsController when those sections became their own pages, so
- * all three read the same numbers from one implementation.
- */
 class CeAnalytics
 {
-    /**
-     * Restricts a `cost_estimates as ce` query builder to only the latest CONFIRMED row per
-     * booking, so a booking that was confirmed, revised and re-confirmed never counts twice.
-     * confirmCe() (BookingCosting) sets status='confirmed' on the new row without demoting
-     * the row it superseded, so without this filter any raw `status='confirmed'` query can
-     * see 2+ "confirmed" rows for the same booking — this is the shared fix for that.
-     */
     public static function onlyLatestConfirmed($query)
     {
         return $query->where('ce.status', 'confirmed')
             ->whereRaw('ce.ce_id = (SELECT MAX(ce2.ce_id) FROM cost_estimates ce2 WHERE ce2.booking_id = ce.booking_id AND ce2.status = "confirmed")');
     }
 
-    /**
-     * Only the latest CONFIRMED CE per booking counts, so a booking that was confirmed,
-     * changed and re-confirmed (Part 2a's revision lifecycle) is never double-counted from
-     * stale revision history. A confirmed CE whose booking was later cancelled is also
-     * excluded — a cancelled booking shouldn't inflate confirmed financial totals even
-     * though its old CE row still literally says status='confirmed'.
-     */
     public static function confirmedCes(string $from, string $to): Collection
     {
         $rows = self::onlyLatestConfirmed(
@@ -53,8 +34,6 @@ class CeAnalytics
                 DB::raw("CONCAT(u.first_name,' ',u.last_name) AS confirmed_by_name"))
             ->get();
 
-        // company_name is often an empty string rather than NULL, so SQL COALESCE won't fall
-        // through to contact_person — use PHP's falsy-coalescing, as elsewhere in the app.
         $rows->each(function ($row) {
             $row->client_name = $row->company_name ?: $row->contact_person;
         });
@@ -69,20 +48,13 @@ class CeAnalytics
             'crew_total' => (float) $confirmedCes->sum('crew_total'),
             'gross_total' => (float) $confirmedCes->sum('grand_total'),
             'count' => $confirmedCes->count(),
-            // FS equipment at CE rates, before any package discount (Part 11 / item 26).
             'fs_equipment_listed' => (float) $confirmedCes->sum(fn ($r) => (float) $r->equipment_total + (float) $r->accessories_total),
-            // Package discount applied on confirmed CEs — shown explicitly rather than left as
-            // an unexplained gap between Equipment List Value and the Confirmed CE Value.
             'discount_total' => (float) $confirmedCes->sum('discount'),
         ];
-        // Outsourced/partner equipment was removed as a feature (see BookingCosting) and is no
-        // longer surfaced as its own metric, but old confirmed CEs from before the removal can
-        // still carry a real outsourced_total — still subtracted here so net_total stays
-        // historically accurate for those, even though it's always 0 for anything new.
         $outsourcedTotal = (float) $confirmedCes->sum('outsourced_total');
         $f['net_total'] = $f['packaged_cost'] - $f['crew_total'] - $outsourcedTotal;
 
-        $pcDivisor = $f['packaged_cost'] ?: 1;   // avoid divide-by-zero on an empty period
+        $pcDivisor = $f['packaged_cost'] ?: 1;
         $f['crew_pct'] = round($f['crew_total'] / $pcDivisor * 100, 1);
         $f['net_pct'] = round($f['net_total'] / $pcDivisor * 100, 1);
         $f['avg_per_ce'] = $f['count'] ? round($f['net_total'] / $f['count'], 2) : 0.0;
@@ -90,10 +62,6 @@ class CeAnalytics
         return $f;
     }
 
-    /**
-     * Monthly recap. When $monthKeys is given every month in the chart window is emitted,
-     * so a quiet month renders as a gap on the axis instead of vanishing.
-     */
     public static function monthly(Collection $confirmedCes, ?array $monthKeys = null): Collection
     {
         $grouped = $confirmedCes->groupBy(fn ($row) => Carbon::parse($row->confirmed_at)->format('Y-m'));

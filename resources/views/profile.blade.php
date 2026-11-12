@@ -19,7 +19,6 @@
 <div class="dashboard-grid">
   <div style="display:flex;flex-direction:column;gap:22px">
 
-    <!-- Profile card -->
     <div class="card">
       <div class="card-header"><h2 class="card-title">Profile Information</h2></div>
       <div class="card-body">
@@ -59,7 +58,6 @@
       </div>
     </div>
 
-    <!-- Change password -->
     <div class="card">
       <div class="card-header"><h2 class="card-title">Change Password</h2></div>
       <div class="card-body">

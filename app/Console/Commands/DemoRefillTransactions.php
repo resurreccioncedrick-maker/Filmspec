@@ -8,25 +8,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-/**
- * Rebuilds all TRANSACTIONAL demo data (clients, crew, bookings and everything under them) while
- * leaving accounts (users), the equipment/accessory catalog, and the vehicle_rates/fleet_vehicles
- * catalog completely untouched — a narrower version of DemoDataSeeder for a database that already
- * has a real catalog and real login accounts worth keeping.
- *
- * Existing client-role/crew-role user accounts are re-attached to freshly generated demo
- * client/crew profiles (same login email/password, new business-facing name/company), so nobody
- * loses the ability to sign in.
- *
- * v2: unlike the first version, this one keeps every generated row internally consistent with
- * the app's own release/approval gates instead of just filling columns — a booking that has had
- * equipment checked out always has cost_approval_status='client_approved' and (if it needs a
- * driver) a Driver crew member assigned, crew are never double-booked across overlapping shoots,
- * equipment.availability_status is recomputed from the actual generated checkout/checkin history
- * instead of left stale, and the handful of tables that were simply never populated before
- * (booking_comments, documents, client_support_messages, terms_acceptances, transport_assignments,
- * equipment_checklist/equipment_transactions) now get real, gate-consistent demo rows too.
- */
 class DemoRefillTransactions extends Command
 {
     protected $signature = 'demo:refill-transactions {--force : Skip the confirmation prompt}';
@@ -35,15 +16,9 @@ class DemoRefillTransactions extends Command
 
     private Carbon $today;
     private array $ids = [];
-    private array $crewBusy = []; // crew_id => [[Carbon start, Carbon end], ...]
+    private array $crewBusy = [];
     private int $incidentSeq = 1;
 
-    // statement_of_accounts and booking_cancellations were missing from this list — both
-    // reference bookings.booking_id, so wiping and re-seeding 'bookings' without also clearing
-    // them left old SOA/cancellation rows pointing at booking_ids that either no longer exist
-    // or (worse) get reassigned to an unrelated new booking after re-seeding. This is exactly
-    // how two stale statement_of_accounts rows ended up "overdue" for bookings that no longer
-    // exist, inflating Billing's overdue count while its (inner-joined) list stayed empty.
     private const TRUNCATE = [
         'terms_acceptances', 'documents', 'booking_comments', 'client_support_messages',
         'data_erasure_requests', 'booking_equipment_requests', 'booking_feedback', 'reminders',
@@ -70,8 +45,6 @@ class DemoRefillTransactions extends Command
         DB::statement('SET FOREIGN_KEY_CHECKS=1');
         $this->info('Cleared ' . count(self::TRUNCATE) . ' transactional tables.');
 
-        // These are transactional/derived state, not catalog identity — a stale 'rented'/
-        // 'assigned' left over from the data we just wiped must not survive the wipe.
         DB::table('equipment')->where('availability_status', 'rented')->update(['availability_status' => 'available']);
         DB::table('fleet_vehicles')->where('status', 'assigned')->update(['status' => 'available']);
 
@@ -110,8 +83,6 @@ class DemoRefillTransactions extends Command
         ];
     }
 
-    // ---------------------------------------------------------------- crew
-
     private function seedCrew(): void
     {
         $crew = [
@@ -126,10 +97,6 @@ class DemoRefillTransactions extends Command
             ['Ella', 'Navarro', 'Production Assistant', 'on_call', 1200],
             ['Ramon', 'Aquino', 'Drone Pilot', 'freelance', 4000],
         ];
-        // A dedicated Driver is required for any booking that uses FilmSpec transport (the
-        // release-readiness gate checks for a crew member holding the Driver position) — the
-        // original 10-person roster had nobody in that position, which meant the driver-required
-        // gate could never actually be satisfied by seeded data.
         $driverPosName = collect(array_keys($this->ids['positions']->all()))->first(fn ($n) => stripos($n, 'driver') !== false);
         if ($driverPosName) {
             $crew[] = ['Jolo', 'Ferrer', $driverPosName, 'on_call', 1500];
@@ -140,7 +107,7 @@ class DemoRefillTransactions extends Command
         $crewIds = [];
         foreach ($crew as $i => [$fn, $ln, $posName, $emp, $rate]) {
             $posId = $this->ids['positions'][$posName] ?? $this->ids['positions'][$posNames[0]];
-            $uid = $crewUsers[$i] ?? null; // first N crew rows re-attach to real crew accounts
+            $uid = $crewUsers[$i] ?? null;
             $cid = DB::table('crew_members')->insertGetId([
                 'user_id' => $uid, 'first_name' => $fn, 'last_name' => $ln,
                 'email' => strtolower("{$fn}.{$ln}") . '@filmspec-crew.ph', 'phone' => '09' . random_int(150000000, 999999999),
@@ -170,7 +137,6 @@ class DemoRefillTransactions extends Command
         ]);
     }
 
-    /** True if $crewId has no other overlapping-date booking already registered this run. */
     private function crewIsFree(int $crewId, Carbon $start, Carbon $end): bool
     {
         foreach ($this->crewBusy[$crewId] ?? [] as [$bStart, $bEnd]) {
@@ -187,7 +153,6 @@ class DemoRefillTransactions extends Command
         $this->crewBusy[$crewId][] = [$start, $end];
     }
 
-    /** Picks up to $count crew names free for [$start,$end], never double-booking anyone. */
     private function pickAvailableCrew(array $pool, Carbon $start, Carbon $end, int $count, array $exclude = []): array
     {
         $free = array_values(array_filter($pool, function ($name) use ($start, $end, $exclude) {
@@ -205,8 +170,6 @@ class DemoRefillTransactions extends Command
 
         return $picked;
     }
-
-    // ---------------------------------------------------------------- clients
 
     private function seedClients(): void
     {
@@ -229,7 +192,7 @@ class DemoRefillTransactions extends Command
         $clientUsers = $this->ids['clientUsers'];
         $clientIds = [];
         foreach ($companies as $i => [$name, $entityType, $contact, $terms, $discPct]) {
-            $uid = $clientUsers[$i] ?? null; // first N companies re-attach to real client accounts
+            $uid = $clientUsers[$i] ?? null;
             $email = $uid
                 ? DB::table('users')->where('user_id', $uid)->value('email')
                 : Str::slug($contact) . '@example.com';
@@ -247,8 +210,6 @@ class DemoRefillTransactions extends Command
         }
         $this->ids['clients'] = $clientIds;
     }
-
-    // ---------------------------------------------------------------- bookings + transactions
 
     private function seedBookingsAndTransactions(): void
     {
@@ -288,11 +249,6 @@ class DemoRefillTransactions extends Command
             }
         }
 
-        // Decide which bookings use FilmSpec transport (drives the driver-required gate) —
-        // roughly a fifth of released/releasable bookings, plus two deliberate, clearly-labeled
-        // demo scenarios: one 'confirmed' booking left without a driver so the blocked gate has
-        // a real example, and one already-progressed booking with the driver correctly assigned
-        // so the clean pass-through state has one too.
         $eligible = array_keys(array_filter($bookingSpecs, fn ($s) => in_array($s['status'], ['confirmed', 'ongoing', 'pending_inspection', 'returned', 'completed'], true)));
         shuffle($eligible);
         foreach (array_slice($eligible, 0, (int) ceil(count($eligible) * 0.18)) as $idx) {
@@ -308,14 +264,10 @@ class DemoRefillTransactions extends Command
             $bookingSpecs[$firstOngoing]['transport'] = true;
             $bookingSpecs[$firstOngoing]['forceNoDriver'] = false;
         }
-        // One more 'confirmed' booking deliberately left awaiting client approval, so that UI
-        // state (distinct from the driver-gate one above) has a real example too.
         $confirmedIdxs = collect($eligible)->filter(fn ($idx) => $bookingSpecs[$idx]['status'] === 'confirmed' && $idx !== $firstConfirmed)->values();
         if ($confirmedIdxs->isNotEmpty()) {
             $bookingSpecs[$confirmedIdxs->first()]['pendingApproval'] = true;
         }
-        // And a third 'confirmed' booking where transport has never even been reviewed —
-        // distinct blocking reason from the two above (missing driver / pending approval).
         $confirmedIdxs2 = $confirmedIdxs->filter(fn ($idx) => $idx !== ($confirmedIdxs->first()))->values();
         if ($confirmedIdxs2->isNotEmpty()) {
             $bookingSpecs[$confirmedIdxs2->first()]['transportUnreviewed'] = true;
@@ -388,16 +340,6 @@ class DemoRefillTransactions extends Command
                 $accLines[] = ['id' => $accId, 'qty' => $qty];
             }
 
-            // A booking using FilmSpec transport needs its driver picked from the availability
-            // pool too (same double-booking rule as regular crew) — decided before the general
-            // crew pick so the driver reservation and the regular crew pool don't collide. If the
-            // one driver on the roster is already busy on these dates, the booking simply doesn't
-            // use FilmSpec transport rather than being left with transport assigned and no driver
-            // able to satisfy the release gate (the exact contradiction this whole rebuild exists
-            // to eliminate) — except for the one deliberate forceNoDriver demo booking, which stays
-            // at 'confirmed' forever and is never actually released, so no contradiction arises.
-            // No Driver position in the catalog at all means the release gate could never be
-            // satisfied for any transport-using booking, so transport is simply never used.
             $useTransport = $spec['transport'] && $driverName;
             $lineCrew = [];
             $driverAssigned = false;
@@ -451,12 +393,6 @@ class DemoRefillTransactions extends Command
                 'generated_at' => $spec['created'],
             ]);
 
-            // A booking whose equipment has actually been released (anything past 'confirmed')
-            // MUST show client_approved here — that is exactly the gate the app enforces before
-            // checkout, so seeded data must never contradict it. Only a still-'confirmed' booking
-            // may legitimately still be awaiting approval, and only the one deliberately marked
-            // 'pendingApproval' above is left that way; the rest default to approved once the CE
-            // is confirmed, matching normal fast-moving demo bookings.
             if ($ceStatus !== 'confirmed') {
                 $costApproval = null;
             } elseif ($spec['status'] !== 'confirmed') {
@@ -465,13 +401,7 @@ class DemoRefillTransactions extends Command
                 $costApproval = $spec['pendingApproval'] ? 'pending_client' : 'client_approved';
             }
 
-            // Transport alone doesn't imply a driver is required — that's a separate per-booking
-            // choice staff make on the Assign Transport form. The forceNoDriver demo booking
-            // still needs this true, or its deliberately-blocked gate demo would stop blocking
-            // now that "transport assigned" no longer auto-implies "driver required".
             $driverRequired = $useTransport && ($driverAssigned || $spec['forceNoDriver']);
-            // Staff review transport (even to conclude none is needed) as part of normal booking
-            // setup — except the one deliberate demo booking showing the "never reviewed" block.
             $transportConfirmedAt = $spec['transportUnreviewed'] ? null : $spec['created']->copy()->addDay();
 
             DB::table('bookings')->where('booking_id', $bookingId)->update([
@@ -499,9 +429,6 @@ class DemoRefillTransactions extends Command
                 $this->seedChecklistAndTransactions($bookingId, $equipLines, $accLines, $returned, $spec['start'], $spec['end']);
             }
 
-            // Only a CURRENTLY active dispatch keeps a transport_assignments row — the real
-            // TransportController deletes the row (freeing the vehicle) once an assignment is
-            // completed, so a 'returned'/'completed' booking would have none left in reality.
             if ($useTransport && $vehicleRateId && in_array($spec['status'], ['confirmed', 'ongoing'], true)) {
                 $this->seedTransportAssignment($bookingId, $vehicleRateId, $driverAssigned ? $this->ids['crew'][$driverName] : null, $spec['start']);
             }
@@ -524,12 +451,6 @@ class DemoRefillTransactions extends Command
         DB::table('fleet_vehicles')->where('fleet_vehicle_id', $fleetVehicle->fleet_vehicle_id)->update(['status' => 'assigned', 'updated_at' => $this->today]);
     }
 
-    /**
-     * Mirrors ChecklistController::saveChecklist()'s real side effects (equipment_checklist +
-     * equipment_transactions rows, and an auto-created incident_reports row on damaged/missing
-     * check-in) so a completed/returned/ongoing booking's checklist page shows real history
-     * instead of every item sitting unchecked despite the booking supposedly being done.
-     */
     private function seedChecklistAndTransactions(int $bookingId, array $equipLines, array $accLines, bool $returned, Carbon $start, Carbon $end): void
     {
         $uid = $this->ids['uid']['ops'];
@@ -579,9 +500,6 @@ class DemoRefillTransactions extends Command
             }
         }
 
-        // Accessories go through the same checklist screen but never generate equipment_
-        // transactions/incidents (accessories aren't serialized inventory) — matches
-        // ChecklistController::saveChecklist()'s `! $isAcc` guard exactly.
         foreach ($accLines as $line) {
             DB::table('equipment_checklist')->insert([
                 'booking_id' => $bookingId, 'accessory_id' => $line['id'], 'direction' => 'out',
@@ -598,7 +516,6 @@ class DemoRefillTransactions extends Command
         }
     }
 
-    /** Derives equipment.availability_status from the checkout/checkin history just generated. */
     private function recomputeEquipmentAvailability(): void
     {
         $latest = DB::table('equipment_transactions')
@@ -687,8 +604,6 @@ class DemoRefillTransactions extends Command
             $cursor->addDay();
         }
     }
-
-    // ---------------------------------------------------------------- supporting data
 
     private function seedSupportingData(): void
     {
@@ -853,7 +768,7 @@ class DemoRefillTransactions extends Command
             $clientId = $booking->client_id;
             $userId = DB::table('clients')->where('client_id', $clientId)->value('user_id');
             if (! $userId) {
-                continue; // only bookings from clients with a real login went through online checkout
+                continue;
             }
             DB::table('terms_acceptances')->insert([
                 'user_id' => $userId, 'booking_id' => $bid,

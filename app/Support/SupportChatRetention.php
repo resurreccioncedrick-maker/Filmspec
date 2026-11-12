@@ -5,10 +5,6 @@ namespace App\Support;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
-/**
- * Shared by the support-chat:prune scheduled command and the Data Retention admin page's
- * "Run Cleanup Now" button, so both call exactly the same logic instead of forking it.
- */
 class SupportChatRetention
 {
     public static function retentionDays(): int
@@ -16,12 +12,6 @@ class SupportChatRetention
         return (int) config('filmspec.support_chat_retention_days', 90);
     }
 
-    /**
-     * A client with any booking that isn't finished (not completed/cancelled) is still an
-     * active relationship — their older support-chat messages may still be relevant to a
-     * live shoot or dispute, so cleanup skips them regardless of age until every one of their
-     * bookings reaches a terminal status.
-     */
     private static function eligibleQuery(\DateTimeInterface $cutoff)
     {
         return DB::table('client_support_messages')
@@ -31,10 +21,6 @@ class SupportChatRetention
             });
     }
 
-    /**
-     * Counts for the admin page — how many messages exist, how many are currently past the
-     * retention window (i.e. what a run right now would delete), and when cleanup last ran.
-     */
     public static function stats(): array
     {
         $days = self::retentionDays();
@@ -50,7 +36,6 @@ class SupportChatRetention
         ];
     }
 
-    /** Deletes messages (and their attachment files) past the retention window. Returns the count deleted. */
     public static function prune(?int $actorId = null): int
     {
         $days = self::retentionDays();

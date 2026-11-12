@@ -16,7 +16,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SuperAdminController extends Controller
 {
-    // Mirrors legacy $ROLES_DEF.
     private array $rolesDef = [
         'super_admin' => ['label' => 'Super Admin', 'color' => '7c3aed', 'desc' => 'Full access — manage users, roles, all system data'],
         'operations_manager' => ['label' => 'Operations Manager', 'color' => '0891b2', 'desc' => 'Equipment, crew, bookings, billing, reports, user management'],
@@ -26,8 +25,6 @@ class SuperAdminController extends Controller
         'crew' => ['label' => 'Crew Member', 'color' => '0f766e', 'desc' => 'Crew portal — view assignments and file incident reports'],
     ];
 
-    // Every slug that appears anywhere in config('filmspec.role_permissions') — kept complete
-    // so the Role Access Matrix never has to fall back to a raw, un-humanized slug.
     private array $moduleLabels = [
         'dashboard' => 'Dashboard', 'equipment' => 'Equipment', 'accessories' => 'Accessories',
         'crew' => 'Crew', 'bookings' => 'Bookings', 'clients' => 'Clients',
@@ -43,8 +40,6 @@ class SuperAdminController extends Controller
         'crew_portal' => 'Crew Portal',
     ];
 
-    // Category grouping for the Role Access Matrix checklist — purely a presentation grouping,
-    // doesn't affect what config('filmspec.role_permissions') actually grants.
     private array $moduleGroups = [
         'Operations' => ['dashboard', 'bookings', 'clients', 'crew', 'equipment', 'accessories', 'attendance', 'calendar_data'],
         'Finance' => ['billing', 'pos', 'cost_estimates', 'repair_purchase', 'reports'],
@@ -68,7 +63,6 @@ class SuperAdminController extends Controller
             return $this->export($request);
         }
 
-        // Ensure all defined roles exist (matches legacy's self-healing role seed)
         foreach ($this->rolesDef as $rn => $rd) {
             DB::table('roles')->where('role_name', $rn)->exists()
                 ?: DB::table('roles')->insert(['role_name' => $rn, 'description' => $rd['desc']]);
@@ -130,10 +124,6 @@ class SuperAdminController extends Controller
         ]);
     }
 
-    // Streams the live database as a downloadable .sql file. Read-only — never mutates
-    // anything, so unlike restore() this is safe to run without a confirmation step. Also
-    // saved to storage/app/backups (same as the scheduled job) so a manual download shows up
-    // in Recent Backups instead of leaving no trace once it's left the browser's downloads.
     public function backup(): Response
     {
         $sql = DatabaseBackup::dump();
@@ -152,12 +142,8 @@ class SuperAdminController extends Controller
         ]);
     }
 
-    /** Re-download a specific file already sitting in storage/app/backups (history list). */
     public function downloadBackup(string $filename): Response
     {
-        // Listing real filenames from the directory (rather than trusting the URL segment
-        // against a regex) is what actually rules out path traversal / arbitrary file reads —
-        // a regex can still be satisfied by a name that happens not to exist.
         $dir = storage_path('app/backups');
         $real = collect(glob($dir . DIRECTORY_SEPARATOR . '*.sql'))->map(fn ($f) => basename($f));
         if (! $real->contains($filename)) {
@@ -170,7 +156,6 @@ class SuperAdminController extends Controller
         ]);
     }
 
-    /** Recent Backups list + status-strip figures for the Backup and Restore tab. */
     private function backupHistory(): array
     {
         $dir = storage_path('app/backups');
@@ -201,7 +186,6 @@ class SuperAdminController extends Controller
         ];
     }
 
-    /** Export ▾ — two independent datasets: the user list, and the full (uncapped) activity log. */
     private function export(Request $request): StreamedResponse|Response
     {
         $type = $request->query('export', 'users');
@@ -396,15 +380,10 @@ class SuperAdminController extends Controller
             }
 
             $sqlContent = file_get_contents($file->getRealPath());
-            // A real dump always CREATEs at least one table — a .sql-named file that's actually
-            // something else entirely (empty, plain text, HTML, a different tool's export)
-            // shouldn't be handed to the mysql CLI/mysqli at all.
             if (! preg_match('/create\s+table/i', $sqlContent)) {
                 return ['type' => 'danger', 'text' => 'This file doesn\'t look like a database dump (no CREATE TABLE statement found). Restore cancelled.'];
             }
 
-            // Automatic safety net: snapshot the CURRENT database before overwriting it, so a
-            // bad upload has a way back. Saved next to manual backups, not auto-deleted.
             $origName = $file->getClientOriginalName();
             $preRestoreName = 'pre_restore_' . now()->format('Y-m-d_His') . '.sql';
             $preRestoreDir = storage_path('app/backups');

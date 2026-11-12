@@ -2,10 +2,6 @@
 
 namespace App\Support;
 
-/**
- * Ported as-is from core/mailer.php (buildOtpEmail) and verify_signup.php's
- * inline signup template so the emails look identical to the legacy app.
- */
 class OtpMailTemplates
 {
     public static function login(string $name, string $otp): string

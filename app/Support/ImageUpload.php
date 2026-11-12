@@ -5,21 +5,10 @@ namespace App\Support;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
-/**
- * Saves images to Laravel's own "public" disk (storage/app/public, exposed via the
- * public/storage symlink from `php artisan storage:link`). image_path values stored
- * in the database keep the same relative shape ("assets/uploads/{subDir}/...") they
- * always had, so no data migration was needed when this moved off the legacy webroot.
- * Mirrors core/upload.php's handleImageUpload()/deleteOldImage() in intent, not location.
- */
 class ImageUpload
 {
     private const ALLOWED_MIMES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
 
-    // The stored extension comes from THIS map (keyed by the verified MIME type), never from
-    // the client-supplied original filename — a crafted upload whose bytes are a genuine image
-    // (so getMimeType() correctly reports e.g. image/gif) but named "shell.php" must never be
-    // saved with a .php extension onto the public disk.
     private const EXT_BY_MIME = [
         'image/jpeg' => 'jpg', 'image/jpg' => 'jpg', 'image/png' => 'png',
         'image/webp' => 'webp', 'image/gif' => 'gif',

@@ -1,4 +1,3 @@
-// FilmSpec — App JS
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -7,7 +6,6 @@ function init() {
     feather.replace({ 'stroke-width': 1.8, width: 14, height: 14 });
   }
 
-  // ── Tabs ──────────────────────────────────────────────────
   document.querySelectorAll('[data-tab]').forEach(btn => {
     btn.addEventListener('click', function(e) {
       e.preventDefault();
@@ -24,11 +22,6 @@ function init() {
     });
   });
 
-  // ── Nav flyouts (e.g. the Analytics group) ────────────────
-  // Each trigger is a <button data-flyout-target="flyout-xyz">; the panel itself lives
-  // outside <aside> in the DOM (see layouts/app.blade.php) so it isn't clipped by the
-  // sidebar's own overflow. Positioned with getBoundingClientRect() on open, since the
-  // panel uses position:fixed and has no reliable CSS-only anchor to the trigger.
   let navFlyoutCloseTimer = null;
   function openNavFlyout(trigger) {
     clearTimeout(navFlyoutCloseTimer);
@@ -71,8 +64,6 @@ function init() {
     document.querySelectorAll('.nav-flyout.open').forEach(f => f.classList.remove('open'));
   }, true);
 
-  // ── Modals ─────────────────────────────────────────────────
-  // data-modal trigger (open)
   document.querySelectorAll('[data-modal]').forEach(el => {
     el.addEventListener('click', function(e) {
       e.preventDefault();
@@ -80,14 +71,12 @@ function init() {
     });
   });
 
-  // Click outside to close
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
     overlay.addEventListener('click', function(e) {
       if (e.target === this) closeModalEl(this);
     });
   });
 
-  // Close buttons
   document.querySelectorAll('.modal-close, [data-modal-close]').forEach(btn => {
     btn.addEventListener('click', function() {
       const ov = this.closest('.modal-overlay');
@@ -95,14 +84,12 @@ function init() {
     });
   });
 
-  // ESC key
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       document.querySelectorAll('.modal-overlay.active').forEach(closeModalEl);
     }
   });
 
-  // ── Auto-hide alerts ──────────────────────────────────────
   document.querySelectorAll('[data-autohide]').forEach(el => {
     setTimeout(() => {
       el.style.transition = 'opacity .4s, transform .4s';
@@ -112,8 +99,6 @@ function init() {
     }, 4500);
   });
 
-  // ── Global input profiling ────────────────────────────────
-  // Auto-uppercase name fields
   const NAME_FIELDS = [
     'first_name','last_name','contact_person','company_name',
     'dop_name','head_crew_name','custodian_name','new_client_name',
@@ -129,7 +114,6 @@ function init() {
     }
   });
 
-  // Phone inputs: enforce 09XXXXXXXXX (11 digits, starts with 09)
   document.querySelectorAll('input[name="phone"], input[name="new_client_phone"], input[type="tel"]').forEach(inp => {
     inp.setAttribute('maxlength', '11');
     inp.setAttribute('placeholder', inp.placeholder || '09XXXXXXXXX');
@@ -147,10 +131,6 @@ function init() {
     inp.addEventListener('input', () => { inp.setCustomValidity(''); });
   });
 
-  // ── Sidebar nav scroll position ───────────────────────────
-  // Every nav click is a full page load in this app, which used to snap the
-  // sidebar back to the top even when a lower group (e.g. Analytics/Team/Admin)
-  // was scrolled into view — restore it so the sidebar stays where you left it.
   (function persistSidebarScroll() {
     const nav = document.querySelector('.sidebar-nav');
     if (!nav) return;
@@ -163,7 +143,6 @@ function init() {
     } catch (e) {}
   })();
 
-  // ── Image upload previews ─────────────────────────────────
   document.querySelectorAll('.img-upload-zone input[type="file"]').forEach(input => {
     input.addEventListener('change', function() {
       const zone = this.closest('.img-upload-zone');
@@ -171,7 +150,6 @@ function init() {
       const reader = new FileReader();
       reader.onload = e => {
         zone.classList.add('has-image');
-        // Remove existing content except the input
         Array.from(zone.children).forEach(c => { if (c !== this) c.remove(); });
         const img = document.createElement('img');
         img.className = 'preview-img';
@@ -207,31 +185,19 @@ function closeModalEl(el) {
   if (count === 0) document.body.style.overflow = '';
 }
 
-// Position a .crew-slot-drop (or similar) dropdown as position:fixed, anchored
-// to its input's current on-screen location - this lets it escape a scrollable
-// ancestor (e.g. a modal-body with overflow-y:auto), which would otherwise clip
-// an absolutely-positioned dropdown that overflows the ancestor's clip box.
 function positionSearchDrop(inputEl, dropEl) {
   if (!inputEl || !dropEl) return;
-  // .modal has `transform:scale(...)` (for its open/close animation), and per spec any
-  // non-none transform on an ancestor makes IT the containing block for position:fixed
-  // descendants instead of the viewport - so a fixed dropdown left inside .modal renders
-  // at the wrong spot even with viewport-relative coordinates. Move it to <body> once (a
-  // "portal") so position:fixed always resolves against the real viewport.
   if (dropEl.parentElement !== document.body) {
     document.body.appendChild(dropEl);
   }
   const rect = inputEl.getBoundingClientRect();
   dropEl.style.position = 'fixed';
   dropEl.style.left = rect.left + 'px';
-  dropEl.style.right = 'auto'; // the base .crew-slot-drop class sets right:0 for its
-                                // original absolute-positioning use - left+right+width
-                                // together is over-constrained, and right was winning.
+  dropEl.style.right = 'auto';
   dropEl.style.top = (rect.bottom + 3) + 'px';
   dropEl.style.width = Math.max(rect.width, 210) + 'px';
 }
 
-// ── Reusable table/list search + filter + pagination (booking tab lists) ──
 function listFilter(opts) {
   const rows = Array.from(document.querySelectorAll(opts.rowSelector));
   const q = opts.searchId ? (document.getElementById(opts.searchId)?.value || '').toLowerCase().trim() : '';
@@ -304,9 +270,6 @@ function showToast(msg, type) {
   setTimeout(() => { item.classList.remove('show'); setTimeout(() => item.remove(), 300); }, 3500);
 }
 
-// ── Export ▾ dropdown (partials/export-dropdown.blade.php) ─────────────────
-// Event-delegated (not hardcoded element ids) so any number of independent dropdowns can
-// coexist on one page — e.g. Billing's 3 per-tab export buttons.
 document.addEventListener('click', e => {
   const toggle = e.target.closest('.export-toggle');
   if (toggle) {

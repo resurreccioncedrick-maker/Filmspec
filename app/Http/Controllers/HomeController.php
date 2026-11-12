@@ -21,16 +21,12 @@ class HomeController extends Controller
             return redirect()->route('dashboard');
         }
 
-        // AJAX: equipment detail (description + accessories) — mirrors index.php's ?eq_detail=X branch
         if ($request->has('eq_detail')) {
             $eid = (int) $request->query('eq_detail');
             $accs = DB::table('accessories as a')
                 ->join('equipment_accessory_links as eal', 'eal.accessory_id', '=', 'a.accessory_id')
                 ->where('eal.equipment_id', $eid)
                 ->where('a.is_active', 1)
-                // Package Inclusions are informational (what ships with the package) so they
-                // always show here; Optional Add-Ons are gated by the Public Visibility toggle;
-                // Internal/Operational accessories are staff-only and never shown to clients.
                 ->where(function ($w) {
                     $w->where('a.accessory_type', 'package_inclusion')
                         ->orWhere(function ($w2) {
@@ -42,10 +38,6 @@ class HomeController extends Controller
                 ->select('a.accessory_id', 'a.accessory_name', 'a.description', 'a.daily_rate', 'a.is_included', 'a.image_path', 'a.tracking_method', 'a.quantity')
                 ->get();
 
-            // Nothing in the client-facing Optional Add-Ons list showed real availability before,
-            // so a client could check out an accessory with zero left — see AccessoryAvailability
-            // for the shared math (also used by CartController's add-to-cart validation, so the
-            // two can never disagree).
             $availByAcc = \App\Support\AccessoryAvailability::bulkAvailable($accs->pluck('accessory_id')->all());
             foreach ($accs as $acc) {
                 $acc->available_units = $availByAcc[$acc->accessory_id] ?? 0;
@@ -144,14 +136,9 @@ class HomeController extends Controller
                 ->get()
                 ->each(function ($m) {
                     $m->author_label = $m->author_role === 'client' ? null : \App\Support\StaffTeamLabel::forRole($m->author_role);
-                    // Pre-department-routing rows have no department — treated as the 'staff'
-                    // bucket, same convention as ClientBookingDetailController's booking chat.
                     $m->department = $m->department ?: 'staff';
                 });
 
-            // Newest time ANY staff member opened this client's thread — used for a client-side
-            // "Seen" receipt under the client's own last message, same semantics as
-            // MessageReadTracker but aggregated across staff rather than scoped to one user_id.
             $staffLastRead = DB::table('staff_message_reads')
                 ->where('thread_type', 'support')->where('thread_id', $clientId)
                 ->max('last_read_at');
@@ -188,17 +175,6 @@ class HomeController extends Controller
             ->selectRaw("(SELECT COUNT(*) FROM equipment_units eu WHERE eu.equipment_id = e.equipment_id AND eu.status IN ('available','allocated')) AS units_available")
             ->get();
 
-        // "Available units right now" — for equipment with physical units tracked, the real
-        // count of units sitting at status=available (not a date-specific count, since the
-        // client hasn't picked shoot dates yet at this stage); for equipment with no units
-        // tracked, fall back to the legacy whole-row flag (stock_quantity when available, 0
-        // otherwise). Drives the catalog badge off real data instead of the single
-        // availability_status flag, which can be stale for multi-unit gear (e.g. still reads
-        // "available" even when every unit is actually already committed).
-        //
-        // avail_state also says *why* something isn't available (in_use / booked /
-        // maintenance), not just a flat "Unavailable" — computed from the real per-unit status
-        // breakdown for unit-tracked gear, or the legacy flag for everything else.
         $pageIds = $equipment->pluck('equipment_id');
         $unitStatusBreakdown = DB::table('equipment_units')
             ->whereIn('equipment_id', $pageIds)
@@ -231,9 +207,6 @@ class HomeController extends Controller
             }
         }
 
-        // Available items first, unavailable last — a stable sort, so within each group the
-        // original category/name order is kept. Both the Featured picks (take(4) below) and the
-        // full catalog (ALL_EQ, fed from this same collection) inherit this ordering.
         $equipment = $equipment->sortBy(fn ($eq) => $eq->available_units > 0 ? 0 : 1)->values();
 
         $clientBookings = [];
@@ -250,9 +223,6 @@ class HomeController extends Controller
         }
 
         $stats = [
-            // Total catalog size, not a live per-date availability count — labeled "Equipment
-            // Items" (not "Available") since retired units are the only ones excluded, and
-            // real availability depends on the shoot dates the client hasn't picked yet.
             'equip' => (int) DB::table('equipment')->where('availability_status', '!=', 'retired')->count(),
             'crew' => (int) DB::table('crew_members')->where('status', 'active')->count(),
             'done' => (int) DB::table('bookings')->where('booking_status', 'completed')->count(),
@@ -271,11 +241,6 @@ class HomeController extends Controller
         return view('home', compact('isLoggedIn', 'user', 'categories', 'equipment', 'clientBookings', 'stats', 'statusMap', 'supportMessages', 'supportMsg', 'staffLastRead', 'faqs', 'publicReviews', 'accountMsg', 'erasurePending', 'chatDepartments'));
     }
 
-    /**
-     * Lightweight polling for the homepage support widget — returns messages newer than
-     * `after` (a message_id) as JSON so the client-side JS can append them without a full
-     * page reload. Same client-scoped, non-internal filter as index()'s $supportMessages.
-     */
     public function supportPoll(Request $request)
     {
         $user = Auth::user();
@@ -305,7 +270,6 @@ class HomeController extends Controller
         return response()->json(['messages' => $messages, 'staff_last_read' => $staffLastRead]);
     }
 
-    /** Streams a general-support-chat attachment — 404 unless it belongs to this client. */
     public function supportAttachment(int $messageId)
     {
         $user = Auth::user();

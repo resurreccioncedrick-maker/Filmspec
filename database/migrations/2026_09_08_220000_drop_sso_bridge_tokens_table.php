@@ -6,13 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * The SSO bridge (App\Support\LegacyBridge / core/sso_bridge.php) existed only to carry a
-     * logged-in Laravel user's identity across into not-yet-ported legacy pages. Every one of
-     * those redirects has since been replaced with a native Laravel render (CE preview,
-     * checklist print) or a same-app link (billing, attendance, cost-email), so nothing mints
-     * or consumes a bridge token anymore — this table is dead.
-     */
     public function up(): void
     {
         Schema::dropIfExists('sso_bridge_tokens');

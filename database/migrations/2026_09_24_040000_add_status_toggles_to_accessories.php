@@ -10,9 +10,6 @@ return new class extends Migration
     {
         Schema::table('accessories', function (Blueprint $table) {
             $table->boolean('is_active')->default(1)->after('quantity_in_use');
-            // Governs whether an Optional Add-On is offered as a selectable item in the public
-            // equipment catalog — Package Inclusion / Internal-Operational accessories aren't
-            // standalone catalog products, so this only applies in practice to add-ons.
             $table->boolean('is_public')->default(1)->after('is_active');
         });
     }

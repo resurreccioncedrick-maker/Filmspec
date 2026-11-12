@@ -49,7 +49,6 @@ class ActivityController extends Controller
         ]);
     }
 
-    /** Same filters index() applies, shared with export() so the two can never drift apart. */
     private function filteredQuery(Request $request)
     {
         $search = $request->query('q', '');
@@ -68,7 +67,6 @@ class ActivityController extends Controller
         return $query;
     }
 
-    /** Export ▾ — reuses filteredQuery() unbounded (no page/perPage) so it always matches what's on screen. */
     private function export(Request $request): StreamedResponse|Response
     {
         $headers = ['Time', 'User', 'Role', 'Action', 'Module', 'Description', 'IP Address'];

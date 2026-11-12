@@ -27,7 +27,6 @@
 </div>
 @endif
 
-<!-- Stats -->
 <div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">
   <div class="stat-card">
     <div class="stat-icon"><i data-feather="package"></i></div>
@@ -56,7 +55,6 @@
   </div>
 </div>
 
-<!-- Category filter -->
 <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;align-items:center">
   <span style="font-size:9.5px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-right:4px">Category</span>
   <a href="{{ $equipBase }}?view={{ $viewMode }}{{ $search ? '&q=' . urlencode($search) : '' }}"
@@ -78,7 +76,6 @@
       <span class="badge badge-yellow" style="font-family:var(--font-mono);font-size:.72rem">{{ $total }}</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
-      <!-- View toggle -->
       <a href="{{ $equipBase }}?view=table&cat={{ $catFilter }}&status={{ $statusFilter }}&q={{ urlencode($search) }}"
          class="btn {{ $viewMode === 'table' ? 'btn-primary' : 'btn-outline' }} btn-sm" title="Table view">
         <i data-feather="list"></i>
@@ -124,7 +121,6 @@
   </div>
 
   @elseif ($viewMode === 'grid')
-  <!-- GRID VIEW -->
   <div style="padding:18px">
     <div class="equip-grid">
       @foreach ($equipment as $eq)
@@ -195,7 +191,6 @@
   </div>
 
   @else
-  <!-- TABLE VIEW -->
   <div class="table-wrap">
     <table>
       <thead>
@@ -305,7 +300,6 @@
 
 @if ($canManage)
 
-<!-- ADD EQUIPMENT MODAL -->
 <div class="modal-overlay" id="modalAddEquip">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
@@ -384,7 +378,6 @@
   </div>
 </div>
 
-<!-- EDIT EQUIPMENT MODAL -->
 <div class="modal-overlay" id="modalEditEquip">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
@@ -494,7 +487,6 @@
   </div>
 </div>
 
-<!-- ADD CATEGORY -->
 <div class="modal-overlay" id="modalAddCat">
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
@@ -516,7 +508,6 @@
   </div>
 </div>
 
-<!-- ACCESSORIES MODAL -->
 <style>
 .acc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;margin-bottom:16px}
 .acc-card{background:var(--s2);border:1px solid var(--border);border-radius:9px;overflow:hidden;transition:box-shadow .15s}
@@ -562,7 +553,6 @@
   </div>
 </div>
 
-<!-- PHYSICAL UNITS MODAL -->
 <div class="modal-overlay" id="modalUnits">
   <div class="modal" style="max-width:780px">
     <div class="modal-header">
@@ -626,7 +616,6 @@
   </div>
 </div>
 
-<!-- MARK FOR MAINTENANCE MODAL -->
 <div class="modal-overlay" id="modalMarkMaintenance">
   <div class="modal" style="max-width:460px">
     <div class="modal-header">
@@ -654,7 +643,6 @@
   </div>
 </div>
 
-<!-- UNIT MAINTENANCE HISTORY MODAL -->
 <div class="modal-overlay" id="modalUnitHistory">
   <div class="modal" style="max-width:480px">
     <div class="modal-header">
@@ -711,8 +699,6 @@ function editEquip(eq) {
   document.getElementById('edit_requires_op').checked = !!parseInt(eq.requires_operator);
   toggleOperatorSection('edit');
 
-  // Once this model has real Physical Units, Stock Quantity/Condition/Availability are
-  // derived — hide the manual fields and point staff at the Physical Units panel instead.
   var hasUnits = parseInt(eq.unit_count || 0) > 0;
   document.getElementById('edit_manual_stock_cond').style.display = hasUnits ? 'none' : '';
   document.getElementById('edit_manual_avail').style.display = hasUnits ? 'none' : '';
@@ -878,11 +864,6 @@ function loadUnits() {
       if (!data.length) {
         tbody.innerHTML = '';
         empty.style.display = 'block';
-        // Physical units are an optional, separate per-asset tracking layer — the item's
-        // Stock Quantity (used for booking/availability everywhere else) stays a plain
-        // manual count until at least one unit is added, at which point it switches to
-        // being calculated from the units below instead. Zero units here is the normal
-        // starting state, not a sync problem — this note exists so that isn't read as one.
         document.getElementById('unitsEmptyNote').textContent =
           'This is normal — Stock Quantity (' + currentUnitsStockQty + ') is a separate, manually-set count used for availability. '
           + 'Add units below only if you want to track specific serial-tagged items individually; '
@@ -1043,10 +1024,6 @@ function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// For passing a JS string literal as an inline onclick="..." argument from a template-literal-
-// built row (JSON.stringify's own double quotes would otherwise terminate the double-quoted
-// HTML attribute early, silently breaking the button — HTML-escaping the stringified output
-// lets the browser decode it back to valid JS before the handler runs).
 function jsAttrArg(v) {
   return JSON.stringify(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }

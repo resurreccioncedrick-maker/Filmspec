@@ -5,14 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 
-/**
- * bookings.vehicle_rate_id has existed in the live schema for a while (added directly to the
- * DB, never captured in a migration) with no foreign key or even an index — nothing enforced
- * that it actually pointed at a real, current vehicle_rates row. Adds both now, matching the
- * ON DELETE SET NULL pattern already used for other optional references in this schema (e.g.
- * crew_attendance.replacement_crew_id) — deleting a vehicle rate shouldn't delete the booking
- * history that once used it, just detach the reference.
- */
 return new class extends Migration
 {
     public function up(): void
@@ -28,7 +20,7 @@ return new class extends Migration
         )->c;
 
         if ($indexExists || $fkExists) {
-            return; // already applied outside this migration (e.g. the legacy self-heal path)
+            return;
         }
 
         Schema::table('bookings', function (Blueprint $table) {

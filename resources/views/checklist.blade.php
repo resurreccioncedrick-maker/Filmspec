@@ -8,8 +8,6 @@
 
 @if ($canManage)
 @section('topbarActions')
-{{-- The Check-Out List / Check-In List toggle lower on this same page already switches
-     direction — having Checklist Out/In buttons up here too was the same control twice. --}}
 <a href="{{ route('checklist.print', ['booking_id' => $bid]) }}" target="_blank" class="btn btn-outline btn-sm"><i data-feather="printer"></i> Print Record</a>
 <a href="{{ route('booking-detail', $bid) }}" class="btn btn-outline btn-sm"><i data-feather="arrow-left"></i> Back to Booking</a>
 @endsection
@@ -30,7 +28,6 @@
 </div>
 @endif
 
-<!-- Booking header -->
 <div class="card" style="margin-bottom:20px">
   <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
     <div>
@@ -70,7 +67,6 @@
 @else
 
 @if ($dir === 'out' && $canManage)
-<!-- Pre-flight gate checks -->
 <div class="card" style="margin-bottom:20px;border-left:4px solid {{ $gateOk ? 'var(--green)' : 'var(--red)' }}">
   <div class="card-header" style="padding-bottom:8px">
     <h2 class="card-title" style="color:{{ $gateOk ? 'var(--green)' : 'var(--red)' }}">
@@ -144,7 +140,6 @@
 </div>
 @endif
 
-<!-- Direction toggle -->
 <div style="display:flex;gap:0;margin-bottom:20px;border:1px solid var(--border2);border-radius:8px;overflow:hidden;width:fit-content">
   <a href="{{ route('checklist', ['booking_id' => $bid, 'dir' => 'out']) }}"
      style="padding:10px 24px;font-weight:600;font-size:13px;display:flex;align-items:center;gap:7px;
@@ -220,8 +215,6 @@
           @if ($canManage)
           <td style="text-align:center">
             @if ($eq->is_multi)
-            {{-- A multi-unit line has no checkbox of its own — the actual quantity/tally lives
-                 in the Qty cell instead, and doubles as the toggle for its unit rows. --}}
             <i data-feather="layers" style="width:14px;height:14px;color:var(--muted)"></i>
             @else
             <input type="checkbox" name="items[{{ $lineKey }}][checked]" value="1"
@@ -366,11 +359,6 @@
             @endif
           </td>
         </tr>
-        {{-- Per-unit rows for a multi-unit line — real checkbox/condition/notes inputs, styled
-             exactly like an ordinary row (same cells, same controls) instead of a separate
-             floating panel. Only the one picked from the line's dropdown above is shown at a
-             time; every unit's inputs still exist in the DOM the whole time (just hidden) so
-             Save Checklist / Release All / Check All still submit every unit in one POST. --}}
         @if ($canManage && $eq->is_multi)
         @foreach ($eq->slots as $s)
         @php
@@ -502,9 +490,6 @@ function highlightDamaged(sel) {
   }
 }
 
-// A multi-unit line's grp-badge tally is derived straight from its own hidden checkboxes —
-// there is no separate JS state to keep in sync, so this can never drift from what will
-// actually be submitted.
 function refreshLineTally(line) {
   const rows = document.querySelectorAll(`.unit-row[data-line="${line}"]`);
   const total = rows.length;
@@ -517,9 +502,6 @@ function refreshLineTally(line) {
   }
 }
 
-// Clicking the Qty tally reveals all of that line's real unit rows at once (same table, same
-// controls as any other row) so they can be checked individually — clicking it again hides
-// them. Nothing is rendered client-side; every row's inputs already exist in the DOM.
 function toggleUnits(line, btn) {
   const rows = document.querySelectorAll(`.unit-row[data-line="${line}"]`);
   const showing = rows.length && rows[0].style.display !== 'none';

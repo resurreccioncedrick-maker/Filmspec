@@ -33,7 +33,6 @@ class CrewDataController extends Controller
 
         $spendTotal = (float) $crewLines->sum(fn ($r) => $r->rate_used * $r->paid_days);
 
-        // Chart window is independent of the table period (see ReportPeriod).
         $chartMonths = $period['chart_months'];
         $chartKeys = ReportPeriod::chartMonthKeys($chartMonths);
         $chartCes = CeAnalytics::confirmedCes(
@@ -69,13 +68,9 @@ class CrewDataController extends Controller
 
         $crewBooked = $crewLines->pluck('crew_id')->unique()->count();
 
-        // Crew-Assigned Shoots = confirmed-CE bookings in this window that actually have a
-        // crew line; Shoots Needing Crew = the remainder (confirmed but nobody assigned yet).
         $crewAssignedShoots = $crewLines->pluck('booking_id')->unique()->count();
         $shootsNeedingCrew = max(0, $bookingIds->count() - $crewAssignedShoots);
 
-        // Period Summary card — scoped to the CHART window (6M/12M), not the KPI row's period
-        // filter above, since it's meant to summarize what the trend chart right above it covers.
         $periodSummaryShoots = $chartBookingIds->unique()->count();
         $periodSummaryAssigned = $chartCrewLines->pluck('booking_id')->unique()->count();
         $periodSummary = [
@@ -89,9 +84,6 @@ class CrewDataController extends Controller
             'attendance_exceptions' => (int) $chartNoShowDays->sum(),
         ];
 
-        // "vs last period" pills on Crew Spend and Crew Booked — not an average, which is
-        // already an average across the chart window, so comparing it to itself wouldn't mean
-        // much. Null for 'all' mode, where the view just omits the pill.
         $prevPeriod = ReportPeriod::previous($period);
         $crewDeltas = ['spend' => null, 'crew_booked' => null];
         if ($prevPeriod) {
@@ -110,7 +102,6 @@ class CrewDataController extends Controller
             'kpis' => [
                 'spend' => $spendTotal,
                 'shoots' => $bookingIds->count(),
-                // Distinct people booked across the window, not line count.
                 'crew_booked' => $crewBooked,
                 'crew_assigned_shoots' => $crewAssignedShoots,
                 'shoots_needing_crew' => $shootsNeedingCrew,
@@ -120,25 +111,11 @@ class CrewDataController extends Controller
         ]);
     }
 
-    /**
-     * Shared by index() and export() — the paid-days-minus-no-shows computation that produces
-     * the by-person and by-role tables, factored out so export() can never drift from what's
-     * actually shown on screen for the same period/search.
-     *
-     * @return array{0: \Illuminate\Support\Collection, 1: \Illuminate\Support\Collection, 2: \Illuminate\Support\Collection, 3: \Illuminate\Support\Collection, 4: int}
-     */
     private function crewByPersonAndRole(array $period, string $search, string $roleFilter = '', string $engagementFilter = ''): array
     {
         $confirmedCes = CeAnalytics::confirmedCes($period['from'], $period['to']);
         $bookingIds = $confirmedCes->pluck('booking_id');
 
-        // Deliberately reads LIVE booking_crew assignments for confirmed bookings rather than
-        // a frozen snapshot: booking_crew isn't versioned the way cost_estimates is, so this
-        // can legitimately differ from the CE's stored crew_total if crew was reassigned
-        // after confirmation. Once a booking is completed, BookingDetailController::addCrew()/
-        // removeCrew() refuse further roster changes so this can't silently rewrite history for
-        // a shoot that already happened (Part 11 panelist revision — "assignment history
-        // protection").
         $crewLines = DB::table('booking_crew as bc')
             ->join('crew_members as cm', 'bc.crew_id', '=', 'cm.crew_id')
             ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
@@ -148,18 +125,8 @@ class CrewDataController extends Controller
                 'cm.first_name', 'cm.last_name', 'cm.employment_type', 'cp.position_name', 'b.shoot_date_end')
             ->get();
 
-        // A crew line with no assigned production role isn't a legitimate "Unassigned" role —
-        // it's incomplete data that needs a human to fix, so it's counted here and surfaced as
-        // a warning instead of being grouped into the Roles table as though it were a real role.
         $needsRoleCount = $crewLines->whereNull('position_name')->pluck('crew_id')->unique()->count();
 
-        // Real attendance, not the planned assignment, decides whether a day actually got
-        // paid: a booking_crew row's hours_worked/rate_used only ever record what was PLANNED
-        // at assignment time and are never adjusted afterward, so a crew member logged
-        // no_show/back_out on any shoot day for an assignment previously still counted as
-        // fully worked and paid here. Each no_show/back_out attendance day knocks one day off
-        // that assignment's paid days (rate_used is a per-day rate — see BookingDetailController's
-        // addCrew()), floored at zero.
         $noShowDays = DB::table('crew_attendance')
             ->whereIn('booking_id', $bookingIds)
             ->whereIn('status', ['no_show', 'back_out'])
@@ -188,8 +155,6 @@ class CrewDataController extends Controller
             ];
         })->sortByDesc('paid')->values();
 
-        // "Unassigned" is excluded here (not grouped in) — it isn't a real production role, see
-        // $needsRoleCount above.
         $byRole = $crewLines->whereNotNull('position_name')->groupBy('position_name')->map(function ($rows, $role) {
             return (object) [
                 'role' => $role,
@@ -216,7 +181,6 @@ class CrewDataController extends Controller
         return [$byPerson, $byRole, $crewLines, $bookingIds, $needsRoleCount];
     }
 
-    /** Export ▾ — two datasets (by-crew, by-role), same computation index() uses. */
     private function export(Request $request): StreamedResponse|Response
     {
         $period = ReportPeriod::resolve($request);
@@ -266,8 +230,6 @@ class CrewDataController extends Controller
         ], $filename);
     }
 
-    /** Same paid-days-minus-no-shows logic as the main query, for an arbitrary window — used
-     *  to compute the previous period's figures for the comparison pills. */
     private function spendAndCrewBooked(string $from, string $to): array
     {
         $bookingIds = CeAnalytics::confirmedCes($from, $to)->pluck('booking_id');

@@ -8,10 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Shared read-tracking for all three staff messaging surfaces (support chat, booking
-        // comments, repair/purchase tickets) rather than a read/unread column duplicated three
-        // times. thread_id is polymorphic by thread_type (client_id / booking_id / ticket_id),
-        // so it deliberately has no FK — the three target tables don't share a keyspace.
         Schema::create('staff_message_reads', function (Blueprint $table) {
             $table->increments('read_id');
             $table->integer('user_id');

@@ -33,7 +33,6 @@ class BillingController extends Controller
         $role = $user->role->role_name ?? '';
         $canRecord = in_array($role, ['super_admin', 'operations_manager', 'accounting'], true);
 
-        // Auto-mark overdue SOAs and bookings
         DB::table('statement_of_accounts')
             ->where('due_date', '<', now()->toDateString())
             ->whereIn('status', ['issued', 'draft'])
@@ -68,10 +67,6 @@ class BillingController extends Controller
         $payPages = max(1, (int) ceil($totalPay / $perPage));
 
         $payments = (clone $pQuery)
-            // payment_id, not created_at — demo/seed data backdates created_at to line up with
-            // payment_date rather than real insertion order (same issue the Bookings list had),
-            // so a freshly recorded payment could sort below older seeded rows with a fabricated
-            // later timestamp. payment_id always reflects true insertion order.
             ->orderByDesc('p.payment_id')
             ->select('p.*', 'b.booking_reference', 'b.project_title', 'b.final_amount', 'c.contact_person', 'c.company_name')
             ->forPage($page, $perPage)
@@ -129,14 +124,8 @@ class BillingController extends Controller
             ->whereMonth('payment_date', now()->month)->whereYear('payment_date', now()->year)
             ->sum('amount');
         $outstanding = (float) DB::table('statement_of_accounts')->where('status', '!=', 'paid')->sum('balance');
-        // Reuses filteredOverdueQuery()'s own join+where (unfiltered, so an active search on the
-        // Overdue tab doesn't shrink this badge) instead of a separate hand-copied predicate —
-        // the two must be structurally identical, not just textually similar, or a data anomaly
-        // the join quietly drops (e.g. a statement_of_accounts row whose booking_id no longer
-        // exists) inflates this count while never actually appearing in the list below.
         $overdueCount = (int) $this->filteredOverdueQuery(new Request())->count();
 
-        // Relocated from the Cost Estimate editor — accounting/admin approve discounts here.
         $pendingDiscounts = DB::table('booking_discounts as bd')
             ->join('bookings as b', 'bd.booking_id', '=', 'b.booking_id')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
@@ -159,10 +148,6 @@ class BillingController extends Controller
             ->limit(25)
             ->get();
 
-        // Client-submitted payment claims (ClientBookingDetailController::handleSubmitPayment())
-        // — a client's own "Pay" submission never touches `payments` directly; it sits here
-        // until accounting/admin approves it, which is the only thing that actually creates the
-        // real payments row.
         $pendingPaymentSubmissions = DB::table('client_payment_submissions as cps')
             ->join('bookings as b', 'cps.booking_id', '=', 'b.booking_id')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
@@ -202,7 +187,6 @@ class BillingController extends Controller
         ]);
     }
 
-    /** Same filters index() applies to the Payments tab, shared with export(). */
     private function filteredPaymentsQuery(Request $request)
     {
         $search = $request->query('q', '');
@@ -228,7 +212,6 @@ class BillingController extends Controller
         return $pQuery;
     }
 
-    /** Same filters index() applies to the Final Billing (SOA) tab, shared with export(). */
     private function filteredSoaQuery(Request $request)
     {
         $soaSearch = $request->query('q_soa', '');
@@ -251,7 +234,6 @@ class BillingController extends Controller
         return $soQuery;
     }
 
-    /** Same filter index() applies to the Overdue tab, shared with export(). */
     private function filteredOverdueQuery(Request $request)
     {
         $odSearch = $request->query('q_od', '');
@@ -259,9 +241,6 @@ class BillingController extends Controller
         $odQuery = DB::table('statement_of_accounts as s')
             ->join('bookings as b', 's.booking_id', '=', 'b.booking_id')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
-            // Same definition as $overdueCount above, not a literal status='overdue' match — that
-            // status only gets set by index()'s own auto-mark update, so relying on it here made
-            // this list depend on a side effect instead of just checking the real due date/balance.
             ->where('s.due_date', '<', now()->toDateString())
             ->where('s.status', '!=', 'paid')
             ->where('s.balance', '>', 0);
@@ -276,7 +255,6 @@ class BillingController extends Controller
         return $odQuery;
     }
 
-    /** Same filters index() applies to the Cancellation Charges tab, shared with export(). */
     private function filteredCancellationsQuery(Request $request)
     {
         $ccSearch = $request->query('q_cc', '');
@@ -299,11 +277,6 @@ class BillingController extends Controller
         return $ccQuery;
     }
 
-    /**
-     * Export ▾ — Billing has 6 independent tabs with no shared column shape, so each gets its
-     * own scoped export (?export=<tab>&format=<fmt>) instead of one combined file, mirroring
-     * the Reports/Crew Data multi-dataset convention.
-     */
     private function export(Request $request): StreamedResponse|Response
     {
         $type = $request->query('export', 'payments');
@@ -412,7 +385,6 @@ class BillingController extends Controller
             return DataExporter::respond($format, 'Billing — Discounts', $headers, $rows, 'billing-discounts-export');
         }
 
-        // Default: payments
         $headers = ['Receipt #', 'Booking', 'Client', 'Type', 'Method', 'Amount', 'Date'];
         $rows = $this->filteredPaymentsQuery($request)->orderByDesc('p.payment_id')
             ->select('p.receipt_number', 'b.booking_reference', 'c.company_name', 'c.contact_person',
@@ -487,9 +459,6 @@ class BillingController extends Controller
             if (! $bookingClient) {
                 return ['type' => 'danger', 'text' => 'Booking not found.'];
             }
-            // Document type defaults to the client's own VAT registration, but the Billing
-            // modal's dropdown lets staff override it per payment for the rare exception
-            // (e.g. the client record's VAT flag is wrong or stale) — never silently ignored.
             $rctypeInput = $request->input('receipt_type', '');
             $rctype = in_array($rctypeInput, ['official_receipt', 'acknowledgement_receipt'], true)
                 ? $rctypeInput
@@ -497,11 +466,6 @@ class BillingController extends Controller
             $isVat = $rctype === 'official_receipt' ? 1 : 0;
             $rcPrefix = $isVat ? 'OR' : 'AR';
 
-            // The remaining-balance check and the insert both happen inside the same
-            // booking-row-locked transaction — otherwise two near-simultaneous payment
-            // submissions for the same booking could each read the same stale "amount paid
-            // so far", both pass the "doesn't exceed the balance" check, and both insert,
-            // together overpaying the booking.
             $error = DB::transaction(function () use ($rctype, $rcPrefix, $bid, $ptype, $pmethod, $amount, $ref, $bankName, $proofPath, $pdate, $uid, $isVat, $notes) {
                 $bkTotal = (float) (DB::table('bookings')->where('booking_id', $bid)->lockForUpdate()->value('final_amount') ?? 0);
                 $bkPaid = (float) DB::table('payments')->where('booking_id', $bid)->sum('amount');
@@ -509,10 +473,6 @@ class BillingController extends Controller
                 if ($bkTotal > 0 && $amount > $remaining + 0.005) {
                     return ['type' => 'danger', 'text' => 'Payment of <strong>₱' . number_format($amount, 2) . '</strong> exceeds the remaining balance of <strong>₱' . number_format(max(0, $remaining), 2) . '</strong>. Please enter the correct amount.'];
                 }
-                // A payment that fully settles what's left IS the final payment, whatever type
-                // was picked — the Payment Purpose dropdown only auto-suggests this client-side
-                // and stops once staff touch it manually, so without this a downpayment-labeled
-                // payment could complete the booking and stay mislabeled forever.
                 $ptype = $amount >= $remaining - 0.005 ? 'final' : $ptype;
 
                 $rcSeq = (int) DB::table('payments')->where('receipt_type', $rctype)->lockForUpdate()->count() + 1;
@@ -549,7 +509,6 @@ class BillingController extends Controller
                 ]);
             } else {
                 $soaRef = 'FB-' . date('Y') . '-' . str_pad((string) $bid, 4, '0', STR_PAD_LEFT);
-                // clients.payment_terms real enum is 50_downpayment/90_days/6_months/2_weeks_crew
                 $payTerms2 = (string) DB::table('bookings as b')
                     ->join('clients as c', 'b.client_id', '=', 'c.client_id')
                     ->where('b.booking_id', $bid)->value('c.payment_terms');
@@ -611,12 +570,6 @@ class BillingController extends Controller
         return null;
     }
 
-    /**
-     * Approving a client-submitted payment claim is the ONLY thing that turns it into a real
-     * `payments` row — mirrors record_payment's receipt-numbering/VAT-derivation/balance-check/
-     * SOA-update logic exactly (kept as its own copy rather than a shared extraction, so this
-     * new path can't accidentally change behavior for the already-shipped direct-record flow).
-     */
     private function approvePaymentSubmission(Request $request, int $uid): array
     {
         $subId = (int) $request->input('submission_id');
@@ -733,14 +686,6 @@ class BillingController extends Controller
         return ['type' => 'success', 'text' => 'Payment submission rejected.'];
     }
 
-    /**
-     * Void/Reversal — genuinely new; no payment-deletion capability existed before this.
-     * Append-only: the original row is only flagged (is_voided/voided_by/voided_at/void_reason),
-     * never mutated or deleted. The actual balance correction is a separate negative-amount
-     * reversing row (reversal_of_id points back at the original) so every existing
-     * SUM(payments.amount) call site across the app (booking detail, billing, dashboard,
-     * reports, client detail) nets out correctly with no changes needed there.
-     */
     private function voidPayment(Request $request, int $uid): array
     {
         $pid = (int) $request->input('payment_id');
@@ -749,10 +694,6 @@ class BillingController extends Controller
             return ['type' => 'danger', 'text' => 'A reason is required to void a payment.'];
         }
 
-        // Payment is re-read and locked inside the transaction (not just checked beforehand) so
-        // two near-simultaneous void requests for the same payment can't both read is_voided=0
-        // and both insert a reversing entry — same race class record_payment already guards
-        // against for overpayment, via the same lockForUpdate()-inside-transaction pattern.
         $result = DB::transaction(function () use ($pid, $reason, $uid) {
             $payment = DB::table('payments')->where('payment_id', $pid)->lockForUpdate()->first();
             if (! $payment) {
@@ -799,8 +740,6 @@ class BillingController extends Controller
             return ['receipt_number' => $payment->receipt_number];
         });
 
-        // An error array returned from inside the transaction (payment missing/already
-        // voided/negative) has a 'type' key; the success path's return doesn't.
         if (isset($result['type'])) {
             return $result;
         }
@@ -810,9 +749,6 @@ class BillingController extends Controller
         return ['type' => 'success', 'text' => 'Payment voided and a reversing entry recorded.'];
     }
 
-    // Propose happens on the Bookings page (and, for clients, their booking page); this is
-    // where accounting/admin staff — and, from the booking detail page, Traffic — sign off.
-    // Logic lives in BookingCosting so every entry point shares one implementation.
     private function approveDiscount(Request $request, int $uid): array
     {
         $bid = (int) $request->input('booking_id');

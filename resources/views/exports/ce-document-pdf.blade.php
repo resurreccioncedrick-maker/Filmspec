@@ -3,13 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <style>
-{{-- dompdf has no CSS Grid/Flexbox support, so this mirrors ce-preview.blade.php's .ce-sheet
-     styling (the on-screen "official document") using plain tables — same content, same look,
-     just a layout engine dompdf can actually render. Keep both in sync by eye if either changes. --}}
 @page { margin: 18px 22px; }
 *{box-sizing:border-box;margin:0;padding:0}
-{{-- DejaVu Sans is the font dompdf ships with full Unicode coverage — plain "Arial" maps to
-     core Helvetica, which has no glyph for ₱ and silently prints "?" instead. --}}
 body{font-family:'DejaVu Sans',sans-serif;color:#000;font-size:10.5px}
 table{border-collapse:collapse;width:100%}
 .sheet{border:1.5px solid #000;margin-bottom:0}
@@ -98,7 +93,6 @@ table{border-collapse:collapse;width:100%}
   };
 @endphp
 
-<!-- ═══ PAGE 1: EQUIPMENT ═══ -->
 <div class="sheet pagebreak">
   @php $renderHeader('E'); @endphp
   @php $renderInfo(); @endphp
@@ -152,7 +146,6 @@ table{border-collapse:collapse;width:100%}
   </table>
 </div>
 
-<!-- ═══ PAGE 2: CREW TF ═══ -->
 <div class="sheet pagebreak">
   @php $renderHeader('M'); @endphp
   @php $renderInfo(); @endphp
@@ -202,7 +195,6 @@ table{border-collapse:collapse;width:100%}
   </table>
 </div>
 
-<!-- ═══ PAGE 3: SUMMARY ═══ -->
 <div class="sheet">
   @php $renderHeader('S'); @endphp
   @php $renderInfo(); @endphp

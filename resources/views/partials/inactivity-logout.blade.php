@@ -1,10 +1,3 @@
-{{-- Auto-logout after inactivity. Self-contained (its own CSS/JS, no dependency on the host
-     page's modal system) so the same partial works identically whether it's included in the
-     staff layout, the Crew Portal, or the client-facing home page. Activity is tracked via a
-     shared localStorage timestamp so multiple tabs of the same site don't fight each other —
-     typing in one tab keeps every tab's timer alive, and a tab that's been backgrounded
-     recalculates its remaining time (rather than trusting a possibly-throttled setTimeout) the
-     moment it's focused again. --}}
 @auth
 <div id="inactivityOverlay" style="display:none;position:fixed;inset:0;background:rgba(11,26,51,.55);z-index:99999;align-items:center;justify-content:center;padding:16px">
   <div style="background:#fff;border-radius:14px;max-width:360px;width:100%;padding:26px 24px;box-shadow:0 20px 50px rgba(0,0,0,.3);font-family:'DM Sans',system-ui,sans-serif;text-align:center">
@@ -26,8 +19,8 @@
 </form>
 <script>
 (function(){
-  var TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes of inactivity
-  var WARN_MS = 60 * 1000;         // show the warning for the last 60 seconds
+  var TIMEOUT_MS = 20 * 60 * 1000;
+  var WARN_MS = 60 * 1000;
   var STORAGE_KEY = 'fs_last_activity';
 
   var overlay = document.getElementById('inactivityOverlay');
@@ -82,7 +75,6 @@
   var lastMark = 0;
   function markActivity() {
     var t = now();
-    // Throttled — we don't need (or want) a localStorage write on every single mousemove.
     if (t - lastMark < 2000) return;
     lastMark = t;
     localStorage.setItem(STORAGE_KEY, String(t));
@@ -93,22 +85,17 @@
     window.addEventListener(evt, markActivity, { passive: true });
   });
 
-  // Another tab just recorded activity — keep this tab's clock in sync instead of logging out
-  // a tab the person isn't currently looking at while they're actively using a different one.
   window.addEventListener('storage', function (e) {
     if (e.key === STORAGE_KEY) schedule();
   });
 
-  // A backgrounded tab's own setTimeout can fire late (browsers throttle inactive-tab timers),
-  // so recompute from the real last-activity timestamp the moment this tab is looked at again,
-  // rather than trusting whatever the throttled timer already queued.
   document.addEventListener('visibilitychange', function () {
     if (! document.hidden) schedule();
   });
 
   var stayBtn = document.getElementById('inactivityStayBtn');
   if (stayBtn) stayBtn.addEventListener('click', function () {
-    lastMark = 0; // force the next markActivity() through the throttle
+    lastMark = 0;
     markActivity();
   });
 

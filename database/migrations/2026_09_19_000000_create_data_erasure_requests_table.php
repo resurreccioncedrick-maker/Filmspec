@@ -4,14 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * Backs the Data Privacy Act (R.A. 10173) right-to-erasure flow: a client requests erasure
- * of their personal data from their own Account page, staff review and action it from
- * Data Retention. "Erasure" here means anonymizing identifying fields on users/clients —
- * booking, payment, and other financial/legal records are deliberately kept intact (see
- * App\Support\ClientErasure) rather than deleted, since those need to be retained for
- * accounting/legal reasons regardless of a data-subject's erasure request.
- */
 return new class extends Migration
 {
     public function up(): void

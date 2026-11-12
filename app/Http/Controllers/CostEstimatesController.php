@@ -31,12 +31,6 @@ class CostEstimatesController extends Controller
             ->join('bookings as b', 'ce.booking_id', '=', 'b.booking_id')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id');
 
-        // There is no 'cancelled' CE status — a CE is cancelled in practice when its booking
-        // is, so that tab keys off booking_status while the others exclude cancelled bookings.
-        // 'confirmed' is deduplicated to the latest confirmed row per booking (CeAnalytics::
-        // onlyLatestConfirmed) as defense-in-depth — BookingCosting::confirmCe() now demotes
-        // every other confirmed row for a booking to 'superseded' at confirm time, so this
-        // filter should never actually need to catch anything in normal operation.
         $applyTab = function ($q, string $tab) {
             if ($tab === 'confirmed') {
                 return CeAnalytics::onlyLatestConfirmed($q)->where('b.booking_status', '!=', 'cancelled');
@@ -89,7 +83,6 @@ class CostEstimatesController extends Controller
             ->forPage($page, $perPage)
             ->get();
 
-        // COALESCE won't fall through an empty-string company_name — resolve in PHP (Part 3a).
         $rows->each(function ($r) {
             $r->client_name = $r->company_name ?: $r->contact_person;
             $r->is_revision = (bool) preg_match('/-R\d+$/', (string) $r->ce_reference);
@@ -112,14 +105,10 @@ class CostEstimatesController extends Controller
                 ->where('ce.confirmed_at', '>=', $monthStart)->sum('ce.grand_total'),
         ];
 
-        // Financial dashboard, moved here from Reports in Part 11 — the reference tool keeps
-        // the KPI row, recap chart and CE list together on its Cost Estimate page.
         $confirmedCes = CeAnalytics::confirmedCes($period['from'], $period['to']);
         $ceFinancials = CeAnalytics::financials($confirmedCes);
         $ceByClient = CeAnalytics::byClient($confirmedCes);
 
-        // "vs last period" pills on the 3 headline cards — null for 'all' mode or when there's
-        // nothing to compare against, in which case the view just omits the pill.
         $prevPeriod = ReportPeriod::previous($period);
         $ceDeltas = ['packaged_cost' => null, 'crew_total' => null, 'net_total' => null];
         if ($prevPeriod) {
@@ -129,7 +118,6 @@ class CostEstimatesController extends Controller
             }
         }
 
-        // Chart window is independent of the table period (see ReportPeriod).
         $chartMonths = $period['chart_months'];
         $chartCes = CeAnalytics::confirmedCes(
             ReportPeriod::chartFrom($chartMonths)->toDateTimeString(),
@@ -153,10 +141,6 @@ class CostEstimatesController extends Controller
         ]);
     }
 
-    // Moved from ReportsController in Part 11 so the export follows its data. Uses
-    // respondSections (not respond) so the export can lead with an "Applied Filters" / generated
-    // metadata block, per the panelist revision's export-traceability requirement — every export
-    // is thus self-describing about which filters and revision rules produced it.
     private function exportFinancials($confirmedCes, string $format = 'csv', ?array $period = null): StreamedResponse|Response
     {
         $userId = Auth::id();
@@ -176,9 +160,6 @@ class CostEstimatesController extends Controller
             'Confirmed By', 'Gross (PHP)', 'Confirmed CE Value (ex-VAT)', 'Crew Quoted (PHP)', 'FilmSpec Portion (PHP)'];
 
         $rows = $confirmedCes->map(function ($ce) {
-            // outsourced_total is still subtracted here (not displayed) so FilmSpec Portion
-            // stays accurate for old confirmed CEs from before outsourced/partner equipment was
-            // removed as a feature -- see CeAnalytics::financials() for the same reasoning.
             $net = (float) $ce->subtotal - (float) $ce->crew_total - (float) $ce->outsourced_total;
 
             return [$ce->ce_reference, $ce->booking_reference, $ce->project_title, $ce->client_name,

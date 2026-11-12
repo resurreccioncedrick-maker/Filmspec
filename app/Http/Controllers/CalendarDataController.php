@@ -8,14 +8,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
-/**
- * Calendar Data (Part 17) — an analytics read of the shoot calendar, distinct from the
- * booking calendar widget already on the Dashboard (which is for creating/viewing individual
- * bookings, not for reading density/utilization).
- *
- * In month mode the page renders a day grid; in the wider modes (3/6/12/all) it renders a
- * monthly summary table instead, since a multi-month grid doesn't read well.
- */
 class CalendarDataController extends Controller
 {
     private array $statusBadge = [
@@ -41,14 +33,7 @@ class CalendarDataController extends Controller
         [$dayMap, $bookings] = $this->buildDayMap($from, $to, $status, $projectType, $clientId);
 
         $totalDays = (int) $from->diffInDays($to) + 1;
-        // Utilization/Busiest-Day/Longest-Gap are all "primary" scheduling facts and must not
-        // be inflated by bookings that were never confirmed — $day['count'] here is deliberately
-        // the CONFIRMED count only (see buildDayMap()), so every KPI derived from it below is
-        // confirmed-only by construction, not a per-KPI filter that's easy to forget on one of
-        // them.
         $shootDays = collect($dayMap)->filter(fn ($d) => $d['count'] > 0)->count();
-        // Tentative (pending-only) shoot days are tracked separately and never folded into the
-        // utilization/busiest/gap figures above.
         $tentativeDays = collect($dayMap)->filter(fn ($d) => $d['pending_count'] > 0)->count();
 
         $byWeekday = array_fill(0, 7, 0);
@@ -84,8 +69,6 @@ class CalendarDataController extends Controller
         $grid = $period['mode'] === 'month' ? $this->monthGrid($from, $dayMap) : null;
         $monthlySummary = $period['mode'] !== 'month' ? $this->monthlySummary($dayMap, $from, $to) : null;
 
-        // Day-detail side panel (month view only) — defaults to today when it falls inside the
-        // displayed month, else the busiest day, so the panel is never empty on first load.
         $selectedDay = null;
         $selectedDayData = null;
         if ($grid) {
@@ -101,8 +84,6 @@ class CalendarDataController extends Controller
             ];
         }
 
-        // "This Month at a Glance" (month view only) — a plain tally over the displayed month,
-        // independent of the day-detail selection above.
         $monthGlance = null;
         if ($grid) {
             $monthDayMap = collect($dayMap)->filter(fn ($d, $k) => substr($k, 0, 7) === $from->format('Y-m'));
@@ -121,18 +102,8 @@ class CalendarDataController extends Controller
             ];
         }
 
-        // Deliberately NOT sourced from $bookings above: that set is bounded by the selected
-        // (backward-looking) period window, so under 3m/6m/12m/all — whose "to" is today —
-        // it would always be empty. "Upcoming" means from today forward regardless of which
-        // historical window is being browsed.
         $upcoming = $this->upcomingShoots(10, $status, $projectType, $clientId);
 
-        // "vs last period" pill on Shoot Days / Utilization only — Busiest Day, Busiest Day of
-        // Week and Longest Gap are point-in-time facts about this specific window, not a trend,
-        // so a percentage on them wouldn't mean anything. Shown as a POINT difference (e.g.
-        // "+4pt"), not a relative percent change — utilization is already a percentage, so
-        // running it through a percent-of-a-percent formula would read as far more dramatic
-        // than what actually happened.
         $calDelta = null;
         $prevPeriod = ReportPeriod::previous($period);
         if ($prevPeriod) {
@@ -159,7 +130,6 @@ class CalendarDataController extends Controller
         ]);
     }
 
-    /** The next N shoots from today forward, independent of the selected analytics period. */
     private function upcomingShoots(int $limit = 10, string $status = '', string $projectType = '', int $clientId = 0): \Illuminate\Support\Collection
     {
         $rows = DB::table('bookings as b')
@@ -200,10 +170,6 @@ class CalendarDataController extends Controller
         return $rows;
     }
 
-    /**
-     * Sums each Sunday-first week row of the month grid (same boundaries as monthGrid()) and
-     * returns the busiest one's date range, clipped to the days actually in the displayed month.
-     */
     private function busiestWeek(array $grid): ?array
     {
         $best = null;
@@ -223,9 +189,6 @@ class CalendarDataController extends Controller
         return $bestCount > 0 ? $best : null;
     }
 
-    /**
-     * @return array{0: array<string, array{date:string,count:int,items:\Illuminate\Support\Collection}>, 1: \Illuminate\Support\Collection}
-     */
     private function buildDayMap(Carbon $from, Carbon $to, string $status = '', string $projectType = '', int $clientId = 0): array
     {
         $bookings = DB::table('bookings as b')
@@ -249,11 +212,6 @@ class CalendarDataController extends Controller
         $dayMap = [];
         $cursor = $from->copy();
         while ($cursor->lte($to)) {
-            // 'count' is deliberately the CONFIRMED count (booking_status != pending/cancelled)
-            // — every KPI in index() reads 'count' directly, so defining it as confirmed-only
-            // here means utilization/busiest-day/longest-gap can't accidentally include pending
-            // bookings just by forgetting a filter downstream. Pending is tracked in parallel
-            // via 'pending_count', never merged into 'count'.
             $dayMap[$cursor->toDateString()] = [
                 'date' => $cursor->toDateString(), 'count' => 0, 'pending_count' => 0, 'items' => collect(),
             ];
@@ -282,7 +240,6 @@ class CalendarDataController extends Controller
         return [$dayMap, $bookings];
     }
 
-    /** Longest unbroken run of zero-booking days within the window. */
     private function longestGap(array $dayMap, Carbon $from, Carbon $to): int
     {
         $longest = 0;
@@ -301,7 +258,6 @@ class CalendarDataController extends Controller
         return $longest;
     }
 
-    /** Sunday-first grid padded to full weeks, for the month view. */
     private function monthGrid(Carbon $monthStart, array $dayMap): array
     {
         $firstOfMonth = $monthStart->copy()->startOfMonth();

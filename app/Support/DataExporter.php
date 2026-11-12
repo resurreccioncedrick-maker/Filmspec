@@ -8,20 +8,8 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-/**
- * Shared "turn this dataset into a downloadable file" for every staff data-table/report page's
- * Export ▾ dropdown (partials/export-dropdown.blade.php). Callers pass rows that are ALREADY
- * display-formatted (dates via ->format(), money via App\Support\Money, status enums turned into
- * their plain-text label) — CSV/Excel/PDF never re-derive formatting themselves, so the three
- * formats can never drift apart from each other or from what's shown on screen.
- */
 class DataExporter
 {
-    /**
-     * @param  string  $format  csv|xlsx|pdf
-     * @param  string[]  $headers  column labels, in display order
-     * @param  iterable<array<int, string>>  $rows  each row a plain array of display strings, same order as $headers
-     */
     public static function respond(string $format, string $title, array $headers, iterable $rows, string $filenameBase, ?string $subtitle = null): StreamedResponse|Response
     {
         $rows = is_array($rows) ? $rows : iterator_to_array($rows);
@@ -74,12 +62,6 @@ class DataExporter
         return Pdf::loadHTML($html)->setPaper('a4', $orientation)->download($filename);
     }
 
-    /**
-     * For structured multi-section documents (e.g. Profit & Loss) that don't fit one flat
-     * table — a sequence of labeled blocks instead. Each section is
-     * ['title' => ?string, 'headers' => ?string[], 'rows' => array<array<int,string>>]:
-     * a section with no 'headers' is just plain label/value lines (no header row rendered).
-     */
     public static function respondSections(string $format, string $title, array $sections, string $filenameBase): StreamedResponse|Response
     {
         $stamp = now()->format('Y-m-d_His');
@@ -136,7 +118,7 @@ class DataExporter
                 $maxCols = max($maxCols, count($row));
                 $r++;
             }
-            $r++; // blank separator row
+            $r++;
         }
         foreach (range('A', \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($maxCols)) as $col) {
             $ws->getColumnDimension($col)->setAutoSize(true);

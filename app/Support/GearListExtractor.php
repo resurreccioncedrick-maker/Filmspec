@@ -10,11 +10,6 @@ use PhpOffice\PhpWord\Element\Text;
 use PhpOffice\PhpWord\Element\TextRun;
 use PhpOffice\PhpWord\IOFactory as WordIOFactory;
 
-/**
- * Turns an uploaded gear-list file (Word, Excel, or CSV/plain text) into a flat list of
- * text lines — one per paragraph/row — so GearListParser can run the same
- * quantity/category/external-source parsing regardless of source format.
- */
 class GearListExtractor
 {
     public static function extractLines(UploadedFile $file): array
@@ -37,7 +32,6 @@ class GearListExtractor
             return [];
         }
 
-        // Strip a UTF-8 BOM if present so the first line's first cell isn't corrupted.
         $bom = fread($handle, 3);
         if ($bom !== "\xEF\xBB\xBF") {
             rewind($handle);
@@ -117,12 +111,6 @@ class GearListExtractor
             $parts[] = self::elementText($element);
         }
 
-        // A TextRun's own children are fragments of one continuous run of text — Word splits a
-        // single word across several <w:r> runs for spell-check/revision markers all the time
-        // ("Amira" as two runs "Ami" + "ra"), so these must be concatenated with no separator or
-        // the joined text corrupts ("Ami ra") and silently breaks catalog matching downstream.
-        // Only genuinely separate block-level children (paragraphs within a cell, etc.) get a
-        // space between them so distinct lines don't run together.
         $sep = $container instanceof TextRun ? '' : ' ';
 
         return implode($sep, array_filter($parts, fn ($p) => $p !== ''));

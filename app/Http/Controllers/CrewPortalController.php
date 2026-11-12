@@ -24,15 +24,8 @@ class CrewPortalController extends Controller
 
     private array $bookingBadge = ['confirmed' => 'badge-blue', 'ongoing' => 'badge-green', 'pending_inspection' => 'badge-orange', 'returned' => 'badge-gray'];
 
-    // Same set IncidentsController.php uses — kept in sync manually since it's a small,
-    // rarely-changed fixed list, not worth a shared config entry for one array.
     private array $damageTypes = ['scratches' => 'Scratches', 'cracked_broken' => 'Cracked / Broken Part', 'electronic_malfunction' => 'Electronic Malfunction', 'missing_part' => 'Missing Part', 'others' => 'Others'];
 
-    // Lightweight poll for the Equipment Checklist tab — lets the page notice a newly
-    // checklist-eligible booking (or an arrival-status change) without a manual reload.
-    // Returns a cheap signature (not the full dataset) that the frontend just compares
-    // against what it already has; a mismatch means "go reload", matching the existing
-    // /support-poll pattern elsewhere in the app rather than inventing a new one.
     public function checklistPoll(Request $request)
     {
         $user = Auth::user();
@@ -49,7 +42,6 @@ class CrewPortalController extends Controller
         $rows = DB::table('booking_crew as bc')
             ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
             ->where('bc.crew_id', $crewMember->crew_id)
-            // Checklist is Head Crew only — a non-head has nothing to poll for.
             ->where('bc.is_head_crew', 1)
             ->whereNotIn('bc.assignment_status', ['declined', 'back_out'])
             ->whereIn('b.booking_status', ['confirmed', 'ongoing'])
@@ -64,11 +56,6 @@ class CrewPortalController extends Controller
         return response()->json(['ok' => true, 'signature' => md5($signature)]);
     }
 
-    // Head Crew gate — staff mark ONE crew member per booking as Head Crew (booking_crew.is_head_crew,
-    // set from the Crew Talent Fee card). Only that person may use Attendance and Equipment
-    // Checklist (Confirm Arrival / Check-In) for that booking. Everything else in the portal is
-    // open to every assigned crew member. A head who is declined / backed out loses access
-    // automatically because those assignments are excluded here.
     private function isHeadCrewOf(int $crewId, int $bookingId): bool
     {
         return $bookingId > 0 && DB::table('booking_crew')
@@ -94,26 +81,10 @@ class CrewPortalController extends Controller
             $msg = $this->handleAction($request, $uid);
         }
 
-        // Every write action's form carries a hidden return_tab field so submitting stays on
-        // the tab the crew member was on (e.g. Equipment Checklist, Attendance) instead of
-        // bouncing back to the Today tab, which is the default when this page is opened fresh.
         $activeTab = $request->input('return_tab', 'dashboard');
-        // Same idea one level deeper — which in-page sub-tab (Check-Out/Check-In on the
-        // checklist page, Attendance/Timesheets on the attendance page) to reopen on.
         $activeSubTab = $request->input('return_subtab', '');
-        // And one level deeper still — both the checklist and attendance pages now require
-        // picking a specific booking before its marking UI appears, so remember which one.
         $activeBookingId = (int) $request->input('return_booking_id', 0);
 
-        // Staff-authored reminders flagged "visible to crew" — reuses the existing Reminders
-        // tool (config('filmspec.role_permissions') never granted crew that module) rather
-        // than a separate announcements feature. Not scoped to a linked crew_members row —
-        // any crew-role login sees these.
-        // Excludes reminders whose date has already passed — without this, an old to-do nobody
-        // got around to marking done stays pinned at the top forever (ascending date order
-        // surfaces the OLDEST one first) and can permanently crowd out newer announcements out
-        // of the 10-row limit, indistinguishable from a current one since the view has no
-        // "overdue" treatment for this list the way the staff Reminders page does.
         $crewAnnouncements = DB::table('reminders')
             ->where('visible_to_crew', true)->where('is_done', false)
             ->where('reminder_date', '>=', now()->toDateString())
@@ -127,9 +98,6 @@ class CrewPortalController extends Controller
             ->select('cm.*', 'cp.position_name')
             ->first();
 
-        // The My Profile page shows this instead of the edit form while a submission is still
-        // awaiting super_admin/operations_manager/traffic review, so crew can't submit a second,
-        // conflicting request before the first is resolved.
         $pendingProfileRequest = $crewMember
             ? DB::table('crew_profile_requests')->where('crew_id', $crewMember->crew_id)->where('status', 'pending')->first()
             : null;
@@ -165,10 +133,6 @@ class CrewPortalController extends Controller
                 ->where('bc.crew_id', $cmId)
                 ->whereNotIn('bc.assignment_status', ['declined', 'back_out'])
                 ->whereIn('b.booking_status', ['confirmed', 'ongoing', 'pending_inspection', 'returned'])
-                // Crew shouldn't see (or be able to act on) an assignment until the client has
-                // actually approved the cost estimate — a booking only ever reaches 'ongoing'/
-                // later by having passed through this gate already, so this only ever excludes
-                // genuinely-not-yet-approved 'confirmed' bookings, not historical ones.
                 ->where('b.cost_approval_status', 'client_approved')
                 ->orderByDesc('b.shoot_date_start')
                 ->select('b.booking_id', 'b.booking_reference', 'b.project_title', 'b.shoot_date_start',
@@ -179,8 +143,6 @@ class CrewPortalController extends Controller
                 ->limit(30)
                 ->get();
 
-            // Bookings (among this crew member's own active assignments) where they are the
-            // marked Head Crew — drives who sees/uses Attendance and Checklist.
             $headBookingIds = DB::table('booking_crew')
                 ->where('crew_id', $cmId)->where('is_head_crew', 1)
                 ->whereNotIn('assignment_status', ['declined', 'back_out'])
@@ -205,15 +167,10 @@ class CrewPortalController extends Controller
                 ->where('b.cost_approval_status', 'client_approved')
                 ->orderByDesc('b.shoot_date_start')
                 ->distinct()
-                // shoot_date_start must be in the SELECT list to ORDER BY it under DISTINCT
-                // (MySQL error 3065) — harmless to include, it's a per-booking column so it
-                // doesn't affect the distinct-by-booking_id de-duplication.
                 ->select('b.booking_id', 'b.booking_reference', 'b.project_title', 'b.shoot_date_start')
                 ->limit(50)
                 ->get();
 
-            // Fix 3 — equipment picker scoped to whichever of the crew member's own active
-            // bookings is selected, same shape as IncidentsController.php's $bookingEquipMap.
             $activeBookingIds = $myActiveBookings->pluck('booking_id')->all();
             $bookingEquipMap = [];
             if ($activeBookingIds) {
@@ -226,9 +183,6 @@ class CrewPortalController extends Controller
                     $bookingEquipMap[$row->booking_id][] = $row;
                 }
 
-                // Powers the File Incident Report modal's Unit select — cascades from whichever
-                // Equipment the crew member already picked, entirely client-side (no round trip),
-                // same idea as $bookingEquipMap cascading from Booking.
                 $equipIdsForUnits = collect($equipRows)->pluck('equipment_id')->unique()->all();
                 $equipmentUnitMap = [];
                 if ($equipIdsForUnits) {
@@ -237,12 +191,6 @@ class CrewPortalController extends Controller
                     }
                 }
 
-                // Booking-scoped unit map: which specific unit(s) are on THIS booking's
-                // equipment. Primary source is booking_equipment_units — allocated the moment
-                // equipment is added to a booking (EquipmentUnitAllocator), not just at
-                // Checklist check-out time. Falls back to the Checklist (direction='out') for
-                // bookings created before this table existed, then to $equipmentUnitMap above
-                // (every unit of that model) as a last resort.
                 $bookingEquipmentUnitMap = [];
                 $allocatedUnits = DB::table('booking_equipment_units as beu')
                     ->join('booking_equipment as be', 'beu.bk_equip_id', '=', 'be.bk_equip_id')
@@ -273,8 +221,6 @@ class CrewPortalController extends Controller
                     }
                 }
 
-                // Same two-level cascade (Booking -> Accessory -> Unit) as equipment above, so the
-                // File Incident Report modal can report on an accessory, not just equipment.
                 $accRows = DB::table('booking_accessories as ba')
                     ->join('accessories as a', 'ba.accessory_id', '=', 'a.accessory_id')
                     ->whereIn('ba.booking_id', $activeBookingIds)
@@ -291,9 +237,6 @@ class CrewPortalController extends Controller
                     }
                 }
 
-                // Booking-scoped accessory unit map — same idea as $bookingEquipmentUnitMap
-                // above, sourced from booking_accessory_units (allocated the moment the
-                // accessory is added to a booking).
                 $bookingAccessoryUnitMap = [];
                 $allocatedAccUnits = DB::table('booking_accessory_units as bau')
                     ->join('booking_accessories as ba', 'bau.ba_id', '=', 'ba.ba_id')
@@ -306,7 +249,6 @@ class CrewPortalController extends Controller
                 }
             }
 
-            // Fix 5 — attendance/timesheet history, never previously surfaced to the crew member.
             $myAttendance = DB::table('crew_attendance as ca')
                 ->join('bookings as b', 'ca.booking_id', '=', 'b.booking_id')
                 ->where('ca.crew_id', $cmId)
@@ -323,15 +265,6 @@ class CrewPortalController extends Controller
                 ->limit(30)
                 ->get();
 
-            // Equipment checklist — trusted crew (whoever holds a crew login, per how these
-            // accounts are provisioned) can check equipment OUT while a booking is 'confirmed'
-            // and back IN while it's 'ongoing', mirroring ChecklistController's own direction
-            // logic 1:1 so the auto status-transition rules stay consistent either way it's done.
-            // 'pending_inspection' is included too — crew_save_checklist auto-flips a booking
-            // there the moment every item is checked in, and without this the booking would
-            // vanish from the crew's own checklist the instant they finished, with no way left
-            // to reopen it and fix a mistake (an item wrongly checked, or one missed entirely).
-            // Head Crew only — non-head crew get no checklist bookings at all.
             $checklistBookings = $myBookings->whereIn('booking_status', ['confirmed', 'ongoing', 'pending_inspection'])
                 ->whereIn('booking_id', $headBookingIds);
             $checklistBookingIds = $checklistBookings->pluck('booking_id')->all();
@@ -352,11 +285,6 @@ class CrewPortalController extends Controller
                         'ci.checked as ci_checked', 'ci.quantity_actual as ci_qty', 'ci.condition_in', 'ci.notes as ci_notes')
                     ->get();
 
-                // Accessories dispatched alongside equipment share the same equipment_checklist
-                // table (accessory_id column, equipment_id left null) — mirrors
-                // ChecklistController's own equipment/accessory union so crew can actually check
-                // accessories in too, not just the main equipment line (they were previously
-                // missing from this screen entirely).
                 $accRows = DB::table('booking_accessories as ba')
                     ->join('accessories as a', 'ba.accessory_id', '=', 'a.accessory_id')
                     ->leftJoin('equipment_checklist as co', function ($j) {
@@ -373,9 +301,6 @@ class CrewPortalController extends Controller
                         'ci.checked as ci_checked', 'ci.quantity_actual as ci_qty', 'ci.condition_in', 'ci.notes as ci_notes')
                     ->get();
 
-                // Which specific unit(s) are allocated to each line, so crew sees the real asset
-                // tag(s) instead of just an anonymous "Qty N" — same source of truth as the
-                // admin Checklist page and the Incident Report form's Unit field.
                 $allocEqTags = DB::table('booking_equipment_units as beu')
                     ->join('booking_equipment as be', 'beu.bk_equip_id', '=', 'be.bk_equip_id')
                     ->join('equipment_units as eu', 'beu.equipment_unit_id', '=', 'eu.unit_id')
@@ -399,22 +324,12 @@ class CrewPortalController extends Controller
                 foreach ($checklistBookings as $bk) {
                     $myChecklistBookings->push((object) [
                         'booking' => $bk,
-                        // Which tab a booking shows under is about whether field arrival has
-                        // actually been confirmed (bookings.field_arrival_confirmed_at), not
-                        // booking_status — those are independent: office can release equipment
-                        // (flipping status confirmed -> ongoing) before crew ever opens the
-                        // portal, and previously that status flip alone silently moved the
-                        // booking out of "Confirm Arrival" and into "Check-In", with no way
-                        // left to confirm arrival for it at all.
                         'direction' => empty($bk->field_arrival_confirmed_at) ? 'out' : 'in',
                         'items' => $itemsByBooking[$bk->booking_id] ?? [],
                     ]);
                 }
             }
 
-            // Team attendance — same trust model: whoever's on this booking's crew can mark
-            // the whole field team's attendance for the day, not just their own, since only
-            // one crew member (the one with the login) is typically present to do it.
             $teamBookings = $myBookings->whereIn('booking_status', ['confirmed', 'ongoing']);
             $teamBookingIds = $teamBookings->pluck('booking_id')->all();
             if ($teamBookingIds) {
@@ -441,9 +356,6 @@ class CrewPortalController extends Controller
                     $bkIsHead = in_array((int) $bk->booking_id, $headBookingIds, true);
                     $myTeamBookings->push((object) [
                         'booking' => $bk,
-                        // $myTeamBookings also feeds the Field Requests booking picker, which every
-                        // crew member keeps — so the list stays, but the teammate roster used for
-                        // marking attendance is only handed to the Head Crew of that booking.
                         'is_head' => $bkIsHead,
                         'team' => $bkIsHead ? ($teamByBooking[$bk->booking_id] ?? []) : [],
                     ]);
@@ -455,10 +367,6 @@ class CrewPortalController extends Controller
                     ->get();
             }
 
-            // Field requests — same eligible-booking window as checklist/attendance above, and
-            // the same request-then-staff-approves flow ClientBookingDetailController already
-            // offers clients, just from the crew side (the people actually on set are just as
-            // likely to need something sent out as the client is).
             $fieldReqBookingIds = $myBookings->whereIn('booking_status', ['confirmed', 'ongoing'])->pluck('booking_id')->unique()->values()->all();
             if ($fieldReqBookingIds) {
                 $existingEquipByBooking = DB::table('booking_equipment')->whereIn('booking_id', $fieldReqBookingIds)->get()->groupBy('booking_id');
@@ -490,8 +398,6 @@ class CrewPortalController extends Controller
                 ->get();
         }
 
-        // Left, not inner — an accessory-only incident (ir.equipment_id null) must still show up
-        // in the crew member's own history, same reasoning as IncidentsController.php's admin list.
         $myIncidents = DB::table('incident_reports as ir')
             ->leftJoin('equipment as e', 'ir.equipment_id', '=', 'e.equipment_id')
             ->leftJoin('accessories as acc', 'ir.accessory_id', '=', 'acc.accessory_id')
@@ -502,7 +408,6 @@ class CrewPortalController extends Controller
             ->limit(20)
             ->get();
 
-        // Attendance / Checklist belong to the Head Crew only — never land a non-head on them.
         if (! $isHeadCrew && in_array($activeTab, ['attendance', 'checklist'], true)) {
             $activeTab = 'dashboard';
         }
@@ -529,10 +434,6 @@ class CrewPortalController extends Controller
         ]);
     }
 
-    // Printable check-out/check-in record, scoped to the crew member's own booking — reuses
-    // the exact same view and query shape as ChecklistController::print() (the staff version)
-    // so the two stay visually identical, just with an ownership check added and the "Back"
-    // link pointed at the crew portal instead of the staff booking-detail page.
     public function printChecklist(Request $request)
     {
         $user = Auth::user();
@@ -585,8 +486,6 @@ class CrewPortalController extends Controller
                 DB::raw("CONCAT(ui.first_name,' ',ui.last_name) as ci_by_name")
             );
 
-        // Same equipment/accessory union as ChecklistController::print() — this reuses that
-        // same checklist-print view, which expects item_type/item_name/ref_id either way.
         $accQuery = DB::table('booking_accessories as ba')
             ->join('accessories as a', 'ba.accessory_id', '=', 'a.accessory_id')
             ->leftJoin('equipment_checklist as co', function ($j) use ($bid) {
@@ -628,9 +527,6 @@ class CrewPortalController extends Controller
         ]);
     }
 
-    // Printable attendance record for one booking, scoped to the crew member's own
-    // assignment — shows every attendance row ever logged for that booking (not just
-    // today's), since a multi-day shoot can have attendance marked across several dates.
     public function printAttendance(Request $request)
     {
         $user = Auth::user();
@@ -691,8 +587,6 @@ class CrewPortalController extends Controller
         $crewMember = DB::table('crew_members')->where('user_id', $uid)->first();
 
         if ($action === 'crew_request_profile_change' && $crewMember) {
-            // One pending request at a time — otherwise a second submission could race the
-            // first through approval with stale old-value diffs.
             $existing = DB::table('crew_profile_requests')
                 ->where('crew_id', $crewMember->crew_id)->where('status', 'pending')->exists();
             if ($existing) {
@@ -754,9 +648,6 @@ class CrewPortalController extends Controller
             $eid = $itemType === 'equipment' ? (int) $request->input('equipment_id', 0) : 0;
             $aid = $itemType === 'accessory' ? (int) $request->input('accessory_id', 0) : 0;
 
-            // "unit" is either "u<unit_id>" (a genuinely registered physical unit) or
-            // empty/"unsure" when the crew member picks "Not sure which unit" — there's nothing
-            // to validate for that case, it just leaves the report unit-less like before.
             $unitField = $itemType === 'accessory' ? 'accessory_unit' : 'equipment_unit';
             $unitInput = (string) $request->input($unitField, '');
             $equipmentUnitId = null;
@@ -786,10 +677,6 @@ class CrewPortalController extends Controller
                 return ['type' => 'danger', 'text' => 'Please fill in all required fields.'];
             }
 
-            // Ownership check — a booking_id/item_id must actually be this crew member's own
-            // (non-declined) assignment and that booking's own equipment/accessory, not just any
-            // ID POSTed by the client. The booking/item <select>s only ever offer these in the
-            // real UI, but the server re-validates rather than trusting that alone.
             $ownsBooking = DB::table('booking_crew')->where('crew_id', $crewMember->crew_id)
                 ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
             if (! $ownsBooking) {
@@ -807,11 +694,6 @@ class CrewPortalController extends Controller
                 }
             }
 
-            // A slow mobile upload can make the browser/network retry the same POST before the
-            // first attempt's response ever arrives — guardCrewSubmit() only stops a second
-            // in-page click, not a network-level resend. Treat an identical submission (same
-            // reporter/booking/item/description) landing within the last 20s as that resend and
-            // hand back the already-filed report instead of creating a second one.
             $dupe = DB::table('incident_reports')
                 ->where('reported_by', $uid)->where('booking_id', $bid)
                 ->where('equipment_id', $eid ?: null)->where('accessory_id', $aid ?: null)
@@ -853,9 +735,6 @@ class CrewPortalController extends Controller
         }
 
         if ($action === 'crew_confirm_arrival' && $crewMember) {
-            // The crew-side counterpart to office-only release: crew can't tick items out, but
-            // they CAN tell staff "we've got it and we're on set" — surfaced on the Checklist
-            // page as a single per-booking confirmation, not a per-item one.
             $bid = (int) $request->input('booking_id', 0);
             $ownsBooking = DB::table('booking_crew')->where('crew_id', $crewMember->crew_id)
                 ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
@@ -875,9 +754,6 @@ class CrewPortalController extends Controller
         }
 
         if ($action === 'crew_undo_arrival' && $crewMember) {
-            // Lets crew immediately walk back a mis-tap (wrong booking, or confirmed before
-            // actually arriving) — clears the same two columns crew_confirm_arrival set, with no
-            // other side effects. Doesn't touch anything already saved on the Check-In tab.
             $bid = (int) $request->input('booking_id', 0);
             $ownsBooking = DB::table('booking_crew')->where('crew_id', $crewMember->crew_id)
                 ->where('booking_id', $bid)->whereNotIn('assignment_status', ['declined', 'back_out'])->exists();
@@ -900,21 +776,10 @@ class CrewPortalController extends Controller
             $bid = (int) $request->input('booking_id', 0);
             $direction = $request->input('direction') === 'in' ? 'in' : 'out';
 
-            // Releasing equipment (Checklist Out / Release All) is an office-only action —
-            // Admin / Super Admin / Operations Manager / Traffic Staff, via the main Checklist
-            // page. Crew confirm arrival instead (crew_confirm_arrival above); this action now
-            // only ever handles checking items back IN.
             if ($direction === 'out') {
                 return ['type' => 'danger', 'text' => 'Only office staff can release equipment. Use Confirm Field Arrival instead.'];
             }
 
-            // Simplified crew flow: a plain list of checked "eq_<id>" / "acc_<id>" tokens — no
-            // per-item quantity/condition/notes fields. Every checked item is recorded as its
-            // full expected quantity in 'good' condition; anything actually wrong with a
-            // specific item is reported through the separate File Incident Report action
-            // instead, which already exists and already handles condition/damage detail
-            // properly. Plain numeric values (no prefix) are treated as equipment_id, for any
-            // stale cached form from before accessories were added to this screen.
             $rawChecked = (array) $request->input('items', []);
             $checkedEquipIds = [];
             $checkedAccIds = [];
@@ -937,10 +802,6 @@ class CrewPortalController extends Controller
                 return ['type' => 'danger', 'text' => 'Only the Head Crew of this booking can do this.'];
             }
 
-            // Every item on the booking is processed, not just the checked ones — reopening this
-            // form and unchecking something a crew member ticked by mistake must actually clear
-            // it, not just leave the stale "checked" row in place because it was never
-            // resubmitted. Matches ChecklistController::saveChecklist(), which already does this.
             $bookingEquip = DB::table('booking_equipment')->where('booking_id', $bid)->get()->keyBy('equipment_id');
 
             foreach ($bookingEquip as $eid => $line) {
@@ -959,11 +820,6 @@ class CrewPortalController extends Controller
                     ]);
                 }
 
-                // Unchecking deliberately does NOT reverse the equipment_transactions /
-                // availability_status side effect below — same one-way convention
-                // ChecklistController::saveChecklist() already follows, since another booking
-                // may have already been allocated this unit on the strength of it being
-                // "available" again; silently pulling it back could double-book it.
                 if ($checked) {
                     $existTx = DB::table('equipment_transactions')->where('booking_id', $bid)->where('equipment_id', $eid)->where('transaction_type', 'checkin')->value('transaction_id');
                     if (! $existTx) {
@@ -976,8 +832,6 @@ class CrewPortalController extends Controller
                 }
             }
 
-            // Accessories skip equipment_transactions/availability_status — same as
-            // ChecklistController::saveChecklist() — they aren't serialized/tracked there.
             $bookingAcc = DB::table('booking_accessories')->where('booking_id', $bid)->get()->keyBy('accessory_id');
             foreach ($bookingAcc as $aid => $line) {
                 $checked = in_array($aid, $checkedAccIds, true) ? 1 : 0;
@@ -1001,19 +855,10 @@ class CrewPortalController extends Controller
             $curStatus = DB::table('bookings')->where('booking_id', $bid)->value('booking_status');
             if ($totalEquip > 0 && $returnedCount >= $totalEquip) {
                 if (in_array($curStatus, ['ongoing', 'confirmed'], true)) {
-                    // Matches ChecklistController/BookingDetailController's own path — all
-                    // equipment back in moves to pending_inspection, not straight to returned;
-                    // "returned" only happens once staff deliberately confirm the inspection (or
-                    // skip it via Complete Booking). This used to jump straight to 'returned',
-                    // silently bypassing that inspection gate when crew did the check-in.
                     DB::table('bookings')->where('booking_id', $bid)->update(['booking_status' => 'pending_inspection', 'updated_at' => now()]);
                     ActivityLog::record($uid, 'status_change', 'booking', "Booking #$bid pending inspection — all equipment checked in via crew checklist", $bid);
                 }
             } elseif ($curStatus === 'pending_inspection') {
-                // Crew reopened an already-fully-checked-in booking and unchecked something —
-                // it's no longer actually all back, so undo the auto-transition too. Staff
-                // haven't started the inspection yet at this stage (that only happens from the
-                // main Checklist page), so stepping back to 'ongoing' is always safe here.
                 DB::table('bookings')->where('booking_id', $bid)->update(['booking_status' => 'ongoing', 'updated_at' => now()]);
                 ActivityLog::record($uid, 'status_change', 'booking', "Booking #$bid reopened to ongoing — crew edited checklist after it was pending inspection", $bid);
             }
@@ -1036,9 +881,6 @@ class CrewPortalController extends Controller
                 return ['type' => 'danger', 'text' => 'Only the Head Crew of this booking can do this.'];
             }
 
-            // A crew lead's own submitted date, otherwise unbounded — protects the payroll
-            // no-show/back-out deduction logic in CrewDataController from arbitrarily
-            // backdated/forward-dated entries outside the actual shoot.
             $shootRange = DB::table('bookings')->where('booking_id', $bid)->select('shoot_date_start', 'shoot_date_end')->first();
             if ($shootRange && ($date < $shootRange->shoot_date_start || $date > $shootRange->shoot_date_end)) {
                 return ['type' => 'danger', 'text' => 'Attendance date must fall within this booking\'s shoot dates (' . $shootRange->shoot_date_start . ' to ' . $shootRange->shoot_date_end . ').'];
@@ -1048,9 +890,6 @@ class CrewPortalController extends Controller
             DB::transaction(function () use ($request, $bid, $date, $uid, &$logged) {
                 foreach ((array) $request->input('crew_status', []) as $cid => $status) {
                     $cid = (int) $cid;
-                    // Only allow marking teammates actually assigned (non-declined) to this same
-                    // booking — the form only ever offers these, but the server re-checks rather
-                    // than trusting the POSTed crew_id list.
                     $memberOnBooking = DB::table('booking_crew')->where('booking_id', $bid)->where('crew_id', $cid)
                         ->where('assignment_status', '!=', 'declined')->exists();
                     if (! $memberOnBooking) {
@@ -1066,10 +905,6 @@ class CrewPortalController extends Controller
                     );
                     $logged++;
 
-                    // Same booking_crew sync as the staff-side Log Attendance flow (see
-                    // AttendanceController::handleAction) — without this, a crew lead marking a
-                    // teammate back_out here never actually changed that teammate's real
-                    // assignment status, so Schedule/roster views kept showing them as active.
                     $currentAssignment = DB::table('booking_crew')->where('booking_id', $bid)->where('crew_id', $cid)->value('assignment_status');
                     if ($status === 'back_out' && $currentAssignment !== 'back_out') {
                         DB::table('booking_crew')->where('booking_id', $bid)->where('crew_id', $cid)
@@ -1119,7 +954,7 @@ class CrewPortalController extends Controller
                     'booking_id' => $bid, 'requested_by' => $uid, 'item_type' => 'accessory',
                     'accessory_id' => $aid, 'quantity' => $qty, 'reason' => $reason, 'daily_rate' => $accRate, 'created_at' => now(),
                 ]);
-            } else { // crew — same convention as ClientBookingDetailController: a role/position, not a specific person
+            } else {
                 $pid = (int) $request->input('position_id', 0);
                 if (! $pid) {
                     return ['type' => 'danger', 'text' => 'Please select a role.'];
@@ -1166,7 +1001,6 @@ class CrewPortalController extends Controller
         return null;
     }
 
-    /** Crew's own view of a photo they (or the office, on their assigned maintenance) attached — scoped to their own records, since crew has no 'incidents' module permission for the staff-side route. */
     public function incidentPhoto(int $id)
     {
         $user = Auth::user();

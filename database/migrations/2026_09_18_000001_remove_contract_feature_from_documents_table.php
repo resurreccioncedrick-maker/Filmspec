@@ -5,11 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * Removes the e-signature capability and the "contract" document category — the app has no
- * use for it. Existing contract-tagged documents are recategorized to "other" first so no
- * uploaded files are lost, only the signing feature and the category label.
- */
 return new class extends Migration
 {
     public function up(): void

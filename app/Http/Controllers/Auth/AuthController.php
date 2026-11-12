@@ -41,11 +41,6 @@ class AuthController extends Controller
 
         $user = User::with('role')->where('email', $data['email'])->first();
 
-        // Password is checked FIRST, before anything that reveals whether this email exists or
-        // what state the account is in — checking account existence/status before the password
-        // lets anyone who just knows (or guesses) an email learn whether it's registered,
-        // active, or a pending/rejected client application, with no password required at all.
-        // Only once the password is proven correct do we show the more specific messages below.
         if (! $user || ! Hash::check($data['password'], $user->password_hash)) {
             return back()->withInput()->withErrors(['login' => 'Incorrect email or password.']);
         }
@@ -55,10 +50,6 @@ class AuthController extends Controller
         if (($user->role->role_name ?? '') === 'client') {
             $clientRow = \DB::table('clients')->where('user_id', $user->user_id)->select('status', 'is_active')->first();
             if ($clientRow && ! $clientRow->is_active) {
-                // Deactivating a client (ClientDetailController::deactivate_client) only ever set
-                // clients.is_active — this login check never looked at it, so a deactivated
-                // client could still log in and do everything except start a NEW booking. Matches
-                // the users.is_active check above, just scoped to the clients table's own flag.
                 return back()->withInput()->withErrors(['login' => 'Account deactivated. Contact the administrator.']);
             }
             if (($clientRow->status ?? null) === 'pending') {
@@ -137,10 +128,6 @@ class AuthController extends Controller
         if (! $pending) {
             return redirect()->route('login');
         }
-        // Matches storeMfaToken()'s actual DB expiry (10 minutes) — this used to allow 15, so a
-        // correct code entered between minute 10 and 15 passed this session check but then
-        // always failed the token lookup below (already expired in the DB), burning an attempt
-        // on a code that was actually right.
         if (time() - ($pending['issued_at'] ?? 0) > 600) {
             $request->session()->forget(['mfa_pending', 'mfa_attempts']);
             return redirect()->route('login', ['mfa_expired' => 1]);
@@ -317,9 +304,6 @@ class AuthController extends Controller
             'client_type' => 'first_time',
             'is_vat_registered' => $pending['entity_type'] === 'company' ? 1 : 0,
         ]);
-        // Email verification (the OTP just checked above) is the only gate self-registered
-        // client accounts need — approved immediately here instead of landing in the admin's
-        // pending-applications queue, so a verified client can log in right away.
         \DB::table('clients')->where('user_id', $user->user_id)->update([
             'entity_type' => $pending['entity_type'],
             'status' => 'approved',
@@ -353,11 +337,6 @@ class AuthController extends Controller
 
         $user = User::where('email', $data['email'])->first();
 
-        // Always proceeds to the same reset-password OTP screen whether or not this email is
-        // registered or active — telling the caller "no account found" here is an account-
-        // enumeration leak that needs no password at all. A real, active account gets a real
-        // token and email; anything else silently gets nowhere (the OTP step below will just
-        // never find a matching token), with no observable difference in the response.
         $request->session()->regenerate();
         $request->session()->put('password_reset_pending', [
             'user_id' => $user->user_id ?? 0,
@@ -378,9 +357,6 @@ class AuthController extends Controller
 
             $sent = $this->sendMail($user->email, 'Reset your FilmSpec password', OtpMailTemplates::resetPassword($user->first_name, $otp));
             if (! $sent) {
-                // A real account but the email genuinely failed to send is an operational
-                // problem, not something that depends on whether the account exists — safe to
-                // surface distinctly.
                 $request->session()->forget(['password_reset_pending', 'password_reset_attempts']);
                 \DB::table('password_reset_tokens')->where('user_id', $user->user_id)->delete();
 
@@ -401,9 +377,6 @@ class AuthController extends Controller
         if (! $pending) {
             return redirect()->route('forgot-password');
         }
-        // Matches the actual password_reset_tokens expiry (10 minutes) — same mismatch as the
-        // MFA session check: the old 15-minute window let a correct code pass this check and
-        // then always fail the already-expired DB lookup below.
         if (time() - ($pending['issued_at'] ?? 0) > 600) {
             $request->session()->forget(['password_reset_pending', 'password_reset_attempts']);
 

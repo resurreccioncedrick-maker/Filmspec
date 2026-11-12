@@ -20,10 +20,6 @@ class ClientsController extends Controller
 
     private array $typeLabel = ['regular' => 'Regular', 'first_time' => 'New Customer'];
 
-    // clients.payment_terms enum: 50_downpayment/90_days/6_months/2_weeks_crew.
-    // Legacy clients.php and booking_detail.php both used a different, invalid set of
-    // values here (downpayment_50/pay_later/full_upfront) that silently stored as empty
-    // string under this DB's non-strict sql_mode — fixed to use the real enum consistently.
     private array $termLabel = [
         '50_downpayment' => '50% Downpayment', '90_days' => '90 Days',
         '6_months' => '6 Months', '2_weeks_crew' => '2 Weeks (Crew)',
@@ -106,7 +102,6 @@ class ClientsController extends Controller
         ]);
     }
 
-    /** Same filters index() applies, shared with export() so the two can never drift apart. */
     private function filteredQuery(Request $request)
     {
         $typeFilter = $request->query('type', '');
@@ -128,7 +123,6 @@ class ClientsController extends Controller
         return $query;
     }
 
-    /** Export ▾ — reuses filteredQuery() unbounded (no page/perPage) so it always matches what's on screen. */
     private function export(Request $request): StreamedResponse|Response
     {
         $headers = ['Client', 'Type', 'Contact', 'Bookings', 'Completed', 'Last Booking', 'Payment Terms'];
@@ -183,9 +177,6 @@ class ClientsController extends Controller
                 return ['type' => 'danger', 'text' => 'A client with this email already exists.'];
             }
 
-            // client_type is never taken from the form — every new client starts as
-            // "New Customer" (first_time) and is only promoted to "Regular" via the dedicated
-            // mark_regular_client action below, once they've actually earned it.
             $terms = in_array($request->input('payment_terms'), $validTerms, true) ? $request->input('payment_terms') : '50_downpayment';
             $entityType = in_array($request->input('entity_type'), array_keys($this->entityTypeLabel), true) ? $request->input('entity_type') : 'individual';
 
@@ -217,10 +208,6 @@ class ClientsController extends Controller
             $contact = strtoupper(trim($request->input('contact_person', '')));
             $entityType = in_array($request->input('entity_type'), array_keys($this->entityTypeLabel), true) ? $request->input('entity_type') : 'individual';
 
-            // payment_terms/discount_pct are deliberately NOT touched here — they moved to the
-            // Billing tab's own restricted save (ClientDetailController::updateBilling()). And
-            // client_type is deliberately NOT touched here either — it only changes through the
-            // dedicated mark_regular_client action below, not this basic edit form.
             DB::table('clients')->where('client_id', $cid)->update([
                 'company_name' => $company ?: null, 'contact_person' => $contact, 'email' => $email, 'phone' => $phone,
                 'address' => trim($request->input('address', '')),
@@ -231,15 +218,6 @@ class ClientsController extends Controller
 
             return ['type' => 'success', 'text' => 'Client updated.'];
         }
-
-        // approve_client / reject_client were removed along with the admin approval UI —
-        // self-registered clients are now auto-approved at email verification (AuthController::
-        // verifySignup()), so there's no pending queue left to act on.
-
-        // mark_regular_client / deactivate_client / reactivate_client live in
-        // ClientDetailController::action() instead — they're triggered from the Client Detail
-        // page and need to redirect back there, not to this list page (see updateBilling() for
-        // the same reasoning already established for the Billing tab's save).
 
         return null;
     }

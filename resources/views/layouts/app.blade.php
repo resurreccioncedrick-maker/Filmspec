@@ -42,8 +42,6 @@
       'clients'   => ['icon' => 'briefcase', 'label' => 'Clients', 'mod' => 'clients'],
       'billing'   => ['icon' => 'file-text', 'label' => 'Billing & POS', 'mod' => 'billing'],
       'field-requests' => ['icon' => 'truck', 'label' => 'Field Resource Requests', 'mod' => 'field_requests'],
-      // temporarily hidden: support chat still buggy
-      // 'support-chat' => ['icon' => 'message-circle', 'label' => 'Support Chat', 'mod' => 'support_chat'],
     ],
     'Inventory' => [
       'equipment'   => ['icon' => 'camera', 'label' => 'Equipment', 'mod' => 'equipment'],
@@ -54,10 +52,6 @@
       'crew'       => ['icon' => 'users', 'label' => 'Crew Management', 'mod' => 'crew'],
       'attendance' => ['icon' => 'clock', 'label' => 'Attendance', 'mod' => 'attendance'],
     ],
-    // A single 'Analytics' row with a flyout of the 6 real pages, rather than 6 flat rows —
-    // the flat list was the tallest group in the sidebar by a wide margin. Each child still
-    // carries its own 'mod', checked individually, so a future role with only partial
-    // Analytics access degrades correctly instead of all-or-nothing.
     'Analytics' => [
       'analytics' => ['icon' => 'pie-chart', 'label' => 'Analytics', 'flyout' => [
         'reports' => ['icon' => 'bar-chart-2', 'label' => 'Reports', 'mod' => 'reports'],
@@ -81,13 +75,6 @@
 
   $canAccess = fn (string $mod) => in_array($mod, config("filmspec.role_permissions.$navRole", []), true);
 
-  // Live "needs your attention" count for the Billing nav item — same filters
-  // BillingController::index() already uses for pendingDiscounts/pendingPayBkgs, just as a
-  // cheap count rather than the full row data. Only computed for roles that can see Billing
-  // at all, so this doesn't add a query to every page load for every role.
-  // Kept as two named counts (not just one summed total) so the tooltip can say which part is
-  // which — a bare combined number gave no way to tell "pending discounts" from "unbilled
-  // bookings" from the sidebar alone.
   $billingBadgePendingDiscounts = 0;
   $billingBadgeUnbilled = 0;
   if ($canAccess('billing')) {
@@ -102,11 +89,6 @@
   }
   $billingBadgeCount = $billingBadgePendingDiscounts + $billingBadgeUnbilled;
 
-  // Global "new messages waiting" counts for the Support Chat and Bookings nav items — the
-  // per-thread unread dot on the Support Chat inbox and BookingDetailController's own
-  // $unreadComments only ever surface once staff is already on that specific page; this reuses
-  // the exact same MessageReadTracker::unreadFlags() logic, just across every thread at once,
-  // so staff notice new client messages from anywhere in the sidebar.
   $supportChatBadgeCount = 0;
   if ($canAccess('support_chat')) {
     $lastPerClient = \Illuminate\Support\Facades\DB::table('client_support_messages')
@@ -127,9 +109,6 @@
     ));
   }
 
-  // Same "Pending Review" count FieldRequestsController::index() shows on its own tab —
-  // the nav item had no badge at all, so a pending field request was invisible to staff
-  // unless they happened to click into the page.
   $fieldRequestsBadgeCount = 0;
   if ($canAccess('field_requests')) {
     $fieldRequestsBadgeCount = \Illuminate\Support\Facades\DB::table('booking_equipment_requests')->where('status', 'pending')->count();
@@ -185,11 +164,6 @@
           </button>
         @else
           @continue(! $canAccess($item['mod']))
-          {{-- URL resolves off 'page' when present (for an item that shares another module's
-               permission but has its own route), else off 'mod' — matches ported_pages' keys,
-               not the $page array key, since a hyphenated key like 'cost-estimates' never
-               matched the config's 'cost_estimates' entry, which silently fell through to a
-               dead legacy URL. --}}
           @php $urlKey = $item['page'] ?? $item['mod']; @endphp
           <a href="{{ $pageUrl($urlKey) }}" class="nav-item {{ $curPage === $urlKey ? 'active' : '' }}">
             <i data-feather="{{ $item['icon'] }}"></i>
@@ -218,12 +192,6 @@
   </div>
 </aside>
 
-{{-- Flyout panels for nav groups with a 'flyout' sub-list (e.g. Analytics) — rendered as
-     siblings of <aside>, not nested inside it, because .sidebar has overflow:hidden and
-     .sidebar-nav has overflow-y:auto; a panel positioned absolute/relative to either of
-     those would get silently clipped at the sidebar's edge instead of floating past it.
-     app.js positions each one with position:fixed against its trigger's real screen
-     position on hover/focus, so it tracks correctly even if the sidebar itself scrolls. --}}
 @foreach ($nav as $groupName => $items)
   @foreach ($items as $page => $item)
     @continue(! isset($item['flyout']))

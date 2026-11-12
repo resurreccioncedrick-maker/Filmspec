@@ -23,7 +23,6 @@
 </div>
 @endif
 
-<!-- KPI Row -->
 <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
   <div class="stat-card" style="--sb:#dc2626">
     <div class="stat-icon" style="background:#fee2e2;color:#dc2626"><i data-feather="alert-circle"></i></div>
@@ -47,7 +46,6 @@
   </div>
 </div>
 
-<!-- Status tabs -->
 <div class="tabs" style="margin-bottom:12px">
   @foreach (['all' => 'All', 'requested' => 'Requested', 'approved' => 'Approved', 'in_progress' => 'In Progress', 'completed' => 'Completed', 'cancelled' => 'Cancelled'] as $k => $l)
   <a href="{{ $rpBase }}?tab={{ $k }}&type={{ $typeFilter }}" class="tab-btn {{ $tab === $k ? 'active' : '' }}">
@@ -56,7 +54,6 @@
   @endforeach
 </div>
 
-<!-- Type filter -->
 <div class="tabs" style="margin-bottom:18px">
   @foreach (['' => 'All Types', 'repair' => 'Repair', 'purchase' => 'Purchase'] as $k => $l)
   <a href="{{ $rpBase }}?tab={{ $tab }}&type={{ $k }}" class="tab-btn {{ $typeFilter === $k ? 'active' : '' }}">{{ $l }}</a>
@@ -130,7 +127,6 @@
           @endif
         </td>
         <td>
-          {{-- Same stored status, worded for the kind of job (Part 15). --}}
           <span class="badge {{ $statusBadge[$t->status] ?? 'badge-gray' }}">
             {{ $statusLabelByType[$t->type][$t->status] ?? ($statusLabel[$t->status] ?? ucfirst($t->status)) }}
           </span>
@@ -199,7 +195,6 @@
 @include('partials.access-log')
 
 @if ($canPost)
-<!-- NEW TICKET MODAL -->
 <div class="modal-overlay" id="modalNewTicket">
   <div class="modal" style="max-width:560px">
     <div class="modal-header">
@@ -290,7 +285,6 @@
   </div>
 </div>
 
-<!-- EDIT TICKET MODAL (Part 15) -->
 <div class="modal-overlay" id="modalEditTicket">
   <div class="modal" style="max-width:560px">
     <div class="modal-header">
@@ -392,7 +386,6 @@
   </div>
 </div>
 
-<!-- TICKET DETAILS & MESSAGES (Part 15) -->
 <div class="modal-overlay" id="modalTicketDetails">
   <div class="modal" style="max-width:600px">
     <div class="modal-header">
@@ -419,7 +412,6 @@
   </div>
 </div>
 
-<!-- UPDATE STATUS MODAL -->
 <div class="modal-overlay" id="modalUpdateStatus">
   <div class="modal" style="max-width:460px">
     <div class="modal-header">
@@ -468,11 +460,8 @@ function toggleTicketType() {
   document.getElementById('ticketUnitWrap').style.display = isRepair ? '' : 'none';
 }
 
-// ── Equipment type-to-search (New/Edit Ticket) ──────────────────────────────
 const REPAIR_ALL_EQUIPMENT = {!! $allEquipment->values()->toJson() !!};
 
-// Same cascade (Equipment -> Unit) IncidentsController's incident form already uses, so staff
-// can pin down which physical unit a repair ticket is for.
 const RP_EQUIPMENT_UNITS = {!! json_encode($equipmentUnitMap) !!};
 
 function populateRPUnitSelect(equipmentId, selectId, preselect) {
@@ -541,7 +530,6 @@ function toggleStatusCost() {
   document.getElementById('us_costWrap').style.display = sel.value === 'completed' ? '' : 'none';
 }
 
-// ── Edit ticket / details & messages (Part 15) ─────────────────────────────
 const TICKET_STATUS_LABELS = @json($statusLabelByType);
 
 function toggleEditTicketType() {

@@ -4,12 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * Digital contract e-signature (Part 6) builds on the existing "documents" table (category
- * already includes "contract") rather than a parallel signature system. Only meaningful where
- * category = 'contract' — left nullable and unenforced elsewhere, same discipline the table
- * already uses for booking_id/client_id being "exactly one, checked in the controller."
- */
 return new class extends Migration
 {
     public function up(): void

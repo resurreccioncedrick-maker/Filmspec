@@ -1,18 +1,3 @@
-{{--
-  Shared "Export ▾" dropdown for staff data-table/report pages. Plain <a href> links (no
-  AJAX) so the browser's normal file-download flow just works with streamDownload()/dompdf.
-
-  Props:
-    id           - unique DOM id suffix (required when a page has more than one dropdown,
-                   e.g. Billing's 3 tabs)
-    formats      - which formats to offer, default all three
-    exportParam  - query param name identifying WHAT to export (default 'export')
-    exportValue  - if set, exportParam holds this fixed value (a "type", Reports-style
-                   multi-dataset pages) and the format goes in a separate formatParam instead
-                   of exportParam directly (simple single-dataset pages, the common case)
-    formatParam  - query param name for the format when exportValue is set (default 'format')
-    label        - button label, default "Export"
---}}
 @php
   $formats = $formats ?? ['csv', 'xlsx', 'pdf'];
   $exportParam = $exportParam ?? 'export';

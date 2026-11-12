@@ -8,10 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Genuinely new — equipment is currently tracked as one row per model with an
-        // aggregate stock_quantity, no per-physical-unit records at all. This table adds
-        // individual-unit tracking (asset tag/serial/condition/status/location) alongside the
-        // existing model-level row, without changing or removing stock_quantity.
         Schema::create('equipment_units', function (Blueprint $table) {
             $table->id('unit_id');
             $table->integer('equipment_id');

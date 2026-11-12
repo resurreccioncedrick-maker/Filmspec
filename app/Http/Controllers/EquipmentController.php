@@ -14,11 +14,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EquipmentController extends Controller
 {
-    // Display-only relabel — the stored enum values (excellent/good/fair/under_repair,
-    // available/booked/rented/under_repair/retired) are unchanged everywhere they're compared
-    // or filtered on (75+ call sites across the app), only the human-facing label/badge text
-    // changes: condition Fair→Serviceable, under_repair(as condition)→Damaged; availability
-    // booked→Allocated, rented→"In Field", under_repair(as status)→"Under Maintenance".
     private array $condBadge = [
         'excellent' => 'badge-green', 'good' => 'badge-blue', 'fair' => 'badge-yellow', 'under_repair' => 'badge-red',
     ];
@@ -37,8 +32,6 @@ class EquipmentController extends Controller
         'under_repair' => 'Under Maintenance', 'retired' => 'Retired',
     ];
 
-    // Physical Units (equipment_units) is a brand-new per-unit table, so it uses the new
-    // vocabulary directly in its own stored values — no legacy values to stay compatible with.
     private array $unitCondLabel = [
         'excellent' => 'Excellent', 'good' => 'Good', 'serviceable' => 'Serviceable', 'damaged' => 'Damaged',
     ];
@@ -147,9 +140,6 @@ class EquipmentController extends Controller
             ->forPage($page, $perPage)
             ->get();
 
-        // Per-row unit-status breakdown ("2 Available · 2 Allocated") for equipment with
-        // physical units defined — mirrors the breakdown Accessories already shows per card.
-        // Equipment with no units yet keeps the single catalog-wide badge (handled in the view).
         $pageIds = $equipment->pluck('equipment_id');
         $unitBreakdown = DB::table('equipment_units')
             ->whereIn('equipment_id', $pageIds)
@@ -186,10 +176,6 @@ class EquipmentController extends Controller
 
         $categories = DB::table('equipment_categories')->orderBy('category_name')->get();
 
-        // Equipment with physical units defined (equipment_units) counts stats at the unit
-        // level (available/allocated/in_field/under_maintenance units); equipment that has no
-        // units yet still counts at the model/row level via availability_status, exactly as
-        // before — a hybrid so stats stay accurate for both tracked and not-yet-tracked gear.
         $modelIdsWithUnits = DB::table('equipment_units')
             ->where('status', '!=', 'retired')
             ->distinct()->pluck('equipment_id');
@@ -242,7 +228,6 @@ class EquipmentController extends Controller
         ]);
     }
 
-    /** Same filters index() applies, shared with export() so the two can never drift apart. */
     private function filteredQuery(Request $request)
     {
         $catFilter = (int) $request->query('cat', 0);
@@ -266,7 +251,6 @@ class EquipmentController extends Controller
         return $query;
     }
 
-    /** Export ▾ — reuses filteredQuery() unbounded (no page/perPage) so it always matches what's on screen. */
     private function export(Request $request): StreamedResponse|Response
     {
         $headers = ['Equipment', 'Category', 'Brand', 'Model', 'Serial', 'Rate/Day', 'Qty', 'Condition', 'Status'];
@@ -369,9 +353,6 @@ class EquipmentController extends Controller
             }
 
             $newStatus = in_array($request->input('status'), array_keys($this->unitStatusLabel), true) ? $request->input('status') : $unit->status;
-            // Manually setting an allocated unit back to available/maintenance/retired takes it
-            // off its booking line — otherwise it stays linked there while also being free to
-            // book again.
             if ($newStatus !== $unit->status && in_array($newStatus, ['available', 'under_maintenance', 'retired'], true)) {
                 \App\Support\EquipmentUnitAllocator::detachEquipmentUnit($unitId);
             }
@@ -458,12 +439,6 @@ class EquipmentController extends Controller
         return response()->json(['success' => false, 'error' => 'Unknown action']);
     }
 
-    // Stock Quantity and Condition are no longer staff-typed at the model level once an
-    // equipment model has real Physical Units recorded — they're derived from those units
-    // instead, matching the panelist's "move to physical asset level" recommendation. Equipment
-    // with zero units yet (the common case for anything added before this feature, or not
-    // migrated to per-unit tracking) keeps its existing manually-set values untouched, so
-    // nothing regresses for models that never get per-unit records.
     private array $unitCondRank = ['excellent' => 0, 'good' => 1, 'serviceable' => 2, 'damaged' => 3];
 
     private function recalcFromUnits(int $eid): void
@@ -497,10 +472,6 @@ class EquipmentController extends Controller
             $requiresOp = $request->boolean('requires_operator', true);
 
             try {
-                // Serial Number, Date Acquired, Condition, and Stock Quantity all moved to the
-                // physical-unit level (Physical Units panel, added after saving) per the
-                // panelist recommendation — a brand-new model starts with no units, so these
-                // start at safe defaults and pick up real values once units are recorded.
                 $eid = DB::table('equipment')->insertGetId([
                     'category_id' => (int) $request->input('category_id'),
                     'equipment_name' => $request->input('equipment_name', ''),
@@ -520,10 +491,6 @@ class EquipmentController extends Controller
                 return ['type' => 'danger', 'text' => 'Failed to add. ' . (str_contains($e->getMessage(), 'Duplicate') ? 'Serial number already exists.' : 'Database error.')];
             }
 
-            // Stock Quantity is meant to always equal the count of real Physical Units — a
-            // placeholder unit is created immediately so a brand-new model never sits in the
-            // old "quantity without any matching unit" state. Staff edit this placeholder's
-            // asset tag/serial from the Physical Units panel once they know the real one.
             DB::table('equipment_units')->insert([
                 'equipment_id' => $eid, 'asset_tag' => "EQ{$eid}-1",
                 'condition' => 'good', 'status' => 'available', 'date_acquired' => now()->toDateString(),
@@ -548,11 +515,6 @@ class EquipmentController extends Controller
                 }
             }
 
-            // Once real Physical Units exist for this model, Stock Quantity and Condition are
-            // derived (recalcFromUnits(), kept in sync on every unit add/update/retire) and
-            // Availability is driven by the normal checkout/checkin/retire flows — none of the
-            // three are accepted from this form anymore. Equipment with no units yet falls back
-            // to the original manually-set behavior so nothing regresses for it.
             $hasUnits = DB::table('equipment_units')->where('equipment_id', $eid)->where('status', '!=', 'retired')->exists();
 
             $newAvailStatus = $request->input('availability_status', $old->availability_status ?? 'available');
@@ -605,15 +567,6 @@ class EquipmentController extends Controller
             return ['type' => 'success', 'text' => 'Equipment retired.'];
         }
 
-        // Both actions below previously picked an arbitrary (`->first()`, not booking-specific)
-        // booking_equipment row and logged a transaction against it without ever touching
-        // availability_status — so the confirm dialog's promise ("mark as In Field") never
-        // actually happened, and the transaction could get attributed to the wrong booking
-        // entirely if this equipment had ever been used on more than one. Now scoped to the
-        // one booking this action is actually valid for, and booking_status/availability_status
-        // are kept in sync with what BookingDetailController::checkout()/checkin() do for the
-        // normal release/return flow (the extra crew/driver/cost-approval gates that flow
-        // enforces are deliberately not duplicated here — this stays the quick, no-frills path).
         if ($action === 'checkout' && $role === 'operations_manager') {
             $eid = (int) $request->input('equipment_id');
             $booking = DB::table('booking_equipment as be')

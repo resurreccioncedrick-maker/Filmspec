@@ -37,10 +37,6 @@ class CrewController extends Controller
             return $this->handleAjaxAction($request);
         }
 
-        // Crew profile-change approvals: a deliberately narrower (but overlapping) role set
-        // than $canManage — traffic can approve/reject a crew member's own requested contact
-        // info/password change even though traffic doesn't get the sweeping crew-management
-        // ($canManage) grant used for everything else on this page.
         $canApproveCrewProfile = in_array($role, ['super_admin', 'operations_manager', 'traffic'], true);
 
         $msg = null;
@@ -115,9 +111,6 @@ class CrewController extends Controller
             ->orderBy('crew_id')->orderBy('date_from')
             ->get();
 
-        // Per-crew-member current/upcoming booking, so staff can see at a glance who's on a
-        // shoot right now (or coming up) without cross-referencing the Bookings page — the
-        // registry previously showed no schedule information at all.
         $currentAssignments = [];
         $rawAssignments = DB::table('booking_crew as bc')
             ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
@@ -128,15 +121,11 @@ class CrewController extends Controller
                 'b.shoot_date_start', 'b.shoot_date_end')
             ->get();
         foreach ($rawAssignments as $a) {
-            // Earliest (soonest-starting) assignment per crew member only — a quick-glance
-            // column, not a full itinerary; the crew member's own detail still shows everything.
             if (! isset($currentAssignments[$a->crew_id])) {
                 $currentAssignments[$a->crew_id] = $a;
             }
         }
 
-        // Positions tab — how many crew members currently hold each position as their primary
-        // role, so staff can see at a glance which positions are actually staffed.
         $positionsWithCounts = DB::table('crew_positions as cp')
             ->leftJoin('crew_members as cm', function ($j) {
                 $j->on('cm.primary_position_id', '=', 'cp.position_id')->where('cm.status', 'active');
@@ -147,8 +136,6 @@ class CrewController extends Controller
             ->selectRaw('COUNT(cm.crew_id) AS crew_count')
             ->get();
 
-        // Schedule tab — a month calendar of confirmed/ongoing crew assignments, same
-        // day-map-building approach as Dashboard's and Calendar Analytics' calendars.
         $scheduleMonth = $request->query('smonth', now()->format('Y-m'));
         $scheduleAssignments = DB::table('booking_crew as bc')
             ->join('bookings as b', 'bc.booking_id', '=', 'b.booking_id')
@@ -174,7 +161,6 @@ class CrewController extends Controller
         ]);
     }
 
-    /** Same filters index() applies, shared with export() so the two can never drift apart. */
     private function filteredQuery(Request $request)
     {
         $statusFilter = $request->query('status', '');
@@ -200,7 +186,6 @@ class CrewController extends Controller
         return $query;
     }
 
-    /** Export ▾ — reuses filteredQuery() unbounded (no page/perPage) so it always matches what's on screen. */
     private function export(Request $request): StreamedResponse|Response
     {
         $headers = ['Crew Member', 'Position', 'Department', 'Type', 'Rate (12hr)', 'Phone', 'Status'];
@@ -224,11 +209,6 @@ class CrewController extends Controller
         return DataExporter::respond($request->query('export'), 'Crew Registry', $headers, $rows, 'crew-export');
     }
 
-    /**
-     * Feeds the Crew Management detail panel — one fetch returns everything all five sub-tabs
-     * need (Overview/Qualifications/Schedule/Attendance/History) so switching tabs is instant,
-     * client-side, with no extra round trips.
-     */
     private function crewDetail(int $cid): JsonResponse
     {
         $cm = DB::table('crew_members as cm')
@@ -272,8 +252,6 @@ class CrewController extends Controller
             ->limit(50)
             ->get();
 
-        // For the Schedule tab's "Mark Withdrawn" replacement picker — every other active crew
-        // member, so a withdrawal and its replacement can be chosen in one step.
         $otherActiveCrew = DB::table('crew_members')
             ->where('status', 'active')->where('crew_id', '!=', $cid)
             ->orderBy('last_name')
@@ -327,10 +305,6 @@ class CrewController extends Controller
             return response()->json(['success' => true]);
         }
 
-        // Withdrawing before a shoot is a crew-ASSIGNMENT change, not an attendance log entry —
-        // moved out of the day-of Attendance form per the panelist notes. Requires a replacement
-        // in the same step, same conflict checks batchAddCrew()/FieldRequestsController::dispatch()
-        // already use for assigning anyone else to a booking.
         if ($action === 'mark_withdrawn') {
             $bkCrewId = (int) $request->input('bk_crew_id');
             $replacementId = (int) $request->input('replacement_crew_id');
@@ -396,13 +370,6 @@ class CrewController extends Controller
         return response()->json(['success' => false, 'error' => 'Unknown action']);
     }
 
-    /**
-     * Enforces the Employment Type -> compensation-field rule that the Add/Edit Crew JS toggle
-     * (toggleRates()) only ever showed visually: staff rows must have a real monthly salary,
-     * freelance/on_call rows must have a real base rate. Also zeroes whichever block's inputs
-     * are hidden client-side, since the hidden inputs still POST their stale values (they are
-     * not `disabled`, only visually hidden).
-     */
     private function validatedCompensation(string $employmentType, Request $request): array
     {
         $baseRate = (float) $request->input('base_rate_12hr', 0);
@@ -430,11 +397,6 @@ class CrewController extends Controller
         ];
     }
 
-    /**
-     * Approve/reject a crew member's self-requested profile change (contact info and/or
-     * password, from the crew portal's My Profile page). Deliberately separate from
-     * handleAction() — reachable by traffic too, which doesn't get the general $canManage grant.
-     */
     private function handleProfileApproval(Request $request, int $reviewerUid): ?array
     {
         $action = $request->input('action', '');
@@ -455,7 +417,6 @@ class CrewController extends Controller
             return ['type' => 'success', 'text' => 'Request rejected.'];
         }
 
-        // approve_profile_request
         $changes = json_decode($pr->changes ?? '{}', true) ?: [];
         $update = [];
         foreach ($changes as $field => $vals) {
@@ -664,16 +625,8 @@ class CrewController extends Controller
                 return ['type' => 'error', 'text' => "No 'crew' role exists in this system — cannot create a login."];
             }
 
-            // Shown once in the success message below — this app has no outbound mail
-            // configured beyond the CE-approval flow, so staff hand this over directly
-            // (same reasoning DocumentController/ImageUpload use for not wiring email here).
             $tempPassword = Str::random(4) . '-' . Str::random(4);
 
-            // Locks the crew_members row for the duration of the check+insert so two
-            // near-simultaneous submits (double-click, two tabs) can't both pass the
-            // "no linked login yet" / "email not in use" checks and create two accounts
-            // (or crash on the email's unique constraint) — same race class fixed
-            // elsewhere this session for discounts/payments.
             $result = DB::transaction(function () use ($cid, $email, $crewRoleId, $tempPassword) {
                 $cm = DB::table('crew_members')->where('crew_id', $cid)->lockForUpdate()->first();
                 if (! $cm) {

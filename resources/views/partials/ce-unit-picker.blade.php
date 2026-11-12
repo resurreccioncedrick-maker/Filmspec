@@ -1,22 +1,3 @@
-{{--
-  Shared per-line "Release Unit" cell for the Cost Estimate editor's Equipment Rental and
-  Accessories & Add-ons tables. Renders ONLY the cell content — the enclosing <form> and the
-  single "Confirm All Units" submit button live once per table (see ce-preview.blade.php), not
-  per row, so confirming several lines' picks is one action instead of one click per row.
-
-  Expected variables:
-    confirmed bool    whether this line's unit_confirmed flag is already set
-    tags      ?string comma-joined asset tags currently allocated to this line, or null
-    opts      Collection  every non-retired unit of this model, each {unit_id, asset_tag,
-                          status, selectable} — 'selectable' means available or already on
-                          this exact line; everything else renders disabled so staff can see
-                          the whole pool and why a given unit can't be picked right now.
-    allocatedHere array  unit_id(s) currently allocated to this line, in no particular order
-    quantity  int     how many unit slots this line needs
-    rowKey    string  unique per-row DOM id prefix (e.g. "eq123" / "ac45")
-    lineField string  the array key under "lines[...]" identifying this line (bk_equip_id / ba_id)
-    idValue   int     the line's own id value
---}}
 @php
     $statusLabel = ['available' => 'Available', 'allocated' => 'Allocated elsewhere', 'in_field' => 'In the Field',
         'inspection_pending' => 'Pending Inspection', 'under_maintenance' => 'Under Maintenance', 'booked_overlap' => 'Booked on overlapping dates'];

@@ -6,13 +6,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-/**
- * Saves a photo attached to an incident report, maintenance record, or repair/purchase ticket
- * to the private `local` disk — same convention as ChatAttachmentUpload and the inline
- * proof-of-payment validation (10MB cap, image/PDF mimes, random filename), not the public
- * ImageUpload disk used for equipment/accessory catalog photos: evidence photos are never
- * meant to be publicly servable, only viewable through an authenticated route per record.
- */
 class EvidencePhotoUpload
 {
     private const ALLOWED_MIMES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];

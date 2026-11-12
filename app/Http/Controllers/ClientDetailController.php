@@ -8,12 +8,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 
-/**
- * Client Detail — Overview/Bookings/Billing/Documents/Activity tabs. Didn't exist before this
- * pass (clients.blade.php was list-only); built to match the reference mockup and to give
- * Payment Terms/Loyalty Discount a permission-gated home in the Billing tab, separate from the
- * plain Add/Edit Client modal's basic fields.
- */
 class ClientDetailController extends Controller
 {
     private array $typeBadge = ['regular' => 'badge-green', 'first_time' => 'badge-blue'];
@@ -84,9 +78,6 @@ class ClientDetailController extends Controller
             ];
         }
 
-        // Same query as ClientDocumentsController::show() — the Documents tab now includes the
-        // shared partial directly (like Booking Detail already does) instead of iframing that
-        // whole separate full-layout page inside this one.
         $documents = DB::table('documents as d')
             ->leftJoin('users as u', 'd.uploaded_by', '=', 'u.user_id')
             ->where('d.client_id', $id)
@@ -111,9 +102,6 @@ class ClientDetailController extends Controller
         ]);
     }
 
-    /** Mark as Regular / Deactivate / Reactivate — controlled actions triggered from this page's
-     *  "More" menu, redirecting back here (unlike ClientsController::handleAction(), which
-     *  renders the list page and would otherwise bounce the user away from the detail view). */
     public function action(Request $request, int $id): RedirectResponse
     {
         $user = $request->user();
@@ -134,8 +122,6 @@ class ClientDetailController extends Controller
             if ($client->client_type === 'regular') {
                 return redirect()->route('client-detail', $id)->with('cd_flash', ['type' => 'danger', 'text' => 'This client is already a Regular Client.']);
             }
-            // Same threshold clients.blade.php uses to flag eligibility — re-checked here
-            // server-side so this can't be triggered on an ineligible client.
             $completed = DB::table('bookings')->where('client_id', $id)->where('booking_status', 'completed')->count();
             if ($completed < 4) {
                 return redirect()->route('client-detail', $id)->with('cd_flash', ['type' => 'danger', 'text' => "This client has only $completed completed booking(s) — Regular Client status requires at least 4."]);
@@ -180,9 +166,6 @@ class ClientDetailController extends Controller
         return redirect()->route('client-detail', $id);
     }
 
-    /** Basic-fields save (name/contact/entity/notes) — triggered from this page's Edit Profile
-     *  action. Mirrors ClientsController::handleAction()'s edit_client validation, but redirects
-     *  back here instead of to the list page. */
     public function updateProfile(Request $request, int $id): RedirectResponse
     {
         $user = $request->user();
@@ -216,8 +199,6 @@ class ClientDetailController extends Controller
         return redirect()->route('client-detail', $id)->with('cd_flash', ['type' => 'success', 'text' => 'Client profile updated.']);
     }
 
-    /** Billing tab's own save — separate from ClientsController::handleAction()'s edit_client,
-     *  since this is deliberately behind the stricter billing-permission gate, not just canManage. */
     public function updateBilling(Request $request, int $id): RedirectResponse
     {
         $user = $request->user();

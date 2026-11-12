@@ -36,12 +36,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 @media (max-width:820px){ .checkout-grid{grid-template-columns:1fr} .checkout-side{position:static} }
 
 @media (max-width:640px){
-  /* Top bar — was a single nowrap flex row (logo + breadcrumb on the left,
-     Print/Export/view-toggle buttons on the right) with no wrapping or size
-     reduction at all, so on a ~390px phone the buttons ran straight off the
-     right edge instead of ever reaching a second line. Stack logo above
-     actions, let actions wrap if there are several, and shrink the button/
-     logo sizing to match. */
   .top-bar{flex-direction:column;align-items:flex-start;gap:10px;padding:12px 16px}
   .top-bar-logo{font-size:17px}
   .top-bar-logo img{height:22px!important}
@@ -50,32 +44,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   .tbtn-pdf{padding:7px 12px!important;font-size:12px!important}
   .bcrumb{font-size:11px;overflow-x:auto;white-space:nowrap;max-width:100%}
 
-  /* Booking Details form — 16px avoids Safari's auto-zoom-on-focus, 44px
-     tap targets. Field ids are untouched (doSubmit() reads them by id). */
   #bf_title,#bf_type,#bf_start,#bf_end,#bf_location,#bf_notes{
     font-size:16px!important;min-height:44px;padding:11px 12px!important;
   }
   #bf_notes{min-height:64px}
   #submit_lock_btn{padding:10px 18px!important;font-size:13px!important}
 
-  /* Map — shrink from the desktop 340px so it doesn't eat half the screen;
-     Leaflet is re-measured via invalidateSize() (see script block). */
   #submitBookingMap{height:200px!important}
 
-  /* Live Cost Preview sidebar */
   .checkout-side .agree-row{gap:12px}
   .checkout-side .agree-row input[type=checkbox]{width:20px;height:20px}
   .checkout-side .agree-link{font-size:14px}
   #submitBtn{width:100%;min-height:48px;font-size:14.5px}
 
-  /* Sheet tabs */
   .sheet-tabs{overflow-x:auto}
   .stab{padding:11px 16px;font-size:13px;min-height:44px;display:flex;align-items:center}
 
-  /* CE breakdown — header/info/totals/footer are fixed-width CSS grids with
-     zero responsive handling today; stack them. The .ce-tbl equipment/crew
-     tables already scroll horizontally (existing overflow-x:auto wrappers),
-     this just makes their text legible instead of a full card rebuild. */
   .ce-header{grid-template-columns:1fr}
   .ce-header-left,.ce-header-right{padding:14px 16px}
   .ce-info-row{grid-template-columns:1fr;min-height:0}
@@ -87,11 +71,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   .ce-footer{grid-template-columns:1fr;gap:26px}
 }
 
-{{-- Restored the earlier blue-branded on-screen look for the client-facing document (design
-     only — same markup/classes/data as before, just re-themed). The black/white Arial styling
-     this replaces was written to match FilmSpec's official Excel/PDF template; that template is
-     untouched here (see exports/ce-document-pdf.blade.php) — only what the client sees on screen
-     in ce-preview changes. --}}
 .ce-sheet{background:#fff;border:1px solid #A8D0FF;border-radius:10px;overflow:hidden;margin-bottom:24px;box-shadow:0 2px 10px rgba(0,61,128,.08);font-family:'DM Sans',sans-serif;color:var(--text)}
 
 .ce-header{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid #003D80}
@@ -111,8 +90,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .ce-info-lbl{padding:5px 14px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.03em;background:#fff;border-right:none}
 .ce-info-val{padding:5px 14px;font-size:12px;font-weight:600;font-style:normal;color:#0f172a}
 
-/* On-screen "Client & Project Information" card (internal editor view) — same markup, its own
-   softer variant so it doesn't need the client sheet's blue header/table treatment above. */
 .ce-info.ce-info-soft{border-bottom:none}
 .ce-info-soft .ce-info-row{grid-template-columns:150px 1fr;border-bottom:1px solid var(--border,#e2e8f0);min-height:40px}
 .ce-info-soft .ce-info-row:nth-child(even){background:#f8fafc}
@@ -201,7 +178,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .doc-accept-btn{padding:9px 22px;background:#003D80;color:#fff;border:none;border-radius:6px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s}
 .doc-accept-btn:hover{background:#004499}
 
-/* ═══ Booking-mode editor layout (mode=booking) ═══ */
 .bcrumb{font-size:12px;color:rgba(255,255,255,.75);margin-bottom:2px}
 .bcrumb a{color:rgba(255,255,255,.85);text-decoration:none}
 .bcrumb a:hover{text-decoration:underline}
@@ -247,34 +223,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .terms-box{background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:12px 14px;margin-bottom:16px;font-size:11.5px;color:var(--sub);line-height:1.6}
 .client-preview-wrap{background:#f1f5f9;border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:16px}
 .client-preview-label{font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
-{{-- The client-view document is a full desktop layout — embedding it at the sidebar's ~320px
-     width with no scaling squished every 2-column grid and wrapped/truncated every cell (the
-     bug reported). Render it at its natural width inside a fixed-size clipping viewport, then
-     scale the whole thing down with a CSS transform so it's a proper shrunk thumbnail instead
-     of a forced reflow — 960px natural width * 1/3 = 320px, matching the sidebar column. --}}
 .client-preview-viewport{width:100%;height:560px;overflow:hidden;position:relative;border:1px solid var(--border);border-radius:6px;background:#fff}
 .client-preview-frame{width:960px;height:2400px;border:none;transform:scale(.3333);transform-origin:top left;position:absolute;top:0;left:0}
 </style>
 </head>
 <body>
 @php
-  // Single source for the fallback VAT-inclusive extraction used throughout this page (only
-  // exercised before BookingCosting has computed a real $ceBd) — reads the configurable rate
-  // instead of a hardcoded 12/112, matching BookingCosting::extractVat() and CartController.
   $vatRate = (float) config('filmspec.vat_rate');
-  // ?tab_embed=1 is how Booking Detail's own Cost Estimate tab loads this page — unlike
-  // ?embed=1 (the Client Preview thumbnail, which hides this whole bar), the tab still wants
-  // Export reachable, just none of the navigation/toggle chrome that duplicates what the
-  // surrounding Booking Detail page already has (breadcrumb, logo, Internal/For Client toggle,
-  // Print, and a Back to Booking button pointing at the very page this is already embedded in).
   $tabEmbed = request()->boolean('tab_embed');
 @endphp
 
-{{-- ?embed=1 is how the Client Preview thumbnail (below) loads this same page — its own
-     toolbar (Internal/For Client toggle, Print, Export, Back to Booking) has no room in a
-     ~320px sidebar and duplicates buttons the surrounding page already has, so it's skipped
-     entirely there. The thumbnail's "View" link opens the full page (no embed param) when a
-     real, unscaled look is actually wanted. --}}
 @unless (request()->boolean('embed'))
 <div class="top-bar no-print">
   <div style="display:flex;flex-direction:column;gap:3px">
@@ -314,11 +272,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <button class="tbtn" onclick="window.print()">Print</button>
     @endunless
     @if ($mode === 'booking')
-    {{-- Same Export ▾ pattern every other staff page uses (partials/export-dropdown.blade.php),
-         hand-built here with inline SVGs instead of data-feather — this standalone document page
-         never loads the feather-icons script the shared partial relies on (see Print above,
-         which does the same for the same reason). Links straight to this URL + &export=fmt,
-         handled by CePreviewController::exportDocument(). --}}
     @php
       $ceExportBase = collect(request()->query())->except('export')->all();
       $ceExportIcons = [
@@ -368,16 +321,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div>
 @endif
 
-{{-- The Excel/PDF-matching official document (.ce-sheet tabs below) was already written to
-     support both modes' data (see the safe cart-mode defaults passed in for booking mode), but
-     was only ever wired to cart mode — booking-mode client view fell through to the internal
-     editor cards instead. Client view (any mode) now gets the official document; the internal
-     editor cards stay exactly as they were, for staff building the quote. --}}
 @if ($mode === 'cart' || ($mode === 'booking' && $isClientView))
 @if ($mode === 'cart')
 <div class="checkout-grid no-print">
 <div>
-<!-- Step 1: Booking Details — inline form, replaces old modal -->
 <div class="no-print" id="bf_form" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:22px 24px;margin-bottom:0;box-shadow:0 2px 8px rgba(0,0,0,.06)">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap">
     <div>
@@ -450,7 +397,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div>
 <div class="checkout-side">
 
-<!-- Step 2: Live Cost Preview — updates as location zone is detected -->
 <div class="no-print" style="background:#fff;border:2px solid #003D80;border-radius:10px;padding:20px 22px;margin-bottom:0;box-shadow:0 2px 10px rgba(0,61,128,.1)">
   <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:#003D80;margin-bottom:12px">Step 2 — Cost Preview</div>
   <div id="cp-date-conflicts" style="display:none;background:#fdecea;border:1px solid #f5b7b1;border-radius:7px;padding:10px 12px;font-size:12px;color:#c0392b;margin-bottom:12px"></div>
@@ -500,14 +446,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <div class="no-print" style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase;padding:4px 0">— Full Cost Breakdown —</div>
 @endif
 
-<!-- Sheet Tabs — mirrors the company's actual 3-sheet Excel workbook (Equipment / Crew TF / Summary) -->
 <div class="sheet-tabs no-print">
   <div class="stab on" onclick="showSheet('equipment',this)">Equipment (E)</div>
   <div class="stab" onclick="showSheet('crew',this)">Crew TF (M)</div>
   <div class="stab" onclick="showSheet('summary',this)">Summary (S)</div>
 </div>
 
-<!-- ═══ SHEET: EQUIPMENT ═══ -->
 <div class="ce-sheet sheet-content on" id="sheet-equipment">
 
   <div class="ce-header">
@@ -665,7 +609,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 </div>
 
-<!-- ═══ SHEET: CREW TF ═══ -->
 <div class="ce-sheet sheet-content" id="sheet-crew">
   @if ($mode === 'cart')
   <div style="background:#eff6ff;border-bottom:2px solid #93c5fd;padding:10px 16px;font-size:12px;color:#1e40af;display:flex;align-items:center;gap:8px">
@@ -843,7 +786,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 </div>
 
-<!-- ═══ SHEET: SUMMARY ═══ -->
 <div class="ce-sheet sheet-content" id="sheet-summary">
 
   <div class="ce-header">
@@ -991,7 +933,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 </div>
 @else
-{{-- ═══════════════════ BOOKING-MODE CE EDITOR (matches the reference mockup) ═══════════════════ --}}
 @php $flash = session('bd_flash'); @endphp
 @if ($flash)
 <div class="no-print" style="background:{{ $flash['type'] === 'success' ? '#f0fdf4' : '#fef2f2' }};border:1px solid {{ $flash['type'] === 'success' ? '#bbf7d0' : '#fca5a5' }};color:{{ $flash['type'] === 'success' ? '#166534' : '#b91c1c' }};padding:10px 16px;border-radius:8px;margin-bottom:14px;font-size:13px;font-weight:600">
@@ -1023,7 +964,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 <div class="editor-grid">
   <div>
-    <!-- Client & Project Information -->
     <div class="ecard">
       <div class="ecard-head">
         <h3><i data-feather="user" style="width:14px;height:14px"></i> Client &amp; Project Information</h3>
@@ -1043,7 +983,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       </div>
     </div>
 
-    <!-- Cost Breakdown -->
     <div class="ecard">
       <div class="ecard-head"><h3><i data-feather="camera" style="width:14px;height:14px"></i> Equipment Rental</h3>
         @if ($canManage)<button type="button" class="addline-btn" onclick="ceOpenAddEquip()"><i data-feather="plus" style="width:12px;height:12px"></i> Add Equipment</button>@endif
@@ -1169,7 +1108,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
             <td>
               <div style="font-weight:600">{{ $cl->position_name ?? 'Crew' }}</div>
               <div style="font-size:11px;color:var(--muted)">{{ $cl->crew_name }}</div>
-              {{-- Head Crew mark: internal view only (never in FOR CLIENT view, CE PDF or print). --}}
               @if (! $isClientView)
               <div class="no-print" style="margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
                 @if (! empty($cl->is_head_crew))
@@ -1231,9 +1169,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
         @endphp
         <span style="color:#1e40af;font-weight:600">{{ $pricingLabels[$cePricingMode] ?? '' }}</span>
         @elseif (($ceDiscount ?? 0) > 0)
-        {{-- Approved client-requested discount (booking_discounts), a separate mechanism from
-             the staff CE-level override above — applyDiscount() bakes it into cost_estimates.discount
-             and the totals already reflect it, so this card must not say "No discount applied". --}}
         <span style="color:#1e40af;font-weight:600">Discount applied: ₱{{ number_format($ceDiscount, 2) }}</span>
         @else
         <span style="color:var(--muted);font-style:italic">No discount applied</span>
@@ -1296,7 +1231,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 </div>
 
 @if ($canManage)
-<!-- EDIT CLIENT & PROJECT INFO -->
 <div class="doc-mo" id="moEditInfo"><div class="doc-box" style="width:520px">
   <div class="doc-head"><h3>Edit Client &amp; Project Info</h3><button class="doc-close" onclick="closeDocMo('moEditInfo')">&times;</button></div>
   <form method="POST" action="{{ $actionUrl }}">
@@ -1328,7 +1262,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </form>
 </div></div>
 
-<!-- ADD EQUIPMENT -->
 <div class="doc-mo" id="moAddEquip"><div class="doc-box" style="width:520px">
   <div class="doc-head"><h3>Add Equipment</h3><button class="doc-close" onclick="closeDocMo('moAddEquip')">&times;</button></div>
   <form method="POST" action="{{ $actionUrl }}">
@@ -1358,7 +1291,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </form>
 </div></div>
 
-<!-- ADD CREW -->
 <div class="doc-mo" id="moAddCrew"><div class="doc-box" style="width:520px">
   <div class="doc-head"><h3>Add Crew Member</h3><button class="doc-close" onclick="closeDocMo('moAddCrew')">&times;</button></div>
   <form method="POST" action="{{ $actionUrl }}">
@@ -1394,7 +1326,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </form>
 </div></div>
 
-<!-- ADD ACCESSORY -->
 <div class="doc-mo" id="moAddAcc"><div class="doc-box" style="width:480px">
   <div class="doc-head"><h3>Add Accessories</h3><button class="doc-close" onclick="closeDocMo('moAddAcc')">&times;</button></div>
   <form method="POST" action="{{ $actionUrl }}">
@@ -1423,7 +1354,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </form>
 </div></div>
 
-<!-- ASSIGN/EDIT TRANSPORT -->
 <div class="doc-mo" id="moTransport"><div class="doc-box" style="width:480px">
   <div class="doc-head"><h3>{{ $transCost > 0 ? 'Edit' : 'Assign' }} Transport</h3><button class="doc-close" onclick="closeDocMo('moTransport')">&times;</button></div>
   <form method="POST" action="{{ $actionUrl }}">
@@ -1458,7 +1388,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </form>
 </div></div>
 
-<!-- SET DISCOUNT -->
 <div class="doc-mo" id="moDiscount"><div class="doc-box" style="width:460px">
   <div class="doc-head"><h3>Set Discount</h3><button class="doc-close" onclick="closeDocMo('moDiscount')">&times;</button></div>
   <form method="POST" action="{{ $actionUrl }}">
@@ -1487,7 +1416,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 
 </div>
 
-<!-- ═══ TERMS AND CONDITIONS MODAL ═══ -->
 <div class="doc-mo" id="tcMo">
   <div class="doc-box">
     <div class="doc-head">
@@ -1554,7 +1482,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 </div>
 
-<!-- ═══ PRIVACY POLICY MODAL ═══ -->
 <div class="doc-mo" id="ppMo">
   <div class="doc-box">
     <div class="doc-head">
@@ -1648,11 +1575,8 @@ function showSheet(id, el) {
 
 function openDocMo(id) {
     document.getElementById(id).classList.add('on');
-    // Short screens may not need scrolling at all — check once the modal is laid out.
     if (id === 'tcMo') setTimeout(checkTcScrolled, 50);
 }
-// Same read-first rule as the signup Terms on the login page: the box can only be ticked after
-// the Terms have been scrolled through and accepted via the modal's own "I Agree" button.
 let tcRead = false;
 function checkTcScrolled() {
     const body = document.getElementById('tcScrollBody');
@@ -1696,7 +1620,6 @@ document.addEventListener('keydown', function(e) {
 });
 
 @if ($mode === 'booking' && $canManage)
-// ── In-place editing: equipment/crew search-select (Add Equipment / Add Crew modals) ──────
 const ceEquipData = {!! $availEquip->values()->toJson() !!};
 const ceCrewData  = {!! $availCrew->values()->toJson() !!};
 
@@ -1730,8 +1653,6 @@ function ceSelectEquip(i) {
     document.getElementById('ceEquipList').style.display = 'none';
     ceRenderAddEquipUnitSlots();
 }
-// Available (unallocated) physical units per equipment model — standalone-page equivalent of
-// booking-detail.blade.php's EQUIP_AVAIL_UNITS, for this page's own Add Equipment modal.
 const CE_AVAIL_UNITS = {!! $availUnitsByEquipId->map(fn ($g) => $g->map(fn ($u) => ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag])->values())->toJson() !!};
 function ceRenderAddEquipUnitSlots() {
     const wrap = document.getElementById('ceAddEquipUnitsWrap');
@@ -1753,7 +1674,6 @@ function ceRenderAddEquipUnitSlots() {
     wrap.innerHTML = html;
 }
 
-// ── Accessory search-select (Add Accessories modal) — same pattern as equipment above ──────
 const ceAccData = {!! $allAccessoriesList->map(fn ($a) => [
     'accessory_id' => $a->accessory_id, 'accessory_name' => $a->accessory_name,
     'daily_rate' => $a->daily_rate, 'is_included' => $a->is_included,
@@ -1815,20 +1735,11 @@ function ceOpenAddAcc() {
     openDocMo('moAddAcc');
 }
 
-// When this page is embedded (the Booking Detail "Cost Estimate" tab), Add Equipment /
-// Add Crew / Assign Transport delegate back to Booking Detail's own modals via postMessage
-// instead of opening a second, separately-styled copy of the same form — one real
-// implementation of each workflow. Viewed standalone ("Open Full Page"), there's no parent to
-// delegate to, so the page's own modals below still work as a fallback.
 function ceInIframe() {
     try { return window.self !== window.top; } catch (e) { return true; }
 }
 
 @if ($justActed ?? false)
-// A form on this page (Confirm All Units, Add Equipment, etc.) was just submitted and redirected
-// back here. When embedded as the parent's Cost Estimate iframe, the parent's own Release
-// Readiness widget was rendered once, server-side, before this change — it has no other way to
-// find out. Reload the parent so it recomputes with current data instead of showing stale counts.
 if (ceInIframe()) { window.top.location.reload(); }
 @endif
 
@@ -1882,13 +1793,6 @@ function ceOpenTransport() {
 @endif
 
 @if ($mode === 'cart')
-// ── Step 1 draft persistence ──────────────────────────────────────────────────
-// "Edit List" (and any other way of leaving this page) is a full navigation
-// away from ce-preview.blade.php, which wipes every in-memory JS value —
-// so whatever the client had typed/pinned reappeared as empty on return.
-// Everything entered in Step 1 is mirrored to localStorage and restored on
-// load instead, scoped to this cart (so a different cart never pre-fills a
-// stale draft) and expiring after 24h.
 const BF_DRAFT_KEY = 'fs_booking_draft_v1';
 
 function bfSaveDraft() {
@@ -1906,7 +1810,7 @@ function bfSaveDraft() {
             zone:    document.getElementById('bf_zone').value,
             mult:    document.getElementById('bf_transport_multiplier').value,
         }));
-    } catch (e) { /* storage unavailable (private mode, quota, etc.) — draft just won't persist */ }
+    } catch (e) {}
 }
 
 let _bfSaveTimer = null;
@@ -1960,9 +1864,8 @@ function bfRestoreDraft() {
     if (draft.start && draft.end) checkDateConflicts();
 }
 
-// ── Base costs for live preview ───────────────────────────────────────────────
 const VAT_RATE = {{ $vatRate }};
-const _BASE_EQUIP = {{ $equipTotal }};   // per-day equipment total (cart days = 1)
+const _BASE_EQUIP = {{ $equipTotal }};
 const _BASE_CREW  = 0;
 
 let _shootDays    = 1;
@@ -1999,12 +1902,6 @@ function updateLiveCost(multiplier, zone, label) {
     _currentZoneLabel = label;
 
     const eqAdj    = _BASE_EQUIP * _shootDays * multiplier;
-    // Transportation is never actually charged at booking-submission time — CartController::
-    // submitBooking() always stores transportation_cost=0/transport_multiplier=1.00 and staff
-    // assign the real transport cost later. It's not a date/quantity-driven line the way
-    // equipment is, so showing a computed peso estimate here was misleading — like Personnel/
-    // Crew TF, it's shown as TBD and excluded from grand/sub/vat, which already only ever
-    // summed eqAdj + _BASE_CREW (_BASE_CREW is always 0 too, for the same reason).
     const grand    = eqAdj + _BASE_CREW;
     const vat      = grand * VAT_RATE / (1 + VAT_RATE);
     const sub      = grand - vat;
@@ -2054,9 +1951,6 @@ function updateLiveCost(multiplier, zone, label) {
     const el_w = document.getElementById('eq-words');
     if (el_w) el_w.textContent = 'Amount in Words: ' + _numToWords(eqAdj) + ' PESOS ONLY';
 
-    // CartController::submitBooking() always hardcodes transportation_cost to 0 regardless of
-    // this field's value (transport is assigned by staff after booking) — kept at 0 here too so
-    // the hidden field never implies a figure the booking won't actually be created with.
     document.getElementById('bf_transport_cost').value = '0.00';
 }
 
@@ -2224,8 +2118,6 @@ function _isInLuzon(lat, lng) {
     return lat >= 12.0 && lat <= 18.7 && lng >= 119.5 && lng <= 122.5;
 }
 
-// Shared by the map-click handler and the type-to-locate search below — creates the
-// draggable marker on first use, just moves it on subsequent calls.
 function _submitPlaceMarker(lat, lng) {
     const latlng = L.latLng(lat, lng);
     if (_submitMarker) _submitMarker.setLatLng(latlng);
@@ -2272,11 +2164,6 @@ function initSubmitMap() {
     });
 }
 
-// Type-to-locate: debounced place search restricted to a Luzon viewbox, rendered as a custom
-// two-line (name / full address) suggestion dropdown under the field — replaces relying on
-// the browser's own remembered-entries autocomplete. Picking a suggestion reuses
-// _submitReverseGeocode for the water check / zone detection / live cost update, with
-// updateName=false since we already have the name from the suggestion itself.
 let _submitGeocodeTimer = null;
 let _submitSuggestions = [];
 
@@ -2316,8 +2203,6 @@ async function _submitFetchSuggestions(query) {
     }
 }
 
-// Built via DOM nodes + textContent rather than innerHTML string-concat — display_name comes
-// straight from Nominatim (third-party, untrusted), so it must never be interpolated as HTML.
 function _submitRenderSuggestions() {
     const box = document.getElementById('bf_location_suggest');
     box.innerHTML = '';
@@ -2385,9 +2270,6 @@ function bfSyncEndMin() {
     checkDateConflictsDebounced();
 }
 
-// Catches an equipment-availability conflict as soon as the client picks their shoot dates,
-// instead of only at final submission — reuses the server's EquipmentAvailability::check() via
-// the cart's check_dates action, so this can never disagree with what submit actually enforces.
 let _dateConflicts = [];
 let _dcTimer = null;
 function checkDateConflictsDebounced() {
@@ -2419,7 +2301,7 @@ function checkDateConflicts() {
             }
             updateSubmitBtn();
         })
-        .catch(() => { /* non-blocking — final submit still re-validates server-side */ });
+        .catch(() => {});
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2431,9 +2313,6 @@ document.addEventListener('DOMContentLoaded', () => {
         form.addEventListener('change', bfSaveDraftDebounced);
     }
 });
-// Mobile CSS shrinks #submitBookingMap's height at narrow widths — Leaflet
-// needs invalidateSize() after any container resize (orientation change,
-// browser chrome show/hide) or it redraws misaligned/partially blank.
 window.addEventListener('resize', () => { if (_submitMap) _submitMap.invalidateSize(); });
 window.addEventListener('orientationchange', () => { if (_submitMap) setTimeout(() => _submitMap.invalidateSize(), 200); });
 
@@ -2494,9 +2373,6 @@ function doSubmit() {
             } else {
                 _submitInFlight = false;
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Booking'; }
-                // Server-side conflict messages (e.g. EquipmentAvailability::check()) include
-                // <strong> markup meant for an HTML-rendered banner — alert() shows raw text, so
-                // the tags would otherwise appear literally instead of being stripped/styled.
                 const rawMsg = d.error || 'Error submitting booking. Please try again.';
                 alert(rawMsg.replace(/<[^>]*>/g, ''));
             }

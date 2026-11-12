@@ -1,6 +1,3 @@
-{{-- Shared period control (Part 11): MONTH / 3 / 6 / 12 / ALL plus ‹ month › navigation.
-     Pure query-param links — no JS. $periodRoute is the route name of the hosting page;
-     $extraParams carries any page-specific query the bar must preserve (sort, search, tab). --}}
 @php
   $extraParams = $extraParams ?? [];
   $barBase = fn (array $overrides) => route($periodRoute, array_merge($extraParams, $overrides));

@@ -58,7 +58,6 @@
 
 <div style="font-size:1.1rem;font-weight:700;color:var(--blue-700);margin-bottom:14px">{{ $period['label'] }}</div>
 
-<!-- KPIs -->
 <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
   <div class="stat-card">
     @include('partials.stat-comparison', ['delta' => $equipDeltas['fs_earned']])
@@ -87,7 +86,6 @@
   Data shown is based on current confirmed Cost Estimates. Only the current active confirmed version of each CE is counted — draft, cancelled, and superseded revisions are excluded.
 </div>
 
-<!-- Earnings trend -->
 <div class="card" style="margin-bottom:22px">
   <div class="card-header">
     <h2 class="card-title">Confirmed Equipment Value Trend
@@ -107,7 +105,6 @@
   </div>
 </div>
 
-<!-- Top equipment -->
 <div class="card" style="margin-bottom:22px">
   <div class="card-header">
     <h2 class="card-title">Top Equipment by Confirmed Value <span style="font-weight:400;color:var(--text-muted);font-size:.8rem">{{ $period['label'] }}</span></h2>
@@ -139,7 +136,6 @@
 </div>
 @endif
 
-<!-- Sort controls -->
 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
   <span style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700">Sort by</span>
   <div class="tabs" style="margin-bottom:0">
@@ -154,7 +150,6 @@
 </div>
 
 <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:16px">
-  <!-- Equipment Breakdown table -->
   <div class="card">
     <div class="card-header">
       <h2 class="card-title">Equipment Breakdown</h2>
@@ -198,7 +193,6 @@
     </div>
   </div>
 
-  <!-- Equipment by Category donut -->
   <div class="card">
     <div class="card-header"><h2 class="card-title">Equipment by Category <span style="font-weight:400;color:var(--text-muted);font-size:.8rem">{{ $period['label'] }}</span></h2></div>
     <div class="card-body">
@@ -222,7 +216,6 @@
   </div>
 </div>
 
-<!-- Bookings with Confirmed Equipment CEs (Part 12) -->
 <div style="margin-top:26px">
   <div class="card">
     <div class="card-header">

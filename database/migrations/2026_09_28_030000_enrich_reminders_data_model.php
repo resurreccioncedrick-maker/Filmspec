@@ -5,15 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * Reminders module: adds the pieces the mockup called for that the live table never had —
- * a real "Related To" link (booking/client/equipment/crew), a real "Assigned To" user relation
- * (person_in_charge stays as-is for existing rows and as a plain-text fallback for people who
- * aren't system users, e.g. an external partner), a Due Time for to-dos, a structured
- * multi-level Visibility selector on top of the existing visible_to_crew flag it keeps in sync
- * with, a "Low" priority option, and a real attendees list for meetings instead of tracking
- * only one meeting at a time with no named participants.
- */
 return new class extends Migration
 {
     public function up(): void

@@ -26,7 +26,6 @@
 </div>
 @endif
 
-<!-- KPI row -->
 <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
   <div class="stat-card" style="--sb:#7c3aed">
     <div class="stat-icon" style="background:#f3e8ff;color:#7c3aed"><i data-feather="shield"></i></div>
@@ -52,7 +51,6 @@
   </div>
 </div>
 
-<!-- TABS -->
 <div class="tabs" style="margin-bottom:22px">
   <button class="tab-btn active" data-tab="tab-users">User Management</button>
   <button class="tab-btn" data-tab="tab-roles">Role Permissions</button>
@@ -62,7 +60,6 @@
 
 <div data-tab-panes>
 
-<!-- USERS TAB -->
 <div id="tab-users" class="tab-pane active">
   <div class="card">
     <div class="card-header">
@@ -188,7 +185,6 @@
   </div>
 </div>
 
-<!-- ROLE PERMISSIONS TAB -->
 <div id="tab-roles" class="tab-pane">
   <div class="card">
     <div class="card-header">
@@ -255,7 +251,6 @@
   </div>
 </div>
 
-<!-- SYSTEM ACTIVITY TAB -->
 <div id="tab-activity" class="tab-pane">
   <div class="card">
     <div class="card-header">
@@ -297,7 +292,6 @@
     </div>
   </div>
 
-  <!-- Active sessions -->
   <div class="card" style="margin-top:22px">
     <div class="card-header">
       <h2 class="card-title">Recently Active Users (last 2 hours)</h2>
@@ -323,7 +317,6 @@
   </div>
 </div>
 
-<!-- BACKUP AND RESTORE TAB -->
 <div id="tab-settings" class="tab-pane">
 
   <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
@@ -459,9 +452,8 @@
 
 </div>
 
-</div><!-- /tab-panes -->
+</div>
 
-<!-- ADD USER MODAL -->
 <div class="modal-overlay" id="modalAddUser">
   <div class="modal" style="max-width:560px">
     <div class="modal-header">
@@ -517,7 +509,6 @@
   </div>
 </div>
 
-<!-- EDIT USER MODAL -->
 <div class="modal-overlay" id="modalEditUser">
   <div class="modal" style="max-width:520px">
     <div class="modal-header">
@@ -563,7 +554,6 @@
   </div>
 </div>
 
-<!-- RESET PASSWORD MODAL -->
 <div class="modal-overlay" id="modalResetPw">
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
@@ -614,9 +604,6 @@ function resetPw(uid, name) {
   openModal('modalResetPw');
 }
 
-// Role Access Matrix — switches the visible role-panel without touching the top-level
-// .tab-pane system (that one's handled globally in app.js and toggles ALL .tab-pane
-// elements on the page, which would fight a naive reuse of the same classes here).
 function switchRolePanel(btn) {
   const pills = btn.closest('.role-pills');
   pills.querySelectorAll('.role-pill').forEach(p => {

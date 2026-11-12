@@ -65,8 +65,6 @@ class ReminderController extends Controller
             $meeting->related_label = $relatedLabel($meeting->related_type, $meeting->related_id);
         }
 
-        // Compact pickers for the Related-To and Assigned-To selects — kept small (recent/active
-        // only) since this is a lightweight combo box, not a searchable autocomplete.
         $pickerBookings = DB::table('bookings')->orderByDesc('booking_id')->limit(100)
             ->select('booking_id', 'booking_reference', 'project_title')->get();
         $pickerClients = DB::table('clients')->orderBy('company_name')
@@ -145,8 +143,6 @@ class ReminderController extends Controller
 
             $visibility = in_array($request->input('visibility'), ['internal', 'roles', 'crew_portal'], true) ? $request->input('visibility') : 'internal';
             $visibleRoles = $visibility === 'roles' ? implode(',', (array) $request->input('visible_roles', [])) : null;
-            // visible_to_crew stays the single source of truth the Crew Portal already reads —
-            // the new visibility selector just drives it instead of a standalone checkbox now.
             $visibleToCrew = $visibility === 'crew_portal';
 
             $fields = [

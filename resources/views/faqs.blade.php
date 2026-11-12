@@ -90,7 +90,6 @@
 @include('partials.access-log')
 
 @if ($canPost)
-<!-- ADD/EDIT FAQ MODAL -->
 <div class="modal-overlay" id="modalAddFaq">
   <div class="modal" style="max-width:560px">
     <div class="modal-header">
@@ -99,7 +98,6 @@
     </div>
     <form method="POST">
       @csrf
-      {{-- One form serves add and edit; the action and id are swapped in by JS. --}}
       <input type="hidden" name="action" id="faqAction" value="add_faq">
       <input type="hidden" name="faq_id" id="faqId">
       <div class="modal-body">

@@ -17,8 +17,6 @@
   $compareActiveQ = request('compare', '');
   $filterBase = collect(request()->query())->except(['export'])->all();
 
-  // format defaults to 'csv' server-side (DataExporter::respond()'s default) — the client-side
-  // format-pill selector below rewrites these links' ?format= to xlsx/pdf without a page reload.
   $exportLink = function (string $type) use ($filterBase, $reportsBase) {
       return $reportsBase . '?' . http_build_query(array_merge($filterBase, ['export' => $type]));
   };
@@ -81,7 +79,6 @@
 .compare-range { font-size:11px;color:#7c3aed;background:rgba(124,58,237,.07);border:1px solid rgba(124,58,237,.2);border-radius:5px;padding:3px 9px;white-space:nowrap; }
 </style>
 
-<!-- FILTER BAR -->
 <form method="GET" action="{{ $reportsBase }}" class="rpt-filter" id="rptFilterForm">
   <i data-feather="calendar" style="width:15px;height:15px;color:var(--muted);flex-shrink:0"></i>
   <input type="date" name="date_from" class="form-control" style="width:140px;font-size:12.5px"
@@ -149,8 +146,6 @@
 @endif
 
 @php
-  // ↑12% vs previous period, same treatment on every applicable card — $t is one
-  // $kpiTrends[...] entry (or null when there's nothing to compare against).
   $trendBadge = function (?array $t) {
       if (! $t) return '';
       if (! empty($t['isNew'])) {
@@ -164,7 +159,6 @@
           . $arrow . ' ' . $t['pct'] . '% <span style="font-weight:400;color:var(--muted)">vs previous period</span></div>';
   };
 @endphp
-<!-- KPI STRIP -->
 <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:22px">
   <div class="stat-card green">
     <div class="stat-icon" style="background:var(--greenl);color:var(--green)"><i data-feather="trending-up"></i></div>
@@ -202,7 +196,6 @@
   </div>
 </div>
 
-<!-- SECTION: SALES -->
 <div class="rpt-section">
   <span class="rpt-section-label"><i data-feather="trending-up" style="width:11px;height:11px;vertical-align:middle;margin-right:4px"></i>Sales Overview</span>
   <div class="rpt-section-line"></div>
@@ -263,7 +256,6 @@
   </div>
 </div>
 
-<!-- SECTION: BOOKINGS -->
 <div class="rpt-section" style="margin-top:32px">
   <span class="rpt-section-label"><i data-feather="layers" style="width:11px;height:11px;vertical-align:middle;margin-right:4px"></i>Bookings &amp; Equipment</span>
   <div class="rpt-section-line"></div>
@@ -283,8 +275,6 @@
     @if ($bookingsByType->isEmpty())
     <div class="empty-state" style="padding:32px 0"><i data-feather="layers"></i><h3>No bookings in this period</h3></div>
     @else
-    {{-- Horizontal bar instead of a donut — with this few categories a donut is usually one
-         giant slice and a sliver, which reads worse than a simple ranked bar list. --}}
     <div style="padding:16px 20px 4px">
       <canvas id="typeChart" height="{{ max(90, $bookingsByType->count() * 42) }}"></canvas>
     </div>
@@ -344,7 +334,6 @@
 
 </div>
 
-<!-- SECTION: EQUIPMENT & PEOPLE -->
 <div class="rpt-section" style="margin-top:32px">
   <span class="rpt-section-label"><i data-feather="users" style="width:11px;height:11px;vertical-align:middle;margin-right:4px"></i>Equipment &amp; People</span>
   <div class="rpt-section-line"></div>
@@ -430,7 +419,6 @@
 
 </div>
 
-<!-- SECTION: CLIENTS -->
 <div class="rpt-section" style="margin-top:32px">
   <span class="rpt-section-label"><i data-feather="briefcase" style="width:11px;height:11px;vertical-align:middle;margin-right:4px"></i>Clients</span>
   <div class="rpt-section-line"></div>
@@ -473,7 +461,6 @@
   @endif
 </div>
 
-<!-- SECTION: INCIDENTS & FEEDBACK -->
 <div class="rpt-section" style="margin-top:32px">
   <span class="rpt-section-label"><i data-feather="alert-triangle" style="width:11px;height:11px;vertical-align:middle;margin-right:4px"></i>Incidents &amp; Feedback</span>
   <div class="rpt-section-line"></div>
@@ -755,9 +742,6 @@ new Chart(document.getElementById('availChart'), {
   }
 });
 
-// Export ▾ open/close is handled by the shared .export-toggle delegated listener in
-// public/assets/js/app.js — this page only needs its own format-pill behavior, since it's
-// the one page offering 8 different datasets from a single dropdown instead of one dataset.
 function rptSetExportFormat(fmt) {
   document.querySelectorAll('.export-fmt-pill').forEach(b => b.classList.toggle('active', b.dataset.fmt === fmt));
   document.querySelectorAll('#reportsExportMenu .export-opt[data-type]').forEach(a => {

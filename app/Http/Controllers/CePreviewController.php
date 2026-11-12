@@ -78,8 +78,6 @@ class CePreviewController extends Controller
 
         $baseTransRate = (float) (DB::table('system_settings')->where('setting_key', 'base_transportation_rate')->value('setting_value') ?: 0);
 
-        // Prices are VAT-inclusive. Extract the VAT component via the configurable rate,
-        // matching BookingCosting::extractVat() (not a hardcoded 12/112).
         $vatRate = (float) config('filmspec.vat_rate');
         $grand = max(0, $equipTotal);
         $vat = round($grand * $vatRate / (1 + $vatRate), 2);
@@ -115,13 +113,6 @@ class CePreviewController extends Controller
         ));
     }
 
-    /**
-     * The CE document's Export ▾ (CSV/Excel/PDF) — same shared dropdown every other
-     * staff page uses (partials/export-dropdown.blade.php), replacing what used to be a
-     * "Save as PDF" button that was just window.print() in disguise. PDF renders the same
-     * official-document markup the client sees on screen (dompdf, one page per sheet); CSV/XLSX
-     * go through DataExporter::respondSections() like every other multi-section export.
-     */
     private function exportDocument(Request $request)
     {
         $data = $this->bookingMode($request, true);
@@ -129,8 +120,6 @@ class CePreviewController extends Controller
             return $data;
         }
 
-        // Always the client-facing document, regardless of which toggle the staff viewer
-        // currently has selected on screen.
         $data['isClientView'] = true;
         $format = (string) $request->query('export');
         $filenameBase = 'CE-' . preg_replace('/[^A-Za-z0-9_-]/', '', (string) $data['ceNumber']);
@@ -144,7 +133,6 @@ class CePreviewController extends Controller
         return DataExporter::respondSections($format, 'Cost Estimate ' . $data['ceNumber'], $this->exportSections($data), $filenameBase);
     }
 
-    /** Equipment / Crew TF / Summary as DataExporter::respondSections() sections — same 3 "sheets" the PDF and on-screen document use. */
     private function exportSections(array $d): array
     {
         $vatRate = (float) config('filmspec.vat_rate');
@@ -211,29 +199,18 @@ class CePreviewController extends Controller
         ];
     }
 
-    // Booking-mode CE — an existing booking's confirmed/draft cost estimate, viewed by staff
-    // (internal or "for client" toggle) or by the client themselves (always forced to the
-    // client view). Reuses BookingCosting::breakdown()/lines(), the same helpers the Package &
-    // Totals panel and CE export already use, so this document, the panel, and the CSV never
-    // drift out of sync with each other.
     private function bookingMode(Request $request, bool $asData = false)
     {
         $bid = (int) $request->query('booking_id');
         $uid = Auth::id();
         $role = Auth::user()->role->role_name ?? 'client';
 
-        // A client-role viewer is ALWAYS forced to the client view no matter what the URL says —
-        // the toggle is a staff convenience, not an access control, and must not be bypassable
-        // by hand-editing the query string.
         $isClientView = $role === 'client' || $request->query('view') === 'client';
 
         $bookingQuery = DB::table('bookings as b')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
             ->where('b.booking_id', $bid);
 
-        // A client can only ever load their own booking's CE — never trust booking_id alone
-        // for a client-role viewer, matching the same check ClientBookingDetailController::show()
-        // already applies.
         if ($role === 'client') {
             $bookingQuery->where('c.user_id', $uid);
         }
@@ -264,10 +241,6 @@ class CePreviewController extends Controller
             ->select('ba.*', 'a.accessory_name')
             ->get();
 
-        // Which specific unit(s) are allocated to each equipment/accessory line — same
-        // EquipmentUnitAllocator data the Checklist and Incident Report pages already read,
-        // so the CE editor shows the same real asset tag(s) instead of staff having to guess
-        // or look it up elsewhere.
         $equipUnitTags = DB::table('booking_equipment_units as beu')
             ->join('equipment_units as eu', 'beu.equipment_unit_id', '=', 'eu.unit_id')
             ->where('beu.bk_equip_id', '>', 0)
@@ -281,13 +254,6 @@ class CePreviewController extends Controller
             ->get()->groupBy('ba_id')->map(fn ($g) => $g->pluck('asset_tag')->implode(', '));
         $accTotal = (float) $accLines->sum('subtotal');
 
-        // Per-line unit picker options for the manual assign/confirm UI: EVERY non-retired unit
-        // of that equipment/accessory model, not just the ones currently free — staff need to
-        // see the whole pool and exactly why a given unit isn't selectable (in the field, under
-        // maintenance, etc.), not have busy units silently vanish and leave an unexplained empty
-        // dropdown. Each option carries its real status; only 'available' units (or one already
-        // allocated to THIS specific line, so reopening an already-confirmed line still shows its
-        // current pick) are left enabled — everything else renders disabled with its status.
         $allEquipLines = collect($equipGroups)->flatten(1);
         $equipUnitsByEquipId = DB::table('equipment_units')
             ->whereIn('equipment_id', $allEquipLines->pluck('equipment_id')->unique()->all() ?: [0])
@@ -298,8 +264,6 @@ class CePreviewController extends Controller
             ->whereIn('bk_equip_id', $allEquipLines->pluck('bk_equip_id')->all() ?: [0])
             ->get(['bk_equip_id', 'equipment_unit_id'])
             ->groupBy('bk_equip_id')->map(fn ($g) => $g->pluck('equipment_unit_id')->all());
-        // Date-aware: a unit held by another booking only blocks this one when their shoot dates
-        // overlap — reported as 'booked_overlap' so the picker can say why it's disabled.
         $unitOption = function ($u, array $allocatedHere, array $busy) {
             $here = in_array((int) $u->unit_id, array_map('intval', $allocatedHere), true);
             $reservable = in_array($u->status, EquipmentUnitAllocator::RESERVABLE_STATUSES, true);
@@ -364,17 +328,12 @@ class CePreviewController extends Controller
         $cePricingInput = $ce && $ce->pricing_input !== null ? (float) $ce->pricing_input : null;
         $ceVatExempt = $ce ? (bool) $ce->vat_exempt : false;
 
-        // Equipment-vs-crew split of the billed total (BookingCosting::breakdown()). Only
-        // meaningful once a CE exists — without one the sections fall back to the listed
-        // rate-card totals with VAT extracted, same as cart mode.
         $ceBd = $ce ? BookingCosting::breakdown($bid, $ce) : null;
         $ceBdDiscounted = $ceBd && $ceBd['pricing_mode'] !== 'no_discount';
 
         $itemTotal = $equipTotal + $crewTotal + $accTotal + $transCost;
 
         if ($cePricingMode !== 'no_discount' && $cePricingInput !== null) {
-            // Package pricing: a negotiated all-in price is quoted NET of VAT — opposite
-            // convention from rate-card prices — with 12% added on top.
             $netBase = match ($cePricingMode) {
                 'package_price' => $cePricingInput,
                 'discount_percent' => $itemTotal * (1 - min(100, $cePricingInput) / 100),
@@ -387,16 +346,10 @@ class CePreviewController extends Controller
             $subtotal = $netBase;
             $grand = $netBase + $vat;
         } elseif ($ce) {
-            // Read the already-correct, persisted totals BookingCosting itself billed from,
-            // rather than re-deriving them here — a second, independent computation is exactly
-            // what let this page drift out of sync with the real amount (missing the ×days
-            // factor on equipment was one such divergence this caught).
             $subtotal = (float) $ce->subtotal;
             $vat = (float) $ce->vat_amount;
             $grand = (float) $ce->grand_total;
         } else {
-            // No cost_estimates row yet — nothing persisted to read, so fall back to a live
-            // computation (now date/zone-correct) for this pre-generation preview.
             $vatRate = (float) config('filmspec.vat_rate');
             $grand = max(0, $itemTotal + $ceOtherCharges - $ceDiscount);
             $vat = round($grand * $vatRate / (1 + $vatRate), 2);
@@ -436,9 +389,6 @@ class CePreviewController extends Controller
 
         $mode = 'booking';
 
-        // Version/supersede context (same logic as CostEstimatesController's list-row flag) —
-        // shown as a "Version N" + Draft/Confirmed/Superseded badge on the CE header, and used
-        // to decide whether in-place editing is even offered (never on a superseded revision).
         $ceVersion = 1;
         $isSuperseded = false;
         if ($ce) {
@@ -448,17 +398,9 @@ class CePreviewController extends Controller
                 ->where('booking_id', $bid)->where('status', 'confirmed')->where('ce_id', '>', $ce->ce_id)->exists();
         }
 
-        // In-place editing (Add Equipment/Crew/Accessories/Assign Transport/Set Discount, plus
-        // the Client & Project Info "Edit" action) reuses BookingDetailController::act()'s
-        // existing, already-validated actions — same permission gate it uses
-        // ($isAdmin + a live, non-superseded booking) — rather than duplicating that logic here.
         $isAdmin = in_array($role, ['super_admin', 'operations_manager', 'traffic'], true);
         $canManage = $isAdmin && ! $isClientView && ! $isSuperseded
             && in_array($booking->booking_status, ['pending', 'confirmed', 'ongoing'], true);
-        // set_discount is the one in-place-editing action BookingDetailController::act() does
-        // NOT extend to 'traffic' (unlike add_equipment/batch_add_crew/assign_transport/etc,
-        // all of which do) — the Add Discount button/modal needs its own, stricter check so a
-        // traffic-role viewer isn't shown a control that silently does nothing when submitted.
         $canDiscount = $canManage && in_array($role, ['super_admin', 'operations_manager'], true);
 
         $availEquip = collect();
@@ -487,9 +429,6 @@ class CePreviewController extends Controller
                 ->orderBy('e.equipment_name')
                 ->get();
 
-            // Powers the standalone (non-iframe) Add Equipment/Add Accessories modals' optional
-            // Release Unit picker — same idea as BookingDetailController's own copy for when CE
-            // is viewed embedded in the booking page.
             $availUnitsByEquipId = EquipmentUnitAllocator::reservableEquipmentUnits($availEquip->pluck('equipment_id')->all(), $bid, $ds, $de)
                 ->groupBy('equipment_id');
 
@@ -532,14 +471,6 @@ class CePreviewController extends Controller
             'equipUnitOptions' => $equipUnitOptions, 'accUnitOptions' => $accUnitOptions,
             'allocatedEqUnitIds' => $allocatedEqUnitIds, 'allocatedAccUnitIds' => $allocatedAccUnitIds,
             'availUnitsByEquipId' => $availUnitsByEquipId, 'availAccessoryUnitsByAccId' => $availAccessoryUnitsByAccId,
-            // Set whenever BookingDetailController::act() just processed a form submitted from
-            // THIS page (every action redirects back here with return_to=ce_preview and flashes
-            // 'bd_flash' regardless of target). When this page is embedded as the parent's Cost
-            // Estimate iframe, the parent's own Release Readiness widget (crew/equipment counts,
-            // etc.) is rendered once, server-side, when booking-detail itself loaded — it has no
-            // way to know an iframe-submitted action just changed that data. Confirmed real:
-            // confirming units here left the parent's widget showing stale unconfirmed counts
-            // until a full page reload. Reload the parent whenever something was just submitted.
             'justActed' => $request->session()->has('bd_flash'),
             'equipBaseTotal' => $equipBaseTotal, 'equipTotal' => $equipTotal, 'crewTotal' => $crewTotal,
             'transCost' => $transCost, 'transZone' => $transZone, 'transMult' => $transMult, 'zoneLabels' => $zoneLabels,
@@ -552,7 +483,6 @@ class CePreviewController extends Controller
             'availEquip' => $availEquip, 'availCrew' => $availCrew, 'positions' => $positions,
             'vehicleRates' => $vehicleRates, 'allAccessoriesList' => $allAccessoriesList, 'accDays' => $accDays,
             'actionUrl' => route('booking-detail.act', $bid),
-            // Cart-mode-only values the shared view still references — safe empty defaults.
             'equipLines' => [], 'estimatedCrewLines' => [], 'baseTransRate' => 0,
         ];
 

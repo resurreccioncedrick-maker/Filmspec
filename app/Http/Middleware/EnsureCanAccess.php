@@ -8,9 +8,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureCanAccess
 {
-    /**
-     * Mirrors requireAccess()/canAccess() from core/auth.php in the legacy app.
-     */
     public function handle(Request $request, Closure $next, string $module): Response
     {
         $user = $request->user();

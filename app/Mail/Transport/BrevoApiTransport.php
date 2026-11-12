@@ -9,9 +9,6 @@ use Symfony\Component\Mailer\Transport\AbstractTransport;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
 
-// Sends via Brevo's HTTPS REST API instead of raw SMTP sockets, since
-// Railway blocks outbound SMTP entirely (confirmed: 30s timeout on
-// smtp.gmail.com:587/465), but plain HTTPS is never blocked.
 class BrevoApiTransport extends AbstractTransport
 {
     public function __construct(private readonly string $apiKey)

@@ -17,7 +17,6 @@
 <div class="alert alert-{{ $msg['type'] }}" style="margin-bottom:18px">{{ $msg['text'] }}</div>
 @endif
 
-<!-- KPIs -->
 <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px">
   <div class="stat-card">
     <div class="stat-icon"><i data-feather="tag"></i></div>
@@ -46,7 +45,6 @@
   </div>
 </div>
 
-<!-- Tabs -->
 <div class="tabs" style="margin-bottom:18px">
   <a href="{{ $transportBase }}?tab=rates" class="tab-btn {{ $tab === 'rates' ? 'active' : '' }}"><i data-feather="tag" style="width:13px;height:13px;margin-right:5px;vertical-align:middle"></i>Vehicle Types &amp; Rates</a>
   <a href="{{ $transportBase }}?tab=fleet" class="tab-btn {{ $tab === 'fleet' ? 'active' : '' }}"><i data-feather="truck" style="width:13px;height:13px;margin-right:5px;vertical-align:middle"></i>Fleet <span class="badge badge-gray" style="margin-left:4px">{{ $stats['fleet_total'] }}</span></a>
@@ -54,7 +52,6 @@
 </div>
 
 @if ($tab === 'rates')
-<!-- Vehicle Types -->
 <div class="card">
   <div class="card-header">
     <h2 class="card-title"><i data-feather="truck" style="width:15px;height:15px;margin-right:6px;vertical-align:middle"></i>Vehicle Types &amp; Rates</h2>
@@ -131,7 +128,6 @@
 @endif
 
 @if ($tab === 'fleet')
-<!-- Fleet -->
 <div class="card">
   <div class="card-header">
     <h2 class="card-title"><i data-feather="truck" style="width:15px;height:15px;margin-right:6px;vertical-align:middle"></i>Fleet Vehicles</h2>
@@ -170,7 +166,6 @@
 @endif
 
 @if ($tab === 'assignments')
-<!-- Transport Assignments -->
 <div class="card">
   <div class="card-header">
     <h2 class="card-title"><i data-feather="navigation" style="width:15px;height:15px;margin-right:6px;vertical-align:middle"></i>Transport Assignments</h2>
@@ -228,7 +223,6 @@
 @endif
 
 @if ($canManage)
-<!-- Add Vehicle Type Modal -->
 <div class="modal-overlay" id="modalAddVehicle">
   <div class="modal" style="max-width:440px">
     <div class="modal-header"><div class="modal-title"><i data-feather="plus-circle"></i> Add Vehicle Type</div><button class="modal-close" data-modal-close>&times;</button></div>
@@ -257,7 +251,6 @@
   </div>
 </div>
 
-<!-- Edit Vehicle Type Modal -->
 <div class="modal-overlay" id="modalEditVehicle">
   <div class="modal" style="max-width:440px">
     <div class="modal-header"><div class="modal-title"><i data-feather="edit-2"></i> Edit Vehicle Type</div><button class="modal-close" data-modal-close>&times;</button></div>
@@ -287,7 +280,6 @@
   </div>
 </div>
 
-<!-- Add Fleet Vehicle Modal -->
 <div class="modal-overlay" id="modalAddFleet">
   <div class="modal" style="max-width:460px">
     <div class="modal-header"><div class="modal-title"><i data-feather="plus-circle"></i> Add Vehicle to Fleet</div><button class="modal-close" data-modal-close>&times;</button></div>
@@ -331,7 +323,6 @@
   </div>
 </div>
 
-<!-- Edit Fleet Vehicle Modal -->
 <div class="modal-overlay" id="modalEditFleet">
   <div class="modal" style="max-width:460px">
     <div class="modal-header"><div class="modal-title"><i data-feather="edit-2"></i> Edit Vehicle</div><button class="modal-close" data-modal-close>&times;</button></div>
@@ -375,7 +366,6 @@
   </div>
 </div>
 
-<!-- Create Transport Assignment Modal -->
 <div class="modal-overlay" id="modalCreateAssignment">
   <div class="modal" style="max-width:480px">
     <div class="modal-header"><div class="modal-title"><i data-feather="navigation"></i> Create Transport Assignment</div><button class="modal-close" data-modal-close>&times;</button></div>

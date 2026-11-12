@@ -7,10 +7,6 @@ use Illuminate\Support\Facades\DB;
 
 class BookingCosting
 {
-    // Equipment/crew/transport rates are quoted VAT-inclusive (the "sticker price" a
-    // client sees already has 12% VAT baked in — see CartController::submitBooking and
-    // ce_preview.php, which both extract VAT this way for the client-facing document).
-    // Given a VAT-inclusive gross amount, this returns the VAT portion embedded within it.
     private static function extractVat(float $grossInclusive): float
     {
         $rate = (float) config('filmspec.vat_rate');
@@ -18,9 +14,6 @@ class BookingCosting
         return round($grossInclusive * $rate / (1 + $rate), 2);
     }
 
-    // Package pricing modes (Part 2c): a "package deal" price is quoted NET of VAT —
-    // opposite convention from rate-card prices — with 12% added on top for the official
-    // total, per standard BIR invoicing practice. Returns [subtotal, vat, grandTotal].
     private static function computeTotals(float $itemTotal, float $otherCharges, float $discountAmt, string $pricingMode, ?float $pricingInput, bool $vatExempt, float $noDiscount = 0.0): array
     {
         if ($pricingMode === 'no_discount') {
@@ -30,8 +23,6 @@ class BookingCosting
             return [$grand - $vat, $vat, $grand];
         }
 
-        // Lines flagged "no discount" sit outside the deal: the discount is worked out on
-        // everything else, then they are added back at full rate on top.
         $noDiscount = max(0, min($noDiscount, $itemTotal));
         $discountable = $itemTotal - $noDiscount;
 
@@ -48,10 +39,6 @@ class BookingCosting
         return [$netBase, $vat, $netBase + $vat];
     }
 
-    // Server-side transport cost — never trust a posted transport_cost value directly (the
-    // browser's preview JS can go stale, get hand-edited, or fail to run at all). Always
-    // re-derive it from vehicle_rates.base_rate (or the flat base_transportation_rate fallback
-    // when no vehicle is selected) times the zone multiplier.
     public static function transportCost(?int $vehicleRateId, ?string $zone): float
     {
         if (!$zone) {
@@ -69,25 +56,10 @@ class BookingCosting
         return round($base * $mult, 2);
     }
 
-    /**
-     * The CE breakdown the Package & totals panel and the client-facing CE document render:
-     * the listed buckets (FS equipment / net items / transportation / crew TF) plus the
-     * equipment-vs-crew split of the discounted total.
-     *
-     * Nothing here is stored — it is all derived on read from columns that already exist,
-     * deliberately, so there is no second copy of a number to drift out of sync.
-     *
-     * The split is taken FROM the CE's own net base (`subtotal`) rather than re-deriving the
-     * discount, which guarantees equip_grand + crew_grand always equals the CE grand total.
-     * Under a package price, crew passes through whole and the discount lands entirely on the
-     * equipment side; under % / flat discount modes it is shared proportionally.
-     */
     public static function breakdown(int $bookingId, ?object $ce = null): array
     {
         $ce ??= DB::table('cost_estimates')->where('booking_id', $bookingId)->orderByDesc('ce_id')->first();
 
-        // Outsourced/partner equipment was removed as a feature — net_items stays in the
-        // breakdown shape (other code still reads the key) but is always 0 now.
         $netItems = 0.0;
 
         if ($ce) {
@@ -120,16 +92,6 @@ class BookingCosting
         $packaged = $pricingMode === 'no_discount' ? $listedTotal : $packagedCost;
 
         if ($pricingMode === 'no_discount') {
-            // Rate-card prices are quoted VAT-inclusive, so VAT comes OUT of each bucket
-            // rather than being added on top (vat_exempt is not honoured here, matching
-            // computeTotals() — an inclusive price has the VAT baked in either way).
-            //
-            // A flat/percent discount approved via booking_discounts lands in $ce->discount
-            // while pricing_mode stays 'no_discount' — it must still come off what's shown
-            // here (computeTotals() already applies it to the booking's real total, so this
-            // display would otherwise silently disagree with the actual amount owed). Split
-            // the post-discount figure across equipment/crew by their listed share, same
-            // proportional approach the package/percent/flat pricing-mode branch below uses.
             $discountedTotal = max(0, $listedTotal - $discountAmt);
             $f = $listedTotal > 0 ? $discountedTotal / $listedTotal : 0.0;
             $equipGross = round($equipSubtotal * $f, 2);
@@ -167,8 +129,6 @@ class BookingCosting
             'discount_amount' => $discountAmt,
             'packaged_cost' => $packaged,
             'discount_on_packaged_cost' => max(0, $listedTotal - $packaged),
-            // Outsourced/partner equipment (the only source of "no discount" lines) was
-            // removed as a feature — always 0 now, key kept since other code reads it.
             'not_discounted' => 0.0,
             'equip_net' => $equipNet,
             'equip_vat' => $equipVat,
@@ -177,15 +137,10 @@ class BookingCosting
             'crew_vat' => $crewVat,
             'crew_grand' => $crewNet + $crewVat,
             'summary_grand' => $equipNet + $equipVat + $crewNet + $crewVat,
-            // True when the agreed package doesn't even cover the crew fees — the panel
-            // flags this instead of rendering a negative equipment total.
             'package_under_crew' => $pricingMode === 'package_price' && $packaged < $crewTf,
         ];
     }
 
-    // Gathers the lines a CE document/export/email needs, grouped the way the CE prints
-    // (category sections, OTHERS last) — see ce_preview.php, which sections identically.
-    // Shared by BookingDetailController (CSV export) and CePreviewController (booking-mode CE).
     public static function lines(int $bookingId): array
     {
         $equip = DB::table('booking_equipment as be')
@@ -216,8 +171,6 @@ class BookingCosting
         return ['groups' => $groups, 'crew' => $crew];
     }
 
-    // Pre-discount subtotal a proposed/approved discount is computed against — shared by
-    // BookingsController::proposeDiscount() and BillingController's approve/reject handlers.
     public static function rawBookingSubtotal(int $id): float
     {
         $eTotal = (float) DB::table('booking_equipment')->where('booking_id', $id)
@@ -232,20 +185,11 @@ class BookingCosting
         return $eTotal + $cTotal + $aTotal + $transCost;
     }
 
-    // Equipment costs more the farther the shoot zone is from Manila — same
-    // bookings.transport_multiplier column Assign Transport already sets (BookingDetailController,
-    // zone map manila=1.0/luzon=1.5/luzon_far=2.0), previously only ever applied on the CE preview
-    // document and never actually billed. Floored at 1.0 since a booking with no zone set yet
-    // stores a NULL/0 multiplier, not a discount.
     private static function equipmentZoneMultiplier(int $bookingId): float
     {
         return max(1.0, (float) (DB::table('bookings')->where('booking_id', $bookingId)->value('transport_multiplier') ?? 1.0));
     }
 
-    // Normalizes a discount type string and validates the paired value against the booking's
-    // raw (pre-discount) subtotal. Returns an error message, or null when valid. Shared by
-    // proposeDiscount(), setDiscount() and approveDiscount() so all three apply exactly the
-    // same rules regardless of entry point (client request, staff propose, staff direct-set).
     private static function validateDiscountInput(string $type, float $value, float $rawSub): ?string
     {
         if ($value <= 0) {
@@ -263,9 +207,6 @@ class BookingCosting
         return null;
     }
 
-    // Peso amount actually taken off, for a given discount type/value against the booking's
-    // raw subtotal — flat is the value itself, percent is a share of the subtotal, and package
-    // is a target total (so the "discount" is simply the gap between the subtotal and it).
     private static function computeDiscountAmount(string $type, float $value, float $rawSub): float
     {
         $computed = match ($type) {
@@ -291,11 +232,6 @@ class BookingCosting
         };
     }
 
-    // Shared by BookingsController (staff, from the Bookings page), ClientBookingDetailController
-    // (client, from their own booking page), and BookingDetailController (staff, directly from
-    // the booking page) — who proposed it is recorded via $proposerId and resolved to "staff"
-    // vs "client" later by joining booking_discounts.proposed_by -> users -> roles, the same
-    // authorship pattern already used for comments (BookingDetailController.php's comment feed).
     public static function proposeDiscount(int $bookingId, int $proposerId, string $type, float $value, string $reason): array
     {
         $type = self::normalizeDiscountType($type);
@@ -308,10 +244,6 @@ class BookingCosting
             return ['type' => 'danger', 'text' => $error];
         }
 
-        // Locks the booking row so two near-simultaneous proposals (double-click, two open tabs)
-        // can't both pass the "nothing already pending" check before either commits its insert —
-        // the same race was previously unguarded here, unlike BillingController's record_payment,
-        // which already locks this way before its own balance check + insert.
         $error = DB::transaction(function () use ($bookingId, $type, $value, $reason, $proposerId) {
             DB::table('bookings')->where('booking_id', $bookingId)->lockForUpdate()->value('booking_id');
             if (DB::table('booking_discounts')->where('booking_id', $bookingId)->where('status', 'pending')->exists()) {
@@ -366,15 +298,6 @@ class BookingCosting
         ]);
     }
 
-    // New base references are standardized to CE-{year}-#### (4-digit, sequential per calendar
-    // year), matching the panelist revision's "standardize CE numbering" requirement. A new
-    // draft spun up after a prior CE was confirmed keeps that booking's base reference with a
-    // revision suffix (-R2, -R3, ...) so a booking's CE history stays visually linked —
-    // CE-2026-0001-R1, -R2, etc.
-    //
-    // NN is MAX+1 rather than COUNT+1 so deleting a CE can never hand out a number twice.
-    // Pre-existing legacy references (YY-MM-NN or CE-YYYY-####) are left alone — some are
-    // already out with clients — and the formats coexist without any display code caring.
     private static function nextCeReference(int $bookingId): string
     {
         $existing = DB::table('cost_estimates')->where('booking_id', $bookingId)
@@ -409,8 +332,6 @@ class BookingCosting
             ->selectRaw('COALESCE(SUM(rate_used * hours_worked),0) AS t')->value('t');
         $aTotal = (float) DB::table('booking_accessories')->where('booking_id', $id)
             ->selectRaw('COALESCE(SUM(subtotal),0) AS t')->value('t');
-        // Outsourced/partner equipment was removed as a feature — outsourced_total stays a
-        // real column (other code still reads it) but is always written as 0 now.
         $oTotal = 0.0;
         $transCost = (float) (DB::table('bookings')->where('booking_id', $id)->value('transportation_cost') ?? 0);
         $rawSub = $eTotal + $cTotal + $aTotal + $oTotal + $transCost;
@@ -429,9 +350,6 @@ class BookingCosting
         $vatExempt = $latest ? (bool) $latest->vat_exempt : false;
         [$sub, $vat, $grand] = self::computeTotals($rawSub, $otherCharges, $discountAmt, $pricingMode, $pricingInput, $vatExempt);
 
-        // A confirmed CE is locked/immutable history — further changes start a fresh draft
-        // rather than overwriting it. Otherwise (no CE yet, or the latest is still a draft)
-        // keep today's behavior: update that one row in place.
         $updateExisting = $latest && $latest->status !== 'confirmed';
 
         if ($updateExisting) {
@@ -455,12 +373,6 @@ class BookingCosting
         self::updateBookingTotal($id);
     }
 
-    // Confirming a CE is the one moment a booking can end up with two rows both saying
-    // "confirmed" (this booking already had one confirmed, then got revised and re-confirmed).
-    // Demoting every other confirmed row for the same booking to 'superseded' here — in the same
-    // action that creates the new confirmed row — is what CeAnalytics::onlyLatestConfirmed()'s
-    // dedup filter used to have to work around; this makes 'superseded' a real, stored fact
-    // instead of something inferred at query time.
     public static function confirmCe(int $bookingId, int $userId, ?string $note = null): array
     {
         $latest = DB::table('cost_estimates')->where('booking_id', $bookingId)->orderByDesc('ce_id')->first();
@@ -485,9 +397,6 @@ class BookingCosting
 
         $msg = 'Cost estimate <strong>' . e($latest->ce_reference) . '</strong> confirmed.';
 
-        // Timeline validation: a normal CE shouldn't be confirmed after its shoot has already
-        // happened — flagged here rather than blocked outright, since legitimate paperwork
-        // (recording a historical/migrated CE) can legitimately trail the shoot date.
         $shootEnd = DB::table('bookings')->where('booking_id', $bookingId)->value('shoot_date_end');
         if ($shootEnd && strtotime($shootEnd) < strtotime('today')) {
             $msg .= ' <strong>Note:</strong> the shoot date has already passed — confirming this as a historical/migration record.';
@@ -496,13 +405,6 @@ class BookingCosting
         return ['type' => 'success', 'text' => $msg];
     }
 
-    // Reverts a confirmed CE back to an editable draft — the escape hatch for a CE that got
-    // confirmed before it was actually filled out (no real completeness check existed before
-    // confirmCe()'s grand_total guard was added, so older/mis-clicked confirms can still be
-    // sitting around). Clears the confirmation record and, since any client-facing approval
-    // tied to that confirmed version is no longer meaningful, resets cost_approval_status too -
-    // the booking goes back to "not yet sent to client" rather than keeping a stale approval on
-    // a cost estimate that's about to change.
     public static function reopenCe(int $bookingId, int $userId): array
     {
         $latest = DB::table('cost_estimates')->where('booking_id', $bookingId)->orderByDesc('ce_id')->first();
@@ -520,13 +422,8 @@ class BookingCosting
         return ['type' => 'warning', 'text' => 'Cost estimate <strong>' . e($latest->ce_reference) . '</strong> reopened for edits — finish it and confirm again when ready.'];
     }
 
-
-    // Applies a new pricing mode to the booking's current CE. Caller is responsible for
-    // validating $pricingMode/$pricingInput first (see BookingDetailController::updateCePricing).
     public static function applyPricingMode(int $bookingId, int $userId, string $pricingMode, ?float $pricingInput, bool $vatExempt): void
     {
-        // Ensures a mutable draft row exists — auto-spins a new one if the latest CE was
-        // already confirmed, so confirmed history is never rewritten.
         self::generateCostEstimate($bookingId, $userId);
         $latest = DB::table('cost_estimates')->where('booking_id', $bookingId)->orderByDesc('ce_id')->first();
 
@@ -534,27 +431,14 @@ class BookingCosting
             'pricing_mode' => $pricingMode, 'pricing_input' => $pricingInput, 'vat_exempt' => $vatExempt,
         ]);
 
-        // Recompute totals now that the new pricing mode is in place.
         self::generateCostEstimate($bookingId, $userId);
     }
 
-    // Writes an approved discount amount onto the booking's current CE. Mirrors
-    // applyPricingMode()'s shape: generateCostEstimate() first guarantees a mutable draft
-    // exists (spins a new one if the latest CE was already confirmed), then only THAT row's
-    // ce_id is updated — never a blanket update-by-booking_id, which previously clobbered
-    // the discount column on old, confirmed (supposedly immutable) CE rows too.
     public static function applyDiscount(int $bookingId, int $userId, float $discountAmt): void
     {
         self::generateCostEstimate($bookingId, $userId);
         $latest = DB::table('cost_estimates')->where('booking_id', $bookingId)->orderByDesc('ce_id')->first();
 
-        // Writing the raw discount column alone left subtotal/vat_amount/grand_total stale at
-        // whatever generateCostEstimate() just computed (with the OLD discount, usually none) —
-        // bookings.final_amount below ends up correct, but the CE row's own stored totals stay
-        // wrong until something else happens to regenerate it. Any page reading those columns
-        // directly (CePreviewController does, to avoid a second independent calculation) would
-        // show a price the client was never actually billed. Recompute them here with the same
-        // math generateCostEstimate() uses, now that the real discount is known.
         $rawSub = self::rawBookingSubtotal($bookingId);
         [$sub, $vat, $grand] = self::computeTotals(
             $rawSub, (float) $latest->other_charges, $discountAmt,
@@ -606,10 +490,6 @@ class BookingCosting
         return ['type' => 'success', 'text' => 'Discount proposal rejected.'];
     }
 
-    // For when a client calls in and staff agree a discount on the spot — no separate
-    // approval step needed, since the phone call itself is the authorization.
-    // Records a booking_discounts row that's already 'approved' (proposed_by and approved_by
-    // both the acting staff member) and applies it immediately.
     public static function setDiscount(int $bookingId, int $staffId, string $type, float $value, string $reason): array
     {
         $type = self::normalizeDiscountType($type);
@@ -622,8 +502,6 @@ class BookingCosting
             return ['type' => 'danger', 'text' => $error];
         }
 
-        // Same race guard as proposeDiscount() — locks the booking row so two near-simultaneous
-        // submits can't both pass the "nothing already pending" check before either inserts.
         $result = DB::transaction(function () use ($bookingId, $type, $value, $reason, $staffId) {
             DB::table('bookings')->where('booking_id', $bookingId)->lockForUpdate()->value('booking_id');
             if (DB::table('booking_discounts')->where('booking_id', $bookingId)->where('status', 'pending')->exists()) {

@@ -9,12 +9,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
-/**
- * Staff-side inbox for the homepage support chat (client_support_messages) — the widget in
- * HomeController::index() has always let clients send messages, but nothing on the staff side
- * ever read them back. This closes that gap, following the same insert/attachment/is_internal
- * shape HomeController and BookingDetailController::postComment() already use.
- */
 class SupportChatController extends Controller
 {
     public function index()
@@ -42,10 +36,6 @@ class SupportChatController extends Controller
             } elseif ($body === '' && ! $attach['success']) {
                 $flash = ['type' => 'danger', 'text' => 'Message cannot be empty.'];
             } else {
-                // Department is derived from the replying staff member's own role, not picked —
-                // same convention BookingDetailController::postComment() uses for booking chat,
-                // so a client's "Accounting" thread always lands replies from whoever actually
-                // handles accounting, regardless of which conversation the staffer clicked into.
                 $role = Auth::user()->role->role_name ?? null;
                 DB::table('client_support_messages')->insert([
                     'client_id' => $clientId, 'user_id' => $uid,
@@ -85,11 +75,6 @@ class SupportChatController extends Controller
         ));
     }
 
-    /**
-     * The conversation list shown in the left rail — needed on every request to this
-     * controller now that index() and show() render the same split-inbox view, not just
-     * on the old list-only page.
-     */
     private function threadList(): array
     {
         $uid = Auth::id();
@@ -101,8 +86,6 @@ class SupportChatController extends Controller
             ->get()
             ->keyBy('client_id');
 
-        // Grouping the last-message preview in PHP rather than a correlated subquery —
-        // simpler and plenty fast at this table's realistic size.
         $lastMessages = DB::table('client_support_messages')
             ->orderByDesc('created_at')
             ->get(['client_id', 'body', 'is_internal', 'created_at'])
@@ -133,7 +116,6 @@ class SupportChatController extends Controller
         return ['threads' => $threads];
     }
 
-    /** Lightweight polling for the staff thread view — mirrors HomeController::supportPoll(). */
     public function poll(Request $request, int $clientId)
     {
         $after = (int) $request->query('after', 0);
@@ -157,7 +139,6 @@ class SupportChatController extends Controller
         return response()->json(['messages' => $messages]);
     }
 
-    /** Staff-only attachment download — route already gated by can_access:support_chat. */
     public function attachment(int $clientId, int $messageId)
     {
         $message = DB::table('client_support_messages')

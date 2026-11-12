@@ -33,7 +33,6 @@
 </div>
 @endif
 
-<!-- Stats -->
 <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
   <div class="stat-card">
     <div class="stat-icon"><i data-feather="users"></i></div>
@@ -57,7 +56,6 @@
   </div>
 </div>
 
-<!-- Tabs -->
 <div class="tabs" style="margin-bottom:18px">
   <a href="{{ $crewBase }}?tab=members" class="tab-btn {{ $tab === 'members' ? 'active' : '' }}"><i data-feather="users" style="width:13px;height:13px;margin-right:5px;vertical-align:middle"></i>Crew Members</a>
   <a href="{{ $crewBase }}?tab=positions" class="tab-btn {{ $tab === 'positions' ? 'active' : '' }}"><i data-feather="briefcase" style="width:13px;height:13px;margin-right:5px;vertical-align:middle"></i>Positions <span class="badge badge-gray" style="margin-left:4px">{{ $positionsWithCounts->count() }}</span></a>
@@ -283,7 +281,6 @@
   </div>
 </div>
 
-<!-- CREW DETAIL MODAL -->
 <div class="modal-overlay" id="modalCrewDetail">
   <div class="modal" style="max-width:480px">
     <div class="modal-header" style="flex-direction:column;align-items:stretch;gap:10px">
@@ -484,7 +481,6 @@
 
 @if ($canManage)
 
-<!-- ADD CREW MODAL -->
 <div class="modal-overlay" id="modalAddCrew">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
@@ -616,7 +612,6 @@
   </div>
 </div>
 
-<!-- EDIT CREW MODAL -->
 <div class="modal-overlay" id="modalEditCrew">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
@@ -742,7 +737,6 @@
   </div>
 </div>
 
-<!-- ADD POSITION MODAL -->
 <div class="modal-overlay" id="modalAddPos">
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
@@ -794,7 +788,6 @@
 
 @endif
 
-<!-- Unavailability Modal -->
 <div class="modal-overlay" id="modalAvailability">
   <div class="modal" style="max-width:480px">
     <div class="modal-header">
@@ -862,7 +855,6 @@
   </div>
 </div>
 
-<!-- Link Login modal -->
 <div class="modal-overlay" id="modalLinkCrew">
   <div class="modal" style="max-width:440px">
     <div class="modal-header">
@@ -888,7 +880,6 @@
   </div>
 </div>
 
-<!-- Unlink Login modal -->
 <div class="modal-overlay" id="modalUnlinkCrew">
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
@@ -938,7 +929,6 @@ document.addEventListener('keydown', function (e) {
 });
 
 @if ($tab === 'schedule')
-// ── Crew Schedule calendar — same day-map/grid approach as the Dashboard calendar ──────────
 const CREW_SCHED_ASSIGNMENTS = {!! $scheduleAssignments->map(fn ($a) => [
   'crew_name' => $a->crew_name,
   'ref' => $a->booking_reference,
@@ -1021,7 +1011,7 @@ document.addEventListener('DOMContentLoaded', crewRenderSchedule);
 
 function guardAddCrewSubmit() {
   var btn = document.getElementById('addCrewSubmitBtn');
-  if (btn.disabled) return false; // already submitting — swallow a double-click/double-submit
+  if (btn.disabled) return false;
   btn.disabled = true;
   btn.innerHTML = '<i data-feather="save"></i> Adding…';
   return true;
@@ -1143,8 +1133,6 @@ function _escAvail(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// --- Availability calendar (month grid, days within any of this crew member's blocks
-// highlighted) — reuses the same _allBlocks array the list view already fetches once.
 function availCalPrev() { _availCalDate.setMonth(_availCalDate.getMonth() - 1); renderAvailCalendar(); }
 function availCalNext() { _availCalDate.setMonth(_availCalDate.getMonth() + 1); renderAvailCalendar(); }
 
@@ -1178,13 +1166,10 @@ function renderAvailCalendar() {
   document.getElementById('avail_cal_grid').innerHTML = html;
 }
 
-// --- Crew Management detail panel ---
 let cdCurrentId = null;
 let cdCurrentCrewData = null;
 let cdOtherActiveCrew = [];
 
-// Lets other pages (e.g. Attendance's Assigned Crew list) deep-link straight to a crew
-// member's profile via ?tab=members#crew-<id>, instead of just landing on the plain list.
 document.addEventListener('DOMContentLoaded', function () {
   var m = location.hash.match(/^#crew-(\d+)$/);
   if (m) openCrewDetail(parseInt(m[1], 10));
@@ -1321,7 +1306,7 @@ function switchCdTab(tab) {
 function submitAddQualification(e) {
   e.preventDefault();
   const btn = e.target.querySelector('button[type="submit"]');
-  if (btn.disabled) return false; // already submitting — swallow a double-click/double-submit
+  if (btn.disabled) return false;
   const title = document.getElementById('cd_qual_title').value.trim();
   if (!title) { alert('Qualification title is required.'); return false; }
   btn.disabled = true;
@@ -1397,10 +1382,6 @@ function escHtmlCd(s) {
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// For passing a JS string literal as an inline onclick="..." argument from a template-literal-
-// built button (JSON.stringify's own double quotes would otherwise terminate the double-quoted
-// HTML attribute early, silently breaking the button — HTML-escaping the stringified output
-// lets the browser decode it back to valid JS before the handler runs).
 function jsAttrArg(v) {
   return JSON.stringify(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }

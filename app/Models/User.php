@@ -13,7 +13,6 @@ use Illuminate\Notifications\Notifiable;
 #[Hidden(['password_hash'])]
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
     protected $table = 'users';
@@ -28,18 +27,11 @@ class User extends Authenticatable
         ];
     }
 
-    /**
-     * The legacy schema stores the hash in `password_hash`, not `password`,
-     * so the Authenticatable contract is pointed at that column instead.
-     */
     public function getAuthPassword(): string
     {
         return $this->password_hash;
     }
 
-    /**
-     * No remember_token column exists on the legacy `users` table.
-     */
     public function getRememberToken()
     {
         return null;
@@ -47,7 +39,6 @@ class User extends Authenticatable
 
     public function setRememberToken($value)
     {
-        // no-op: legacy schema has no remember_token column
     }
 
     public function getRememberTokenName()

@@ -6,10 +6,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
-/**
- * A single client's documents (Part 18). Not a general client-detail page — this app has none
- * — just the one purpose, reached from a "Documents" button on the clients list.
- */
 class ClientDocumentsController extends Controller
 {
     public function show(Request $request, int $id): View

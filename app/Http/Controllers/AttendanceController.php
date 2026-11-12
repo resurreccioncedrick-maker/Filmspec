@@ -39,13 +39,6 @@ class AttendanceController extends Controller
             return $this->export($request);
         }
 
-        // The Log Shoot Attendance / Log Timesheet Entry forms POST booking_id/crew_id and
-        // attendance_date or timesheet_date in the request body, not the query string — reading
-        // only query() here meant a successful save re-rendered this same request with every
-        // filter reset to empty, immediately hiding the booking picker, day-strip, and
-        // timesheets table right after the save-confirmation message. Falling back to the POST
-        // body (checking both possible date field names) keeps the picked booking/date visible
-        // after a save, while GET-driven links (?booking_id=&date=) still take priority as before.
         $filterBooking = (int) $request->query('booking_id', $request->input('booking_id', 0));
         $filterCrew = (int) $request->query('crew_id', $request->input('crew_id', 0));
         $filterDate = $request->query('date', $request->input('attendance_date', $request->input('timesheet_date', '')));
@@ -73,11 +66,6 @@ class AttendanceController extends Controller
                 ->select('bc.*', DB::raw("CONCAT(cm.first_name,' ',cm.last_name) AS crew_name"), 'cm.phone', 'cp.position_name')
                 ->get();
 
-            // Booking Schedule strip — one card per day of the shoot, so staff pick a day by
-            // clicking it instead of typing/searching a date manually. When no explicit ?date=
-            // was given, default to today only if today actually falls within this booking's
-            // shoot range — otherwise "today" would silently point outside the booking entirely
-            // (e.g. opening a booking that already wrapped, or hasn't started yet).
             $bookingRange = DB::table('bookings')->where('booking_id', $filterBooking)
                 ->select('shoot_date_start', 'shoot_date_end', 'booking_status')->first();
             if ($bookingRange && ! $filterDate) {
@@ -86,9 +74,6 @@ class AttendanceController extends Controller
                     ? $todayStr : $bookingRange->shoot_date_start;
             }
 
-            // Pre-fills the form with whatever's already logged for the currently-selected day
-            // (not always "today" — the Booking Schedule strip lets staff pick any day in the
-            // shoot range, so this has to follow that selection).
             $existingAttByCrew = DB::table('crew_attendance')
                 ->where('booking_id', $filterBooking)->where('attendance_date', $activeDate)
                 ->get()->keyBy('crew_id');
@@ -177,7 +162,6 @@ class AttendanceController extends Controller
         ]);
     }
 
-    /** Same filters index() applies, shared with export() so the two can never drift apart. */
     private function filteredAttendanceQuery(Request $request)
     {
         $filterBooking = (int) $request->query('booking_id', 0);
@@ -194,7 +178,6 @@ class AttendanceController extends Controller
         return $attQuery;
     }
 
-    /** Export ▾ — reuses filteredAttendanceQuery() unbounded (no page/perPage) so it always matches what's on screen. */
     private function export(Request $request): StreamedResponse|Response
     {
         $headers = ['Date', 'Crew Member', 'Position', 'Booking', 'Status', 'Replacement', 'Logged By'];
@@ -225,9 +208,6 @@ class AttendanceController extends Controller
         return DataExporter::respond($request->query('export'), 'Attendance', $headers, $rows, 'attendance-export');
     }
 
-    // Printable attendance record for one booking — staff-side counterpart to
-    // CrewPortalController::printAttendance(), same view, no crew-ownership check since
-    // any staff member with access to this page can already see every booking's attendance.
     public function print(Request $request): View|RedirectResponse
     {
         $bid = (int) $request->query('booking_id', 0);
@@ -292,14 +272,9 @@ class AttendanceController extends Controller
                 return ['type' => 'danger', 'text' => 'Attendance date must fall within this booking\'s shoot dates (' . $shootRange->shoot_date_start . ' to ' . $shootRange->shoot_date_end . ').'];
             }
 
-            // The whole batch commits together — a call sheet is one logical submission, and a
-            // failure partway through must not leave some crew logged/synced and others not.
             DB::transaction(function () use ($request, $bid, $date, $uid, &$logged) {
                 foreach ((array) $request->input('crew_status', []) as $cid => $status) {
                     $cid = (int) $cid;
-                    // Back Out is no longer logged here — withdrawing before a shoot is now a
-                    // crew-assignment change (Crew Management → Schedule → Mark Withdrawn),
-                    // which requires picking a replacement at the same time.
                     if (! in_array($status, ['present', 'late', 'absent', 'no_show'], true)) {
                         continue;
                     }

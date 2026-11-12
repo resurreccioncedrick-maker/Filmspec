@@ -27,7 +27,6 @@
 </div>
 @endif
 
-<!-- Booking Header Card -->
 <div class="card" style="margin-bottom:22px;overflow:visible;position:relative;z-index:2">
   <div class="card-body">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px">
@@ -78,7 +77,6 @@
       </div>
     </div>
 
-    <!-- Meta row -->
     <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);font-size:.83rem">
       <div>
         <div style="color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Project</div>
@@ -124,20 +122,10 @@
       </div>
     </div>
 
-    <!-- Booking Status Pipeline -->
     @php
-      // Kept in ongoing -> pending_inspection -> returned order (not the Returned-before-
-      // Inspection order the panelist's notes suggested): confirmInspection() in
-      // BookingDetailController only flips status to 'returned' AFTER inspection is confirmed
-      // (see bulkCheckin()/confirmInspection() — 'returned' means "inspection passed, accepted
-      // back," not "physically received"). Reordering the display without changing that real
-      // state machine would make the pipeline show "Returned" as done before it actually is.
       $pipeline = ['pending' => 0, 'confirmed' => 1, 'ongoing' => 2, 'pending_inspection' => 3, 'returned' => 4, 'completed' => 5];
       $currentStep = $pipeline[$booking->booking_status] ?? ($booking->booking_status === 'cancelled' ? -1 : 0);
       $isCancelled = $booking->booking_status === 'cancelled';
-      // Payment status has its own dedicated summary card further down the page (Total /
-      // Paid / Balance / Status) — it's deliberately not a step here, since "paid" isn't a
-      // production-pipeline stage and mixing it in understated the real payment state.
       $steps = [
         ['key' => 'pending', 'label' => 'Submitted', 'icon' => 'file-text'],
         ['key' => 'confirmed', 'label' => 'Confirmed', 'icon' => 'check-circle'],
@@ -177,7 +165,6 @@
       @endif
     </div>
 
-    <!-- Downpayment notice -->
     @php
       $_dpPaid = $payments->sum('amount');
       $_dpRequired = (float) $booking->final_amount * 0.5;
@@ -211,7 +198,6 @@
     </div>
     @endif
 
-    <!-- Stage-aware action bar -->
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center">
 
       @if (($st === 'pending' || ($booking->approval_status ?? '') === 'pending_approval') && $isAdmin)
@@ -237,8 +223,6 @@
         @endif
 
       @elseif ($st === 'confirmed' && $isAdmin)
-        {{-- Assign Transport now lives only on the Cost Estimate tab (delegates back to this
-             page's modalAssignTransport via postMessage). --}}
         @if ($ce)
         @if ($ce->status === 'confirmed')
         <span class="badge badge-green" style="align-self:center"><i data-feather="check" style="width:11px;height:11px"></i> Confirmed</span>
@@ -251,9 +235,6 @@
         </form>
         @endif
         @elseif (in_array($role, ['super_admin', 'operations_manager'], true))
-        {{-- 'issued' is a legacy intermediate state (historical rows may still carry it) —
-             there's no way to newly set it any more (see BookingCosting::issueCe() removal),
-             but the badge is kept so an old issued-but-unconfirmed CE still reads clearly. --}}
         @if ($ce->status === 'issued')
         <span class="badge badge-blue" style="align-self:center">Issued — Awaiting Confirmation</span>
         @endif
@@ -274,9 +255,6 @@
         <div class="action-menu-wrap">
           <button type="button" class="btn-icon" onclick="toggleActionMenu(this)" title="More actions"><i data-feather="more-vertical"></i></button>
           <div class="action-menu">
-            {{-- Add Equipment / Assign Crew now live only on the Cost Estimate tab (which
-                 delegates back to this page's own modals via postMessage — see the
-                 window.addEventListener('message', ...) listener below). --}}
             @if ($hasCrew && $costApproval !== 'client_approved')
             @if ($ce && $ce->status === 'confirmed')
             <form method="POST" action="{{ $actionUrl }}"
@@ -372,32 +350,18 @@
   </div>
 </div>
 
-<!-- Pre-release checklist -->
 @if ($booking->booking_status === 'confirmed' && $isAdmin)
 @php
   $crewCount = $crewLines->count();
   $equipCount = $equipmentLines->count();
   $accCount = $accessoryLines->count();
   $crewOk = $crewCount > 0;
-  // "Ready" now means every equipment/accessory line has its release unit(s) manually
-  // confirmed on the Cost Estimate tab — not merely that a line exists. A booking with zero
-  // lines at all is never "ready" either (nothing to release isn't the same as release-ready).
   $equipUnconfirmedCount = $equipmentLines->where('unit_confirmed', 0)->count() + $accessoryLines->where('unit_confirmed', 0)->count();
   $equipOk = ($equipCount + $accCount) > 0 && $equipUnconfirmedCount === 0;
   $driverOk = ! $driverNeeded || $driverCount > 0;
-  // The client must have actually approved the cost estimate — staff confirming the CE only
-  // sends it to the client (cost_approval_status becomes 'pending_client'); it does not mean
-  // the client said yes. Equipment must never go out to the field before that approval lands.
   $costApprovalOk = ($booking->cost_approval_status ?? null) === 'client_approved';
-  // Transport is always tracked, whether or not the booking ends up using it — "no transport
-  // needed" and "nobody has looked at transport yet" used to be indistinguishable (both just
-  // null/zero columns), letting a booking reach "ready" without staff ever opening Assign
-  // Transport. transport_confirmed_at is set the moment that form is actually submitted, with
-  // any outcome; this is what's required here, not specifically having a vehicle selected.
   $transportConfirmed = ! empty($booking->transport_confirmed_at);
   $transportOk = $transportConfirmed && $driverOk;
-  // Payment collection is accounting's own workspace (Billing & POS), not an equipment-release
-  // concern — it deliberately doesn't gate or appear in this checklist.
   $allOk = $crewOk && $equipOk && $transportOk && $costApprovalOk;
   $totalConds = 4;
   $metConds = ($equipOk ? 1 : 0) + ($crewOk ? 1 : 0) + ($costApprovalOk ? 1 : 0) + ($transportOk ? 1 : 0);
@@ -409,13 +373,7 @@
       ['label' => 'Cost Approval', 'ok' => $costApprovalOk],
   ];
 
-  // General term, not "Driver" — a booking's transport can be missing a driver, a vehicle, or
-  // just an unfinalized fee. The row/banner text says "setup incomplete" rather than singling
-  // out the driver as if that's always the specific thing missing.
   $rows = [
-      // Labeled "Equipment/Accessories" (not just "Equipment") since this step is only ready
-      // once EVERY line of both — accessories included, whenever the booking has any — has its
-      // release unit manually confirmed, not equipment alone.
       ['label' => 'Equipment/Accessories', 'ok' => $equipOk, 'detail' => $equipOk
           ? ($equipCount + $accCount) . ' item' . (($equipCount + $accCount) != 1 ? 's' : '') . ' confirmed'
           : (($equipCount + $accCount) === 0 ? 'No equipment/accessories added' : "$equipUnconfirmedCount item" . ($equipUnconfirmedCount != 1 ? 's' : '') . ' awaiting unit confirmation'),
@@ -507,11 +465,7 @@
   </div>
 </div>
 @endif
-{{-- The client_approved + confirmed case used to show a third, redundant banner here with its
-     own "Open Checklist OUT" button — that state is now fully covered by the Release Readiness
-     card above, which is the single source of truth for whether release is authorized. --}}
 
-<!-- Tabs -->
 <div class="tabs">
   @if ($ce)
   <button class="tab-btn active" data-tab="tab-cost-estimate">
@@ -519,8 +473,6 @@
     @if ($ce->status === 'confirmed')<span class="badge badge-green" style="margin-left:4px">Confirmed</span>@else<span class="badge badge-gray" style="margin-left:4px">Draft</span>@endif
   </button>
   @else
-  {{-- No CE generated yet — the CE page's "Edit Client & Project Info" isn't reachable until
-       a CE exists, so this small pre-CE form is the only place to set these fields early. --}}
   <button class="tab-btn active" data-tab="tab-project-details">Project Details</button>
   @endif
   <button class="tab-btn" data-tab="tab-payments">Payments <span class="badge badge-blue" style="margin-left:4px">{{ $payments->count() }}</span></button>
@@ -544,8 +496,6 @@
 <div data-tab-panes>
 
 @if (! $ce)
-<!-- PROJECT DETAILS TAB — only shown pre-CE; once a CE exists, its "Edit Client & Project Info"
-     modal on the Cost Estimate tab covers the same fields. -->
 <div id="tab-project-details" class="tab-pane active">
   <div class="card" id="card-project-details">
     <div class="card-header">
@@ -613,8 +563,6 @@
 @endif
 
 @if ($ce)
-<!-- COST ESTIMATE TAB — embeds the full CE editor (equipment/crew/accessories/transport/discount
-     all live here now) so it's the one place to build and manage the quote for this booking. -->
 <div id="tab-cost-estimate" class="tab-pane active">
   <div class="card" style="margin-bottom:0">
     <div class="card-header">
@@ -628,7 +576,6 @@
 </div>
 @endif
 
-<!-- PAYMENTS TAB -->
 <div id="tab-payments" class="tab-pane">
   @php
     $payPaid = $payments->sum('amount');
@@ -684,10 +631,6 @@
   </div>
 
 
-  {{-- Preview List and the itemized cost breakdown that used to live here are now the Cost
-       Estimate tab's job (it embeds the CE editor, which shows the same equipment listing and
-       totals). What's left below is what has no home there: field additions, the client's
-       response to the quote, and the pricing-mode/VAT-exempt controls. --}}
   <div class="card" id="card-package-totals" style="margin-bottom:16px">
     <div class="card-header">
       <h2 class="card-title">Pricing &amp; Client Response</h2>
@@ -720,9 +663,6 @@
       @endphp
 
       @if ($fieldAdditions->isNotEmpty())
-      {{-- Equipment/accessories requested and delivered to the field mid-shoot, on top of the
-           original booking — already folded into the totals above (added at Dispatch), listed
-           out here so it's clear which items these are and when each was followed up. --}}
       <div style="margin-bottom:14px">
         <div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--blue-700);margin-bottom:6px">
           FIELD ADDITIONS
@@ -747,8 +687,6 @@
       </div>
       @endif
 
-      {{-- Client response — the closest signal we have to their "Check inbox": we can't read
-           a mailbox, but the portal approve/reject flow already records the answer. --}}
       @php
         $carLabels = ['pending_client' => 'Awaiting client response', 'client_approved' => 'Approved by client', 'client_rejected' => 'Rejected by client'];
         $carColors = ['pending_client' => 'badge-yellow', 'client_approved' => 'badge-green', 'client_rejected' => 'badge-red'];
@@ -1039,7 +977,6 @@
   </div>
 </div>
 
-<!-- INCIDENTS TAB -->
 <div id="tab-incidents" class="tab-pane">
   <div class="card">
     <div class="card-header">
@@ -1124,7 +1061,6 @@
   </div>
 </div>
 
-<!-- ACTIVITY LOG TAB -->
 <div id="tab-log" class="tab-pane">
   <div class="card" id="logCard">
     <div class="card-header">
@@ -1182,7 +1118,6 @@
   </div>
 </div>
 
-<!-- COMMENTS TAB -->
 <div id="tab-comments" class="tab-pane">
   <div class="card" id="commentsCard">
     <div class="card-header">
@@ -1251,12 +1186,10 @@
   </div>
 </div>
 
-<!-- DOCUMENTS TAB -->
 <div id="tab-documents" class="tab-pane">
   @include('partials.documents-card')
 </div>
 
-<!-- CANCELLATIONS TAB -->
 <div id="tab-cancellations" class="tab-pane">
   <div class="card">
     <div class="card-header">
@@ -1328,7 +1261,6 @@
 @endphp
 <div id="tab-requests" class="tab-pane">
 
-  <!-- Extension Requests -->
   <div class="card" style="margin-bottom:16px" id="extRequestsCard">
     <div class="card-header">
       <h2 class="card-title">Rental Extension Requests</h2>
@@ -1383,7 +1315,6 @@
     @endif
   </div>
 
-  <!-- Field Requests (equipment / accessory / crew follow-ups) -->
   <div class="card" id="fieldRequestsCard">
     <div class="card-header">
       <h2 class="card-title">Field Requests</h2>
@@ -1460,7 +1391,6 @@
 
 </div>
 
-<!-- Client Feedback (read-only — client submits this from their booking page) -->
 @if ($booking->booking_status === 'completed')
 <div class="card" style="margin-top:22px">
   <div class="card-header">
@@ -1495,7 +1425,6 @@
 </div>
 @endif
 
-<!-- APPROVE BOOKING MODAL -->
 <div class="modal-overlay" id="modalApproveBooking">
   <div class="modal" style="max-width:520px">
     <div class="modal-header" style="background:var(--success,#15803d);color:#fff;border-radius:10px 10px 0 0">
@@ -1531,7 +1460,6 @@
   </div>
 </div>
 
-<!-- REJECT BOOKING MODAL -->
 <div class="modal-overlay" id="modalRejectBooking">
   <div class="modal" style="max-width:480px">
     <div class="modal-header" style="background:var(--red,#dc2626);color:#fff;border-radius:10px 10px 0 0">
@@ -1570,7 +1498,6 @@
   </div>
 </div>
 
-<!-- ADD EQUIPMENT MODAL -->
 <div class="modal-overlay" id="modalAddEquip">
   <div class="modal" style="max-width:560px">
     <div class="modal-header">
@@ -1606,7 +1533,6 @@
   </div>
 </div>
 
-<!-- CLOSE PROJECT — Part 9 -->
 <div class="modal-overlay" id="modalCloseProject">
   <div class="modal" style="max-width:520px">
     <div class="modal-header">
@@ -1656,7 +1582,6 @@
   </div>
 </div>
 
-<!-- SET DISCOUNT MODAL -->
 <div class="modal-overlay" id="modalSetDiscount">
   <div class="modal" style="max-width:480px">
     <div class="modal-header">
@@ -1699,7 +1624,6 @@
 </div>
 
 
-<!-- FIELD ADD EQUIPMENT MODAL -->
 <div class="modal-overlay" id="modalFieldAdd">
   <div class="modal" style="max-width:620px">
     <div class="modal-header" style="background:#fffbeb;border-bottom:2px solid #fbbf24">
@@ -1757,7 +1681,6 @@
   </div>
 </div>
 
-<!-- ASSIGN TRANSPORT MODAL -->
 @php
   $driverCrewList = $availCrew->filter(fn ($c) => stripos($c->position_name ?? '', 'driver') !== false);
   if ($driverCrewList->isEmpty()) $driverCrewList = $availCrew;
@@ -1851,7 +1774,6 @@
   </div>
 </div>
 
-<!-- ASSIGN CREW MODAL -->
 <style>
 .crew-slot-btn{display:block;width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid transparent;background:transparent;cursor:pointer;transition:background .14s,border-color .14s;margin-bottom:4px;text-align:left}
 .crew-slot-btn:hover{background:var(--hover,rgba(0,0,0,.04));border-color:var(--border)}
@@ -2003,7 +1925,6 @@
   </div>
 </div>
 
-<!-- RELEASE EQUIPMENT MODAL -->
 <div class="modal-overlay" id="modalRelease">
   <div class="modal" style="max-width:480px">
     <div class="modal-header">
@@ -2041,7 +1962,6 @@
   </div>
 </div>
 
-<!-- RETURN EQUIPMENT MODAL -->
 <div class="modal-overlay" id="modalReturn">
   <div class="modal" style="max-width:520px">
     <div class="modal-header">
@@ -2101,7 +2021,6 @@
   </div>
 </div>
 
-<!-- EXTEND RENTAL MODAL -->
 <div class="modal-overlay" id="modalExtendRental">
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
@@ -2129,7 +2048,6 @@
   </div>
 </div>
 
-<!-- RECORD PAYMENT MODAL -->
 @php
   $paidSoFar = $payments->sum('amount');
   $remaining = max(0, $booking->final_amount - $paidSoFar);
@@ -2222,7 +2140,6 @@
 </div>
 
 @if ($canRecord)
-<!-- APPROVE PAYMENT SUBMISSION MODAL -->
 <div class="modal-overlay" id="modalApprovePaymentSub">
   <div class="modal" style="max-width:440px">
     <div class="modal-header">
@@ -2248,7 +2165,6 @@
   </div>
 </div>
 
-<!-- REJECT PAYMENT SUBMISSION MODAL -->
 <div class="modal-overlay" id="modalRejectPaymentSub">
   <div class="modal" style="max-width:440px">
     <div class="modal-header">
@@ -2276,7 +2192,6 @@
 </div>
 @endif
 
-<!-- INCIDENT UPDATE MODAL -->
 <div class="modal-overlay" id="modalIncident">
   <div class="modal" style="max-width:520px">
     <div class="modal-header" style="background:#fef2f2;border-bottom:2px solid #fecaca">
@@ -2338,7 +2253,6 @@
   </div>
 </div>
 
-<!-- REQUEST CANCELLATION MODAL -->
 <div class="modal-overlay" id="modalRequestCancel">
   <div class="modal" style="max-width:460px">
     <div class="modal-header">
@@ -2367,7 +2281,6 @@
   </div>
 </div>
 
-<!-- ON-FIELD CANCELLATION MODAL -->
 <div class="modal-overlay" id="modalOnFieldCancel">
   <div class="modal" style="max-width:480px">
     <div class="modal-header">
@@ -2404,7 +2317,6 @@
 </div>
 
 @if ($isAdmin)
-<!-- DUPLICATE BOOKING MODAL -->
 <div class="modal-overlay" id="modalDuplicateBooking">
   <div class="modal" style="max-width:460px">
     <div class="modal-header">
@@ -2443,7 +2355,6 @@
 </div>
 @endif
 
-<!-- APPROVE CANCELLATION MODAL -->
 <div class="modal-overlay" id="modalApproveCancellation">
   <div class="modal" style="max-width:460px">
     <div class="modal-header">
@@ -2481,7 +2392,6 @@
   </div>
 </div>
 
-<!-- REJECT CANCELLATION MODAL -->
 <div class="modal-overlay" id="modalRejectCancellation">
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
@@ -2506,7 +2416,6 @@
   </div>
 </div>
 
-<!-- APPROVE CLIENT REQUEST MODAL -->
 <div class="modal-overlay" id="modalApproveReq">
   <div class="modal" style="max-width:440px">
     <div class="modal-header" style="background:var(--success,#15803d);color:#fff;border-radius:10px 10px 0 0">
@@ -2540,7 +2449,6 @@
   </div>
 </div>
 
-<!-- REJECT CLIENT REQUEST MODAL -->
 <div class="modal-overlay" id="modalRejectReq">
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
@@ -2707,9 +2615,6 @@ function toggleDamageFields(val) {
   document.getElementById('damageFields').style.display = (val === 'damaged' || val === 'missing') ? 'block' : 'none';
 }
 
-// Shows a reference suggestion (rate × zone multiplier) next to the cost field — it never
-// writes into #atCost itself, so it can't clobber a value the admin already typed. The cost
-// is always a manual entry; this is just a guide.
 function atRecalc() {
     const zone    = document.getElementById('atZone');
     const vehicle = document.getElementById('atVehicle');
@@ -2725,7 +2630,6 @@ function atRecalc() {
     }
 }
 
-// ── Assign Crew modal ──────────────────────────────────────────────────────
 const alreadyAssignedIds = new Set({!! $assignedCrewIds->toJson() !!});
 
 let cfgSlotCtx = null;
@@ -2934,7 +2838,6 @@ function prepareCrewBatch() {
   return true;
 }
 
-// ── Equipment catalog quick-add panel (Part 9) ─────────────────────────────
 function filterCatalogPanel() {
   const q = (document.getElementById('cat_filter').value || '').toLowerCase().trim();
   document.querySelectorAll('#catalogPanel [data-cat-row]').forEach(row => {
@@ -2943,7 +2846,6 @@ function filterCatalogPanel() {
   });
 }
 
-// ── Package pricing mode toggle ─────────────────────────────────────────────
 function togglePricingInput() {
   const sel = document.getElementById('pricingModeSelect');
   const wrap = document.getElementById('pricingInputWrap');
@@ -2955,7 +2857,6 @@ function togglePricingInput() {
   label.textContent = labels[sel.value] || 'Amount';
 }
 
-// ── Set Discount modal: only the field for the selected type is ever shown ─
 function toggleSetDiscInput() {
   const sel = document.getElementById('setDiscType');
   const input = document.getElementById('setDiscValue');
@@ -2968,7 +2869,6 @@ function toggleSetDiscInput() {
   if (note) note.style.display = sel.value === 'package' ? '' : 'none';
 }
 
-// ── Inline crew slot search (Equipment Slots section) ──────────────────────
 function _slotPool(posId, q) {
   let pool = crewData.filter(c => !alreadyAssignedIds.has(c.crew_id));
   if (posId) {
@@ -3025,7 +2925,6 @@ function prepSlot(eid) {
   return true;
 }
 
-// ── General crew search ─────────────────────────────────────────────────────
 function openGen(q) {
   const posId = parseInt(document.getElementById('genPos')?.value||0);
   let pool = crewData.filter(c => !alreadyAssignedIds.has(c.crew_id)
@@ -3058,7 +2957,6 @@ function prepGen() {
   return true;
 }
 
-// ── Accessories tab: suggested accessories ──────────────────────────────────
 (function(){
   const btn = document.querySelector('[data-tab="tab-accessories"]');
   if (!btn) return;
@@ -3106,7 +3004,6 @@ function escHtmlAcc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// Tab switching
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -3118,17 +3015,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     });
 });
 
-// Arriving from Field Resource Requests' "Review" link (#tab-requests) — jump straight to that
-// tab instead of landing on the default one, so staff don't have to hunt for it.
 if (location.hash) {
     const target = document.querySelector('.tab-btn[data-tab="' + location.hash.slice(1) + '"]');
     if (target) target.click();
 }
 
-// The Cost Estimate tab embeds the CE editor in an iframe. Its Add Equipment / Assign Crew /
-// Assign Transport buttons no longer carry their own modals — they postMessage up to this page
-// and reuse these same modals (openAddEquipModal/openAddCrewModal/modalAssignTransport), so
-// there's exactly one implementation of each workflow instead of two that could drift apart.
 window.addEventListener('message', (e) => {
     if (! e.data || e.data.source !== 'ce-editor') return;
     if (e.data.action === 'openAddEquip') openAddEquipModal();
@@ -3152,12 +3043,8 @@ function prepareReject() {
     return true;
 }
 
-// ── Searchable equipment/crew lists ──────────────────────────────────────────
 const equipData = {!! $availEquip->values()->toJson() !!};
 const crewData  = {!! $availCrew->values()->toJson() !!};
-// Available (unallocated) physical units per equipment model — powers the Add Equipment
-// modal's optional Release Unit picker, so staff can pin a specific unit down right at
-// add-time instead of only confirming it later on the Cost Estimate tab.
 const EQUIP_AVAIL_UNITS = {!! $availUnitsByEquipId->map(fn ($g) => $g->map(fn ($u) => ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag])->values())->toJson() !!};
 
 function renderAddEquipUnitSlots() {

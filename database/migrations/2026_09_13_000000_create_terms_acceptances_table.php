@@ -4,12 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * Terms & Conditions version tracking (Part 8). The checkout page (ce-preview.blade.php cart
- * mode) already gates booking submission on two checkboxes (#chkTc/#chkPp) — this persists that
- * acceptance durably instead of it only ever existing as client-side JS state, so which version
- * of the terms a client agreed to (and when) survives the text changing later.
- */
 return new class extends Migration
 {
     public function up(): void

@@ -1,31 +1,21 @@
-/* ============================================================
-   FilmSpec — Light Blue Theme
-   Clean, professional. White/light-gray background, blue accents.
-   Fonts: Bebas Neue + DM Sans + JetBrains Mono
-   ============================================================ */
 :root {
-  /* Backgrounds */
   --bg:      #ECF2FA;
   --surface: #ffffff;
   --s2:      #F0F6FC;
   --s3:      #E2EDF8;
 
-  /* Borders */
   --border:  #CFDFEE;
   --border2: #B5CFEA;
 
-  /* Accent blue — cobalt, matched to logo */
   --accent:  #0060C7;
   --accent2: #004EA3;
   --acclight:#E5F0FF;
   --accglow: rgba(0,96,199,.10);
 
-  /* Text */
   --text:    #0B1A33;
   --sub:     #385270;
   --muted:   #7695B0;
 
-  /* Status */
   --green:   #16a34a;
   --greenl:  #dcfce7;
   --red:     #dc2626;
@@ -38,7 +28,6 @@
   --purplel: #ede9fe;
   --cyan:    #0891b2;
 
-  /* Legacy aliases */
   --surface-bg:    var(--bg);
   --surface-card:  var(--surface);
   --surface-hover: var(--s2);
@@ -57,14 +46,12 @@
   --blue-600: var(--accent);
   --blue-700: var(--accent2);
 
-  /* Layout */
   --sidebar-w: 240px;
   --topbar-h:  58px;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
 
-  /* Shadows */
   --shadow-sm: 0 1px 4px rgba(0,30,80,.07);
   --shadow-md: 0 4px 16px rgba(0,30,80,.10);
   --shadow-lg: 0 8px 32px rgba(0,30,80,.13);
@@ -90,10 +77,8 @@ a { text-decoration:none; color:inherit; }
 button { font-family:var(--font-body); cursor:pointer; }
 img { max-width:100%; }
 
-/* ── LAYOUT ── */
 .app-shell { display:flex; min-height:100vh; }
 
-/* ── SIDEBAR ── */
 .sidebar {
   width: var(--sidebar-w);
   height: 100vh;
@@ -251,14 +236,12 @@ img { max-width:100%; }
 .nav-logout { color:var(--muted) !important; }
 .nav-logout:hover { color:var(--red) !important; background:var(--redl) !important; }
 
-/* ── MAIN ── */
 .main-content {
   margin-left:var(--sidebar-w); flex:1; min-height:100vh; background:var(--bg);
   display:flex; flex-direction:column;
 }
 .page-body { flex:1; }
 
-/* ── TOPBAR ── */
 .topbar {
   height:var(--topbar-h); border-bottom:1px solid var(--border);
   display:flex; align-items:center; padding:0 24px; gap:14px;
@@ -282,13 +265,11 @@ img { max-width:100%; }
 
 .page-body { padding:24px; }
 
-/* ── ANIMATION ── */
 @keyframes fup {
   from { opacity:0; transform:translateY(8px); }
   to   { opacity:1; transform:translateY(0); }
 }
 
-/* ── BUTTONS ── */
 .btn {
   display:inline-flex; align-items:center; gap:5px;
   padding:7px 14px; border-radius:var(--radius-sm);
@@ -320,7 +301,6 @@ img { max-width:100%; }
 }
 .btn-icon:hover { color:var(--accent); border-color:var(--accent); background:var(--acclight); }
 
-/* ── ACTION DROPDOWN (row-level "more actions" menu) ── */
 .action-menu-wrap { position:relative; display:inline-flex; }
 
 .action-menu {
@@ -342,9 +322,6 @@ img { max-width:100%; }
 .action-menu a:hover, .action-menu button:hover { background:var(--s2); }
 .action-menu i, .action-menu svg { width:14px; height:14px; flex-shrink:0; color:var(--muted); }
 
-/* A disabled menu item previously looked pixel-identical to an enabled one (no color/cursor
-   change at all) — clicking it silently did nothing, which just looked broken, especially on
-   touch devices where the explanatory title="" tooltip can never be seen. */
 .action-menu button:disabled {
   color:var(--muted); cursor:not-allowed; opacity:.65;
 }
@@ -369,7 +346,6 @@ img { max-width:100%; }
 
 .action-menu-divider { height:1px; background:var(--border); margin:6px 2px; }
 
-/* ── CARDS ── */
 .card {
   background:var(--surface); border:1px solid var(--border);
   border-radius:var(--radius-md); margin-bottom:20px; overflow:hidden;
@@ -389,7 +365,6 @@ img { max-width:100%; }
 
 .card-body { padding:16px 18px; }
 
-/* ── STAT CARDS ── */
 .stats-grid {
   display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:22px;
 }
@@ -419,7 +394,6 @@ img { max-width:100%; }
 }
 .stat-icon i,.stat-icon svg { width:17px; height:17px; }
 
-/* "vs last period" comparison pill — top-right corner of a .stat-card */
 .stat-cmp {
   position:absolute; top:14px; right:14px;
   display:inline-flex; align-items:center; gap:3px;
@@ -439,7 +413,6 @@ img { max-width:100%; }
 .stat-delta.up   { color:var(--green); }
 .stat-delta.down { color:var(--red); }
 
-/* ── SCROLLABLE CARD BOXES ── */
 .card-scroll    { max-height:320px; overflow-y:auto; overflow-x:auto; }
 .card-scroll-sm { max-height:240px; overflow-y:auto; }
 .card-scroll::-webkit-scrollbar,
@@ -451,7 +424,6 @@ img { max-width:100%; }
 .card-scroll::-webkit-scrollbar-thumb:hover,
 .card-scroll-sm::-webkit-scrollbar-thumb:hover { background:var(--muted); }
 
-/* ── TABLES ── */
 .table-wrap { overflow-x:auto; overflow-y:visible; }
 
 table { width:100%; border-collapse:collapse; }
@@ -470,7 +442,6 @@ tbody td {
 tbody tr:last-child td { border-bottom:none; }
 tbody tr:hover td { background:var(--acclight); }
 
-/* ── BADGES ── */
 .badge {
   display:inline-flex; align-items:center;
   padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600;
@@ -485,7 +456,6 @@ tbody tr:hover td { background:var(--acclight); }
 .badge-gray   { background:var(--s3);      color:var(--muted); }
 .badge-cyan   { background:#e0f2fe;        color:var(--cyan); }
 
-/* ── FORMS ── */
 .form-group { display:flex; flex-direction:column; gap:5px; margin-bottom:14px; }
 .form-group label {
   font-size:10.5px; color:var(--sub); letter-spacing:.5px;
@@ -505,7 +475,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
 .form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 .form-row.cols-3 { grid-template-columns:1fr 1fr 1fr; }
 
-/* ── FILTER BAR ── */
 .filter-bar { display:flex; align-items:center; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
 
 .search-input-wrap {
@@ -520,7 +489,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
   padding:8px 0; flex:1; font-family:var(--font-body); outline:none;
 }
 
-/* ── SEARCHABLE DROPDOWN (type-to-search pickers: crew, bookings, equipment, etc.) ── */
 .crew-slot-drop{display:none;position:absolute;left:0;right:0;top:calc(100% + 3px);background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 24px rgba(0,30,80,.14);z-index:9999;max-height:220px;overflow-y:auto;min-width:210px}
 .csd-item{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s}
 .csd-item:last-child{border-bottom:none}
@@ -529,7 +497,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
 .csd-ref{font-weight:700;font-size:.85rem;color:var(--text)}
 .csd-sub{font-size:.75rem;color:var(--text-muted,var(--muted));margin-top:2px}
 
-/* ── LIST PAGER (booking tab search/filter/pagination) ── */
 .pager {
   display:flex; align-items:center; justify-content:space-between; gap:12px;
   padding:10px 18px; border-top:1px solid var(--border); flex-wrap:wrap; background:var(--s2);
@@ -547,7 +514,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
 .toolbar-search .search-input-wrap { min-width:180px; flex:0 0 auto }
 .toolbar-search select.form-control { width:auto; font-size:12px; padding:7px 10px }
 
-/* ── TABS ── */
 .tabs {
   display:flex; gap:2px; background:var(--s3);
   padding:3px; border-radius:7px; margin-bottom:20px; flex-wrap:wrap;
@@ -567,7 +533,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
 
 .tab-divider { width:1px; align-self:stretch; background:var(--border2); margin:2px 10px; }
 
-/* ── MODALS ── */
 .modal-overlay {
   position:fixed; inset:0; background:rgba(0,30,80,.45);
   backdrop-filter:blur(3px);
@@ -580,9 +545,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
 .modal {
   background:var(--surface); border:1px solid var(--border2);
   border-radius:var(--radius-lg); width:560px; max-width:94vw;
-  /* var(--vvh) tracks the real visible height (keyboard-aware.js) so the modal
-     shrinks along with the keyboard instead of staying sized to the full,
-     un-shrunk layout viewport — which is what traps fields behind the keyboard. */
   max-height:calc(var(--vvh, 100vh) - 40px);
   overflow-y:auto; transform:scale(.96); transition:transform .2s;
   box-shadow:var(--shadow-lg);
@@ -611,7 +573,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
   padding:14px 22px; border-top:1px solid var(--border);
 }
 
-/* ── ALERTS ── */
 .alert {
   display:flex; align-items:flex-start; gap:10px;
   padding:12px 14px; border-radius:var(--radius-md); margin-bottom:16px;
@@ -623,7 +584,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
 .alert-info    { background:var(--acclight);border-color:var(--border2); color:var(--accent); }
 .alert-warning { background:var(--yellowl); border-color:#fcd34d; color:var(--yellow); }
 
-/* ── EMPTY STATE ── */
 .empty-state {
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   padding:52px 24px; text-align:center;
@@ -632,7 +592,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
 .empty-state h3 { font-size:14px; font-weight:600; color:var(--sub); margin-bottom:6px; }
 .empty-state p  { font-size:12.5px; color:var(--muted); margin-bottom:16px; }
 
-/* ── EQUIPMENT GRID ── */
 .equip-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; padding:18px; }
 
 .equip-card {
@@ -655,7 +614,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
 .equip-card-rate { font-family:var(--font-mono); font-size:13px; color:var(--accent); font-weight:700; }
 .equip-card-acts { display:flex; gap:5px; margin-top:10px; }
 
-/* ── CREW AVATAR ── */
 .crew-avatar {
   width:36px; height:36px; border-radius:50%;
   background:linear-gradient(135deg,var(--accent),var(--purple));
@@ -664,7 +622,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
 }
 .crew-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
 
-/* ── STATUS DOT ── */
 .status-dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; vertical-align:middle; flex-shrink:0; }
 .dot-green  { background:var(--green); }
 .dot-yellow { background:var(--yellow); animation:pulse 2s infinite; }
@@ -675,7 +632,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
 
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.35;} }
 
-/* ── PAGINATION ── */
 .pagination { display:flex; gap:4px; align-items:center; flex-wrap:wrap; }
 .page-btn {
   display:inline-flex; align-items:center; justify-content:center;
@@ -686,7 +642,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
 .page-btn:hover { color:var(--accent); border-color:var(--accent); }
 .page-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
 
-/* ── IMAGE UPLOAD ── */
 .img-upload-zone {
   border:2px dashed var(--border2); border-radius:var(--radius-md);
   padding:22px; text-align:center; cursor:pointer; transition:all .2s;
@@ -699,7 +654,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
 .img-upload-label { font-size:11.5px; color:var(--muted); margin-top:6px; }
 .img-upload-icon  { font-size:26px; color:var(--border2); margin-bottom:6px; }
 
-/* ── TOAST ── */
 .toast-container { position:fixed; bottom:20px; right:20px; z-index:999; display:flex; flex-direction:column; gap:8px; }
 .toast-item {
   background:var(--surface); border:1px solid var(--border2);
@@ -712,16 +666,13 @@ textarea.form-control { resize:vertical; min-height:72px; }
 .toast-item.show { transform:translateY(0); opacity:1; }
 .toast-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
 
-/* ── TAB PANES ── */
 .tab-pane { display:none; animation:fup .25s ease; }
 .tab-pane.active { display:block; }
 
-/* ── MISC ── */
 .mono { font-family:var(--font-mono); }
 .text-accent { color:var(--accent); }
 .text-muted  { color:var(--muted); }
 
-/* ── CHECKLIST SPECIFIC ── */
 .check-row {
   display:flex; align-items:center; gap:12px;
   padding:8px 14px; border-bottom:1px solid var(--border);
@@ -731,7 +682,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
 .check-row input[type=checkbox] { width:16px; height:16px; cursor:pointer; accent-color:var(--accent); }
 .check-row.checked { opacity:.6; text-decoration:line-through; }
 
-/* ── SUPPORT CHAT INBOX ── */
 .sc-inbox {
   display:flex; height:calc(100vh - 230px); min-height:460px;
   background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);
@@ -797,13 +747,11 @@ textarea.form-control { resize:vertical; min-height:72px; }
   .sc-list { width:100%; border-right:none; border-bottom:1px solid var(--border); max-height:280px; }
 }
 
-/* ── CE PREVIEW (prints) ── */
 @media print {
   .sidebar,.topbar,.page-body>.card-header button { display:none !important; }
   .main-content { margin-left:0 !important; }
 }
 
-/* ── ROLE ACCESS CHECKLIST (Super Admin → Role Permissions) ── */
 .role-pills {
   display:flex; gap:8px; flex-wrap:wrap; padding:14px 18px;
   border-bottom:1px solid var(--border); background:var(--s2);
@@ -859,9 +807,6 @@ textarea.form-control { resize:vertical; min-height:72px; }
   .role-banner { flex-direction:column; align-items:flex-start; }
 }
 
-/* ── Export ▾ dropdown (partials/export-dropdown.blade.php) — shared across every staff
-   data-table/report page, promoted from what used to be reports.blade.php's own inline
-   <style> block so every page gets it for free. ── */
 .export-btn { position:relative; }
 .export-menu { display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:5px;min-width:200px;box-shadow:var(--shadow-md);z-index:200; }
 .export-menu.open { display:block; }

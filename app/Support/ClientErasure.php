@@ -6,26 +6,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
-/**
- * Data Privacy Act (R.A. 10173) right-to-erasure. Shared by the client-facing request form
- * (HomeController) and the staff-side Data Retention page (DataRetentionController) so both
- * call exactly the same anonymization logic instead of forking it.
- *
- * Deliberately anonymizes rather than deletes: bookings, payments, and other financial/
- * operational records stay intact (needed for accounting/legal retention regardless of an
- * erasure request) — only the identifying fields on users/clients are scrubbed, and the
- * account is deactivated so it can no longer be logged into. Free-text history the client
- * wrote themselves (booking comments, support chat messages) is left as-is: rewriting a
- * booking's own communication record is a much larger, riskier operation than scrubbing a
- * profile, and those records may themselves need to be kept for the same legal reasons.
- */
 class ClientErasure
 {
-    public static function pendingCount(): int
-    {
-        return (int) DB::table('data_erasure_requests')->where('status', 'pending')->count();
-    }
-
     public static function pendingRequests()
     {
         return DB::table('data_erasure_requests as r')
@@ -36,7 +18,6 @@ class ClientErasure
             ->get();
     }
 
-    /** Anonymizes the client's identifying fields and deactivates their login. */
     public static function anonymize(int $clientId, int $processedBy, ?string $staffNotes = null): void
     {
         $client = DB::table('clients')->where('client_id', $clientId)->first();

@@ -25,7 +25,6 @@
 </div>
 @endif
 
-<!-- KPIs -->
 <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
   <div class="stat-card green">
     <div class="stat-icon"><i data-feather="dollar-sign"></i></div>
@@ -49,7 +48,6 @@
   </div>
 </div>
 
-<!-- Tabs -->
 <div class="tabs">
   <button class="tab-btn {{ $tab === 'payments' ? 'active' : '' }}" data-tab="tab-payments">
     <i data-feather="credit-card" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"></i>
@@ -101,7 +99,6 @@
 
 <div data-tab-panes>
 
-<!-- PAYMENTS TAB -->
 <div id="tab-payments" class="tab-pane {{ $tab === 'payments' ? 'active' : '' }}">
   <div class="card">
     <div class="card-header">
@@ -216,7 +213,6 @@
   </div>
 </div>
 
-<!-- UNBILLED TAB -->
 <div id="tab-unbilled" class="tab-pane {{ $tab === 'unbilled' ? 'active' : '' }}">
   <div class="card">
     <div class="card-header">
@@ -265,7 +261,6 @@
   </div>
 </div>
 
-<!-- SOA TAB -->
 <div id="tab-soa" class="tab-pane {{ $tab === 'soa' ? 'active' : '' }}">
   <div class="card">
     <div class="card-header">
@@ -361,7 +356,6 @@
   </div>
 </div>
 
-<!-- OVERDUE ACCOUNTS TAB -->
 <div id="tab-overdue" class="tab-pane {{ $tab === 'overdue' ? 'active' : '' }}">
   <div class="card">
     <div class="card-header">
@@ -461,7 +455,6 @@
   </div>
 </div>
 
-<!-- CANCELLATION CHARGES TAB -->
 <div id="tab-cancellations" class="tab-pane {{ $tab === 'cancellations' ? 'active' : '' }}">
   <div class="card">
     <div class="card-header">
@@ -549,7 +542,6 @@
   </div>
 </div>
 
-<!-- DISCOUNTS TAB -->
 <div id="tab-discounts" class="tab-pane {{ $tab === 'discounts' ? 'active' : '' }}">
   <div class="card" style="margin-bottom:16px">
     <div class="card-header">
@@ -636,7 +628,6 @@
   </div>
 </div>
 
-<!-- CLIENT PAYMENT REQUESTS TAB -->
 <div id="tab-payment-requests" class="tab-pane {{ $tab === 'payment-requests' ? 'active' : '' }}">
   <div class="card" style="margin-bottom:16px">
     <div class="card-header">
@@ -745,10 +736,9 @@
   </div>
 </div>
 
-</div><!-- /tab panes -->
+</div>
 
 @if ($canRecord)
-<!-- RECORD PAYMENT MODAL -->
 <style>
 .crew-slot-drop{display:none;position:absolute;left:0;right:0;top:calc(100% + 3px);background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 24px rgba(0,30,80,.14);z-index:9999;max-height:220px;overflow-y:auto;min-width:210px}
 .csd-item{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s}
@@ -877,7 +867,6 @@
   </div>
 </div>
 
-<!-- VOID PAYMENT MODAL -->
 <div class="modal-overlay" id="modalVoidPayment">
   <div class="modal" style="max-width:460px">
     <div class="modal-header">
@@ -907,7 +896,6 @@
   </div>
 </div>
 
-<!-- APPROVE DISCOUNT MODAL -->
 <div class="modal-overlay" id="modalApproveDiscount">
   <div class="modal" style="max-width:440px">
     <div class="modal-header">
@@ -938,7 +926,6 @@
   </div>
 </div>
 
-<!-- REJECT DISCOUNT MODAL -->
 <div class="modal-overlay" id="modalRejectDiscount">
   <div class="modal" style="max-width:440px">
     <div class="modal-header">
@@ -966,7 +953,6 @@
   </div>
 </div>
 
-<!-- APPROVE PAYMENT SUBMISSION MODAL -->
 <div class="modal-overlay" id="modalApprovePaymentSub">
   <div class="modal" style="max-width:440px">
     <div class="modal-header">
@@ -992,7 +978,6 @@
   </div>
 </div>
 
-<!-- REJECT PAYMENT SUBMISSION MODAL -->
 <div class="modal-overlay" id="modalRejectPaymentSub">
   <div class="modal" style="max-width:440px">
     <div class="modal-header">
@@ -1064,7 +1049,6 @@ function toggleBillingPaymentFields() {
   document.getElementById('billingProofInput').required = isGcash || isBank;
 }
 
-// ── Record Payment: searchable booking picker ───────────────────────────────
 const pendingPayBkgs = {!! $pendingPayBkgs->values()->toJson() !!};
 
 function _escH(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -1125,13 +1109,11 @@ function prepPayment() {
   return true;
 }
 
-// Module-level state for the currently-selected booking, so the amount field can be edited
-// after selection and everything downstream (purpose, full-settle note) stays in sync.
 let _rpTotal = 0, _rpPaid = 0, _rpBalance = 0, _rpPurposeManual = false;
 
 function fillPaymentInfoFromData(total, paid, isVat) {
   _rpTotal = total; _rpPaid = paid; _rpBalance = Math.max(0, total - paid);
-  _rpPurposeManual = false; // new booking selected — go back to auto-suggesting a purpose
+  _rpPurposeManual = false;
   const fmt = (n) => '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2 });
 
   document.getElementById('bkgFoundNote').classList.add('show');
@@ -1148,11 +1130,6 @@ function fillPaymentInfoFromData(total, paid, isVat) {
   onPayAmountChange();
 }
 
-// Payment Type/Purpose auto-derives from where this payment lands relative to the booking's
-// billing state — first payment is a Downpayment, a payment that fully settles what's left is
-// the Final Balance, anything else in between is a Progress Payment. Still just a *default*:
-// the dropdown stays editable, and once staff pick a purpose themselves we stop overriding it
-// on every amount keystroke (onPayPurposeChange sets _rpPurposeManual).
 function onPayAmountChange() {
   const amt = parseFloat(document.getElementById('payAmount').value) || 0;
 

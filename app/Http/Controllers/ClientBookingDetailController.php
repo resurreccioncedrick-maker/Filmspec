@@ -44,14 +44,6 @@ class ClientBookingDetailController extends Controller
             ->where('booking_id', $id)->where('status', 'pending')
             ->orderByDesc('created_at')->first();
 
-        // A client can only ask for a discount while the booking is still live and nothing
-        // has been paid/refunded/written off yet — matches the whereNotIn('booking_status',
-        // ['cancelled', 'completed']) idiom already used elsewhere in this controller, plus
-        // the payment side so a request can't land after money has already moved. Also closes
-        // off a confusing duplicate: once a discount is pending OR already approved for this
-        // booking, the "Request Discount" button/form must stay hidden — previously it only
-        // checked 'pending', so the button silently reappeared the moment staff approved one,
-        // inviting an identical-looking second request with no real purpose.
         $hasActiveDiscount = DB::table('booking_discounts')->where('booking_id', $id)
             ->whereIn('status', ['pending', 'approved'])->exists();
         $canRequestDiscount = ! in_array($booking->booking_status, ['cancelled', 'completed'], true)
@@ -192,7 +184,7 @@ class ClientBookingDetailController extends Controller
                         } else {
                             $requestMsg = ['type' => 'error', 'text' => 'Please select an accessory.'];
                         }
-                    } else { // crew — client picks a role/position, not a specific person
+                    } else {
                         $pid = (int) $request->input('position_id', 0);
                         if ($pid) {
                             DB::table('booking_equipment_requests')->insert([
@@ -278,11 +270,6 @@ class ClientBookingDetailController extends Controller
             ->where('booking_id', $id)->where('status', 'pending')->sum('amount');
         $remainingBalance = max(0, (float) $booking->final_amount - $paidSoFar - $pendingSubmitted);
 
-        // Client-submitted payment claims — shown as "Awaiting Review" until staff/accounting
-        // approve them from Billing > Client Payment Requests. An approved submission is
-        // excluded here since it already has a real row in $payments above (would otherwise
-        // look like a duplicate entry); a rejected one stays visible briefly so the client sees
-        // the outcome instead of their submission just vanishing.
         $paymentSubmissions = DB::table('client_payment_submissions')
             ->where('booking_id', $id)
             ->where(function ($w) {
@@ -305,8 +292,6 @@ class ClientBookingDetailController extends Controller
             ->get()
             ->each(function ($c) {
                 $c->author_label = $c->author_role === 'client' ? null : \App\Support\StaffTeamLabel::forRole($c->author_role);
-                // Pre-department-routing rows have no department — treated as the 'staff'
-                // bucket (not backfilled in the DB; see the add_department migration).
                 $c->department = $c->department ?: 'staff';
             });
 
@@ -330,14 +315,6 @@ class ClientBookingDetailController extends Controller
         ]);
     }
 
-    /**
-     * A client-submitted payment is a CLAIM, not a confirmed payment — it never touches the
-     * `payments` table directly. Staff/accounting approve it from Billing > Client Payment
-     * Requests, which is what actually inserts the real payments row (same receipt-numbering
-     * and balance-check discipline BookingDetailController::recordPayment() uses). This keeps
-     * every "amount paid so far" calculation elsewhere in the app exactly as trustworthy as it
-     * is today — a pending claim can never be mistaken for real money received.
-     */
     private function handleSubmitPayment(Request $request, int $id, int $uid, object $booking): array
     {
         $ptype = $request->input('payment_type', 'final');
@@ -362,10 +339,6 @@ class ClientBookingDetailController extends Controller
             ->where('booking_id', $id)->where('status', 'pending')->sum('amount');
         $remaining = round((float) $booking->final_amount - $paidSoFar - $pendingSubmitted, 2);
         if ((float) $booking->final_amount > 0 && $amount > $remaining + 0.005) {
-            // Distinguishes "already fully settled" (remaining is genuinely ₱0, e.g. a stale
-            // Pay form left open from before the balance cleared) from "this amount is just too
-            // high" — the old message said "exceeds ₱0.00" either way, which read as a confusing
-            // non-sequitur when the client believed they'd already paid in full.
             if ($remaining <= 0.005) {
                 return ['type' => 'danger', 'text' => 'This booking is already fully paid — no further payment is needed. If you just submitted a payment, it may still be awaiting staff review.'];
             }
@@ -401,11 +374,6 @@ class ClientBookingDetailController extends Controller
             return ['type' => 'danger', 'text' => 'Proof of Payment is required when submitting a payment yourself.'];
         }
 
-        // Re-checked and inserted inside a locked transaction — the balance check above (lines
-        // 353-358) runs before the file upload and was the only guard previously, with no lock,
-        // so a double-click or a stale resubmit after a rejection could both pass it and both
-        // insert before either committed. Locking the booking row here closes that race, same
-        // pattern BillingController's record_payment already uses for real payments.
         $error = DB::transaction(function () use ($id, $uid, $ptype, $pmethod, $amount, $ref, $bankName, $proofPath, $notes, $booking) {
             DB::table('bookings')->where('booking_id', $id)->lockForUpdate()->value('booking_id');
             $paidSoFar = (float) DB::table('payments')->where('booking_id', $id)->sum('amount');
@@ -437,11 +405,6 @@ class ClientBookingDetailController extends Controller
         return ['type' => 'success', 'text' => 'Your payment of <strong>₱' . number_format($amount, 2) . '</strong> has been submitted and is awaiting review by our team.'];
     }
 
-    /**
-     * Streams a chat attachment back — 404 (not 403) if the comment doesn't belong to a
-     * booking owned by the logged-in client, same "don't reveal it exists" discipline as
-     * DocumentController::download().
-     */
     public function attachment(Request $request, int $id, int $commentId)
     {
         $user = Auth::user();

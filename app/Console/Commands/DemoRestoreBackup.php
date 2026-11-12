@@ -5,10 +5,6 @@ namespace App\Console\Commands;
 use App\Support\DatabaseBackup;
 use Illuminate\Console\Command;
 
-/**
- * Restores a SQL dump produced by DatabaseBackup::dump() from a fixed path
- * (storage/app/restore.sql) — a one-shot undo path for the demo reset, run by hand only.
- */
 class DemoRestoreBackup extends Command
 {
     protected $signature = 'demo:restore-backup {--force : Skip the confirmation prompt}';

@@ -18,7 +18,6 @@
   'extraParams' => array_filter(['tab' => $tab, 'q' => $search]),
 ])
 
-<!-- Financial dashboard (moved from Reports in Part 11) -->
 <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
   <div class="stat-card">
     @include('partials.stat-comparison', ['delta' => $ceDeltas['packaged_cost']])
@@ -66,7 +65,6 @@
 <div style="margin-bottom:22px"></div>
 @endif
 
-<!-- Recap chart -->
 <div class="card" style="margin-bottom:16px">
   <div class="card-header">
     <h2 class="card-title">Recap
@@ -86,7 +84,6 @@
   </div>
 </div>
 
-<!-- Where the packaged cost goes + by client -->
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px">
   <div class="card">
     <div class="card-header"><h2 class="card-title">Confirmed CE Composition</h2></div>
@@ -144,11 +141,6 @@
   </div>
 </div>
 
-<!-- KPI Row — deliberately NOT tied to the period filter above: this is a live "right now,
-     this real calendar month" operational snapshot (how much work is moving today), same
-     idea as Dashboard's always-current numbers, not a historical report. Labeled explicitly
-     so switching the period filter above (e.g. to "3 Months") doesn't look like it silently
-     failed to update this row — it's a different question on purpose. -->
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
   <span style="font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)">Current CE Pipeline — As of {{ now()->format('M j, Y') }}</span>
   <span style="font-size:.72rem;color:var(--text-muted)" title="Always the current calendar month, independent of the period filter above">
@@ -178,7 +170,6 @@
   </div>
 </div>
 
-<!-- Status tabs -->
 <div class="tabs" style="margin-bottom:18px">
   @php
     $tabBadge = ['confirmed' => 'badge-green', 'draft' => 'badge-orange', 'issued' => 'badge-blue', 'superseded' => 'badge-gray', 'cancelled' => 'badge-red', 'all' => 'badge-gray'];

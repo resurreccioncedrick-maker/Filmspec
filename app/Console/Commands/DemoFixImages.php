@@ -6,20 +6,12 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
-/**
- * Replaces the shared, repetitive per-category placeholder images (every "Audio" item showing
- * the identical giant "AUD" card) with a distinct icon-on-gradient card per individual
- * equipment/accessory/vehicle row — same idea (can't fetch real product photos), varied enough
- * that a grid of similar items doesn't look like the same image four times.
- */
 class DemoFixImages extends Command
 {
     protected $signature = 'demo:fix-images {--force : Skip the confirmation prompt}';
 
     protected $description = 'Regenerate distinct placeholder images per equipment/accessory/vehicle row';
 
-    // Deliberately gentler, more varied tones than the old flat-primary category icons —
-    // and enough of them that adjacent items in a grid rarely repeat.
     private const PALETTE = [
         ['#3b82f6', '#1d4ed8'], ['#0ea5e9', '#0369a1'], ['#06b6d4', '#0e7490'],
         ['#10b981', '#047857'], ['#84cc16', '#4d7c0f'], ['#f59e0b', '#b45309'],
@@ -28,7 +20,6 @@ class DemoFixImages extends Command
         ['#14b8a6', '#0f766e'], ['#64748b', '#334155'],
     ];
 
-    // A simple representative icon (viewBox 0 0 100 100) per category/kind — line art, not text.
     private const ICONS = [
         'Camera' => '<rect x="18" y="34" width="54" height="38" rx="6"/><path d="M30 34l6-10h16l6 10"/><circle cx="45" cy="53" r="12" fill="none" stroke-width="4"/><rect x="72" y="42" width="12" height="18" rx="2"/>',
         'Lens' => '<circle cx="50" cy="50" r="30"/><circle cx="50" cy="50" r="19" fill="none" stroke-width="4"/><circle cx="50" cy="50" r="8"/>',
@@ -91,8 +82,6 @@ class DemoFixImages extends Command
         foreach ($rows as $r) {
             $path = 'assets/demo/vehicles/veh-' . $r->fleet_vehicle_id . '.svg';
             $this->putCard($path, 'Vehicle', $r->plate_no . ' ' . $r->brand);
-            // fleet_vehicles has no image column in this schema — vehicle imagery, if the UI
-            // ever adds it, would read from this same deterministic path; nothing to update here.
         }
 
         return $rows->count();

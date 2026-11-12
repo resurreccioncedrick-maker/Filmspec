@@ -6,17 +6,11 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('crew_profile_requests', function (Blueprint $table) {
             $table->id('request_id');
             $table->integer('crew_id');
-            // Non-password field changes, e.g. {"phone":{"old":"...","new":"..."},"email":{...}}
-            // — never contains a password field; password is a separate pair of columns below so
-            // a plaintext/hash value is never embedded in a JSON blob an admin's UI might render.
             $table->json('changes')->nullable();
             $table->boolean('password_change_requested')->default(false);
             $table->string('new_password_hash', 255)->nullable();
@@ -32,9 +26,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('crew_profile_requests');

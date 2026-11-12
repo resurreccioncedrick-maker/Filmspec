@@ -44,7 +44,6 @@
   Data shown is based on current confirmed cost estimates. Amounts are ex-VAT unless otherwise stated.
 </div>
 
-<!-- KPIs -->
 <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:22px">
   <div class="stat-card green">
     @include('partials.stat-comparison', ['delta' => $crewDeltas['spend']])
@@ -88,7 +87,6 @@
 </div>
 @endif
 
-<!-- Spend chart + Period Summary -->
 <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:22px" class="crew-chart-grid">
   <div class="card" style="margin-bottom:0">
     <div class="card-header">
@@ -138,7 +136,6 @@
   </div>
 </div>
 
-<!-- Search -->
 <div class="card" style="margin-bottom:14px">
   <div class="card-body">
     <form method="GET" action="{{ route('crew-data') }}">
@@ -169,7 +166,6 @@
 </div>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="crew-data-grid">
-  <!-- People -->
   <div class="card">
     <div class="card-header">
       <h2 class="card-title">Crew Members <span class="badge badge-gray" style="margin-left:4px">{{ $byPerson->count() }}</span></h2>
@@ -208,7 +204,6 @@
     </div>
   </div>
 
-  <!-- Roles -->
   <div class="card">
     <div class="card-header">
       <h2 class="card-title">Crew by Role <span class="badge badge-gray" style="margin-left:4px">{{ $byRole->count() }}</span></h2>

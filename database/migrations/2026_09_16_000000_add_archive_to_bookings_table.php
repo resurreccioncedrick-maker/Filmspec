@@ -9,8 +9,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('bookings', function (Blueprint $table) {
-            // Soft-delete for pending/cancelled bookings — replaces the old hard-delete so
-            // audit history (activity_logs, related line-item tables) is never destroyed.
             $table->boolean('is_archived')->default(false)->after('booking_status');
             $table->dateTime('archived_at')->nullable()->after('is_archived');
             $table->integer('archived_by')->nullable()->after('archived_at');

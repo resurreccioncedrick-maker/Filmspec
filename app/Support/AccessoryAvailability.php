@@ -4,16 +4,8 @@ namespace App\Support;
 
 use Illuminate\Support\Facades\DB;
 
-/**
- * Same "available units right now" math HomeController's eq_detail branch and
- * AccessoriesController's admin stats both need — individually tracked accessories count real
- * accessory_units at status=available; quantity-tracked ones subtract what's already committed
- * to other active bookings from the plain quantity column. Centralized here so CartController's
- * add-to-cart validation can never disagree with what the client was shown.
- */
 class AccessoryAvailability
 {
-    /** @return array<int,int> accessory_id => available units right now */
     public static function bulkAvailable(array $accessoryIds): array
     {
         $accessoryIds = array_values(array_unique(array_map('intval', $accessoryIds)));

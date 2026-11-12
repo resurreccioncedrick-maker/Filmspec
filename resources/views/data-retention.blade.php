@@ -21,7 +21,6 @@
 </div>
 @endif
 
-<!-- KPI row -->
 <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
   <div class="stat-card" style="--sb:#0891b2">
     <div class="stat-icon" style="background:#cffafe;color:#0891b2"><i data-feather="calendar"></i></div>

@@ -73,10 +73,6 @@ class BookingsController extends Controller
             ->selectRaw('(SELECT ce_id FROM cost_estimates ce WHERE ce.booking_id = b.booking_id ORDER BY ce_id DESC LIMIT 1) AS latest_ce_id')
             ->selectRaw("(SELECT CONCAT(discount_type,':',discount_value) FROM booking_discounts bd WHERE bd.booking_id = b.booking_id AND bd.status = 'pending' LIMIT 1) AS pending_discount")
             ->selectRaw("(SELECT discount FROM cost_estimates ce WHERE ce.booking_id = b.booking_id ORDER BY ce_id DESC LIMIT 1) AS active_discount")
-            // booking_id, not created_at — this data has demo/seed rows whose created_at was
-            // backdated for shoot-date realism and doesn't track real insertion order, so
-            // "latest first" by created_at came out visibly scrambled (e.g. #45 above #46).
-            // booking_id is auto-increment and always matches true insertion order.
             ->orderByDesc('b.booking_id')
             ->forPage($page, $perPage)
             ->get();
@@ -100,8 +96,6 @@ class BookingsController extends Controller
             ? (int) Booking::where('approval_status', 'pending_approval')->where('is_archived', false)->count()
             : 0;
 
-        // Same derivation as Dashboard's KPI strip: overdue-for-return is a booking still
-        // 'ongoing' past its own shoot end date, since there's no dedicated status for it.
         $overdueReturnsCount = (int) $baseCountQuery()
             ->where('is_archived', false)->where('booking_status', 'ongoing')
             ->where('shoot_date_end', '<', now()->toDateString())->count();
@@ -146,7 +140,6 @@ class BookingsController extends Controller
         ]);
     }
 
-    /** Same filters index() applies, shared with export() so the two can never drift apart. */
     private function filteredQuery(Request $request, $user, string $role)
     {
         $statusFilter = $request->query('status', '');
@@ -184,7 +177,6 @@ class BookingsController extends Controller
         return $query;
     }
 
-    /** Export ▾ — reuses filteredQuery() unbounded (no page/perPage) so it always matches what's on screen. */
     private function export(Request $request, $user, string $role): StreamedResponse|Response
     {
         $headers = ['Reference', 'Client', 'Project', 'Shoot Start', 'Shoot End', 'Status', 'Payment', 'Amount'];
@@ -214,9 +206,6 @@ class BookingsController extends Controller
         $action = $request->input('action', '');
         $uid = $user->user_id;
 
-        // 'accounting' deliberately excluded: this force-sets payment_status directly with no
-        // payments-table row, receipt, or SOA sync — accounting's real path is record_payment
-        // (BillingController / BookingDetailController), which keeps all of that in sync.
         if ($action === 'update_payment_status' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $bid = (int) $request->input('booking_id');
             $pStatus = $request->input('payment_status');
@@ -238,11 +227,6 @@ class BookingsController extends Controller
         if ($action === 'update_status') {
             $id = (int) $request->input('booking_id');
             $newStatus = $request->input('booking_status');
-            // 'ongoing' and 'completed' are deliberately NOT allowed here — reaching them skips
-            // every gate those transitions actually require (CE confirmed, client cost approval,
-            // crew/transport assigned, equipment checked out/in, incidents resolved), which only
-            // BookingDetailController::checkout()/bulkCheckout() and completeBooking() enforce.
-            // This generic action stays limited to the states that have no such prerequisites.
             $allowed = ['pending', 'confirmed', 'cancelled'];
             if ($role === 'traffic' && $newStatus === 'confirmed') {
                 return ['type' => 'danger', 'text' => 'Bookings must be approved by the Operations Manager before they can be confirmed.'];
@@ -276,10 +260,6 @@ class BookingsController extends Controller
             $bid = (int) $request->input('booking_id');
             $status = Booking::where('booking_id', $bid)->value('booking_status');
             if (in_array($status, ['pending', 'cancelled'], true)) {
-                // A cancelled booking can still have real recorded payments (cancellation only
-                // updates payment_status, it never touches the payments rows themselves). That's
-                // fine here — archiving doesn't destroy anything, so it's just surfaced as a note
-                // rather than blocked like the old hard-delete had to.
                 $hasPayments = DB::table('payments')->where('booking_id', $bid)->exists();
                 $ref = Booking::where('booking_id', $bid)->value('booking_reference');
                 Booking::where('booking_id', $bid)->update([
@@ -311,9 +291,6 @@ class BookingsController extends Controller
                 'approval_status' => 'approved', 'approved_by' => $uid, 'approved_at' => now(),
                 'booking_status' => 'confirmed', 'updated_at' => now(),
             ]);
-            // Matches BookingDetailController's own approve_booking branch — without this, a
-            // booking approved from this list page sits in 'confirmed' with zero cost-estimate
-            // rows until someone happens to add equipment/crew or hits Generate CE manually.
             BookingCosting::generateCostEstimate($bid, $uid);
             DB::table('quotation_log')->insert([
                 'booking_id' => $bid, 'log_type' => 'confirmed', 'logged_by' => $uid,
@@ -327,13 +304,6 @@ class BookingsController extends Controller
         if ($action === 'reject_booking' && in_array($role, ['super_admin', 'operations_manager'], true)) {
             $bid = (int) $request->input('booking_id', 0);
             $notes = trim($request->input('approval_notes', ''));
-            // booking_status must move in lockstep with approval_status — every other surface
-            // (client portal badge/tracker, admin Status column, equipment availability) reads
-            // booking_status, not approval_status, so leaving it at 'pending' here is what made
-            // a rejected booking still show as "Awaiting Review"/"Pending" everywhere but the
-            // small reference-row badge. Mirrors BookingDetailController's own reject_booking
-            // branch: booking_status -> 'cancelled' (booking_status has no separate "rejected"
-            // value) and release any equipment this booking had reserved.
             DB::table('equipment')->whereIn('equipment_id', function ($q) use ($bid) {
                 $q->select('equipment_id')->from('booking_equipment')->where('booking_id', $bid);
             })->update(['availability_status' => 'available']);
@@ -396,9 +366,6 @@ class BookingsController extends Controller
                 'shoot_date_end' => $de,
                 'shoot_location' => $request->input('shoot_location', ''),
                 'notes' => $request->input('notes', ''),
-                // transportation_cost is deliberately not touched here — it's set only via the
-                // Assign Transport action on the booking detail page, where it's a manual entry
-                // (see BookingDetailController::assignTransport()), not derived from zone/vehicle.
                 'delivery_address' => $request->input('delivery_address', ''),
                 'location_zone' => $zone ?: null,
                 'transport_multiplier' => $multiplier,
@@ -415,9 +382,6 @@ class BookingsController extends Controller
         return null;
     }
 
-    // Relocated from the Cost Estimate editor (booking detail) — this is now where staff
-    // propose a discount; approval happens on the Billing page instead of here, matching how
-    // the reference process actually handles discounts (booking, then accounting sign-off).
     private function proposeDiscount(Request $request, int $uid): array
     {
         $bid = (int) $request->input('booking_id');
@@ -446,9 +410,6 @@ class BookingsController extends Controller
                     'contact_person' => strtoupper(trim($request->input('new_client_name'))),
                     'email' => $email,
                     'phone' => $cpRaw,
-                    // Every new client starts as "New Customer" — same rule as
-                    // ClientsController::add_client, so Regular status is only ever earned via
-                    // the mark_regular_client action, never picked at creation time.
                     'client_type' => 'first_time',
                 ]);
                 $clientId = $client->client_id;
@@ -502,8 +463,6 @@ class BookingsController extends Controller
         $lng = (float) $request->input('location_lng', 0);
         $vid = (int) $request->input('vehicle_rate_id', 0);
 
-        // transportation_cost starts at 0 — it's set later via the Assign Transport action on
-        // the booking detail page, where traffic/admin manually enters the actual price.
         $transCost = 0.0;
 
         $approvalSt = $role === 'traffic' ? 'pending_approval' : 'approved';

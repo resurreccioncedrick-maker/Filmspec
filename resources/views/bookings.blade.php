@@ -18,7 +18,6 @@
   $bookingsBase = route('bookings');
 @endphp
 
-<!-- Leaflet map assets (used in booking modals) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -34,7 +33,6 @@
 </div>
 @endif
 
-<!-- KPI strip -->
 <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
   <div class="stat-card {{ $pendingApprovalCount > 0 ? 'orange' : '' }}">
     <div class="stat-icon" style="{{ $pendingApprovalCount > 0 ? 'background:var(--orangel);color:var(--orange)' : '' }}"><i data-feather="file-text"></i></div>
@@ -75,7 +73,6 @@
 </div>
 @endif
 
-<!-- Status quick filter tabs -->
 <div class="tabs" style="margin-bottom:18px">
   @php $cq = $clientFilter ? '&client=' . $clientFilter : ''; @endphp
   <a href="{{ $bookingsBase }}{{ $clientFilter ? '?client=' . $clientFilter : '' }}" class="tab-btn {{ ! $statusFilter ? 'active' : '' }}">All <span class="badge badge-gray" style="margin-left:4px">{{ $total }}</span></a>
@@ -307,7 +304,6 @@
   </div>
 </div>
 
-<!-- ── ADD BOOKING MODAL ── -->
 <div class="modal-overlay" id="modalAddBooking">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
@@ -855,7 +851,6 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 @endpush
 
-<!-- ── EDIT BOOKING MODAL ── -->
 <div class="modal-overlay" id="modalEditBooking">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
@@ -972,7 +967,6 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 
-<!-- ── Propose Discount Modal ── -->
 <div id="modalProposeDiscount" class="modal-overlay">
   <div class="modal" style="max-width:440px">
     <div class="modal-header">
@@ -1017,7 +1011,6 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 
-<!-- ── Reject Booking Modal ── -->
 <div id="modalRejectBooking" class="modal-overlay">
   <div class="modal" style="max-width:440px">
     <div class="modal-header">

@@ -21,7 +21,6 @@
 </div>
 @endif
 
-<!-- KPIs -->
 <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
   <div class="stat-card blue">
     <div class="stat-icon"><i data-feather="clipboard"></i></div>
@@ -45,7 +44,6 @@
   </div>
 </div>
 
-<!-- Partners Meeting -->
 <div class="card" style="margin-bottom:20px">
   <div class="card-header">
     <h2 class="card-title"><i data-feather="users" style="width:16px;height:16px;margin-right:6px;vertical-align:middle"></i>Partners Meeting</h2>
@@ -108,7 +106,6 @@
   </div>
 </div>
 
-<!-- To Do -->
 <div class="card" style="margin-bottom:20px">
   <div class="card-header">
     <h2 class="card-title"><i data-feather="check-square" style="width:16px;height:16px;margin-right:6px;vertical-align:middle"></i>To Do</h2>
@@ -182,7 +179,6 @@
   </div>
 </div>
 
-<!-- Done -->
 <div class="card">
   <details style="padding:12px 20px">
     <summary style="font-size:12px;color:var(--muted);cursor:pointer">Done — {{ $done->count() }} item{{ $done->count() === 1 ? '' : 's' }}</summary>
@@ -242,7 +238,6 @@
 @include('partials.access-log')
 
 @if ($canPost)
-<!-- ADD REMINDER MODAL -->
 <div class="modal-overlay" id="modalAddReminder">
   <div class="modal" style="max-width:520px">
     <div class="modal-header">
@@ -251,7 +246,6 @@
     </div>
     <form method="POST">
       @csrf
-      {{-- One form serves add and edit; the action and id are swapped in by JS (Part 15). --}}
       <input type="hidden" name="action" id="reminderAction" value="add_reminder">
       <input type="hidden" name="reminder_id" id="reminderId">
       <div class="modal-body">
@@ -380,7 +374,6 @@ const REM_PICKERS = {
   crew: {!! Illuminate\Support\Js::from($pickerCrew->map(fn($c) => ['id' => $c->crew_id, 'label' => $c->name])) !!},
 };
 
-// The topbar button adds; the pencil on a row edits. Same form either way (Part 15).
 function openModal_add() {
   document.getElementById('reminderModalTitle').innerHTML =
     '<i data-feather="bell" style="width:16px;height:16px;margin-right:6px;vertical-align:middle"></i>Add Reminder';

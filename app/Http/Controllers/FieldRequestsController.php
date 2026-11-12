@@ -12,22 +12,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-/**
- * Cross-booking staff queue for field follow-up requests (equipment/accessory/crew) once
- * they're approved — Dispatch (assign vehicle + driver + ETA) and Deliver (mark arrived) both
- * live here instead of on the per-booking page, since staff coordinate logistics across many
- * simultaneous shoots at once. Approve/Reject stay on the per-booking Requests tab
- * (BookingDetailController), where staff already has full booking context.
- */
 class FieldRequestsController extends Controller
 {
     public function index(Request $request): View|StreamedResponse|Response
     {
         $user = $request->user();
         $role = $user->role->role_name ?? '';
-        // Route middleware (can_access:field_requests) already blocks the page for other
-        // roles, but every other action-handling controller in this app also double-gates the
-        // POST branch in-controller — matching that convention here.
         $canPost = in_array('field_requests', config("filmspec.role_permissions.$role", []), true);
 
         $msg = null;
@@ -55,9 +45,6 @@ class FieldRequestsController extends Controller
             )
             ->get();
 
-        // Awaiting Dispatch/Out for Delivery apply only to physical resources (equipment/
-        // accessories) — crew items are already committed at approval time and just need a
-        // driver/ETA, tracked separately below as "Ready for Dispatch".
         $stats = [
             'pending' => (int) DB::table('booking_equipment_requests')->where('status', 'pending')->count(),
             'approved' => (int) DB::table('booking_equipment_requests')->where('status', 'approved')
@@ -69,14 +56,9 @@ class FieldRequestsController extends Controller
                 ->where('eta', '<', now())->count(),
         ];
 
-        // Per-tab counts — without these the tab strip gave no clue that, say, "3 Awaiting
-        // Review" (shown in the KPI card above) actually lives under the Pending Review tab
-        // while the default Active tab (approved/dispatched only) shows nothing at all.
         $tabCounts = DB::table('booking_equipment_requests')->selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status');
 
         $vehicleRates = DB::table('vehicle_rates')->where('is_active', 1)->orderBy('base_rate')->get();
-        // Shared by the Driver dropdown (any active crew can drive) and the crew-assignment
-        // picker for unassigned requests (JS re-sorts this same list by matching position_id).
         $activeDrivers = DB::table('crew_members as cm')
             ->leftJoin('crew_positions as cp', 'cm.primary_position_id', '=', 'cp.position_id')
             ->where('cm.status', 'active')
@@ -91,7 +73,6 @@ class FieldRequestsController extends Controller
         ]);
     }
 
-    /** Same filters index() applies, shared with export() so the two can never drift apart. */
     private function filteredQuery(Request $request)
     {
         $statusFilter = $request->query('status', 'active');
@@ -115,7 +96,6 @@ class FieldRequestsController extends Controller
         return $query;
     }
 
-    /** Export ▾ — reuses filteredQuery(), already unbounded (no pagination on this page at all). */
     private function export(Request $request): StreamedResponse|Response
     {
         $headers = ['Booking', 'Client', 'Type', 'Item', 'Qty', 'Status', 'Dispatch Info'];
@@ -187,17 +167,8 @@ class FieldRequestsController extends Controller
         $vehicleId = (int) $request->input('vehicle_rate_id', 0);
 
         $booking = DB::table('bookings')->where('booking_id', $req->booking_id)->first();
-        // Set true wherever this method actually adds something billable to the booking — used
-        // below to reset cost_approval_status the same way addEquipment()/addCrew()/
-        // addAccessory() already do, so a dispatch after client approval doesn't silently grow
-        // the client's bill without asking them to re-approve.
         $costChanged = false;
 
-        // Crew requests are normally assigned at approval time (BookingDetailController::
-        // approveFieldRequest() requires picking a crew_id right there) — but stale/legacy rows
-        // can still reach here unassigned, and the dispatch UI needs a real way to fix that
-        // instead of just asserting "already assigned" when it plainly isn't. Same four checks
-        // batchAddCrew() uses: already-assigned / active status / date-overlap / unavailability.
         if ($req->item_type === 'crew' && ! $req->crew_id) {
             $assignCid = (int) $request->input('assign_crew_id', 0);
             if (! $assignCid) {
@@ -241,18 +212,8 @@ class FieldRequestsController extends Controller
             ActivityLog::record($uid, 'assign', 'booking', "Field request #$reqId: assigned crew $assigneeName to booking {$req->booking_id}", $req->booking_id);
         }
 
-        // Same double-booking guard BookingDetailController::addEquipment()/fieldAddEquipment()
-        // use — approveFieldRequest() never checked this, so without it here, dispatching a
-        // field request was the one equipment-assignment path in the app that could hand the
-        // same physical item to two overlapping bookings at once. Checked (and, for a brand
-        // new line, rejected) BEFORE the atomic claim below, so a rejected dispatch leaves the
-        // request sitting at 'approved' instead of wrongly flipping it to 'dispatched'.
         if ($req->item_type === 'equipment' && $req->equipment_id) {
             $alreadyOnThisBooking = DB::table('booking_equipment')->where('booking_id', $req->booking_id)->where('equipment_id', $req->equipment_id)->exists();
-            // A top-up (this exact booking already has some of this equipment, from an earlier
-            // dispatch) skips the availability check entirely — same special case this method
-            // always had, since re-requesting more of an item this booking already holds isn't
-            // a new commitment to check.
             if (! $alreadyOnThisBooking) {
                 $availError = \App\Support\EquipmentAvailability::check($req->equipment_id, (int) $req->quantity, $req->booking_id, $booking);
                 if ($availError) {
@@ -261,10 +222,6 @@ class FieldRequestsController extends Controller
             }
         }
 
-        // Atomic claim: only proceed if this row is still 'approved' at the moment of the
-        // update. A second near-simultaneous submit (double-click, browser back-and-resubmit)
-        // will affect 0 rows here and bail out before touching booking_equipment/accessories —
-        // closes the double-dispatch race that a plain check-then-act would leave open.
         $claimed = DB::table('booking_equipment_requests')->where('request_id', $reqId)->where('status', 'approved')->update([
             'status' => 'dispatched', 'vehicle_rate_id' => $vehicleId ?: null, 'driver_crew_id' => $driverCid, 'eta' => $eta,
         ]);
@@ -275,11 +232,8 @@ class FieldRequestsController extends Controller
         $numDays = max(1, (new \DateTime($booking->shoot_date_start))->diff(new \DateTime($booking->shoot_date_end))->days + 1);
 
         if ($req->item_type === 'equipment' && $req->equipment_id) {
-            // subtotal is a STORED GENERATED column on booking_equipment — only qty/days/rate set explicitly
             $existing = DB::table('booking_equipment')->where('booking_id', $req->booking_id)->where('equipment_id', $req->equipment_id)->first();
             if ($existing) {
-                // Explicit (int) cast before interpolating into the raw expression — defense in
-                // depth, since a DB-fetched column isn't guaranteed to already be a true PHP int.
                 $addQty = (int) $req->quantity;
                 DB::table('booking_equipment')->where('bk_equip_id', $existing->bk_equip_id)->update(['quantity' => DB::raw("quantity + $addQty")]);
                 \App\Support\EquipmentUnitAllocator::allocate($existing->bk_equip_id, $req->equipment_id, $addQty);
@@ -307,8 +261,6 @@ class FieldRequestsController extends Controller
             $subtotal = (float) $req->quantity * $numDays * (float) $req->daily_rate;
             $existing = DB::table('booking_accessories')->where('booking_id', $req->booking_id)->where('accessory_id', $req->accessory_id)->first();
             if ($existing) {
-                // Explicit casts before interpolating into the raw expressions — defense in
-                // depth, since DB-fetched columns aren't guaranteed to already be true PHP types.
                 $addQty = (int) $req->quantity;
                 $addSubtotal = (float) $subtotal;
                 DB::table('booking_accessories')->where('ba_id', $existing->ba_id)->update([
@@ -332,7 +284,6 @@ class FieldRequestsController extends Controller
             BookingCosting::generateCostEstimate($req->booking_id, $uid);
             $costChanged = true;
         }
-        // crew: already booked at approval — dispatch here only carries the driver/ETA
 
         if ($costChanged && ($booking->cost_approval_status ?? null) === 'client_approved') {
             DB::table('bookings')->where('booking_id', $req->booking_id)->update(['cost_approval_status' => 'pending_client', 'updated_at' => now()]);

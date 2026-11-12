@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <style>
-  /* dompdf-safe: DejaVu Sans ships with dompdf itself, no remote font fetch needed. */
   * { box-sizing: border-box; }
   body { font-family: 'DejaVu Sans', sans-serif; font-size: 10px; color: #1e293b; margin: 0; padding: 24px; }
   .hdr { border-bottom: 2px solid #003D80; padding-bottom: 10px; margin-bottom: 14px; }

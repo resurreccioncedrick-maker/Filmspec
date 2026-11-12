@@ -22,7 +22,6 @@
 </div>
 @endif
 
-<!-- KPI Row -->
 <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:22px">
   <div class="stat-card orange">
     <div class="stat-icon"><i data-feather="alert-triangle"></i></div>
@@ -46,7 +45,6 @@
   </div>
 </div>
 
-<!-- View Switcher: Incidents vs Maintenance -->
 <div class="tabs" style="margin-bottom:18px">
   <a href="{{ $incBase }}?view=incidents&tab={{ $tab }}" class="tab-btn {{ $viewTab === 'incidents' ? 'active' : '' }}">
     <i data-feather="alert-triangle" style="width:14px;height:14px;margin-right:4px;vertical-align:middle"></i>Incident Reports
@@ -59,7 +57,6 @@
 </div>
 
 @if ($viewTab === 'incidents')
-<!-- Sub-tabs for incident status -->
 <div class="tabs" style="margin-bottom:18px">
   @foreach (['all' => 'All', 'open' => 'Open', 'resolved' => 'Resolved', 'closed' => 'Closed'] as $k => $l)
   <a href="{{ $incBase }}?view=incidents&tab={{ $k }}" class="tab-btn {{ $tab === $k ? 'active' : '' }}">
@@ -182,10 +179,9 @@
   </div>
 </div>
 
-@endif {{-- end incidents view --}}
+@endif
 
 @if ($viewTab === 'maintenance')
-<!-- ════ MAINTENANCE SCHEDULES VIEW ════ -->
 
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
   <div class="tabs" style="margin-bottom:0">
@@ -261,7 +257,6 @@
   @endif
 </div>
 
-<!-- ══ NEW MAINTENANCE MODAL ══ -->
 <div class="modal-overlay" id="modalNewMaintenance">
   <div class="modal" style="max-width:520px">
     <div class="modal-header">
@@ -342,7 +337,6 @@
   </div>
 </div>
 
-<!-- ══ UPDATE MAINTENANCE STATUS MODAL ══ -->
 <div class="modal-overlay" id="modalUpdateMaintenance">
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
@@ -381,9 +375,8 @@
   </div>
 </div>
 
-@endif {{-- end maintenance view --}}
+@endif
 
-<!-- ══ NEW INCIDENT MODAL ══ -->
 <div class="modal-overlay" id="modalNewIncident">
   <div class="modal" style="max-width:680px">
     <div class="modal-header">
@@ -459,7 +452,6 @@
           </div>
         </div>
 
-        <!-- Damage Types -->
         <div class="form-group">
           <label>Damage Description (check all that apply)</label>
           <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px">
@@ -543,7 +535,6 @@
   </div>
 </div>
 
-<!-- ══ EDIT INCIDENT MODAL ══ -->
 <div class="modal-overlay" id="modalEditIncident">
   <div class="modal" style="max-width:680px">
     <div class="modal-header">
@@ -681,7 +672,6 @@
   </div>
 </div>
 
-<!-- ══ RESOLVE MODAL ══ -->
 <div class="modal-overlay" id="modalResolveIncident">
   <div class="modal" style="max-width:460px">
     <div class="modal-header">
@@ -730,7 +720,6 @@
   </div>
 </div>
 
-<!-- ══ UNIT HISTORY MODAL ══ -->
 <div class="modal-overlay" id="modalUnitHistory">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
@@ -747,23 +736,16 @@
 </div>
 
 <script>
-// Equipment per booking (pre-loaded)
 const BOOKING_EQUIP = {!! json_encode($bookingEquipMap) !!};
 
-// Registered physical units per equipment model — same data shape/purpose as
-// CrewPortalController's own EQUIPMENT_UNITS, powers the New/Edit Incident Unit select so staff
-// can pin down which specific unit when an equipment model has more than one.
 const EQUIPMENT_UNITS = {!! json_encode($equipmentUnitMap) !!};
 
-// Which unit was actually checked out for a given booking's equipment, per the Equipment
-// Checklist — keyed "bookingId_equipmentId". Tried first so the Unit field can auto-fill with
-// the real unit instead of staff having to guess among every unit of that model company-wide.
 const BOOKING_EQUIPMENT_UNITS = {!! json_encode($bookingEquipmentUnitMap) !!};
 
 function populateIRUnitSelect(equipmentId, selectId, preselect, bookingId) {
   const sel = document.getElementById(selectId);
   if (!sel) return;
-  const wrap = document.getElementById(selectId + 'Wrap'); // e.g. newIR_unitWrap (edit modal has none)
+  const wrap = document.getElementById(selectId + 'Wrap');
   const hint = document.getElementById(selectId.replace('_unit', '_unitHint'));
   const readonly = document.getElementById(selectId.replace('_unit', '_unitReadonly'));
   const bookedUnits = (bookingId && BOOKING_EQUIPMENT_UNITS[bookingId + '_' + equipmentId]) || [];
@@ -781,17 +763,10 @@ function populateIRUnitSelect(equipmentId, selectId, preselect, bookingId) {
 
   sel.innerHTML = units.map((u) => `<option value="u${u.unit_id}">${esc(u.asset_tag)}</option>`).join('')
     + '<option value="">Not sure which unit</option>';
-  // An explicit preselect (editing an incident that already has a unit saved) always wins;
-  // otherwise auto-fill from the booking-allocated unit when there's exactly one candidate.
   const effectiveUnitId = preselect || (!preselect && bookedUnits.length === 1 ? bookedUnits[0].unit_id : null);
   sel.value = effectiveUnitId ? 'u' + effectiveUnitId : '';
   sel.disabled = false;
 
-  // Always show the wrap itself — staff filing/reviewing a report need to see which physical
-  // unit is involved even when there's only one candidate and nothing to actually choose. Only
-  // the control WITHIN it differs: a dropdown when there's genuine ambiguity (2+ units actually
-  // booked, or the fallback full-catalog list when we don't know which one at all), otherwise a
-  // plain read-only tag for the one unit that's already decided.
   if (wrap) wrap.style.display = '';
   const showPicker = bookedUnits.length === 0 || bookedUnits.length >= 2;
   sel.style.display = showPicker ? '' : 'none';
@@ -807,17 +782,14 @@ function populateIRUnitSelect(equipmentId, selectId, preselect, bookingId) {
   }
 }
 
-// Active bookings, for the New Incident booking search (pre-loaded)
 const ACTIVE_BOOKINGS = {!! $activeBookings->values()->toJson() !!};
 
-// Crew per booking (pre-loaded)
 const BOOKING_CREW = {!! json_encode($bookingCrewMap) !!};
 
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// ── Unit History modal — combined incidents + checklist + maintenance for one physical unit ──
 function openUnitHistory(unitId, assetTag) {
   document.getElementById('unitHist_tag').textContent = assetTag || ('#' + unitId);
   const body = document.getElementById('unitHist_body');
@@ -872,7 +844,6 @@ function openUnitHistory(unitId, assetTag) {
     .catch(() => { body.innerHTML = '<div style="padding:20px;color:var(--red)">Could not load unit history.</div>'; });
 }
 
-// ── Booking type-to-search (New Incident) ───────────────────────────────────
 function _irBookingLabel(bk) {
   return bk.booking_reference + ' — ' + (bk.project_title || bk.company_name || bk.contact_person || '');
 }
@@ -919,7 +890,6 @@ function selectBookingForIncident(bookingId) {
   if (crewContainer) populateCrewFromBooking(bookingId, crewContainer);
 }
 
-// ── Equipment type-to-search (New Incident, scoped to the selected booking) ─
 function openIREquipSearch(q) {
   const bookingId = document.getElementById('newIR_booking').value;
   const equip = BOOKING_EQUIP[bookingId] || [];
@@ -954,7 +924,6 @@ function closeIREquipSearch(ms) {
   setTimeout(() => { const d = document.getElementById('newIR_equipDrop'); if (d) d.style.display = 'none'; }, ms);
 }
 
-// ── Equipment type-to-search (New Maintenance Schedule, all equipment) ──────
 const ALL_EQUIPMENT_LIST = {!! $allEquipment->values()->toJson() !!};
 
 function openNMEquipSearch(q) {
@@ -988,11 +957,6 @@ function openNMEquipSearch(q) {
 function closeNMEquipSearch(ms) {
   setTimeout(() => { const d = document.getElementById('nm_equipDrop'); if (d) d.style.display = 'none'; }, ms);
 }
-// Maintenance isn't tied to one specific booking (unlike an Incident Report) — it's scheduled
-// against the equipment model itself — so this just asks "how many units does this model have
-// registered at all": exactly one auto-fills silently (nothing to choose), two or more show a
-// dropdown. Reuses EQUIPMENT_UNITS, the same global equipment_id -> units map already built for
-// the Incident Report form's own fallback case.
 function nm_populateUnitSelect(equipmentId) {
   const wrap = document.getElementById('nm_unitWrap');
   const sel = document.getElementById('nm_unit');
@@ -1122,17 +1086,14 @@ function openEditIncident(ir) {
     ? `<a href="/incidents/${ir.incident_id}/photo" target="_blank">View current photo</a>`
     : '<span style="color:var(--muted)">No photo on file</span>';
 
-  // Damage type checkboxes
   const dtypes = ir.damage_types ? JSON.parse(ir.damage_types) : [];
   document.querySelectorAll('.editIR_dtype').forEach(cb => { cb.checked = dtypes.includes(cb.value); });
 
-  // Extra signatories
   const extraSignDiv = document.getElementById('editIR_extraSignRows');
   extraSignDiv.innerHTML = '';
   const extraSigs = ir.extra_signatories ? JSON.parse(ir.extra_signatories) : [];
   extraSigs.forEach(s => addSignatoryRow('editIR_extraSignRows', s.role, s.name));
 
-  // Crew lineup (support both old keyed-object format and new array-of-objects format)
   const crewCont = document.getElementById('editIR_crewContainer');
   crewCont.innerHTML = '';
   let lineup = [];
@@ -1164,11 +1125,9 @@ function openUpdateMaintenance(mt) {
   openModal('modalUpdateMaintenance');
 }
 
-// Add one blank crew row to new incident modal on page load
 document.addEventListener('DOMContentLoaded', () => {
   addCrewRowEl(document.getElementById('newIR_crewContainer'), '', '');
 
-  // Auto-open new incident modal when redirected from booking detail
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('new') === '1') {
     const bookingId = urlParams.get('booking_id');

@@ -47,9 +47,6 @@ class TransportController extends Controller
             ->select('fv.*', 'vr.label as type_label')
             ->get();
 
-        // "Current Assignment" for the Fleet table = this vehicle's most recent active
-        // transport_assignments row (today or in the future), same "what's it doing right now"
-        // concept the mockup's Fleet table shows per vehicle.
         foreach ($fleet as $v) {
             $active = DB::table('transport_assignments as ta')
                 ->join('bookings as b', 'ta.booking_id', '=', 'b.booking_id')
@@ -271,9 +268,6 @@ class TransportController extends Controller
             if ($inUse > 0) {
                 return ['type' => 'danger', 'text' => "Cannot delete: vehicle type is used in $inUse booking(s)."];
             }
-            // fleet_vehicles.vehicle_type_id has a restrictOnDelete FK to this table — without this
-            // check, deleting a vehicle type that still has fleet vehicles of that type would throw
-            // an unhandled SQL constraint-violation error instead of this friendly message.
             $fleetInUse = (int) DB::table('fleet_vehicles')->where('vehicle_type_id', $vid)->count();
             if ($fleetInUse > 0) {
                 return ['type' => 'danger', 'text' => "Cannot delete: vehicle type is used by $fleetInUse fleet vehicle(s)."];

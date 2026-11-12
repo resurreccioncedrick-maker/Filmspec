@@ -74,7 +74,6 @@
     @if ($canManage)
     <button type="button" class="btn btn-outline btn-sm" onclick="openModal('modalEditProfile')"><i data-feather="edit-2" style="width:13px;height:13px"></i> Edit Profile</button>
     @if ($eligibleForRegular)
-    {{-- Two actions available (Mark as Regular + Deactivate) — worth a dropdown. --}}
     <div class="cd-more-wrap">
       <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('cdMoreMenu').classList.toggle('open')"><i data-feather="more-horizontal" style="width:13px;height:13px"></i> More</button>
       <div class="cd-more-menu" id="cdMoreMenu">
@@ -87,7 +86,6 @@
       </div>
     </div>
     @elseif ($isActive)
-    {{-- Only one action available — show it directly, no point wrapping a single item in a menu. --}}
     <button type="button" class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="openModal('modalDeactivateClient')"><i data-feather="user-x" style="width:13px;height:13px"></i> Deactivate Client</button>
     @else
     <form method="POST" action="{{ route('client-detail.action', $id) }}">
@@ -240,7 +238,6 @@
 @endif
 
 @if ($canManage)
-<!-- Edit Profile Modal -->
 <div id="modalEditProfile" class="modal-overlay">
   <div class="modal" style="max-width:600px">
     <div class="modal-header">
@@ -298,7 +295,6 @@
   </div>
 </div>
 
-<!-- Deactivate Client Modal -->
 <div id="modalDeactivateClient" class="modal-overlay">
   <div class="modal" style="max-width:460px">
     <div class="modal-header">

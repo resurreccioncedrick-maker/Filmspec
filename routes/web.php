@@ -86,13 +86,10 @@ Route::post('/bookings/{id}', [BookingDetailController::class, 'act'])
     ->whereNumber('id')
     ->name('booking-detail.act');
 
-// Calendar Data — Part 17. An analytics read of the shoot calendar, distinct from the
-// booking-creation calendar widget on the Dashboard.
 Route::get('/calendar-data', [CalendarDataController::class, 'index'])
     ->middleware(['auth', 'can_access:calendar_data'])
     ->name('calendar-data');
 
-// Analytics pages split out of Reports — Part 11.
 Route::get('/crew-data', [CrewDataController::class, 'index'])
     ->middleware(['auth', 'can_access:crew_data'])
     ->name('crew-data');
@@ -101,19 +98,15 @@ Route::get('/equipment-data', [EquipmentDataController::class, 'index'])
     ->middleware(['auth', 'can_access:equipment_data'])
     ->name('equipment-data');
 
-// All cost estimates across bookings — Part 10.
 Route::get('/cost-estimates', [CostEstimatesController::class, 'index'])
     ->middleware(['auth', 'can_access:cost_estimates'])
     ->name('cost-estimates');
 
-// CE export as CSV (opens in Excel) — Part 9.
 Route::get('/bookings/{id}/ce-export', [BookingDetailController::class, 'ceExport'])
     ->middleware(['auth', 'can_access:bookings'])
     ->whereNumber('id')
     ->name('booking-detail.ce-export');
 
-// Staff-side inbox for the homepage support chat (client_support_messages) — previously
-// client-only with no staff reply path at all.
 Route::get('/support-chat', [SupportChatController::class, 'index'])
     ->middleware(['auth', 'can_access:support_chat'])
     ->name('support-chat');
@@ -137,27 +130,16 @@ Route::match(['get', 'post'], '/checklist', [ChecklistController::class, 'index'
     ->middleware(['auth', 'can_access:bookings'])
     ->name('checklist');
 
-// Printable check-out/check-in record.
 Route::get('/checklist/print', [ChecklistController::class, 'print'])
     ->middleware(['auth', 'can_access:bookings'])
     ->name('checklist.print');
 
-// No 'auth' middleware: this is a JSON API called via fetch() from the client-facing
-// catalog on the home page. It returns a JSON error for guests/non-clients itself,
-// matching the legacy contract, instead of redirecting to /login.
 Route::match(['get', 'post'], '/cart', [CartController::class, 'handle'])->name('cart');
 
-// Same no-'auth'-middleware contract as /cart above — JSON error for guests/non-clients.
 Route::match(['get', 'post'], '/favorites', [FavoritesController::class, 'handle'])->name('favorites');
 
-// No 'can_access' middleware: both staff (viewing any booking's CE) and clients (viewing
-// only their own, enforced in CePreviewController::bookingMode()) legitimately use this
-// route, so a single-module gate doesn't fit — 'auth' alone plus the controller-side
-// ownership check is the intended contract here.
 Route::get('/ce-preview', [CePreviewController::class, 'index'])->middleware(['auth'])->name('ce-preview');
 
-// No 'auth' middleware, matching legacy: a public tile-fetching proxy with zero
-// login/session check, used by the water-detection canvas helper on the location maps.
 Route::get('/tile-proxy', [TileProxyController::class, 'show'])->name('tile-proxy');
 
 Route::match(['get', 'post'], '/my-bookings/{id}', [ClientBookingDetailController::class, 'show'])
@@ -170,9 +152,6 @@ Route::get('/my-bookings/{id}/attachment/{commentId}', [ClientBookingDetailContr
     ->whereNumber(['id', 'commentId'])
     ->name('client-booking-attachment');
 
-// Uses a direct role check inside the controller (matching legacy's crew_portal.php,
-// which requires hasRole(['crew'])) rather than can_access — the crew role has no
-// entries in ROLE_PERMISSIONS/role_permissions since it's a separate self-service portal.
 Route::match(['get', 'post'], '/crew-portal', [CrewPortalController::class, 'index'])
     ->middleware(['auth'])
     ->name('crew-portal');
@@ -215,8 +194,6 @@ Route::match(['get', 'post'], '/attendance', [AttendanceController::class, 'inde
     ->middleware(['auth', 'can_access:attendance'])
     ->name('attendance');
 
-// Printable attendance record for one booking — staff-side counterpart to
-// crew-portal.attendance-print above.
 Route::get('/attendance/print', [AttendanceController::class, 'print'])
     ->middleware(['auth', 'can_access:attendance'])
     ->name('attendance.print');
@@ -240,15 +217,10 @@ Route::get('/maintenance/{id}/photo', [IncidentsController::class, 'maintenanceP
     ->whereNumber('id')
     ->name('maintenance-photo');
 
-// Uses a direct role check inside the controller (matching legacy's requireRole()) rather
-// than can_access:clients.
 Route::match(['get', 'post'], '/clients', [ClientsController::class, 'index'])
     ->middleware(['auth'])
     ->name('clients');
 
-// Client Detail — Overview/Bookings/Billing/Documents/Activity tabs. Billing Profile
-// (Payment Terms/Loyalty Discount) lives in the Billing tab, gated behind the same
-// 'billing' role-permission check the Dashboard/Payment Receipt already use.
 Route::get('/clients/{id}', [ClientDetailController::class, 'show'])
     ->middleware(['auth', 'can_access:clients'])
     ->whereNumber('id')
@@ -266,16 +238,11 @@ Route::post('/clients/{id}/action', [ClientDetailController::class, 'action'])
     ->whereNumber('id')
     ->name('client-detail.action');
 
-// A single client's documents (Part 18) — embedded via iframe as the Client Detail page's
-// Documents tab, and still reachable directly.
 Route::get('/clients/{id}/documents', [ClientDocumentsController::class, 'show'])
     ->middleware(['auth', 'can_access:clients'])
     ->whereNumber('id')
     ->name('client-documents');
 
-// Documents (Part 18) — access-controlled, unlike ImageUpload's public-webroot pattern.
-// store/download/destroy all re-check the specific parent booking/client inside the
-// controller; a blanket route gate can't express "only if it's THEIR booking".
 Route::post('/documents', [DocumentController::class, 'store'])
     ->middleware(['auth'])
     ->name('documents.store');
@@ -288,8 +255,6 @@ Route::delete('/documents/{id}', [DocumentController::class, 'destroy'])
     ->whereNumber('id')
     ->name('documents.destroy');
 
-// Same "controller self-checks access" contract as Documents above — staff via
-// role_permissions.billing, client via booking ownership.
 Route::get('/payments/{id}/receipt', [PaymentReceiptController::class, 'show'])
     ->middleware(['auth'])
     ->whereNumber('id')
@@ -300,8 +265,6 @@ Route::get('/payments/{id}/proof', [PaymentReceiptController::class, 'proof'])
     ->whereNumber('id')
     ->name('payment-proof');
 
-// Staff-only view of a still-pending client payment submission's uploaded proof — reviewed
-// before approve/reject in Billing > Client Payment Requests.
 Route::get('/payment-submissions/{id}/proof', [PaymentReceiptController::class, 'submissionProof'])
     ->middleware(['auth'])
     ->whereNumber('id')
@@ -311,10 +274,6 @@ Route::match(['get', 'post'], '/billing', [BillingController::class, 'index'])
     ->middleware(['auth', 'can_access:billing'])
     ->name('billing');
 
-// Was: requireLogin() only (no module gate) — any authenticated user, client accounts
-// included, could view any receipt/SOA print by guessing the id. Only staff with billing
-// access print from here (see billing.blade.php's printer icons); clients view their own
-// receipts through the separately-guarded payment-receipt route instead.
 Route::get('/billing-print', [BillingPrintController::class, 'show'])
     ->middleware(['auth', 'can_access:billing'])
     ->name('billing-print');
@@ -339,8 +298,6 @@ Route::match(['get', 'post'], '/superadmin', [SuperAdminController::class, 'inde
     ->middleware(['auth', 'can_access:superadmin'])
     ->name('superadmin');
 
-// Database backup download — separate route since it streams a file rather than
-// redirecting back into index()'s $msg-array/re-render flow like every other action.
 Route::post('/superadmin/backup', [SuperAdminController::class, 'backup'])
     ->middleware(['auth', 'can_access:superadmin'])
     ->name('superadmin.backup');

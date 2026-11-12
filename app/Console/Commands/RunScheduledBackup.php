@@ -6,13 +6,6 @@ use App\Support\DatabaseBackup;
 use App\Support\Settings;
 use Illuminate\Console\Command;
 
-/**
- * Scheduled hourly in bootstrap/app.php but only actually backs up once the current hour
- * matches the configured time — the Scheduled Backups toggle on the Backup and Restore page
- * writes backup_schedule_enabled/hour/keep via Settings, this reads them at run time. Hourly
- * (not dailyAt a fixed time) is what makes "change the time in the dropdown" take effect
- * without a container restart, at hour-level granularity.
- */
 class RunScheduledBackup extends Command
 {
     protected $signature = 'backup:run {--force : Run even if disabled or the hour does not match, for manual testing}';

@@ -9,19 +9,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-/**
- * Mutating actions for Documents (Part 18). Listing happens in the controllers that host the
- * card (BookingDetailController, ClientDocumentsController) since access there already follows
- * the parent record's own permission — this controller re-derives that same access check
- * itself rather than trusting the route middleware alone, because "can see bookings in
- * general" isn't the same claim as "can see THIS booking's files".
- *
- * Deliberately NOT the ImageUpload pattern (public webroot, no auth): these files can carry
- * PII, so they live on the private `local` disk and only ever leave it through download().
- */
 class DocumentController extends Controller
 {
-    private const MAX_SIZE_KB = 10240; // 10MB, matches the raised php.ini ceiling
+    private const MAX_SIZE_KB = 10240;
 
     private const ALLOWED_MIMES = [
         'application/pdf',
@@ -55,8 +45,6 @@ class DocumentController extends Controller
         if ($file->getSize() > self::MAX_SIZE_KB * 1024) {
             return back()->with('doc_msg', ['type' => 'danger', 'text' => 'File too large. Max 10MB.']);
         }
-        // Content-sniffed, not extension-trusted — an .exe renamed .pdf must still be
-        // rejected, the same discipline ImageUpload already applies to photos.
         if (! in_array($file->getMimeType(), self::ALLOWED_MIMES, true)) {
             return back()->with('doc_msg', ['type' => 'danger', 'text' => 'Only PDF, Word, or image files are allowed.']);
         }
@@ -93,7 +81,6 @@ class DocumentController extends Controller
     public function download(Request $request, int $id): StreamedResponse
     {
         $doc = DB::table('documents')->where('document_id', $id)->first();
-        // 404, not 403 — a user without access shouldn't learn the document even exists.
         abort_unless($doc, 404);
 
         $user = $request->user();

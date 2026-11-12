@@ -6,14 +6,6 @@ use App\Support\EquipmentUnitAllocator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
-/**
- * One-time (but safe to re-run) cleanup: releases equipment_units/accessory_units that are
- * still stuck 'allocated' to a booking that's already completed/cancelled. Nothing released
- * units on those transitions before this fix shipped, so a unit tied to e.g. a booking from
- * months ago stayed permanently 'allocated' — confirmed for real: Sennheiser Wireless
- * Microphone System's 2 units were both locked to a single 'completed' booking from June 2026,
- * blocking every other booking from ever getting one even though the real shoot was long over.
- */
 class ReleaseStaleUnitAllocations extends Command
 {
     protected $signature = 'demo:release-stale-unit-allocations {--force : Skip the confirmation prompt}';

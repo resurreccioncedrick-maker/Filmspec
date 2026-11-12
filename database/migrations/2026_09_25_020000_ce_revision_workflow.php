@@ -5,20 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * Panelist revision pass — CE Analytics correctness fixes:
- *  - 'issued' (Issued / Awaiting Confirmation) and 'superseded' become real, storable statuses
- *    instead of 'superseded' being computed on the fly at query time only.
- *  - confirmation_note lets staff record how/why a CE was confirmed (e.g. "client approved via
- *    email Sep 20") — the CE-level equivalent of a client-acceptance reference.
- *  - bookings.cost_approved_at is a stable timestamp for the client's own approve action
- *    (ClientBookingDetailController::act 'client_approve_cost'), distinct from the
- *    general-purpose updated_at column other unrelated writes also touch.
- *  - Backfill: any booking that already has 2+ 'confirmed' rows (the literal "15 vs 14" bug —
- *    BookingCosting::confirmCe() never used to demote the row it superseded) gets every row but
- *    the newest moved to 'superseded' here, so the fix is real at the data level, not just
- *    hidden behind a query filter.
- */
 return new class extends Migration
 {
     public function up(): void
@@ -34,7 +20,6 @@ return new class extends Migration
             $table->dateTime('cost_approved_at')->nullable()->after('cost_approval_status');
         });
 
-        // Backfill: demote every confirmed CE row except the newest, per booking.
         DB::statement(
             "UPDATE cost_estimates ce
              JOIN (SELECT booking_id, MAX(ce_id) AS latest_id FROM cost_estimates WHERE status = 'confirmed' GROUP BY booking_id) latest

@@ -82,9 +82,6 @@ class AccessoriesController extends Controller
 
         $accessories = $this->filteredQuery($request)->orderBy('a.accessory_name')->select('a.*')->get();
 
-        // Unit-status aggregates (Available Now / Allocated·In Field / Under Maintenance) are
-        // computed once here rather than per-accessory in the loop below — cheaper, and it's
-        // exactly the breakdown the KPI row and each card need.
         $unitStatusTotals = DB::table('accessory_units')->where('status', '!=', 'retired')
             ->select('status', DB::raw('COUNT(*) as cnt'))->groupBy('status')->pluck('cnt', 'status');
 
@@ -105,9 +102,6 @@ class AccessoriesController extends Controller
                 ->sum('ba.quantity');
             $acc->in_use = $inUse;
             $acc->unit_count = (int) DB::table('accessory_units')->where('accessory_id', $acc->accessory_id)->where('status', '!=', 'retired')->count();
-            // "Total" and "Available" both come from the physical units once an accessory is
-            // individually tracked; a quantity-tracked accessory has no per-unit rows, so both
-            // fall back to the plain quantity/in-use arithmetic instead.
             $acc->total_units = ($acc->tracking_method ?? 'quantity') === 'individual' ? $acc->unit_count : (int) ($acc->quantity ?? 1);
             $acc->available = ($acc->tracking_method ?? 'quantity') === 'individual'
                 ? (int) DB::table('accessory_units')->where('accessory_id', $acc->accessory_id)->where('status', 'available')->count()
@@ -147,7 +141,6 @@ class AccessoriesController extends Controller
         ]);
     }
 
-    /** Same filters index() applies, shared with export() so the two can never drift apart. */
     private function filteredQuery(Request $request)
     {
         $search = $request->query('q', '');
@@ -171,10 +164,6 @@ class AccessoriesController extends Controller
         return $query;
     }
 
-    /**
-     * Export ▾ — this page renders as a card grid, but export flattens it to the same tabular
-     * shape as every other page (there's no sane way to export a card layout as CSV/Excel).
-     */
     private function export(Request $request): StreamedResponse|Response
     {
         $headers = ['Accessory', 'Category', 'Rate/Day', 'Stock', 'In Use', 'Available', 'Linked Equipment'];
@@ -209,10 +198,6 @@ class AccessoriesController extends Controller
         return DataExporter::respond($request->query('export'), 'Accessories', $headers, $rows, 'accessories-export');
     }
 
-    // Mirrors EquipmentController::recalcFromUnits() — once any Physical Units exist for an
-    // accessory, its quantity column is derived from them (count of non-retired units) rather
-    // than staff-typed, for every tracking_method. Matches the same "stock count should always
-    // equal the real units" rule equipment already follows.
     private function recalcAccUnits(int $aid): void
     {
         $count = DB::table('accessory_units')->where('accessory_id', $aid)->where('status', '!=', 'retired')->count();
@@ -231,8 +216,6 @@ class AccessoriesController extends Controller
             $desc = trim($request->input('description', ''));
             $type = in_array($request->input('accessory_type'), array_keys($this->typeLabel), true) ? $request->input('accessory_type') : 'optional_addon';
             $tracking = $request->input('tracking_method') === 'individual' ? 'individual' : 'quantity';
-            // Package Inclusion never carries its own charge; is_included stays in sync with
-            // accessory_type so every existing is_included read elsewhere keeps working.
             $incl = $type === 'package_inclusion' ? 1 : 0;
             $rate = $incl ? 0.0 : (float) $request->input('daily_rate', 0);
             $qty = max(1, (int) $request->input('quantity', 1));
@@ -246,24 +229,15 @@ class AccessoriesController extends Controller
                 $up = ImageUpload::handle($request->file('accessory_image'), 'accessories');
                 if ($up['success']) $imgPath = $up['path'];
             }
-            // Public Visibility only means something for a standalone Optional Add-On — Package
-            // Inclusions/Internal accessories aren't catalog products, so the toggle is forced off.
             $isPublic = $type === 'optional_addon' ? (int) $request->boolean('is_public', true) : 0;
 
             $newId = DB::table('accessories')->insertGetId([
                 'accessory_name' => $name, 'description' => $desc, 'daily_rate' => $rate,
                 'is_included' => $incl, 'accessory_type' => $type, 'tracking_method' => $tracking,
-                // Individually-tracked accessories don't ask for a stock number up front — units
-                // are added afterward via accessory_units, so quantity stays a nominal 1 here
-                // rather than double-counting against the real per-unit count.
                 'quantity' => $tracking === 'individual' ? 1 : $qty, 'image_path' => $imgPath,
                 'is_active' => 1, 'is_public' => $isPublic,
             ]);
 
-            // Stock Qty is meant to always equal the count of real Physical Units, same rule
-            // Equipment follows — placeholder units are created immediately so a brand-new
-            // accessory never sits in the old "quantity without any matching unit" state.
-            // Staff fill in real asset tags/serials from the Units button afterward.
             $placeholderCount = $tracking === 'individual' ? 1 : $qty;
             $units = [];
             for ($n = 1; $n <= $placeholderCount; $n++) {
@@ -315,10 +289,6 @@ class AccessoriesController extends Controller
             }
             $isPublic = $type === 'optional_addon' ? (int) $request->boolean('is_public', true) : 0;
 
-            // Once real Physical Units exist, quantity is derived from them (recalcAccUnits(),
-            // kept in sync on every unit add/update/retire) for every tracking method, same as
-            // Equipment — this form no longer accepts a manual quantity in that case. Accessories
-            // with no units yet (pre-existing ones not yet backfilled) keep the old behavior.
             $hasUnits = DB::table('accessory_units')->where('accessory_id', $aid)->where('status', '!=', 'retired')->exists();
 
             DB::table('accessories')->where('accessory_id', $aid)->update([
@@ -343,10 +313,6 @@ class AccessoriesController extends Controller
             ]);
         }
 
-        // Replaces the old hard DELETE — accessory rows are referenced by booking_accessories
-        // and equipment_checklist history, so deleting one outright would either fail on the FK
-        // or silently orphan past bookings' records. Deactivating (like Equipment's Retire and
-        // Clients' Deactivate) keeps that history intact and hides it from new bookings.
         if ($action === 'deactivate_accessory') {
             $aid = (int) $request->input('accessory_id');
             $row = DB::table('accessories')->where('accessory_id', $aid)->first();
@@ -408,9 +374,6 @@ class AccessoriesController extends Controller
             }
 
             $newStatus = in_array($request->input('status'), array_keys($this->unitStatusLabel), true) ? $request->input('status') : $unit->status;
-            // Manually setting an allocated unit back to available/maintenance/retired takes it
-            // off its booking line — otherwise it stays linked there while also being free to
-            // book again.
             if ($newStatus !== $unit->status && in_array($newStatus, ['available', 'under_maintenance', 'retired'], true)) {
                 \App\Support\EquipmentUnitAllocator::detachAccessoryUnit($unitId);
             }

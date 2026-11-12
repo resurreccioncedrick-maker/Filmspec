@@ -27,7 +27,6 @@
 </div>
 @endif
 
-<!-- Stats -->
 <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px">
   <div class="stat-card">
     <div class="stat-icon"><i data-feather="package"></i></div>
@@ -56,7 +55,6 @@
   </div>
 </div>
 
-<!-- Filter bar -->
 <div class="card" style="margin-bottom:18px">
   <div class="card-body" style="padding:12px 16px">
     <form method="GET" action="{{ $accBase }}" class="filter-bar">
@@ -210,7 +208,6 @@
 @endif
 
 @if ($canManage)
-<!-- ADD ACCESSORY MODAL -->
 <div class="modal-overlay" id="modalAddAcc">
   <div class="modal" style="max-width:580px">
     <div class="modal-header">
@@ -306,7 +303,6 @@
   </div>
 </div>
 
-<!-- EDIT ACCESSORY MODAL -->
 <div class="modal-overlay" id="modalEditAcc">
   <div class="modal" style="max-width:580px">
     <div class="modal-header">
@@ -406,7 +402,6 @@
   </div>
 </div>
 
-<!-- PHYSICAL UNITS MODAL (ACCESSORY) -->
 <div class="modal-overlay" id="modalAccUnits">
   <div class="modal" style="max-width:780px">
     <div class="modal-header">
@@ -466,7 +461,6 @@
   </div>
 </div>
 
-<!-- MANAGE LINKS MODAL -->
 <style>
 .lnk-cat-header{padding:5px 14px;font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);background:var(--s2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1}
 .lnk-row{border-bottom:1px solid var(--border)}
@@ -591,9 +585,6 @@ let editAccUnitCount = 0;
 function onEditAccTrackingChange() {
   const isIndiv = document.getElementById('editAccTracking').value === 'individual';
   const hasUnits = editAccUnitCount > 0;
-  // Once any Physical Units are recorded, Stock Qty is always calculated from them (same
-  // rule as Equipment) regardless of tracking method — tracking method only still controls
-  // which availability formula is used, not whether Qty can be hand-typed.
   document.getElementById('editAccQtyWrap').style.display = (!hasUnits && !isIndiv) ? '' : 'none';
   document.getElementById('editAccIndivNote').style.display = (!hasUnits && isIndiv) ? '' : 'none';
   document.getElementById('editAccDerivedNote').style.display = hasUnits ? '' : 'none';
@@ -741,10 +732,6 @@ function loadAccUnits() {
       if (!data.length) {
         tbody.innerHTML = '';
         empty.style.display = 'block';
-        // Quantity Tracked accessories use Stock Qty for availability and never read this
-        // units table at all; Individually Tracked ones use the units below instead, and
-        // (unlike equipment) Stock Qty never auto-updates from them — so make the current
-        // mode explicit here rather than leaving an empty table looking like missing data.
         document.getElementById('accUnitsEmptyNote').textContent = currentAccUnitsTracking === 'individual'
           ? 'This accessory is Individually Tracked — availability is based on the units added below, not Stock Qty. Add units to make it bookable.'
           : 'This is normal — this accessory is Quantity Tracked (Stock Qty: ' + currentAccUnitsQty + '), which is what availability is based on. '
@@ -848,8 +835,6 @@ function reactivateAcc(aid, name) {
     .then(data => { if (data.success) location.reload(); });
 }
 
-// Sync the Add modal's conditional sections (Pricing/Public Visibility) with its default
-// selected Type/Tracking on first render — the onchange handlers only fire on a later change.
 onAddAccTypeChange();
 onAddAccTrackingChange();
 

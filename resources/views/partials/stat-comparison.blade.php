@@ -1,14 +1,3 @@
-{{--
-  Renders a "vs last period" pill for a stat-card, or nothing at all when there's
-  nothing sensible to show (ReportPeriod::delta() already returns null for that:
-  both current and previous are zero, or the mode is 'all' and there's no previous
-  period to compare against in the first place).
-
-  $delta: the ['dir' => 'up'|'down', 'pct' => int|null] array from ReportPeriod::delta(),
-  or null. Optional 'suffix' overrides the unit shown after the number — default '%';
-  pass 'pt' for a rate/percentage metric (e.g. utilization), where a point difference
-  reads more honestly than running a percentage through a relative-percent-change formula.
---}}
 @if ($delta)
 <span class="stat-cmp {{ $delta['dir'] }}">
   @if ($delta['dir'] === 'up')

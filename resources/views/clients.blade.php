@@ -25,7 +25,6 @@
 </div>
 @endif
 
-<!-- Stats row -->
 <div class="stats-grid" style="margin-bottom:20px">
   <div class="stat-card">
     <div class="stat-value">{{ $stats['total'] }}</div>
@@ -45,7 +44,6 @@
   </div>
 </div>
 
-<!-- Type / status filter tabs -->
 <div class="tabs" style="margin-bottom:18px">
   <a href="{{ $clientsBase }}" class="tab-btn {{ ! $typeFilter && ! $statusFilter ? 'active' : '' }}">All <span class="badge badge-gray" style="margin-left:4px">{{ $total }}</span></a>
   <a href="{{ $clientsBase }}?type=regular" class="tab-btn {{ $typeFilter === 'regular' ? 'active' : '' }}">Regular <span class="badge badge-green" style="margin-left:4px">{{ $stats['regular'] }}</span></a>
@@ -202,7 +200,6 @@
 </div>
 
 @if ($canManage)
-<!-- Add Client Modal -->
 <div id="modalAddClient" class="modal-overlay">
   <div class="modal" style="max-width:600px">
     <div class="modal-header">
@@ -291,7 +288,6 @@
   </div>
 </div>
 
-<!-- Edit Client Modal -->
 <div id="modalEditClient" class="modal-overlay">
   <div class="modal" style="max-width:600px">
     <div class="modal-header">

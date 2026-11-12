@@ -7,7 +7,6 @@
   $userRole = auth()->user()->role->role_name ?? '';
 @endphp
 <style>
-/* ── Dashboard-specific ── */
 .dash-header {
   display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
   margin-bottom:20px;padding-bottom:18px;border-bottom:1px solid var(--border);
@@ -21,8 +20,6 @@
 .dash-title { font-family:var(--font-display);font-size:24px;letter-spacing:.5px;color:var(--text);line-height:1; }
 .dash-date  { font-size:12px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:5px; }
 
-/* Needs Attention — Spotlight: the worst item leads as one large callout, the
-   other two fold into small side chips, instead of three equally-weighted cards. */
 .attn-wrap { background:#fef2f2;border:1px solid #fecaca;border-radius:var(--radius-md);padding:18px 20px;margin-bottom:20px; }
 .attn-head { display:flex;align-items:center;gap:8px;margin-bottom:14px;font-weight:700;font-size:14px;color:#991b1b; }
 .attn-spot-grid { display:grid;grid-template-columns:1.3fr 1fr;gap:14px; }
@@ -40,7 +37,6 @@
 .attn-spot-chip .num { font-family:var(--font-display);font-size:22px;color:var(--text);line-height:1; }
 .attn-spot-chip .lbl { font-size:11.5px;color:var(--sub);font-weight:600;margin-top:2px; }
 
-/* Today's Operations */
 .today-ops-grid { display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px; }
 .today-ops-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow-sm); }
 .today-ops-card .icon { width:30px;height:30px;border-radius:8px;background:var(--acclight);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:8px; }
@@ -50,9 +46,6 @@
 .dash-grid-main { display:grid;grid-template-columns:1fr 320px;gap:18px;margin-bottom:20px; }
 .dash-grid-bottom { display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px; }
 
-/* Equipment Status — Signal Board: a real ring chart with a center total instead of a bar +
-   number strip. Overdue is a booking-level flag, not a fleet-utilization slice, so it's called
-   out as its own chip rather than a ring segment. */
 .eq-ring-wrap { display:flex;align-items:center;gap:18px;padding:14px 16px; flex-wrap:wrap; }
 .eq-ring-svg { flex-shrink:0; }
 .eq-ring-center-num { font-family:var(--font-display); }
@@ -65,8 +58,6 @@
 .eq-overdue-chip.alert { background:var(--redl);color:#991b1b; }
 .eq-overdue-chip.clear { background:var(--greenl);color:var(--green); }
 
-/* Financial Snapshot — a real area sparkline with a labeled current-month point, not seven
-   skinny disconnected bars. */
 .fin-snap { padding:16px 18px 4px; }
 .fin-snap .val { font-family:var(--font-display);font-size:32px;color:var(--text);line-height:1; }
 .fin-snap .lbl { font-size:11px;color:var(--muted);margin-top:4px; }
@@ -74,13 +65,11 @@
 .fin-callout { position:absolute;right:4px;font-family:var(--font-mono);font-size:9.5px;font-weight:700;background:var(--accent);color:#fff;border-radius:5px;padding:2px 6px;white-space:nowrap;transform:translate(0,-130%);pointer-events:none; }
 .fin-axis { display:flex;justify-content:space-between;font-size:9px;font-family:var(--font-mono);color:var(--muted);padding:2px 2px 0; }
 
-/* Command Strip's compact agenda — next few shoot days, no need to open the calendar */
 .fin-agenda { padding:12px 18px 16px;border-top:1px solid var(--border);margin-top:14px;display:flex;flex-direction:column;gap:8px; }
 .fin-agenda-row { display:flex;gap:10px;align-items:baseline;font-size:12px; }
 .fin-agenda-date { font-family:var(--font-mono);font-weight:700;color:var(--accent);width:52px;flex-shrink:0; }
 .fin-agenda-txt { color:var(--sub); }
 
-/* Calendar */
 .cal-wrap { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;box-shadow:var(--shadow-sm);margin-bottom:0;height:100%; }
 .cal-head { display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border); }
 .cal-nav-btn { width:32px;height:32px;border:1px solid var(--border);border-radius:8px;background:var(--s2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;color:var(--sub); }
@@ -104,7 +93,6 @@
 .cal-event.pending   { background:var(--yellowl);color:var(--yellow);border-left:2px solid var(--yellow); }
 .cal-more { font-size:9px;color:var(--muted);font-weight:600;margin-top:1px; }
 
-/* Activity feed */
 .activity-item { display:flex;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border); }
 .activity-item:last-child { border-bottom:none; }
 .activity-avatar { width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#fff;flex-shrink:0; }
@@ -127,7 +115,6 @@
 }
 </style>
 
-<!-- ══ PAGE HEADER ══ -->
 <div class="dash-header">
   <div class="dash-header-left">
     <div class="dash-icon-wrap"><i data-feather="grid" style="width:20px;height:20px"></i></div>
@@ -141,7 +128,6 @@
   </div>
 </div>
 
-<!-- ══ NEEDS ATTENTION — Spotlight ══ -->
 @php
   $attnItems = [
     [
@@ -211,7 +197,6 @@
   @endif
 </div>
 
-<!-- ══ TODAY'S OPERATIONS ══ -->
 <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">
   Today's Operations — what's happening today
 </div>
@@ -243,10 +228,8 @@
   </div>
 </div>
 
-<!-- ══ CALENDAR + EQUIPMENT STATUS ══ -->
 <div class="dash-grid-main">
 
-  <!-- Upcoming Calendar -->
   <div class="cal-wrap">
     <div class="cal-head">
       <div style="display:flex;align-items:center;gap:12px">
@@ -274,13 +257,8 @@
     <div class="cal-grid" id="calGrid"></div>
   </div>
 
-  <!-- Equipment Status + Financial Snapshot — "Signal Board" -->
   <div style="display:flex;flex-direction:column;gap:16px">
     @php
-      // Ring segments are the three mutually-exclusive equipment statuses that make up fleet
-      // utilization (available/rented/under_repair) — "Overdue Returns" is a booking-level flag,
-      // not an equipment status, so it's called out as its own chip rather than a ring segment.
-      // Any remainder (e.g. 'booked' units) is left as unfilled track, not force-summed to 100%.
       $eqR = 37; $eqC = 2 * M_PI * $eqR;
       $eqSegments = [
         ['value' => $availableEquipment, 'color' => 'var(--green)'],
@@ -345,7 +323,6 @@
         $finAreaPath = $finLinePath . ' L' . $finLast['x'] . ',64 L' . $finPoints[0]['x'] . ',64 Z';
       }
     @endphp
-    <!-- Financial Snapshot -->
     <div class="card" style="margin-bottom:0">
       <div class="card-header">
         <h2 class="card-title"><i data-feather="bar-chart-2" style="width:14px;height:14px"></i> Financial Snapshot</h2>
@@ -394,7 +371,6 @@
   </div>
 </div>
 
-<!-- ══ REQUESTS AWAITING REVIEW + UPCOMING CONFIRMED BOOKINGS ══ -->
 <div class="dash-grid-bottom">
 
   <div class="card" style="margin-bottom:0">
@@ -453,7 +429,6 @@
 
 </div>
 
-<!-- ══ RECENT ACTIVITY ══ -->
 <div class="card" style="margin-bottom:0">
   <div class="card-header">
     <h2 class="card-title"><i data-feather="activity" style="width:14px;height:14px"></i> Recent Activity</h2>
@@ -496,7 +471,6 @@
 @push('scripts')
 <script>
 
-// ── Calendar ──────────────────────────────────────────────────────────────────
 const CAL_BOOKINGS = {!! $calendarBookings->map(fn ($b) => [
   'id' => $b->booking_id,
   'ref' => $b->booking_reference,
@@ -510,7 +484,7 @@ const CAL_BOOKINGS = {!! $calendarBookings->map(fn ($b) => [
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 let calYear  = {{ (int) \Carbon\Carbon::parse($currentMonth . '-01')->format('Y') }};
-let calMonth = {{ (int) \Carbon\Carbon::parse($currentMonth . '-01')->format('n') }}; // 1-12
+let calMonth = {{ (int) \Carbon\Carbon::parse($currentMonth . '-01')->format('n') }};
 
 function buildBookingMap(year, month) {
   const map = {};
@@ -531,7 +505,7 @@ function renderCalendar() {
   const todayStr  = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
   const firstOfMonth = new Date(calYear, calMonth-1, 1);
   const daysInMonth  = new Date(calYear, calMonth, 0).getDate();
-  const startDow     = firstOfMonth.getDay(); // 0=Sun
+  const startDow     = firstOfMonth.getDay();
   const totalCells   = Math.ceil((startDow + daysInMonth) / 7) * 7;
   const bookingMap   = buildBookingMap(calYear, calMonth);
 

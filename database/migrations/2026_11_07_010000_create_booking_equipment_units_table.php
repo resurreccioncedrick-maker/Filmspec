@@ -6,16 +6,10 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('booking_equipment_units', function (Blueprint $table) {
             $table->id('id');
-            // bk_equip_id is booking_equipment's PK — this pivot ties a specific physical unit
-            // to one line of a booking's equipment (one booking_equipment row can have several
-            // of these when quantity > 1).
             $table->integer('bk_equip_id');
             $table->unsignedBigInteger('equipment_unit_id');
             $table->timestamp('allocated_at')->useCurrent();
@@ -27,9 +21,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('booking_equipment_units');

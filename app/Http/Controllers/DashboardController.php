@@ -11,9 +11,6 @@ class DashboardController extends Controller
     public function index(Request $request): View
     {
         $role = $request->user()->role->role_name ?? '';
-        // Dashboard is one of the few modules a role can have without also having 'billing' (e.g.
-        // traffic) — the revenue KPI and each booking's billed amount are gated on that second,
-        // more specific permission rather than just "can reach this page at all".
         $canSeeFinancials = in_array('billing', config("filmspec.role_permissions.$role", []), true);
 
         $totalBookings = (int) DB::table('bookings')->where('booking_status', '!=', 'cancelled')->count();
@@ -34,21 +31,11 @@ class DashboardController extends Controller
             ->whereBetween('shoot_date_start', [now(), now()->addDays(7)])
             ->count();
 
-        // "Overdue Returns" has no dedicated status of its own — a booking is overdue for
-        // return when its equipment should already be back (shoot_date_end has passed) but the
-        // booking is still 'ongoing' rather than having moved on to returned/inspection/completed.
         $overdueReturns = (int) DB::table('bookings')
             ->where('booking_status', 'ongoing')
             ->where('shoot_date_end', '<', now()->toDateString())
             ->count();
 
-        // "Unresolved Payment Issues" — statements of account past their due date that
-        // still carry a balance, same definition BillingController uses for its own
-        // overdue count. Gated on the billing permission like totalRevenue, so a role
-        // without financial visibility (e.g. traffic) never sees it, even as a 0.
-        // Inner-joined to bookings/clients like Billing's own overdue list — a statement of
-        // accounts whose booking no longer exists (e.g. stale demo data) has no one left to
-        // collect from, so it must not inflate this count while never appearing in that list.
         $unresolvedPaymentIssues = $canSeeFinancials ? (int) DB::table('statement_of_accounts as s')
             ->join('bookings as b', 's.booking_id', '=', 'b.booking_id')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
@@ -67,13 +54,11 @@ class DashboardController extends Controller
             ->get();
 
         $todayBookingIds = $todayShoots->pluck('booking_id');
-        // Units Due Out Today: equipment on bookings starting today (confirmed, not yet released).
         $unitsDueOutToday = (int) DB::table('booking_equipment as be')
             ->join('bookings as b', 'be.booking_id', '=', 'b.booking_id')
             ->where('b.booking_status', 'confirmed')
             ->where('b.shoot_date_start', $today)
             ->sum('be.quantity');
-        // Due Back Today: equipment on ongoing bookings ending today.
         $dueBackToday = (int) DB::table('booking_equipment as be')
             ->join('bookings as b', 'be.booking_id', '=', 'b.booking_id')
             ->where('b.booking_status', 'ongoing')
@@ -92,8 +77,6 @@ class DashboardController extends Controller
             $recentBookings->each(fn ($b) => $b->final_amount = null);
         }
 
-        // Requests Awaiting Review: bookings pending operations-manager approval, with how many
-        // days they've been sitting there (the mockup's REF/CLIENT/PROJECT/SUBMITTED/DAYS table).
         $requestsAwaitingReview = DB::table('bookings as b')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
             ->where('b.approval_status', 'pending_approval')
@@ -106,8 +89,6 @@ class DashboardController extends Controller
             $r->days_waiting = (int) now()->diffInDays(\Carbon\Carbon::parse($r->created_at));
         });
 
-        // Upcoming Confirmed Bookings: same "next 7 days" population as $upcomingCount above,
-        // listed out (the mockup's second dashboard table).
         $upcomingConfirmed = DB::table('bookings as b')
             ->join('clients as c', 'b.client_id', '=', 'c.client_id')
             ->select('b.booking_id', 'b.booking_reference', 'b.project_title', 'b.shoot_date_start', 'b.booking_status', 'c.company_name', 'c.contact_person')
@@ -118,17 +99,12 @@ class DashboardController extends Controller
             ->get();
         $upcomingConfirmed->each(fn ($b) => $b->client_name = $b->company_name ?: $b->contact_person);
 
-        // Financial Snapshot's compact agenda — the next couple of shoot days (from the same
-        // "next 7 days" population as $upcomingConfirmed above), grouped by date so a multi-shoot
-        // day shows as one line instead of one per booking.
         $upcomingAgenda = $upcomingConfirmed
             ->groupBy(fn ($b) => \Carbon\Carbon::parse($b->shoot_date_start)->toDateString())
             ->map(fn ($group, $date) => ['date' => $date, 'count' => $group->count()])
             ->take(3)
             ->values();
 
-        // Financial Snapshot trend — last 6 months of payments, same shape as Reports'/Cost
-        // Estimates' monthly recap charts.
         $financialTrend = collect();
         if ($canSeeFinancials) {
             $trendRows = DB::table('payments')

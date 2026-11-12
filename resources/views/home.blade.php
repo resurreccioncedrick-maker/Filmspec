@@ -7,7 +7,6 @@
 <title>FilmSpec — Equipment &amp; Crew Rentals</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-/* ─── RESET + TOKENS ─── */
 :root{
   --bg:#f0f5fb;--surface:#fff;--s2:#f4f8fd;--s3:#e8f0fb;
   --border:#dde8f5;--border2:#c3d6ee;
@@ -27,7 +26,6 @@ body{font-family:var(--font-b);background:var(--bg);color:var(--text);min-height
 a{text-decoration:none;color:inherit}
 button{font-family:var(--font-b);cursor:pointer}
 
-/* ─── NAV ─── */
 .nav{
   background:var(--surface);
   border-bottom:1px solid var(--border);
@@ -183,10 +181,8 @@ button{font-family:var(--font-b);cursor:pointer}
 .nav-btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
 .nav-btn.primary:hover{background:var(--blue2)}
 
-/* ─── PAGES ─── */
 .pg{display:none}.pg.on{display:block;flex:1}
 
-/* ─── SCROLL REVEAL ─── */
 .reveal{opacity:0;transform:translateY(34px);transition:opacity 1.2s cubic-bezier(.19,1,.22,1),transform 1.2s cubic-bezier(.19,1,.22,1)}
 .reveal.is-visible{opacity:1;transform:translateY(0)}
 .reveal-l{opacity:0;transform:translateX(-48px);transition:opacity 1.2s cubic-bezier(.19,1,.22,1),transform 1.2s cubic-bezier(.19,1,.22,1)}
@@ -205,7 +201,6 @@ button{font-family:var(--font-b);cursor:pointer}
   .reveal,.reveal-l,.reveal-r,.reveal-stagger>*{opacity:1!important;transform:none!important;transition:none!important}
 }
 
-/* ─── HERO ─── */
 .hero{
   background:#0B1A33;
   border-bottom:1px solid var(--border);
@@ -446,7 +441,6 @@ button{font-family:var(--font-b);cursor:pointer}
   margin-top:1px;
 }
 
-/* ─── CONTENT WRAP ─── */
 .ccon{max-width:1220px;margin:0 auto;padding:32px 24px}
 .sec-label{
   font-size:10px;
@@ -465,7 +459,6 @@ button{font-family:var(--font-b);cursor:pointer}
 }
 .sec-sub{font-size:13px;color:var(--muted);margin-bottom:22px;line-height:1.6}
 
-/* ─── HOW IT WORKS ─── */
 .hiw-section{
   background:var(--surface);
   border-top:1px solid var(--border);
@@ -525,7 +518,6 @@ button{font-family:var(--font-b);cursor:pointer}
   line-height:1.75;max-width:190px;
 }
 
-/* ─── EQUIPMENT CATALOG ─── */
 .eq-page-header{
   background:linear-gradient(135deg,#0a1628 0%,#0d2554 55%,#0a2447 100%);
   padding:52px 32px 46px;position:relative;overflow:hidden;
@@ -692,7 +684,6 @@ button{font-family:var(--font-b);cursor:pointer}
 .req-btn.selected:hover{background:var(--redlt);color:var(--red);border-color:#fca5a5}
 .req-btn:disabled{background:var(--s2);color:var(--muted);cursor:not-allowed;box-shadow:none;transform:none}
 
-/* ─── CREW ─── */
 .crew-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
 .crew-card{
   background:var(--surface);
@@ -723,7 +714,6 @@ button{font-family:var(--font-b);cursor:pointer}
 .crew-rate{font-family:var(--font-m);font-size:12.5px;color:var(--blue)}
 .crew-shoots{font-size:10.5px;color:var(--muted);margin-top:2px}
 
-/* ─── MY BOOKINGS ─── */
 .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .bk-tbl{width:100%;border-collapse:collapse}
 .bk-tbl th{
@@ -747,7 +737,6 @@ button{font-family:var(--font-b);cursor:pointer}
 .bk-tbl tbody tr{transition:background var(--trans)}
 .bk-tbl tbody tr:hover td{background:var(--bluelt)}
 
-/* Status-colored row edge (Option B redesign) */
 .bk-tbl tbody tr.row-action td:first-child{box-shadow:inset 3px 0 0 var(--orange)}
 .bk-tbl tbody tr.row-pending td:first-child{box-shadow:inset 3px 0 0 var(--yellow)}
 .bk-tbl tbody tr.row-confirmed td:first-child{box-shadow:inset 3px 0 0 var(--blue)}
@@ -763,7 +752,6 @@ button{font-family:var(--font-b);cursor:pointer}
 .bk-cta{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:7px;font-weight:700;font-size:12px;text-decoration:none;background:var(--bluelt);color:var(--blue)}
 .bk-cta.warn{background:var(--orangelt);color:var(--orange)}
 
-/* Stat tiles (Option B redesign) */
 .bk-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
 .bk-stat{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-md);padding:14px 16px;display:flex;align-items:center;gap:12px;transition:border-color var(--trans)}
 .bk-stat:hover{border-color:var(--blue)}
@@ -806,7 +794,6 @@ button{font-family:var(--font-b);cursor:pointer}
   letter-spacing:.01em;
 }
 
-/* ─── REQUEST LIST (right panel) ─── */
 .rl-overlay{
   position:fixed;
   inset:0;
@@ -879,7 +866,6 @@ button{font-family:var(--font-b);cursor:pointer}
 .rl-empty h3{font-size:15px;font-weight:700;color:var(--sub);margin-bottom:6px}
 .rl-empty p{font-size:12px;line-height:1.7}
 
-/* ─── UPLOAD GEAR LIST (bulk add) ─── */
 .rl-upload{
   background:var(--bluelt);
   border-bottom:1px solid var(--bluemid);
@@ -1083,7 +1069,6 @@ button{font-family:var(--font-b);cursor:pointer}
   box-shadow:none;
 }
 
-/* ─── MODALS ─── */
 .mo{
   position:fixed;
   inset:0;
@@ -1105,9 +1090,6 @@ button{font-family:var(--font-b);cursor:pointer}
   border-radius:var(--radius-lg);
   width:500px;
   max-width:94vw;
-  /* var(--vvh) tracks the real visible height (keyboard-aware.js) so the modal
-     shrinks with the on-screen keyboard instead of staying sized to the full
-     layout viewport. */
   max-height:calc(var(--vvh, 88vh) - 24px);
   overflow-y:auto;
   transform:scale(.96);
@@ -1181,7 +1163,6 @@ textarea.fi{resize:vertical;min-height:60px}
 }
 .btn-g:hover{border-color:var(--blue);color:var(--blue);background:var(--bluelt)}
 
-/* ─── TOAST ─── */
 .toast-w{position:fixed;bottom:22px;right:22px;z-index:999;display:flex;flex-direction:column;gap:8px}
 .toast{
   background:var(--surface);
@@ -1203,7 +1184,6 @@ textarea.fi{resize:vertical;min-height:60px}
 .toast.show{transform:translateY(0);opacity:1}
 .tdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 
-/* ─── FOOTER ─── */
 .site-footer{
   background:linear-gradient(180deg,#070e1a 0%,#050c17 100%);
   border-top:1px solid #1a2a45;
@@ -1305,8 +1285,6 @@ a.footer-contact-link:hover{color:#60b0ff}
   .nav-links{display:none}
   .nav-hamburger{display:flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0}
   .nav{padding:0 16px;gap:10px}
-  /* .nav-links was the flex:1 spacer that pushed nav-right to the edge on desktop —
-     hidden here, so nav-right needs its own push to stay pinned right. */
   .nav-right{margin-left:auto}
   .nav-logo{cursor:pointer}
   .nav-mobile-menu .nl{min-height:44px;display:flex;align-items:center}
@@ -1337,11 +1315,6 @@ a.footer-contact-link:hover{color:#60b0ff}
   #eqDetailMo .mdl{flex-direction:column!important;width:92vw!important;max-width:92vw!important;max-height:90vh!important}
   #edImgArea{width:100%!important;height:170px!important;flex-shrink:0!important;border-radius:var(--radius-lg) var(--radius-lg) 0 0!important}
 
-  /* Hamburger menu — slide-in drawer with a tap-outside-to-close backdrop,
-     matching the approved mobile design, instead of a dropdown below the nav
-     bar. toggleMobileMenu() still just toggles .open on #navMobileMenu —
-     the only markup change is one wrapping div (.nav-mobile-drawer) around
-     the existing, unchanged nl buttons. */
   .nav-mobile-menu{
     display:flex;position:fixed;inset:0;top:62px;background:rgba(11,26,51,.4);
     align-items:stretch;justify-content:flex-start;
@@ -1361,15 +1334,6 @@ a.footer-contact-link:hover{color:#60b0ff}
   }
   .nav-mobile-menu .nl.on{background:var(--bluelt);color:var(--blue)}
 
-  /* Hero — rebuilt as a compact gradient card matching the approved mobile
-     design, instead of the desktop full-bleed logo+stats split (logo is
-     already shown in the top nav, so it's not repeated here). Same markup,
-     CSS only: hero-left's logo/eyebrow hidden, stats become their own row,
-     hero-right becomes the gradient card. */
-  /* min-height:86vh is a desktop-only full-bleed-image sizing rule that was never reset
-     here — on mobile it forced this much shorter compact-card content to vertically center
-     inside a near-full-screen box (align-items:center, inherited from the desktop rule too),
-     which is what was reading as empty space above and below the cards. */
   .hero{background:linear-gradient(145deg,#ffffff 0%,#eef4ff 55%,#f0f5fb 100%);min-height:auto}
   .hero-inner{display:flex;flex-direction:column;padding:16px}
   .hero-logo-wrap,.hero-left>div:nth-child(2){display:none}
@@ -1404,11 +1368,6 @@ a.footer-contact-link:hover{color:#60b0ff}
   .hbtn.ghost{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.4)}
   .hero-eq-line{display:none}
 
-  /* Equipment tiles — 2-column grid, image-top card kept at every mobile width
-     (replaces the old flip-to-horizontal-list-row treatment). Same markup as
-     desktop, renderGrid()'s JS is untouched — only these values change.
-     Values here match the approved mobile design artifact exactly, not just
-     scaled-down desktop values. */
   .eq-card{border-radius:10px}
   .eq-img{background:linear-gradient(135deg,#0B1A33,#1c2f52)}
   .eq-cat-icon{color:rgba(255,255,255,.35)}
@@ -1428,9 +1387,6 @@ a.footer-contact-link:hover{color:#60b0ff}
   .eq-body{padding:10px 11px 11px}
   .eq-name{font-size:13px;font-weight:700;line-height:1.3;min-height:2.4em;margin-bottom:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .eq-brand{font-size:10.5px;letter-spacing:.04em;margin-bottom:0}
-  /* The artifact groups name+brand+op together, then a divider right before
-     price — the existing .eq-divider sits right after brand instead (fixed
-     markup order), so hide it and put the same rule on .eq-foot instead. */
   .eq-divider{display:none}
   .eq-op{font-size:10px;padding:3px 8px;border-radius:999px;margin:4px 0 0}
   .eq-foot{border-top:1px solid var(--border);margin-top:8px;padding-top:8px}
@@ -1438,15 +1394,6 @@ a.footer-contact-link:hover{color:#60b0ff}
   .eq-rate-sub{font-size:10px;font-weight:600;margin-bottom:0}
   .req-btn{margin-top:8px;padding:9px;font-size:11.5px;min-height:38px}
 
-  /* My Bookings — card layout instead of a horizontally-scrolled 7-column
-     table, via CSS Grid placement of the existing <td>s (filterMyBookings()
-     still targets the same tr[data-search]/data-status rows — no markup
-     restructuring, just how each cell is positioned and styled).
-
-     Status now leads every card as a full-bleed colored header strip (the
-     status <td>, nth-child(5)) instead of a small badge buried after the
-     project/reference — status is what a client said matters most at a
-     glance, so it reads first, before the title. */
   .table-wrap{overflow-x:visible;background:transparent!important;border:none!important}
   .bk-tbl,.bk-tbl thead,.bk-tbl tbody{display:block;width:100%}
   .bk-tbl thead{display:none}
@@ -1460,7 +1407,6 @@ a.footer-contact-link:hover{color:#60b0ff}
   .bk-tbl td{padding:0;border-bottom:none;max-width:none!important}
   .bk-tbl td[data-label]::before{content:none}
 
-  /* Row 1 — status header strip, full bleed, solid color by status */
   .bk-tbl td:nth-child(5){grid-column:1/-1;grid-row:1;padding:9px 15px}
   .bk-tbl td:nth-child(5) .bk-pill{display:flex;width:100%;border-radius:0;background:none!important;color:#fff!important;font-size:12px;letter-spacing:.02em;padding:0}
   .bk-tbl tbody tr.row-confirmed td:nth-child(5){background:var(--blue)}
@@ -1469,27 +1415,22 @@ a.footer-contact-link:hover{color:#60b0ff}
   .bk-tbl tbody tr.row-action td:nth-child(5){background:var(--orange)}
   .bk-tbl tbody tr:not(.row-action):not(.row-pending):not(.row-confirmed):not(.row-completed) td:nth-child(5){background:var(--sub)}
 
-  /* Row 2 — project title leads the body; row 3 — reference, small, secondary */
   .bk-tbl td:nth-child(2){grid-column:1/-1;grid-row:2;padding:13px 15px 0}
   .bk-tbl td:nth-child(2) div:first-child{font-size:16.5px!important;white-space:normal!important}
   .bk-tbl td:nth-child(2) div:last-child{display:none}
   .bk-tbl td:nth-child(1){grid-column:1/-1;grid-row:3;font-size:11.5px!important;color:var(--muted)!important;padding:2px 15px 0}
   .bk-tbl td:nth-child(1) strong{color:var(--muted)!important;font-weight:600!important}
 
-  /* Row 4/5 — meta: dates, then items */
   .bk-tbl td:nth-child(4){grid-column:1/-1;grid-row:4;font-size:12.5px!important;color:var(--sub)!important;padding:10px 15px 0;white-space:normal!important}
   .bk-tbl td:nth-child(3){grid-column:1/-1;grid-row:5;font-size:12.5px!important;padding:2px 15px 0}
 
-  /* Row 6 — divider + price/action footer */
   .bk-tbl td:nth-child(6){grid-column:1;grid-row:6;font-size:15px!important;padding:13px 15px 14px;margin-top:12px;border-top:1px solid var(--border)}
   .bk-tbl td:nth-child(7){grid-column:2;grid-row:6;padding:13px 15px 14px;margin-top:12px;border-top:1px solid var(--border);justify-self:end}
   .bk-cta{min-height:40px;padding:8px 14px}
   #myBkSearch,#myBkStatus{font-size:16px!important;min-height:46px}
 
-  /* Gear-list upload — bigger tap targets */
   .rl-upload-pick,.rl-upload-go{min-height:44px}
 
-  /* Account forms — 16px avoids Safari's auto-zoom-on-focus */
   .acct-input{font-size:16px!important;min-height:44px}
 }
 @media(max-width:420px){
@@ -1497,16 +1438,11 @@ a.footer-contact-link:hover{color:#60b0ff}
   .eq-body{padding:9px 10px 10px}
 }
 
-/* Support chat (client-only, sticky bottom-right) */
 .sup-fab{position:fixed;bottom:22px;right:22px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--blue2));border:none;box-shadow:0 6px 20px rgba(0,96,199,.35),0 2px 6px rgba(0,30,80,.15);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:900;transition:transform .2s,box-shadow .2s}
 .sup-fab:hover{transform:translateY(-2px) scale(1.04);box-shadow:0 10px 26px rgba(0,96,199,.4),0 2px 8px rgba(0,30,80,.18)}
 .sup-fab.rl-hide{display:none}
 .sup-fab svg{width:22px;height:22px;color:#fff}
 .sup-fab-badge{position:absolute;top:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2.5px solid var(--bg)}
-/* pointer-events:none belt-and-suspenders alongside display:none — a couple of mobile
-   browser engines are known to still hit-test a display:none element that has
-   backdrop-filter set, which would silently eat scroll/tap gestures on the page behind
-   it even though nothing is visibly wrong. Re-enabled only once .open is actually applied. */
 .sup-overlay{display:none;pointer-events:none;position:fixed;inset:0;backdrop-filter:blur(6px) saturate(1.05);-webkit-backdrop-filter:blur(6px) saturate(1.05);background:rgba(11,26,51,.14);z-index:950}
 .sup-overlay.open{display:block;pointer-events:auto}
 .sup-panel{position:fixed;bottom:22px;right:22px;width:440px;max-height:min(78vh,660px);background:var(--surface);border-radius:22px;box-shadow:0 24px 64px rgba(2,12,34,.24),0 2px 10px rgba(2,12,34,.08);border:1px solid var(--border);display:none;pointer-events:none;flex-direction:column;overflow:hidden;z-index:960}
@@ -1583,7 +1519,6 @@ a.footer-contact-link:hover{color:#60b0ff}
 </head>
 <body>
 
-<!-- ─── NAV ─── -->
 <nav class="nav">
   <button class="nav-hamburger" onclick="toggleMobileMenu()" title="Menu" aria-label="Menu">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -1633,10 +1568,8 @@ a.footer-contact-link:hover{color:#60b0ff}
   </div>
 </div>
 
-<!-- ════════ HOME ════════ -->
 <div id="pg-home" class="pg on">
 
-  <!-- HERO -->
   <div class="hero">
     <div class="hero-slides">
       <img class="hero-slide on" src="{{ asset('assets/images/hero/hero-1.jpg') }}" alt="">
@@ -1708,7 +1641,6 @@ a.footer-contact-link:hover{color:#60b0ff}
   })();
   </script>
 
-  <!-- HOW IT WORKS -->
   <div class="hiw-section">
     <div class="ccon" style="max-width:1100px">
       <div class="reveal" style="text-align:center;margin-bottom:36px">
@@ -1739,7 +1671,6 @@ a.footer-contact-link:hover{color:#60b0ff}
     </div>
   </div>
 
-  <!-- FEATURED EQUIPMENT -->
   <div class="ccon" style="max-width:1220px;padding-top:48px;padding-bottom:52px">
     <div class="reveal" style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap">
       <div>
@@ -1793,7 +1724,6 @@ a.footer-contact-link:hover{color:#60b0ff}
   </div>
 
   @if ($publicReviews->isNotEmpty())
-  <!-- WHAT OUR CLIENTS SAY -->
   <div class="ccon" style="max-width:1220px;padding-top:8px;padding-bottom:56px">
     <div class="sec-label">Client Feedback</div>
     <div class="sec-title">What Our Clients Say</div>
@@ -1844,7 +1774,6 @@ a.footer-contact-link:hover{color:#60b0ff}
 
 </div>
 
-<!-- ════════ EQUIPMENT PAGE ════════ -->
 <div id="pg-equipment" class="pg">
   <div class="eq-page-header">
     <div class="eq-ph-inner">
@@ -1877,12 +1806,10 @@ a.footer-contact-link:hover{color:#60b0ff}
   </div>
   <div style="max-width:1220px;margin:0 auto;padding:28px 24px 52px">
     <div class="eq-grid" id="eqGrid">
-      <!-- populated by JS -->
     </div>
   </div>
 </div>
 
-<!-- ════════ CREW PAGE ════════ -->
 <div id="pg-crew" class="pg">
   <div class="ccon">
     <div class="sec-title">Crew Information</div>
@@ -1897,7 +1824,6 @@ a.footer-contact-link:hover{color:#60b0ff}
   </div>
 </div>
 
-<!-- ════════ MY BOOKINGS ════════ -->
 @if($isLoggedIn)
 <div id="pg-mybookings" class="pg">
   <div class="ccon">
@@ -2030,7 +1956,6 @@ a.footer-contact-link:hover{color:#60b0ff}
 </div>
 @endif
 
-<!-- ─── REQUEST LIST PANEL ─── -->
 <div class="rl-overlay" id="rlOverlay" onclick="togglePanel()"></div>
 <div class="rl-panel" id="rlPanel">
   <div class="rl-head">
@@ -2076,7 +2001,6 @@ a.footer-contact-link:hover{color:#60b0ff}
   </div>
 </div>
 
-<!-- ════════ HELP / FAQ ════════ -->
 <div id="pg-help" class="pg">
   <div class="ccon">
     <div class="sec-title">Help Center</div>
@@ -2115,7 +2039,6 @@ a.footer-contact-link:hover{color:#60b0ff}
   </div>
 </div>
 
-<!-- ════════ ABOUT ════════ -->
 <style>
 .abt-hero{position:relative;border-radius:20px;overflow:hidden;height:520px;margin:8px 0 60px;box-shadow:0 24px 50px -18px rgba(11,26,51,.3)}
 .abt-hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.4s ease}
@@ -2257,7 +2180,6 @@ a.footer-contact-link:hover{color:#60b0ff}
 })();
 </script>
 
-<!-- ════════ ACCOUNT ════════ -->
 @if($isLoggedIn)
 <div id="pg-account" class="pg">
   <div class="ccon">
@@ -2395,7 +2317,6 @@ a.footer-contact-link:hover{color:#60b0ff}
 </div>
 @endif
 
-<!-- AUTH MODAL -->
 <div class="mo" id="authMo">
   <div class="mdl" style="max-width:360px;text-align:center">
     <div class="mb" style="padding:36px 28px">
@@ -2409,7 +2330,6 @@ a.footer-contact-link:hover{color:#60b0ff}
   </div>
 </div>
 
-<!-- SUCCESS MODAL -->
 <div class="mo" id="successMo">
   <div class="mdl" style="max-width:400px;text-align:center">
     <div class="mb" style="padding:40px 32px">
@@ -2421,7 +2341,6 @@ a.footer-contact-link:hover{color:#60b0ff}
   </div>
 </div>
 
-<!-- ══ EQUIPMENT DETAIL MODAL ══ -->
 <div class="mo" id="eqDetailMo">
   <div class="mdl" style="max-width:880px;width:95vw;max-height:88vh;overflow:hidden;display:flex;flex-direction:row;padding:0;align-items:stretch">
 
@@ -2513,14 +2432,11 @@ a.footer-contact-link:hover{color:#60b0ff}
 
 <div class="toast-w" id="toastW"></div>
 
-<!-- ─── JAVASCRIPT ─── -->
 <script>
 const IS_LOGIN  = {{ $isLoggedIn ? 'true' : 'false' }};
 const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
-// Uploaded equipment/accessory images still live on the legacy app until it's fully retired.
 const ASSET_BASE = "{{ asset('storage') }}";
 
-// All equipment as JS data
 const ALL_EQ = {!! $equipment->map(fn ($e) => [
     'id' => (int) $e->equipment_id,
     'name' => $e->equipment_name,
@@ -2539,7 +2455,6 @@ const ALL_EQ = {!! $equipment->map(fn ($e) => [
 
 const EMOJIS = {};
 
-// All active FAQs as JS data (flattened — category stays on each row)
 const ALL_FAQS = {!! $faqs->flatten(1)->map(fn ($f) => [
     'id' => (int) $f->faq_id,
     'q' => $f->question,
@@ -2550,9 +2465,6 @@ const ALL_FAQS = {!! $faqs->flatten(1)->map(fn ($f) => [
 let reqList = [];
 let panelOpen = false;
 
-// ── Guest draft cart (localStorage) ─────────────────────────
-// Anonymous visitors can build a request list before signing in; it's synced to their
-// real (server-side) cart the moment they land back here logged in — see syncGuestCartOnLogin().
 function loadGuestCart() {
   try { return JSON.parse(localStorage.getItem('fs_guest_cart') || '[]'); } catch (e) { return []; }
 }
@@ -2760,14 +2672,14 @@ function rlChangeQty(cartId, delta) {
 }
 
 function rlChangeAccQty(cartId, accessoryId, delta) {
-  if (!IS_LOGIN) return; // accessories aren't tracked in the guest-mode local cart at all
+  if (!IS_LOGIN) return;
   const item = reqList.find(i => i.item_type === 'equipment' && String(i.cart_id) === String(cartId));
   if (!item) return;
   const target = (item.accessories || []).find(a => parseInt(a.accessory_id) === parseInt(accessoryId));
   if (target) {
     const max = Math.max(1, parseInt(target.available_units ?? target.quantity) || 1);
     const current = parseInt(target.quantity || 1);
-    if (Math.max(1, Math.min(max, current + delta)) === current) return; // already at the cap
+    if (Math.max(1, Math.min(max, current + delta)) === current) return;
   }
   const accessories = (item.accessories || []).map(a => {
     const qty = parseInt(a.quantity || 1);
@@ -2895,7 +2807,6 @@ function bookAgain(bookingId, btn) {
     });
 }
 
-// ── Gear list upload (bulk add) ─────────────────────────────
 const FLAG_REASON_LABEL = {
   not_found: 'Not found in catalog',
   ambiguous: 'Matches multiple items',
@@ -2999,7 +2910,6 @@ function renderFlagged(flagged) {
   box.style.display = 'block';
 }
 
-// ── Drag the handle between the matched items and the flagged/needs-review box ──
 (function () {
   const handle = document.getElementById('rlResizeHandle');
   const box = document.getElementById('rlFlaggedBox');
@@ -3008,7 +2918,7 @@ function renderFlagged(flagged) {
   let dragging = false, startY = 0, startH = 0;
 
   function onMove(clientY) {
-    const delta = startY - clientY; // drag up = taller flagged box, drag down = shorter
+    const delta = startY - clientY;
     const next = Math.max(60, Math.min(startH + delta, 560));
     box.style.maxHeight = next + 'px';
   }
@@ -3088,13 +2998,11 @@ function updateDays(cartId, days) {
   fetch('/cart',{method:'POST',body:fd}).then(()=>loadList());
 }
 
-// ── Navigate to CE preview ──────────────────────────────────
 function goToEstimate() {
   if (!reqList.length) return;
   window.location.href = '/ce-preview';
 }
 
-// ── Favorites ────────────────────────────
 function loadFavorites() {
   if (!IS_LOGIN) return;
   fetch('/favorites?action=get')
@@ -3125,7 +3033,6 @@ function filterCat(id, el) {
 }
 function filterSearch(val) { searchTerm=val.toLowerCase(); renderGrid(); }
 
-// ── FAQ / Help panel ────────────────────────────
 function buildFaqCatPills() {
   const wrap = document.getElementById('faqCatPills');
   if (!wrap) return;
@@ -3239,8 +3146,6 @@ function edChangeQty(delta) {
   edSyncCart();
 }
 
-// Pushes the current quantity + selected accessories to the cart — only meaningful once the
-// equipment is already in the Request List (adding fresh goes through edActionBtn instead).
 function edSyncCart() {
   if (!IS_LOGIN) return;
   const item = reqList.find(i => i.item_type === 'equipment' && parseInt(i.equipment_id) === edCurrentEqId);
@@ -3477,8 +3382,6 @@ function refreshEdActionBtn() {
     btn.style.color      = '#fff';
     btn.style.outline    = 'none';
     btn.disabled         = false;
-    // Accessory selection only sticks server-side once there's a real cart row to attach it to —
-    // guests get the base equipment added now and can pick accessories again after signing in.
     btn.onclick          = () => { toggleEquipment(edCurrentEqId, edQty, IS_LOGIN ? getSelectedAccessories() : undefined); setTimeout(refreshEdActionBtn, 450); };
   }
 }
@@ -3509,8 +3412,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 
-@if($isLoggedIn && false) {{-- temporarily hidden: support chat still buggy --}}
-<!-- Support chat (general, not tied to a specific booking) -->
+@if($isLoggedIn && false)
 <button class="sup-fab" onclick="toggleSupportChat()" aria-label="Message FilmSpec">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/></svg>
   @if ($supportMessages->count() > 0)
@@ -3552,7 +3454,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     $deptInitials = ['staff' => 'FS', 'accounting' => 'AC', 'traffic' => 'TR', 'operations_manager' => 'OM'];
   @endphp
 
-  <!-- DEPARTMENT PICKER -->
   <div class="sup-body sup-dept-list" id="deptPicker">
     @foreach ($chatDepartments as $deptKey => $deptLabel)
     @php
@@ -3572,7 +3473,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     @endforeach
   </div>
 
-  <!-- ONE THREAD + FORM PER DEPARTMENT -->
   @foreach ($chatDepartments as $deptKey => $deptLabel)
   @php
     $deptMsgs = $supportMessages->where('department', $deptKey)->values();
@@ -3767,10 +3667,6 @@ function supDayLabel(dateStr) {
 }
 
 function supBubbleHtml(m, body) {
-  // Each polled-in message renders as its own one-item cluster (rather than merging into
-  // the previous DOM cluster) — keeps this function simple; the only cost is that two
-  // consecutive same-sender messages arriving in one poll show two small timestamp lines
-  // instead of one, which self-corrects on the next full page load.
   var side = m.author_role === 'client' ? 'me' : 'them';
   var text = m.body ? '<span class="sup-bubble-text">' + escapeHtml(m.body.trim()) + '</span>' : '';
   var attach = '';

@@ -36,9 +36,6 @@ h2{font-size:16px;font-weight:700;color:#0B1A33;margin-bottom:6px}
   .otp-row input{width:36px;height:48px;font-size:19px}
 }
 @media(max-width:880px){
-  /* Centering against 100vh traps a focused input under the keyboard once the
-     card is taller than the visible (keyboard-shrunk) viewport — align to the top
-     instead so the page scrolls normally. */
   body{align-items:flex-start}
 }
 </style>

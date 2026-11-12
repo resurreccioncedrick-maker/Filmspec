@@ -30,8 +30,6 @@ class RepairPurchaseController extends Controller
         'completed' => 'Completed', 'cancelled' => 'Cancelled',
     ];
 
-    // The same five statuses, worded the way the team talks about each kind of job (Part 15).
-    // The stored values never change — only how they read.
     private array $statusLabelByType = [
         'repair' => [
             'requested' => 'For repair', 'approved' => 'Approved', 'in_progress' => 'In repair',
@@ -43,7 +41,6 @@ class RepairPurchaseController extends Controller
         ],
     ];
 
-    /** Completed tickets are kept for two years, then cleared — same self-healing sweep as Reminders. */
     private const KEEP_COMPLETED_YEARS = 2;
 
     private array $priorityBadge = ['low' => 'badge-gray', 'normal' => 'badge-blue', 'high' => 'badge-orange', 'urgent' => 'badge-red'];
@@ -55,8 +52,6 @@ class RepairPurchaseController extends Controller
         $canPost = in_array($role, config('filmspec.all_staff'), true);
         $canManage = in_array($role, config('filmspec.manage_roles'), true);
 
-        // Opportunistic retention sweep — no cron needed, same approach as Reminders' 45-day
-        // clear. Completed tickets older than two years go; anything still open is untouched.
         DB::table('repair_purchase_tickets')
             ->where('status', 'completed')
             ->whereNotNull('completed_date')
@@ -121,9 +116,6 @@ class RepairPurchaseController extends Controller
             ->select('equipment_id', 'equipment_name', 'brand', 'serial_number')
             ->get();
 
-        // Powers the New/Edit Ticket modals' Unit select — same cascade IncidentsController's
-        // own incident form already uses, so staff can pin down which physical unit a repair
-        // ticket is for when an equipment model has more than one.
         $equipmentUnitMap = [];
         $unitRows = DB::table('equipment_units')
             ->whereIn('equipment_id', $allEquipment->pluck('equipment_id'))
@@ -133,7 +125,6 @@ class RepairPurchaseController extends Controller
             $equipmentUnitMap[$u->equipment_id][] = ['unit_id' => $u->unit_id, 'asset_tag' => $u->asset_tag];
         }
 
-        // Threads for the tickets on this page only — one query, grouped.
         $messages = $tickets->isEmpty() ? collect() : DB::table('repair_purchase_messages as m')
             ->leftJoin('users as u', 'm.user_id', '=', 'u.user_id')
             ->whereIn('m.ticket_id', $tickets->pluck('ticket_id'))
@@ -158,7 +149,6 @@ class RepairPurchaseController extends Controller
         ]);
     }
 
-    /** Same filters index() applies, shared with export() so the two can never drift apart. */
     private function filteredQuery(Request $request)
     {
         $tab = $request->query('tab', 'all');
@@ -184,7 +174,6 @@ class RepairPurchaseController extends Controller
         return $query;
     }
 
-    /** Export ▾ — reuses filteredQuery() unbounded (no page/perPage) so it always matches what's on screen. */
     private function export(Request $request): StreamedResponse|Response
     {
         $headers = ['Ticket #', 'Type', 'Title', 'Equipment', 'Status', 'Priority', 'Est. Cost', 'Actual Cost', 'Target Date'];
@@ -226,7 +215,6 @@ class RepairPurchaseController extends Controller
         return Storage::disk('local')->response($path);
     }
 
-    /** Same "u<id>" cascade-select convention as IncidentsController::parseUnitInput(). */
     private function parseUnitInput(string $unitInput, int $equipmentId): ?int
     {
         if (! str_starts_with($unitInput, 'u')) {
@@ -240,12 +228,6 @@ class RepairPurchaseController extends Controller
         return null;
     }
 
-    /**
-     * Shared ticket-creation logic — used by the staff `add_ticket` action below AND by
-     * CrewPortalController's `crew_submit_ticket` action (crew submits through the crew portal,
-     * which does its own booking/equipment ownership check before calling this, rather than
-     * duplicating the insert logic itself).
-     */
     public function createTicket(Request $request, int $uid): array
     {
         $type = $request->input('type') === 'purchase' ? 'purchase' : 'repair';
@@ -256,9 +238,6 @@ class RepairPurchaseController extends Controller
         }
 
         $eid = (int) $request->input('equipment_id', 0);
-        // Laravel's ConvertEmptyStringsToNull middleware turns a submitted-but-empty
-        // equipment_unit field into null before it reaches here, so input()'s own default
-        // never kicks in — cast explicitly rather than relying on that default.
         $equipmentUnitId = ($type === 'repair' && $eid) ? $this->parseUnitInput((string) $request->input('equipment_unit', ''), $eid) : null;
 
         $photoUpload = EvidencePhotoUpload::handle($request->file('photo'), 'repair-purchase-photos');
@@ -316,8 +295,6 @@ class RepairPurchaseController extends Controller
             $eid = (int) $request->input('equipment_id', 0);
             $equipmentUnitId = ($type === 'repair' && $eid) ? $this->parseUnitInput((string) $request->input('equipment_unit', ''), $eid) : null;
 
-            // A new photo REPLACES the old one; leaving the field blank on edit keeps whatever
-            // was already there rather than clearing it.
             $updateData = [
                 'type' => $type,
                 'title' => $title,

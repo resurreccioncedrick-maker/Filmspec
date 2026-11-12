@@ -37,12 +37,6 @@ class CartController extends Controller
         };
     }
 
-    /**
-     * Lets the client find out a cart item is unavailable for their chosen shoot dates as soon
-     * as they pick those dates (Step 1), instead of only at final submission — reuses the exact
-     * same EquipmentAvailability::check() the server-side submit already enforces, so the two
-     * can never disagree.
-     */
     private function checkDates(Request $request, int $uid): JsonResponse
     {
         $start = $request->input('shoot_date_start', '');
@@ -106,10 +100,6 @@ class CartController extends Controller
             }
         }
 
-        // Accessories chosen alongside an equipment item are stored in their own table
-        // (booking_cart_accessories), keyed by cart_id — attach them here so the request
-        // list panel can actually show and cost them; previously this endpoint never
-        // returned them at all, so they were saved but invisible in the UI.
         $cartIds = $items->pluck('cart_id')->all();
         $accByCart = [];
         if ($cartIds) {
@@ -118,9 +108,6 @@ class CartController extends Controller
                 ->whereIn('bca.cart_id', $cartIds)
                 ->select('bca.cart_id', 'a.accessory_id', 'a.accessory_name', 'a.daily_rate', 'bca.quantity')
                 ->get();
-            // The request list's quantity stepper needs this to cap itself client-side — same
-            // math CartController's add validation and HomeController's eq_detail branch use,
-            // so the three can never disagree on how many are actually available right now.
             $availByAcc = \App\Support\AccessoryAvailability::bulkAvailable($accRows->pluck('accessory_id')->all());
             foreach ($accRows as $row) {
                 $row->available_units = $availByAcc[$row->accessory_id] ?? 0;
@@ -148,15 +135,6 @@ class CartController extends Controller
             return response()->json(['error' => 'Equipment not found']);
         }
 
-        // Right-now available units (not date-specific — EquipmentAvailability::check() at
-        // final submit is the date-aware authority) — same hybrid used on the catalog/detail
-        // badges, so the cap shown to the client can never disagree with what's enforced here.
-        // This is the sole availability check: the legacy whole-row availability_status column
-        // can go stale for unit-tracked gear (e.g. stuck on "rented" while individual units have
-        // since come back to "available"), which previously made the catalog badge promise N
-        // available while this blocked the add outright — the per-unit count below is always the
-        // real, current answer, and already falls back to availability_status for gear with no
-        // individual units tracked.
         $unitCount = (int) DB::table('equipment_units')->where('equipment_id', $eid)->where('status', '!=', 'retired')->count();
         $availableUnits = $unitCount > 0
             ? (int) DB::table('equipment_units')->where('equipment_id', $eid)->whereIn('status', ['available', 'allocated'])->count()
@@ -168,12 +146,6 @@ class CartController extends Controller
             return response()->json(['error' => "Only $availableUnits unit(s) of this equipment are available right now."]);
         }
 
-        // Only accessory_id/quantity are ever trusted from the client — name/price are
-        // client-supplied in the raw payload but must never be persisted from here;
-        // submitBooking() re-derives both from the accessories table at insert time, so storing
-        // them here would be pointless (and previously let a tampered daily_rate ride all the
-        // way into the final cost estimate). Each accessory's quantity is clamped to what's
-        // actually available right now, same math the Optional Add-Ons list itself shows.
         $accRaw = trim($request->input('accessories_json', ''));
         $validAcc = [];
         if ($accRaw) {
@@ -192,7 +164,7 @@ class CartController extends Controller
                     foreach ($existingIds as $accId) {
                         $cap = $availByAcc[$accId] ?? 0;
                         if ($cap <= 0) {
-                            continue; // nothing left — silently dropped, same as an unselected checkbox
+                            continue;
                         }
                         $validAcc[$accId] = min($reqByAccId[$accId], $cap);
                     }
@@ -209,8 +181,6 @@ class CartController extends Controller
             $cartId = DB::getPdo()->lastInsertId();
         }
 
-        // Always replace with the server-validated set for this cart row, same as the old
-        // accessories_json column did on every add/update.
         DB::table('booking_cart_accessories')->where('cart_id', $cartId)->delete();
         if ($validAcc) {
             DB::table('booking_cart_accessories')->insert(array_map(
@@ -265,13 +235,6 @@ class CartController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    /**
-     * "Book Again" (Part 11) — not a full re-run of the admin's duplicate-booking flow (that
-     * also copies specific crew members, which clients never pick directly). Just bulk-adds a
-     * past completed booking's still-available equipment into the client's cart; days default
-     * to 1 since the client hasn't chosen new shoot dates yet — they set those during the normal
-     * checkout flow same as any other cart submission.
-     */
     private function copyFromBooking(Request $request, int $uid): JsonResponse
     {
         $bookingId = (int) $request->input('booking_id', 0);
@@ -321,12 +284,6 @@ class CartController extends Controller
             return response()->json(['error' => 'This booking had no equipment to copy.']);
         }
 
-        // The original booking's accessory add-ons (booking_accessories) are never tied back
-        // to a specific equipment line once a booking is submitted — only to the booking as a
-        // whole — so there's no equipment line to faithfully re-attach each one to. Re-cart
-        // them all against the first copied line so they actually reappear in the Request
-        // List instead of being silently dropped, which is what made "Book Again" look like
-        // it wasn't reproducing the same list.
         if ($copied && $firstCartId) {
             $origAccRows = DB::table('booking_accessories')->where('booking_id', $bookingId)
                 ->select('accessory_id', 'quantity')->get()->unique('accessory_id');
@@ -348,13 +305,7 @@ class CartController extends Controller
         return response()->json(['ok' => true, 'copied' => $copied, 'skipped' => $skipped]);
     }
 
-    /**
-     * Bulk-add from an uploaded gear list (Word/Excel/CSV) — the same "loop lines, skip what
-     * doesn't qualify, upsert the rest" shape as copyFromBooking() above, except the lines
-     * come from a client-authored file instead of a past booking, and misses are reported
-     * back (never silently dropped) via the `flagged` array.
-     */
-    private const GEAR_LIST_MAX_SIZE_KB = 2048; // 2MB — these are text lists, not media
+    private const GEAR_LIST_MAX_SIZE_KB = 2048;
 
     private const GEAR_LIST_ALLOWED_EXT = ['csv', 'txt', 'xlsx', 'xls', 'doc', 'docx'];
 
@@ -435,26 +386,8 @@ class CartController extends Controller
         return response()->json(['ok' => true, 'added' => $added, 'flagged' => $flagged, 'truncated' => $parsed['truncated']]);
     }
 
-    /**
-     * A gear-list line is a descriptive phrase ("Sony FX3 and lens set, tripods"), not a short
-     * search query — so unlike the catalog's own search (EquipmentController::index(), which
-     * checks "does equipment_name contain what the user typed"), this checks the other
-     * direction: "does the line contain a real equipment_name/brand/model/serial_number as a
-     * substring". A NULL brand/model naturally never matches (CONCAT with NULL is NULL in
-     * MySQL), so this is safe against nullable columns without extra guards.
-     */
-    /**
-     * Tiered so a weak signal (brand alone) never dilutes a strong one: "Arri Amira" should
-     * resolve uniquely via brand+model ("Arri" + "Amira"), not come back ambiguous across every
-     * other "Arri ..." camera package just because they all share the same brand.
-     *
-     * CHAR_LENGTH guards matter here: a stray one/two-letter brand or model value (bad data,
-     * but real data is never guaranteed clean) would otherwise substring-match almost any line
-     * of text and silently poison the results.
-     */
     private function findMatchingEquipment(string $text): Collection
     {
-        // Tier 1: the full equipment_name appears in the line — the strongest signal.
         $exact = DB::table('equipment')
             ->where('availability_status', '!=', 'retired')
             ->whereRaw('CHAR_LENGTH(equipment_name) >= 3 AND ? LIKE CONCAT(\'%\', equipment_name, \'%\')', [$text])
@@ -463,8 +396,6 @@ class CartController extends Controller
             return $exact;
         }
 
-        // Tier 2: both brand and model appear in the line — specific enough to disambiguate
-        // between several products from the same brand.
         $brandModel = DB::table('equipment')
             ->where('availability_status', '!=', 'retired')
             ->whereRaw('CHAR_LENGTH(brand) >= 3 AND ? LIKE CONCAT(\'%\', brand, \'%\')', [$text])
@@ -474,7 +405,6 @@ class CartController extends Controller
             return $brandModel;
         }
 
-        // Tier 3: fall back to any single weak signal (brand, model, or serial alone).
         return DB::table('equipment')
             ->where('availability_status', '!=', 'retired')
             ->where(function ($w) use ($text) {
@@ -517,7 +447,6 @@ class CartController extends Controller
             $zoneMultMap = ['manila' => 1.0, 'luzon' => 1.5, 'luzon_far' => 2.0];
             $multiplier = $zoneMultMap[$zone] ?? 1.0;
 
-            // Client bookings: no transport cost yet (admin assigns later)
             $latSql = ($lat != 0 || $lng != 0) ? $lat : null;
             $lngSql = ($lat != 0 || $lng != 0) ? $lng : null;
 
@@ -537,11 +466,6 @@ class CartController extends Controller
 
             $numDays = max(1, (int) (new \DateTime($dateStart))->diff(new \DateTime($dateEnd))->days + 1);
 
-            // Re-check each equipment item against the client's chosen shoot dates — addEquipment()
-            // only verified availability_status at add-to-cart time (before dates were even picked),
-            // which says nothing about another booking already holding this equipment on an
-            // overlapping date range. Same overlap logic BookingDetailController/FieldRequestsController
-            // use for staff-side equipment assignment (App\Support\EquipmentAvailability).
             $dateCheckBooking = (object) ['shoot_date_start' => $dateStart, 'shoot_date_end' => $dateEnd];
             foreach ($items as $it) {
                 if ($it->item_type === 'equipment' && $it->equipment_id) {
@@ -552,13 +476,6 @@ class CartController extends Controller
                 }
             }
 
-            // Everything from here on writes real booking data across several tables — wrapped
-            // in a transaction so a failure partway through (e.g. the equipment-unit allocator,
-            // or any other step) can never leave a half-created booking visible to the admin
-            // queue while the client sees an error and retries, creating a duplicate. Confirmed
-            // this exact failure mode happened for real: a migration gap mid-deploy threw from
-            // inside this method after the booking row had already committed, and the client's
-            // retry produced two near-identical "Pending Approval" bookings for the same project.
             DB::beginTransaction();
 
             $year = date('Y');
@@ -585,13 +502,6 @@ class CartController extends Controller
                 'transport_multiplier' => 1.00,
                 'location_lat' => $latSql,
                 'location_lng' => $lngSql,
-                // approval_status defaults to 'approved' at the DB level (matches the
-                // staff-side auto-approve path) — client self-service submissions must
-                // never skip review, so this is set explicitly, same as a traffic-created
-                // booking. Without it, every client-submitted booking silently bypassed
-                // the approval queue (confirmed: defaulted to 'approved', so it never
-                // appeared under Bookings > Awaiting Review despite the confirmation
-                // screen telling the client "Pending admin approval").
                 'approval_status' => 'pending_approval',
             ]);
 
@@ -612,22 +522,14 @@ class CartController extends Controller
                     $rate = (float) $it->daily_rate;
                     $sub = $it->quantity * $numDays * $rate;
                     $equipTotal += $sub;
-                    // subtotal is a STORED GENERATED column (quantity*days*daily_rate) — must not be set explicitly
                     $bkEquipId = DB::table('booking_equipment')->insertGetId([
                         'booking_id' => $bid, 'equipment_id' => $it->equipment_id, 'quantity' => $it->quantity,
                         'days' => $numDays, 'daily_rate' => $rate,
                     ], 'bk_equip_id');
-                    // Allocated right at booking creation, not only at Equipment Checklist
-                    // check-out time — the client never sees which unit, this just reserves
-                    // real inventory immediately so staff/incident-report pages already know
-                    // which physical unit(s) are on this booking from the start.
                     \App\Support\EquipmentUnitAllocator::allocate($bkEquipId, $it->equipment_id, (int) $it->quantity);
 
                     $cartAccRows = DB::table('booking_cart_accessories')->where('cart_id', $it->cart_id)->get();
                     if ($cartAccRows->isNotEmpty()) {
-                        // Price and name always come from the accessories table, never from
-                        // the client-supplied JSON — see addEquipment()'s comment. Quantity comes
-                        // from the cart row, already clamped to availability at add-to-cart time.
                         $realAccessories = DB::table('accessories')->whereIn('accessory_id', $cartAccRows->pluck('accessory_id'))->get()->keyBy('accessory_id');
                         foreach ($cartAccRows as $cartAcc) {
                             $real = $realAccessories->get($cartAcc->accessory_id);
@@ -650,13 +552,10 @@ class CartController extends Controller
                         }
                     }
                 }
-                // Crew items from cart are intentionally skipped — admin assigns crew
             }
 
             $ceRef = 'CE-' . $year . '-' . str_pad($bid, 4, '0', STR_PAD_LEFT);
             $grandForCe = $equipTotal + $accTotal;
-            // Same VAT-inclusive extraction as BookingCosting::extractVat() — via the configurable
-            // rate, not a hardcoded 12/112, so this stays correct if filmspec.vat_rate ever changes.
             $vatRate = (float) config('filmspec.vat_rate');
             $vat = round($grandForCe * $vatRate / (1 + $vatRate), 2);
             $netEx = $grandForCe - $vat;

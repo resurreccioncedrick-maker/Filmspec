@@ -1,5 +1,3 @@
-{{-- "Access log — last 7 days" collapsible (Part 16). Reads the login/logout entries
-     activity_logs already records under module 'auth'. Expects $accessLog. --}}
 <details style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
   <summary style="font-size:12px;color:var(--muted);cursor:pointer;display:flex;justify-content:space-between">
     <span>Access log ({{ $accessLog->count() }})</span>
