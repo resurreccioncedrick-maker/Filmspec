@@ -484,7 +484,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <div style="font-size:11.5px;color:var(--muted);margin-bottom:12px">Equipment cost only — crew TF and transportation will be determined by admin after booking confirmation.</div>
     <div class="agree-wrap">
       <label class="agree-row">
-        <input type="checkbox" id="chkBookingTerms" onchange="updateSubmitBtn()">
+        <input type="checkbox" id="chkBookingTerms" onchange="onBookingTermsChange(event)">
         <span>I have reviewed and agree to FilmSpec's <button class="agree-link" onclick="openDocMo('tcMo')">Booking Terms &amp; Conditions</button> <span style="font-size:11px;color:var(--muted);font-weight:400">(includes the <button class="agree-link" onclick="openDocMo('ppMo')" style="font-size:inherit;font-weight:400;color:var(--muted);text-decoration:underline">Privacy Policy</button>)</span></span>
       </label>
     </div>
@@ -1494,7 +1494,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <h3>Booking Terms &amp; Conditions</h3>
       <button class="doc-close" onclick="closeDocMo('tcMo')">&times;</button>
     </div>
-    <div class="doc-body">
+    <div class="doc-body" id="tcScrollBody" onscroll="checkTcScrolled()">
       <p>These Terms and Conditions govern your use of FilmSpec's equipment and crew rental services. By submitting a booking request, you confirm that you have read, understood, and agree to be bound by these terms.</p>
 
       <h4>1. Booking and Confirmation</h4>
@@ -1548,7 +1548,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <p>FilmSpec reserves the right to update these Terms and Conditions at any time. Clients will be notified of material changes. Continued use of FilmSpec services following notification constitutes acceptance of the updated terms.</p>
     </div>
     <div class="doc-foot">
-      <button class="doc-accept-btn" onclick="acceptDoc('tcMo','chkBookingTerms')">I Agree &amp; Close</button>
+      <span id="tcScrollHint" style="margin-right:auto;align-self:center;font-size:11.5px;color:var(--muted)">Scroll to the end to continue</span>
+      <button class="doc-accept-btn" id="tcAgreeBtn" disabled style="opacity:.5;cursor:not-allowed" onclick="tcRead=true;acceptDoc('tcMo','chkBookingTerms')">I Agree &amp; Close</button>
     </div>
   </div>
 </div>
@@ -1621,7 +1622,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       Tel: +632 70004683 · Cel: +63927 5056461</p>
     </div>
     <div class="doc-foot">
-      <button class="doc-accept-btn" onclick="acceptDoc('ppMo','chkBookingTerms')">I Agree &amp; Close</button>
+      <button class="doc-accept-btn" onclick="closeDocMo('ppMo'); if (!tcRead) openDocMo('tcMo');">Close</button>
     </div>
   </div>
 </div>
@@ -1647,6 +1648,26 @@ function showSheet(id, el) {
 
 function openDocMo(id) {
     document.getElementById(id).classList.add('on');
+    // Short screens may not need scrolling at all — check once the modal is laid out.
+    if (id === 'tcMo') setTimeout(checkTcScrolled, 50);
+}
+// Same read-first rule as the signup Terms on the login page: the box can only be ticked after
+// the Terms have been scrolled through and accepted via the modal's own "I Agree" button.
+let tcRead = false;
+function checkTcScrolled() {
+    const body = document.getElementById('tcScrollBody');
+    if (!body || body.scrollTop + body.clientHeight < body.scrollHeight - 4) return;
+    const btn = document.getElementById('tcAgreeBtn');
+    btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = 'pointer';
+    const hint = document.getElementById('tcScrollHint');
+    if (hint) hint.style.display = 'none';
+}
+function onBookingTermsChange(e) {
+    if (e.target.checked && !tcRead) {
+        e.target.checked = false;
+        openDocMo('tcMo');
+    }
+    updateSubmitBtn();
 }
 function closeDocMo(id) {
     document.getElementById(id).classList.remove('on');
